@@ -47,6 +47,9 @@ export * from './kds';
 export * from './notifications';
 export * from './employees';
 export * from './settings';
+export * from './capabilities';
+export * from './feature-control';
+export * from './location';
 
 // Modules with classes or constants (explicit values)
 export type { 
@@ -57,6 +60,8 @@ export type {
   OrderResponseDTO,
   OrderItemResponseDTO,
   OrderTimelineEntryDTO,
+  PixPaymentDTO,
+  PreferencePaymentDTO,
   FulfillmentType,
   OrderStatus,
   OrderLineType,

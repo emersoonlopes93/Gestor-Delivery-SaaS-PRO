@@ -11,6 +11,10 @@ export interface TenantRole {
   description?: string;
   isSystem: boolean;
   permissions: string[];
+  protected?: boolean;
+  assignable?: boolean;
+  requiresStrongConfirmation?: boolean;
+  suggestedForNewUsers?: boolean;
 }
 
 /** Role for admin users */

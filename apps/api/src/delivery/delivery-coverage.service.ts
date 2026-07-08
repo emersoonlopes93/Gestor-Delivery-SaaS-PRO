@@ -1,10 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import type { DeliveryCoverageConfig, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { LocationProviderService } from '../location/location-provider.service';
 
 @Injectable()
 export class DeliveryCoverageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly locationProviderService: LocationProviderService,
+  ) {}
 
   async getCoverageConfig(tenantId: string): Promise<DeliveryCoverageConfig | null> {
     return this.prisma.deliveryCoverageConfig.findUnique({
@@ -25,6 +29,10 @@ export class DeliveryCoverageService {
       isDeliveryEnabled?: boolean;
     },
   ): Promise<DeliveryCoverageConfig> {
+    if (!this.locationProviderService.validateCoordinates(data.storeLat, data.storeLng)) {
+      throw new BadRequestException('Coordenadas da loja invalidas. Revise o endereco antes de salvar.');
+    }
+
     const payload: Prisma.DeliveryCoverageConfigUncheckedCreateInput = {
       tenantId,
       storeLat: data.storeLat,

@@ -299,9 +299,8 @@ export function Step6Rules({ onNext, onPrev, onMarkValid }: Step6Props) {
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
           <p className="text-xs leading-relaxed text-indigo-700 dark:text-indigo-300">
-            Entrega continua sendo configurada pelo passo de localizacao e cobertura. Aqui nos
-            concentramos em retirada, agendamento e no que a vitrine publica pode prometer com
-            seguranca.
+            A entrega por raio ja foi configurada no passo anterior. Aqui nos concentramos em
+            retirada, agendamento e no que a vitrine publica pode prometer com seguranca.
           </p>
         </div>
       </div>
@@ -316,7 +315,7 @@ export function Step6Rules({ onNext, onPrev, onMarkValid }: Step6Props) {
           }
           enabled={deliveryEnabled}
           disabled
-          badge={deliveryEnabled ? 'Configurado' : 'Configure no passo de localizacao'}
+          badge={deliveryEnabled ? 'Configurado' : 'Configure no passo de entrega'}
           icon={MapPin}
         />
 

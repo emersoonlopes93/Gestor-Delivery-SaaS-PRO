@@ -12,6 +12,7 @@ import {
   normalizeStorefrontLayout
 } from '@gestor/theme';
 import { StorefrontCustomizationPayload } from '@gestor/types';
+import { ensureDefaultTenantRoles } from './default-tenant-roles';
 
 @Injectable()
 export class TenantService {
@@ -405,36 +406,13 @@ export class TenantService {
         },
       });
 
-      let ownerRole = await tx.tenantRole.findFirst({
+      await ensureDefaultTenantRoles(tx, createdTenant.id);
+      const ownerRole = await tx.tenantRole.findFirstOrThrow({
         where: {
           tenantId: createdTenant.id,
           slug: TenantDefaultRole.TENANT_OWNER,
         },
       });
-
-      if (!ownerRole) {
-        ownerRole = await tx.tenantRole.create({
-          data: {
-            tenantId: createdTenant.id,
-            name: 'Dono',
-            slug: TenantDefaultRole.TENANT_OWNER,
-            isSystem: true,
-          },
-        });
-
-        const allPermissions = await tx.tenantPermission.findMany({
-          select: { id: true },
-        });
-
-        if (allPermissions.length > 0) {
-          await tx.tenantRolePermission.createMany({
-            data: allPermissions.map((permission) => ({
-              roleId: ownerRole.id,
-              permissionId: permission.id,
-            })),
-          });
-        }
-      }
 
       await tx.tenantUserRole.create({
         data: {

@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { TenantUserService } from './tenant-user.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
-import { CurrentTenant, RequirePermissions } from '../common/decorators';
+import { CurrentTenant, CurrentUser, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
 import { UpdateTenantUserDto } from './dto/update-tenant-user.dto';
@@ -39,27 +39,33 @@ export class TenantUserController {
   }
 
   @Post()
-  @RequirePermissions('users.create')
+  @RequirePermissions('users.create', 'users.roles')
   async create(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') actorUserId: string,
     @Body() dto: CreateTenantUserDto,
   ) {
-    return this.tenantUserService.create(tenantId, dto);
+    return this.tenantUserService.createWithActor(tenantId, dto, actorUserId);
   }
 
   @Patch(':id')
-  @RequirePermissions('users.update')
+  @RequirePermissions('users.update', 'users.roles')
   async update(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') actorUserId: string,
     @Param('id') id: string,
     @Body() dto: UpdateTenantUserDto,
   ) {
-    return this.tenantUserService.update(tenantId, id, dto);
+    return this.tenantUserService.updateWithActor(tenantId, id, dto, actorUserId);
   }
 
   @Delete(':id')
   @RequirePermissions('users.delete')
-  async remove(@CurrentTenant() tenantId: string, @Param('id') id: string) {
-    return this.tenantUserService.delete(tenantId, id);
+  async remove(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id') id: string,
+  ) {
+    return this.tenantUserService.deleteWithActor(tenantId, id, actorUserId);
   }
 }

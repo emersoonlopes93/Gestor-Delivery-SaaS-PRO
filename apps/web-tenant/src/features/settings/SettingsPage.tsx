@@ -27,26 +27,10 @@ import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 import { CurrencyInput } from '@gestor/ui';
 
-async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-    const response = await fetch(url, {
-      headers: {
-        'Accept-Language': 'pt-BR',
-        'User-Agent': 'PedeHub-App',
-      },
-    });
-    const data = await response.json();
-    if (data && data.length > 0) {
-      return {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-      };
-    }
-  } catch (err) {
-    console.error('Nominatim geocoding error:', err);
-  }
-  return null;
+interface BackendGeocodeResponse {
+  provider?: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 const DAY_NAMES = [
@@ -184,8 +168,12 @@ export function SettingsPage() {
       // Geocodifica para garantir a localização correta do tenant
       if (settings.street && settings.number && settings.city) {
         const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
-        const coords = await geocodeNominatim(addressStr);
-        if (coords) {
+        const geocodeResponse = await api.post<BackendGeocodeResponse>('/delivery/coverage/geocode', {
+          query: addressStr,
+          source: 'settings',
+        });
+        const coords = geocodeResponse.success ? geocodeResponse.data : null;
+        if (coords?.lat != null && coords?.lng != null) {
           lat = coords.lat;
           lng = coords.lng;
         } else {

@@ -69,6 +69,7 @@ export class PrismaService
         'BaseMenuTemplateVersion',
         'BaseMenuCategory',
         'BaseMenuProduct',
+        'FeatureGlobalSetting',
       ];
 
       const model = params.model ?? '';
@@ -82,6 +83,50 @@ export class PrismaService
         typeof value === 'object' && value !== null;
 
       const ensureRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
+      const prismaFilterKeys = [
+        'equals',
+        'in',
+        'not',
+        'notIn',
+        'lt',
+        'lte',
+        'gt',
+        'gte',
+        'contains',
+        'startsWith',
+        'endsWith',
+        'mode',
+      ];
+
+      const flattenCompoundWhere = (where: Record<string, unknown>) => {
+        for (const key of Object.keys(where)) {
+          const val = where[key];
+          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
+            const valKeys = Object.keys(val);
+            const isPrismaFilter = valKeys.some((filterKey) => prismaFilterKeys.includes(filterKey));
+            if (!isPrismaFilter) {
+              Object.assign(where, val);
+              delete where[key];
+            }
+          }
+        }
+      };
+
+      const preserveTenantCompoundWhere = (where: Record<string, unknown>) => {
+        const compoundKeys = Object.keys(where).filter((key) => key.startsWith('tenantId_'));
+
+        for (const compoundKey of compoundKeys) {
+          const compoundValue = where[compoundKey];
+          if (!isRecord(compoundValue) || Array.isArray(compoundValue)) {
+            continue;
+          }
+
+          where[compoundKey] = {
+            tenantId,
+            ...compoundValue,
+          };
+        }
+      };
 
       const argsRecord = ensureRecord(params.args);
 
@@ -97,19 +142,7 @@ export class PrismaService
         ].includes(params.action)
       ) {
         const where = ensureRecord(argsRecord.where);
-        
-        // Achata chaves compostas no where (ex: tenantId_phone: { tenantId, phone } -> { tenantId, phone })
-        for (const key of Object.keys(where)) {
-          const val = where[key];
-          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
-            const valKeys = Object.keys(val);
-            const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
-            if (!isPrismaFilter) {
-              Object.assign(where, val);
-              delete where[key];
-            }
-          }
-        }
+        flattenCompoundWhere(where);
 
         argsRecord.where = { ...where, tenantId };
 
@@ -122,21 +155,10 @@ export class PrismaService
       // Write operations (where-based)
       else if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
         const where = ensureRecord(argsRecord.where);
+        preserveTenantCompoundWhere(where);
 
-        // Achata chaves compostas no where para operações de escrita também
-        for (const key of Object.keys(where)) {
-          const val = where[key];
-          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
-            const valKeys = Object.keys(val);
-            const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
-            if (!isPrismaFilter) {
-              Object.assign(where, val);
-              delete where[key];
-            }
-          }
-        }
-
-        argsRecord.where = { ...where, tenantId };
+        const hasTenantCompoundWhere = Object.keys(where).some((key) => key.startsWith('tenantId_'));
+        argsRecord.where = hasTenantCompoundWhere ? where : { ...where, tenantId };
       }
 
       // Creation

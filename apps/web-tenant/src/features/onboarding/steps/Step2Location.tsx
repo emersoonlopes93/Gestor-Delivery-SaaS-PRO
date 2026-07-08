@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, MapPin, Navigation, CircleDot, Route, Map, Info } from 'lucide-react';
-import { CurrencyInput } from '@gestor/ui';
+import { Loader2, MapPin, Navigation } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { AddressSearchInput } from '../components/AddressSearchInput';
 import { fetchAddressByCep, isValidCoordinatePair, maskCEP, unmask } from '@gestor/utils';
@@ -36,18 +35,8 @@ interface TenantMeResponse {
   settings?: TenantSettingsPayload | null;
 }
 
-interface DeliveryCoverageConfigSnapshot {
-  storeLat: number;
-  storeLng: number;
-  maxRadiusKm: number | string;
-  defaultPricePerKm: number | string;
-  minimumFee?: number | string | null;
-  maximumFee?: number | string | null;
-  defaultEstimatedDeliveryMinutes?: number | null;
-  isDeliveryEnabled?: boolean;
-}
-
 interface GeocodeResult {
+  provider?: string | null;
   lat: number | null;
   lng: number | null;
 }
@@ -57,16 +46,6 @@ interface Step2Props {
   onPrev: () => void;
   onMarkValid: (valid: boolean) => void;
 }
-
-type DeliveryMethod = 'radius';
-
-type RadiusDeliveryDraft = {
-  maxRadiusKm: number;
-  minimumFee: number;
-  defaultPricePerKm: number;
-  maximumFee: number | null;
-  defaultEstimatedDeliveryMinutes: number;
-};
 
 const EMPTY_FORM: Step2Data = {
   searchQuery: '',
@@ -80,14 +59,6 @@ const EMPTY_FORM: Step2Data = {
   country: 'Brasil',
   lat: null,
   lng: null,
-};
-
-const DEFAULT_RADIUS_DRAFT: RadiusDeliveryDraft = {
-  maxRadiusKm: 5,
-  minimumFee: 5,
-  defaultPricePerKm: 1.5,
-  maximumFee: null,
-  defaultEstimatedDeliveryMinutes: 30,
 };
 
 function hasRequiredAddressFields(form: Step2Data) {
@@ -146,102 +117,6 @@ function buildSearchQueryFromSettings(settings?: TenantSettingsPayload | null) {
     .join(', ');
 }
 
-function toNumberOrNull(value: number | string | null | undefined): number | null {
-  if (value == null || value === '') return null;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function buildRadiusDraft(config?: DeliveryCoverageConfigSnapshot | null): RadiusDeliveryDraft {
-  return {
-    maxRadiusKm: toNumberOrNull(config?.maxRadiusKm) ?? DEFAULT_RADIUS_DRAFT.maxRadiusKm,
-    minimumFee: toNumberOrNull(config?.minimumFee) ?? DEFAULT_RADIUS_DRAFT.minimumFee,
-    defaultPricePerKm: toNumberOrNull(config?.defaultPricePerKm) ?? DEFAULT_RADIUS_DRAFT.defaultPricePerKm,
-    maximumFee: toNumberOrNull(config?.maximumFee),
-    defaultEstimatedDeliveryMinutes:
-      config?.defaultEstimatedDeliveryMinutes ?? DEFAULT_RADIUS_DRAFT.defaultEstimatedDeliveryMinutes,
-  };
-}
-
-function isRadiusDraftValid(draft: RadiusDeliveryDraft) {
-  if (!(draft.maxRadiusKm > 0)) return false;
-  if (draft.minimumFee < 0) return false;
-  if (draft.defaultPricePerKm < 0) return false;
-  if (draft.maximumFee != null && draft.maximumFee < draft.minimumFee) return false;
-  if (!(draft.defaultEstimatedDeliveryMinutes > 0)) return false;
-  return true;
-}
-
-function radiusDraftError(draft: RadiusDeliveryDraft) {
-  if (!(draft.maxRadiusKm > 0)) return 'Informe um raio maior que zero.';
-  if (draft.minimumFee < 0) return 'A taxa minima nao pode ser negativa.';
-  if (draft.defaultPricePerKm < 0) return 'O preco por km nao pode ser negativo.';
-  if (draft.maximumFee != null && draft.maximumFee < draft.minimumFee) {
-    return 'A taxa maxima deve ser maior ou igual a taxa minima.';
-  }
-  if (!(draft.defaultEstimatedDeliveryMinutes > 0)) {
-    return 'Informe um tempo estimado padrao maior que zero.';
-  }
-  return null;
-}
-
-function DeliveryChoiceCard(props: {
-  title: string;
-  description: string;
-  icon: React.FC<{ className?: string }>;
-  active?: boolean;
-  disabled?: boolean;
-  badge?: string;
-  onClick?: () => void;
-}) {
-  const Icon = props.icon;
-
-  return (
-    <button
-      type="button"
-      disabled={props.disabled}
-      onClick={props.onClick}
-      className={`w-full rounded-3xl border p-4 text-left transition ${
-        props.active
-          ? 'border-emerald-300 bg-emerald-50 shadow-sm dark:border-emerald-700 dark:bg-emerald-900/20'
-          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'
-      } ${props.disabled ? 'cursor-not-allowed opacity-70' : ''}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex gap-3">
-          <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-              props.active
-                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300'
-                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-black text-slate-900 dark:text-white">{props.title}</h3>
-              {props.badge ? (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  {props.badge}
-                </span>
-              ) : null}
-            </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{props.description}</p>
-          </div>
-        </div>
-        <div
-          className={`mt-1 h-4 w-4 rounded-full border-2 ${
-            props.active
-              ? 'border-emerald-500 bg-emerald-500'
-              : 'border-slate-300 bg-transparent dark:border-slate-600'
-          }`}
-        />
-      </div>
-    </button>
-  );
-}
-
 export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
   const [form, setForm] = useState<Step2Data>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
@@ -251,11 +126,6 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
   const [manualMode, setManualMode] = useState(false);
   const [coordinatesDirty, setCoordinatesDirty] = useState(false);
   const [addressNotice, setAddressNotice] = useState<string | null>(null);
-  const [coverageConfig, setCoverageConfig] = useState<DeliveryCoverageConfigSnapshot | null>(null);
-  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('radius');
-  const [radiusDraft, setRadiusDraft] = useState<RadiusDeliveryDraft>(DEFAULT_RADIUS_DRAFT);
-  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const detailsRef = useRef<HTMLDivElement | null>(null);
   const geocodeRequestRef = useRef(0);
 
@@ -284,13 +154,9 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     setLoading(true);
 
     try {
-      const [tenantRes, coverageRes] = await Promise.all([
-        api.get<TenantMeResponse>('/tenant/me'),
-        api.get<DeliveryCoverageConfigSnapshot | null>('/delivery/coverage').catch(() => null),
-      ]);
-
+      const tenantRes = await api.get<TenantMeResponse>('/tenant/me');
       const settings = tenantRes.data?.settings;
-      const loadedCoverage = coverageRes?.data ?? null;
+
       const nextForm: Step2Data = {
         searchQuery: buildSearchQueryFromSettings(settings),
         zipCode: settings?.zipCode || '',
@@ -306,14 +172,9 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
       };
 
       setForm(nextForm);
-      setCoverageConfig(loadedCoverage);
-      setDeliveryEnabled(Boolean(loadedCoverage?.isDeliveryEnabled));
-      setRadiusDraft(buildRadiusDraft(loadedCoverage));
-      setDeliveryMethod('radius');
       setShowDetails(Boolean(nextForm.street || nextForm.city || nextForm.zipCode));
       setManualMode(Boolean(nextForm.street || nextForm.city || nextForm.zipCode));
       setCoordinatesDirty(false);
-      setDeliveryError(null);
       setAddressNotice(
         hasRealCoordinates(nextForm.lat, nextForm.lng)
           ? 'Endereco carregado com coordenadas validas.'
@@ -336,6 +197,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     try {
       const response = await api.post<GeocodeResult>('/delivery/coverage/geocode', {
         query: buildFullAddress(form),
+        source: 'onboarding',
       });
 
       if (geocodeRequestRef.current !== currentRequest) return;
@@ -459,16 +321,6 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
   const handleNext = () => {
     if (!isAddressStepValid(form)) return;
 
-    if (deliveryEnabled) {
-      const error = radiusDraftError(radiusDraft);
-      if (error) {
-        setDeliveryError(error);
-        return;
-      }
-    }
-
-    setDeliveryError(null);
-
     onNext(async () => {
       const finalLat = hasRealCoordinates(form.lat, form.lng) ? form.lat : null;
       const finalLng = hasRealCoordinates(form.lat, form.lng) ? form.lng : null;
@@ -485,41 +337,6 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         lat: finalLat,
         lng: finalLng,
       });
-
-      if (finalLat === null || finalLng === null) {
-        await api.patch('/tenant/onboarding-step', { step: 'delivery', completed: false });
-        return;
-      }
-
-      if (deliveryEnabled && deliveryMethod === 'radius') {
-        await api.put('/delivery/coverage', {
-          storeLat: finalLat,
-          storeLng: finalLng,
-          maxRadiusKm: radiusDraft.maxRadiusKm,
-          defaultPricePerKm: radiusDraft.defaultPricePerKm,
-          minimumFee: radiusDraft.minimumFee,
-          maximumFee: radiusDraft.maximumFee ?? undefined,
-          defaultEstimatedDeliveryMinutes: radiusDraft.defaultEstimatedDeliveryMinutes,
-          isDeliveryEnabled: true,
-        });
-        await api.patch('/tenant/onboarding-step', { step: 'delivery', completed: true });
-        return;
-      }
-
-      if (coverageConfig) {
-        await api.put('/delivery/coverage', {
-          storeLat: finalLat,
-          storeLng: finalLng,
-          maxRadiusKm: Number(coverageConfig.maxRadiusKm),
-          defaultPricePerKm: Number(coverageConfig.defaultPricePerKm),
-          minimumFee: toNumberOrNull(coverageConfig.minimumFee) ?? undefined,
-          maximumFee: toNumberOrNull(coverageConfig.maximumFee) ?? undefined,
-          defaultEstimatedDeliveryMinutes: coverageConfig.defaultEstimatedDeliveryMinutes ?? undefined,
-          isDeliveryEnabled: false,
-        });
-      }
-
-      await api.patch('/tenant/onboarding-step', { step: 'delivery', completed: false });
     });
   };
 
@@ -531,9 +348,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     );
   }
 
-  const addressValid = isAddressStepValid(form);
-  const radiusValid = !deliveryEnabled || isRadiusDraftValid(radiusDraft);
-  const nextDisabled = !addressValid || geocoding || !radiusValid;
+  const nextDisabled = !isAddressStepValid(form) || geocoding;
 
   return (
     <div className="space-y-6">
@@ -541,9 +356,9 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/40">
           <MapPin className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
         </div>
-        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Onde fica sua loja e como ela entrega?</h2>
+        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Onde fica sua loja?</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Primeiro confirme o endereco da loja. Depois escolha a forma mais simples de calcular a entrega.
+          Primeiro confirme o endereco da loja. A configuracao de entrega vem no proximo passo.
         </p>
       </div>
 
@@ -670,7 +485,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Pais</label>
               <input
@@ -681,24 +496,11 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
               />
             </div>
 
-            <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Latitude</label>
-              <input
-                type="text"
-                value={form.lat ?? ''}
-                readOnly
-                className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Longitude</label>
-              <input
-                type="text"
-                value={form.lng ?? ''}
-                readOnly
-                className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              />
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <div className="text-xs font-black uppercase tracking-widest text-slate-400">Coordenadas</div>
+              <div className="mt-1 font-semibold text-slate-700 dark:text-slate-200">
+                {hasRealCoordinates(form.lat, form.lng) ? 'Validadas automaticamente' : 'Aguardando validacao'}
+              </div>
             </div>
           </div>
 
@@ -711,204 +513,19 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         </div>
       )}
 
-      <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-start gap-3">
-          <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
-            <CircleDot className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="text-lg font-black text-slate-900 dark:text-white">Escolha o tipo de area de entrega</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Por agora, o modo operacional pronto ponta a ponta e por raio. As outras opcoes aparecem apenas como preview seguro.
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-          <label className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              checked={deliveryEnabled}
-              onChange={(event) => {
-                setDeliveryEnabled(event.target.checked);
-                setDeliveryError(null);
-              }}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            <div>
-              <div className="text-sm font-black text-slate-900 dark:text-white">Quero ativar entrega agora</div>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Se desligar esta opcao, voce ainda pode concluir o onboarding usando retirada no local no passo seguinte.
-              </p>
-            </div>
-          </label>
-        </div>
-
-        {!addressValid ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
-            <p className="text-sm font-bold text-amber-700 dark:text-amber-300">
-              Confirme primeiro o endereco com coordenadas reais da loja para liberar a configuracao de entrega.
-            </p>
-          </div>
-        ) : null}
-
-        <div className="grid gap-3">
-          <DeliveryChoiceCard
-            title="Por raio"
-            description="Calcule a entrega pela distancia em linha reta."
-            icon={CircleDot}
-            active={deliveryEnabled && deliveryMethod === 'radius'}
-            onClick={() => {
-              if (!deliveryEnabled) {
-                setDeliveryEnabled(true);
-              }
-              setDeliveryMethod('radius');
-            }}
-          />
-
-          <DeliveryChoiceCard
-            title="Zonas especiais por mapa"
-            description="Defina areas especiais por mapa depois que a operacao basica estiver publicada."
-            icon={Map}
-            disabled
-            badge="Em breve"
-          />
-
-          <DeliveryChoiceCard
-            title="Por bairro"
-            description="Ainda nao esta pronto ponta a ponta no checkout, por isso nao sera ativado agora."
-            icon={Route}
-            disabled
-            badge="Em breve"
-          />
-        </div>
-
-        {deliveryEnabled && deliveryMethod === 'radius' ? (
-          <div className="space-y-4 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-800 dark:bg-emerald-950/20">
-            <div>
-              <div className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                Entrega por raio
-              </div>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Essa configuracao usa a origem oficial da loja em <code>tenant_settings.lat/lng</code> e salva a cobertura no endpoint atual de delivery.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Raio maximo</span>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0.1}
-                    step={0.1}
-                    value={radiusDraft.maxRadiusKm}
-                    onChange={(event) => {
-                      setRadiusDraft((current) => ({ ...current, maxRadiusKm: Number(event.target.value) }));
-                      setDeliveryError(null);
-                    }}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-14 text-sm font-bold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-900/30"
-                  />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black uppercase tracking-wide text-slate-400">km</span>
-                </div>
-              </label>
-
-              <label className="space-y-2">
-                <span className="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Tempo estimado padrao</span>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={radiusDraft.defaultEstimatedDeliveryMinutes}
-                    onChange={(event) => {
-                      setRadiusDraft((current) => ({
-                        ...current,
-                        defaultEstimatedDeliveryMinutes: Number(event.target.value),
-                      }));
-                      setDeliveryError(null);
-                    }}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-16 text-sm font-bold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-900/30"
-                  />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black uppercase tracking-wide text-slate-400">min</span>
-                </div>
-              </label>
-
-              <label className="space-y-2">
-                <span className="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Taxa minima</span>
-                <CurrencyInput
-                  value={radiusDraft.minimumFee}
-                  onChange={(value) => {
-                    setRadiusDraft((current) => ({ ...current, minimumFee: value }));
-                    setDeliveryError(null);
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-900/30"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Preco por km</span>
-                <CurrencyInput
-                  value={radiusDraft.defaultPricePerKm}
-                  onChange={(value) => {
-                    setRadiusDraft((current) => ({ ...current, defaultPricePerKm: value }));
-                    setDeliveryError(null);
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-900/30"
-                />
-              </label>
-
-              <label className="space-y-2 md:col-span-2">
-                <span className="block text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Taxa maxima</span>
-                <CurrencyInput
-                  value={radiusDraft.maximumFee ?? 0}
-                  onChange={(value) => {
-                    setRadiusDraft((current) => ({
-                      ...current,
-                      maximumFee: value > 0 ? value : null,
-                    }));
-                    setDeliveryError(null);
-                  }}
-                  placeholder="Opcional"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-900/30"
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Deixe zerado se nao quiser limitar um teto de entrega agora.
-                </p>
-              </label>
-            </div>
-
-            {deliveryError ? (
-              <div className="rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-600 dark:border-red-900/40 dark:bg-slate-950">
-                {deliveryError}
-              </div>
-            ) : null}
-
-            <div className="rounded-2xl border border-emerald-200/80 bg-white px-4 py-3 dark:border-emerald-900/40 dark:bg-slate-950">
-              <div className="flex items-start gap-3">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  Essa etapa salva apenas a cobertura oficial por raio. Bairros e zonas especiais ficam para a tela completa de delivery depois do onboarding.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
       <div className="flex gap-3">
         <button
           onClick={onPrev}
           className="flex-1 rounded-2xl bg-slate-100 py-4 text-sm font-black text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
         >
-          ← Voltar
+          Voltar
         </button>
         <button
           onClick={handleNext}
           disabled={nextDisabled}
           className="flex-[2] rounded-2xl bg-emerald-600 py-4 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:disabled:bg-slate-700"
         >
-          Proximo →
+          Proximo
         </button>
       </div>
     </div>

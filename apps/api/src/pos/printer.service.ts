@@ -3,6 +3,13 @@ import { OrderResponseDTO } from '@gestor/types';
 
 @Injectable()
 export class PrinterService {
+  private getFulfillmentLabel(value?: string | null): string {
+    if (typeof value !== 'string') return 'PEDIDO';
+    const normalized = value.trim();
+    if (!normalized) return 'PEDIDO';
+    return normalized.toUpperCase();
+  }
+
   /**
    * Generates a TXT string formatted for 80mm thermal printers.
    * Can return plain text or RAW ESC/POS commands.
@@ -45,7 +52,7 @@ export class PrinterService {
       if (format === 'escpos') lines.push(CENTER, FONT_DOUBLE, BOLD_ON);
       lines.push(center('GESTOR DELIVERY SAAS PRO'));
       if (format === 'escpos') lines.push(FONT_NORMAL);
-      lines.push(center(`${order.fulfillmentType.toUpperCase()} - ${order.orderNumber}`));
+      lines.push(center(`${this.getFulfillmentLabel(order.fulfillmentType)} - ${order.orderNumber}`));
     } else {
       if (format === 'escpos') lines.push(CENTER, BOLD_ON);
       lines.push(center('*** PRODUCAO / KDS ***'));

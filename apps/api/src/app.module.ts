@@ -37,6 +37,7 @@ import { CustomerAuthModule } from './auth/customer-auth.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { FinanceModule } from './finance/finance.module';
 import { PlanGatingGuard } from './common/guards/plan-gating.guard';
+import { FeatureControlModule } from './feature-control/feature-control.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsAppChannelModule } from './whatsapp-channel/whatsapp-channel.module';
 import { AiAgentModule } from './ai-agent/ai-agent.module';
@@ -320,6 +321,7 @@ if (process.env.REDIS_ENABLED === 'false') {
 
     // Notifications (WhatsApp + Push)
     NotificationsModule,
+    FeatureControlModule,
 
     // Add-on Features
     WhatsAppChannelModule,

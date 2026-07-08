@@ -3,6 +3,7 @@ import { Prisma, DeliveryRateRule } from '@prisma/client';
 import type { DeliveryAddressDTO, UpsertDeliveryRateRuleInput } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { GeocodingService } from './geocoding.service';
+import { LocationProviderService } from '../location/location-provider.service';
 
 type DeliveryRateRuleRepo = Prisma.DeliveryRateRuleDelegate;
 type DeliveryCoverageRepo = Prisma.DeliveryCoverageConfigDelegate;
@@ -77,6 +78,7 @@ export class DeliveryRateService {
     @Inject(DELIVERY_COVERAGE_REPO) deliveryCoverageRepo: DeliveryCoverageRepo,
     private readonly prisma: PrismaService,
     private readonly geocodingService: GeocodingService,
+    private readonly locationProviderService: LocationProviderService,
   ) {
     this.deliveryRateRuleRepo = deliveryRateRuleRepo;
     this.deliveryCoverageRepo = deliveryCoverageRepo;
@@ -87,20 +89,6 @@ export class DeliveryRateService {
       where: { tenantId },
     });
     return cfg != null;
-  }
-
-  private haversineDistanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-    const toRad = (deg: number) => (deg * Math.PI) / 180;
-    const r = 6371;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const lat1 = toRad(a.lat);
-    const lat2 = toRad(b.lat);
-    const sinDLat = Math.sin(dLat / 2);
-    const sinDLng = Math.sin(dLng / 2);
-    const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
-    const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-    return r * c;
   }
 
   private clampFee(
@@ -198,19 +186,26 @@ export class DeliveryRateService {
     let lng = input.address?.lng;
     let resolvedCoordinates: { lat: number; lng: number } | undefined;
 
-    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    if (!this.locationProviderService.validateCoordinates(lat, lng)) {
       const addr = input.address;
       if (addr && addr.street && addr.number && addr.neighborhood) {
-        const fullAddress = `${addr.street}, ${addr.number} - ${addr.neighborhood}, ${addr.city || ''} ${addr.state || ''}`;
-        const coords = await this.geocodingService.geocodeAddress(fullAddress);
-        if (coords) {
-          lat = coords.lat;
-          lng = coords.lng;
-          resolvedCoordinates = coords;
+        const geocoded = await this.geocodingService.geocodeStructuredAddress({
+          street: addr.street,
+          number: addr.number,
+          neighborhood: addr.neighborhood,
+          city: addr.city || undefined,
+          state: addr.state || undefined,
+          postalCode: addr.zipCode || undefined,
+          country: 'Brasil',
+        }, 'delivery_quote');
+        if (this.locationProviderService.validateCoordinates(geocoded.lat, geocoded.lng)) {
+          lat = geocoded.lat;
+          lng = geocoded.lng;
+          resolvedCoordinates = { lat: geocoded.lat!, lng: geocoded.lng! };
         }
       }
 
-      if (typeof lat !== 'number' || typeof lng !== 'number') {
+      if (!this.locationProviderService.validateCoordinates(lat, lng)) {
         throw new UnprocessableEntityException(
           'Nao foi possivel localizar o endereco. Revise rua, numero, bairro e cidade ou informe as coordenadas.',
         );
@@ -220,7 +215,7 @@ export class DeliveryRateService {
     const storeLat = typeof settings?.lat === 'number' ? settings.lat : Number(cfg.storeLat);
     const storeLng = typeof settings?.lng === 'number' ? settings.lng : Number(cfg.storeLng);
 
-    if (Math.abs(storeLat - (-23.55052)) < 0.00001 && Math.abs(storeLng - (-46.633308)) < 0.00001) {
+    if (!this.locationProviderService.validateCoordinates(storeLat, storeLng)) {
       return this.buildDecision({
         canDeliver: false,
         matchedStrategy: 'delivery_disabled',
@@ -236,7 +231,7 @@ export class DeliveryRateService {
     const distanceKm =
       typeof input.distanceKm === 'number' && Number.isFinite(input.distanceKm)
         ? input.distanceKm
-        : this.haversineDistanceKm({ lat: storeLat, lng: storeLng }, { lat, lng });
+        : this.locationProviderService.calculateHaversineDistanceKm({ lat: storeLat, lng: storeLng }, { lat, lng });
 
     this.logger.debug(
       `Calculating decision for tenant ${input.tenantId}. Store: ${storeLat},${storeLng}. Customer: ${lat},${lng}. Distance: ${distanceKm}km. MaxRadius: ${cfg.maxRadiusKm}km`,

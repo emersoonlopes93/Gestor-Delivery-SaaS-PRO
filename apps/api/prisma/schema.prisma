@@ -121,6 +121,7 @@ model Tenant {
   tenantAddons                   TenantAddon[]
   billingSubscriptions           TenantBillingSubscription[]
   featureEntitlementOverrides    TenantFeatureEntitlementOverride[]
+  featureTenantOverrides         FeatureTenantOverride[]
   moduleAccess                   TenantModuleAccess[]
   onboarding                     TenantOnboarding?
   operatingHours                 TenantOperatingHours[]
@@ -2062,6 +2063,37 @@ model TenantModuleAccess {
   @@unique([tenantId, module])
   @@index([tenantId])
   @@map("tenant_module_access")
+}
+
+model FeatureGlobalSetting {
+  id         String   @id @default(uuid())
+  featureKey String   @unique @map("feature_key") @db.VarChar(80)
+  status     String   @db.VarChar(20)
+  reason     String?  @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.VarChar(120)
+
+  @@index([status])
+  @@map("feature_global_settings")
+}
+
+model FeatureTenantOverride {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  featureKey String    @map("feature_key") @db.VarChar(80)
+  mode       String    @db.VarChar(20)
+  reason     String?   @db.VarChar(255)
+  expiresAt  DateTime? @map("expires_at")
+  updatedBy  String?   @map("updated_by") @db.VarChar(120)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, featureKey])
+  @@index([tenantId])
+  @@index([featureKey])
+  @@map("feature_tenant_overrides")
 }
 
 model TenantFeatureEntitlementOverride {

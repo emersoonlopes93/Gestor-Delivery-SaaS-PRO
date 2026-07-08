@@ -7,6 +7,14 @@ import type {
   StorefrontOptionItemPayload,
   PizzaCompositionDTO,
 } from '@gestor/types';
+import {
+  dedupeById,
+  getPizzaFlavorSelectionLimit,
+  isHalfAndHalfMounting,
+  isPizzaCategory,
+  normalizePizzaFlavorSelection,
+  trimPizzaFlavorSelection,
+} from '@gestor/utils';
 import { api } from '../lib/api-client';
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
@@ -19,6 +27,7 @@ function cn(...inputs: ClassValue[]) {
 interface ProductDetailsModalProps {
   product: StorefrontProductPayload;
   category?: StorefrontCategoryPayload | null;
+  pizzaFlavorCandidates?: StorefrontProductPayload[];
   isStoreClosed?: boolean;
   onClose: () => void;
 }
@@ -36,52 +45,57 @@ type PizzaPreview = {
   calculatedPrice: number;
 };
 
-export function ProductDetailsModal({ product, category, isStoreClosed, onClose }: ProductDetailsModalProps) {
+export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, isStoreClosed, onClose }: ProductDetailsModalProps) {
   const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
   const [selections, setSelections] = useState<CartSelectedOptionGroup[]>([]);
   const [selectedSizeId, setSelectedSizeId] = useState('');
+  const [selectedMountingItemId, setSelectedMountingItemId] = useState('');
   const [selectedPizzaFlavorIds, setSelectedPizzaFlavorIds] = useState<string[]>([]);
   const [pizzaPreview, setPizzaPreview] = useState<PizzaPreview | null>(null);
   const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
   const [pizzaPreviewError, setPizzaPreviewError] = useState<string | null>(null);
 
-  const isPizzaTemplate = category?.templateType === 'pizza';
+  const optionGroupLinks = product.optionGroupLinks ?? [];
   const isProductAvailable = product.isAvailable && !isStoreClosed;
 
   const sizeGroup = useMemo(() => {
-    if (!isPizzaTemplate) return undefined;
-    return (product.optionGroupLinks ?? []).find((link) =>
+    return optionGroupLinks.find((link) =>
       link.optionGroup?.isActive && (
         link.pricingAxis === 'primary' ||
-        link.optionGroup.name.includes('Tamanhos [Pizza]')
+        /tamanh/i.test(link.optionGroup.name)
       )
     );
-  }, [isPizzaTemplate, product.optionGroupLinks]);
+  }, [optionGroupLinks]);
 
   const mountingGroup = useMemo(() => {
-    if (!isPizzaTemplate) return undefined;
-    return (product.optionGroupLinks ?? []).find((link) =>
-      link.optionGroup?.isActive && link.optionGroup.name.includes('Montagem [Pizza]')
+    return optionGroupLinks.find((link) =>
+      link.optionGroup?.isActive && /montagem|montage/i.test(link.optionGroup.name)
     );
-  }, [isPizzaTemplate, product.optionGroupLinks]);
+  }, [optionGroupLinks]);
+
+  const isPizzaTemplate = isPizzaCategory(category) || Boolean(sizeGroup || mountingGroup);
 
   const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
+  const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
+  const isHalfAndHalf = isHalfAndHalfMounting(selectedMountingItemId, pizzaMountingItems);
+  const flavorSelectionLimit = getPizzaFlavorSelectionLimit(selectedMountingItemId, pizzaMountingItems);
   const pizzaFlavorOptions = useMemo(() => {
-    if (!isPizzaTemplate) return [];
-    return (category?.products ?? []).filter((p) => p.isAvailable && p.id !== product.id);
-  }, [category?.products, isPizzaTemplate, product.id]);
+    if (!isPizzaTemplate || !isPizzaCategory(category)) return [];
+    const source = pizzaFlavorCandidates?.length ? pizzaFlavorCandidates : (category?.products ?? []);
+    return dedupeById(source.filter((p) => p.isAvailable && p.id !== product.id));
+  }, [category, isPizzaTemplate, pizzaFlavorCandidates, product.id]);
 
   const genericOptionLinks = useMemo(() => {
-    const links = (product.optionGroupLinks ?? []).filter((link) => link.optionGroup?.isActive);
+    const links = optionGroupLinks.filter((link) => link.optionGroup?.isActive);
     if (!isPizzaTemplate) return links;
 
     const ignored = new Set<string>();
     if (sizeGroup?.optionGroup.id) ignored.add(sizeGroup.optionGroup.id);
     if (mountingGroup?.optionGroup.id) ignored.add(mountingGroup.optionGroup.id);
     return links.filter((link) => !ignored.has(link.optionGroup.id));
-  }, [isPizzaTemplate, mountingGroup?.optionGroup.id, product.optionGroupLinks, sizeGroup?.optionGroup.id]);
+  }, [isPizzaTemplate, mountingGroup?.optionGroup.id, optionGroupLinks, sizeGroup?.optionGroup.id]);
 
   const hasV2Options = genericOptionLinks.length > 0;
 
@@ -96,6 +110,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
     if (!isPizzaTemplate) {
       setSelectedSizeId('');
+      setSelectedMountingItemId('');
       setSelectedPizzaFlavorIds([]);
       setPizzaPreview(null);
       setPizzaPreviewError(null);
@@ -104,12 +119,30 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
     const firstSize = pizzaSizeItems[0]?.id ?? '';
     setSelectedSizeId((current) => (pizzaSizeItems.some((size) => size.id === current) ? current : firstSize));
+    const preferredMounting =
+      pizzaMountingItems.find((item) => (
+        selectedPizzaFlavorIds.length > 1
+          ? item.name.toLowerCase().includes('meio')
+          : item.name.toLowerCase().includes('inteira')
+      ))?.id ?? pizzaMountingItems[0]?.id ?? '';
+    setSelectedMountingItemId((current) => (
+      pizzaMountingItems.some((item) => item.id === current) ? current : preferredMounting
+    ));
     setSelectedPizzaFlavorIds((current) => {
       const validIds = current.filter((id) => pizzaFlavorOptions.some((flavor) => flavor.id === id));
       if (validIds.length > 0) return validIds.slice(0, 2);
       return product.id ? [product.id] : [];
     });
-  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaSizeItems, product.id]);
+  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
+
+  useEffect(() => {
+    if (!isPizzaTemplate) return;
+
+    setSelectedPizzaFlavorIds((current) => {
+      const validIds = current.filter((id) => pizzaFlavorOptions.some((flavor) => flavor.id === id));
+      return trimPizzaFlavorSelection(validIds, flavorSelectionLimit, product.id);
+    });
+  }, [flavorSelectionLimit, isPizzaTemplate, pizzaFlavorOptions, product.id]);
 
   useEffect(() => {
     if (!isPizzaTemplate || !category?.id || !selectedSizeId || selectedPizzaFlavorIds.length === 0) {
@@ -188,11 +221,13 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
       });
     }
 
-    const mountingItem = mountingGroup?.optionGroup.items.find((item) =>
-      selectedPizzaFlavorIds.length > 1
-        ? item.name.toLowerCase().includes('meio')
-        : item.name.toLowerCase().includes('inteira')
-    ) ?? mountingGroup?.optionGroup.items[0];
+    const mountingItem = mountingGroup?.optionGroup.items.find((item) => item.id === selectedMountingItemId)
+      ?? mountingGroup?.optionGroup.items.find((item) =>
+        selectedPizzaFlavorIds.length > 1
+          ? item.name.toLowerCase().includes('meio')
+          : item.name.toLowerCase().includes('inteira')
+      )
+      ?? mountingGroup?.optionGroup.items[0];
 
     if (mountingGroup && mountingItem) {
       mapped.push({
@@ -209,7 +244,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
     }
 
     return mapped;
-  }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
+  }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
 
   const computed = useMemo(() => {
     let extras = 0;
@@ -253,8 +288,9 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   const validationError = useMemo(() => {
     if (isPizzaTemplate) {
       if (!selectedSizeId) return 'Selecione um tamanho.';
+      if (mountingGroup && !selectedMountingItemId) return 'Selecione a montagem da pizza.';
       if (selectedPizzaFlavorIds.length === 0) return 'Selecione pelo menos 1 sabor.';
-      if (selectedPizzaFlavorIds.length > 2) return 'Selecione no máximo 2 sabores.';
+      if (selectedPizzaFlavorIds.length > flavorSelectionLimit) return `Selecione no máximo ${flavorSelectionLimit} sabor${flavorSelectionLimit > 1 ? 'es' : ''}.`;
       if (pizzaPreviewLoading) return 'Aguarde a simulação do preço.';
       if (pizzaPreviewError) return pizzaPreviewError;
     }
@@ -272,7 +308,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
     }
 
     return null;
-  }, [genericOptionLinks, isPizzaTemplate, pizzaPreviewError, pizzaPreviewLoading, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
+  }, [flavorSelectionLimit, genericOptionLinks, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
 
   const toggleV2Option = (groupId: string, item: StorefrontOptionItemPayload, _minSelect: number, maxSelect: number, selectionType: string) => {
     setSelections((prev) => {
@@ -327,14 +363,14 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
   const togglePizzaFlavor = (flavorId: string) => {
     setSelectedPizzaFlavorIds((prev) => {
-      if (prev.includes(flavorId)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((id) => id !== flavorId);
-      }
-
-      if (prev.length >= 2) return prev;
-      return [...prev, flavorId];
+      return normalizePizzaFlavorSelection(prev, flavorId, flavorSelectionLimit);
     });
+  };
+
+  const toggleMounting = (itemId: string) => {
+    setSelectedMountingItemId(itemId);
+    const nextLimit = getPizzaFlavorSelectionLimit(itemId, pizzaMountingItems);
+    setSelectedPizzaFlavorIds((current) => trimPizzaFlavorSelection(current, nextLimit, product.id));
   };
 
   const handleAddToCart = () => {
@@ -363,6 +399,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
             <div className="w-full h-24 bg-primary-50 sm:rounded-t-3xl" />
           )}
           <button
+            type="button"
             onClick={onClose}
             className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 backdrop-blur-md text-white p-2 rounded-full transition-colors"
           >
@@ -393,11 +430,11 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                     <div>
                       <div className="text-foreground font-black text-sm uppercase tracking-wider">Pizza</div>
                       <div className="text-[10px] text-primary-700 font-bold italic">
-                        Escolha 1 sabor ou 2 sabores meio a meio
+                        {isHalfAndHalf ? 'Escolha até 2 sabores meio a meio' : 'Escolha 1 sabor para a pizza inteira'}
                       </div>
                     </div>
                     <div className="text-[10px] font-black uppercase text-primary-700">
-                      {selectedPizzaFlavorIds.length}/2
+                      {selectedPizzaFlavorIds.length}/{flavorSelectionLimit}
                     </div>
                   </div>
                 </div>
@@ -415,6 +452,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                       return (
                         <button
                           key={size.id}
+                          type="button"
                           onClick={() => setSelectedSizeId(size.id)}
                           className={cn(
                             'px-3 py-3 rounded-xl border text-xs font-black transition-all',
@@ -422,6 +460,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                               ? 'bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-100'
                               : 'bg-white border-gray-100 text-gray-700 hover:border-primary-200'
                           )}
+                          aria-pressed={selected}
                         >
                           {size.name}
                         </button>
@@ -430,11 +469,52 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                   </div>
                 </div>
 
+                {mountingGroup ? (
+                  <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Montagem</div>
+                        <div className="text-[10px] text-gray-400 font-bold">Escolha como a pizza sera montada</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {pizzaMountingItems.map((item) => {
+                        const selected = selectedMountingItemId === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => toggleMounting(item.id)}
+                            className={cn(
+                              'p-3 rounded-xl border text-left transition-all',
+                              selected
+                                ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-200'
+                                : 'bg-white border-gray-100 hover:border-gray-200'
+                            )}
+                            aria-pressed={selected}
+                          >
+                            <div className={cn('text-xs font-bold truncate', selected ? 'text-primary-900' : 'text-gray-700')}>
+                              {item.name}
+                            </div>
+                            {item.description ? (
+                              <div className="text-[10px] text-gray-400 font-bold mt-0.5 line-clamp-2">
+                                {item.description}
+                              </div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Sabores</div>
-                      <div className="text-[10px] text-gray-400 font-bold">Toque para escolher até 2 sabores</div>
+                      <div className="text-[10px] text-gray-400 font-bold">
+                        {isHalfAndHalf ? 'Toque para escolher até 2 sabores' : 'Toque para escolher 1 sabor'}
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -442,16 +522,18 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                       .map((flavor) => {
                         const selected = selectedPizzaFlavorIds.includes(flavor.id);
                         return (
-                          <button
-                            key={flavor.id}
-                            onClick={() => togglePizzaFlavor(flavor.id)}
-                            className={cn(
-                              'p-3 rounded-xl border text-left transition-all',
-                              selected
-                                ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-200'
-                                : 'bg-white border-gray-100 hover:border-gray-200'
-                            )}
-                          >
+                        <button
+                          key={flavor.id}
+                          type="button"
+                          onClick={() => togglePizzaFlavor(flavor.id)}
+                          className={cn(
+                            'p-3 rounded-xl border text-left transition-all',
+                            selected
+                              ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-200'
+                              : 'bg-white border-gray-100 hover:border-gray-200'
+                          )}
+                          aria-pressed={selected}
+                        >
                             <div className={cn('text-xs font-bold truncate', selected ? 'text-primary-900' : 'text-gray-700')}>
                               {flavor.name}
                             </div>
@@ -524,6 +606,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                           return (
                             <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-3">
                               <button
+                                type="button"
                                 onClick={() => toggleV2Option(group.id, item, min, max, group.selectionType)}
                                 className="w-full text-left"
                               >
@@ -552,6 +635,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                               {group.selectionType === 'quantity' && isSelected && item.allowQuantity ? (
                                 <div className="mt-3 flex items-center gap-3">
                                   <button
+                                    type="button"
                                     onClick={() => {
                                       const current = state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1;
                                       updateV2Qty(group.id, item.id, -1);
@@ -565,6 +649,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                                     {state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1}
                                   </div>
                                   <button
+                                    type="button"
                                     onClick={() => updateV2Qty(group.id, item.id, 1)}
                                     className="w-8 h-8 rounded-xl bg-white border border-gray-100 text-gray-500 flex items-center justify-center"
                                   >
@@ -606,6 +691,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.finalPrice)}
                         </span>
                         <button
+                          type="button"
                           onClick={() => {
                             const virtualProduct: StorefrontProductPayload = {
                               id: item.productId,
@@ -664,16 +750,17 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
           <div className="flex items-center gap-4">
             <div className="flex items-center bg-gray-100 rounded-2xl p-1 h-12">
-              <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
+              <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
                 <Minus className="w-5 h-5" />
               </button>
               <span className="w-8 text-center font-bold text-gray-900">{quantity}</span>
-              <button onClick={() => setQuantity((q) => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
+              <button type="button" onClick={() => setQuantity((q) => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
                 <Plus className="w-5 h-5" />
               </button>
             </div>
 
             <button
+              type="button"
               onClick={handleAddToCart}
               disabled={!!validationError || !isProductAvailable}
               className={cn(

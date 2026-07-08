@@ -1,28 +1,28 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { CheckCircle, ArrowLeft, Clock, MapPin, FileText, Package, MessageCircle } from 'lucide-react';
-import type { OrderResponseDTO, StorefrontPayload } from '@gestor/types';
+import { QRCodeSVG } from 'qrcode.react';
+import type { OrderResponseDTO, PixPaymentDTO, StorefrontPayload } from '@gestor/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 
 export function OrderConfirmationPage() {
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const { tenantSlug, orderId } = useParams<{ tenantSlug: string; orderId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [order, setOrder] = useState<OrderResponseDTO | null>((location.state as { order?: OrderResponseDTO })?.order ?? null);
-  const [isLoading, setIsLoading] = useState(!order);
+  const initialOrder = (location.state as { order?: OrderResponseDTO })?.order ?? null;
+  const hasInitialOrder = !!(initialOrder && Array.isArray(initialOrder.items) && initialOrder.items.length > 0);
+  const [order, setOrder] = useState<OrderResponseDTO | null>(initialOrder);
+  const [isLoading, setIsLoading] = useState(!hasInitialOrder);
   const storefront = queryClient.getQueryData<StorefrontPayload>(['storefront', tenantSlug]);
   const whatsappNumber = storefront?.tenant?.whatsappNumber;
+  const hasCompleteOrder = !!(order && Array.isArray(order.items) && order.items.length > 0);
 
   useEffect(() => {
-    if (order || !tenantSlug) return;
-    const match = location.pathname.match(/\/order\/([^/]+)/);
-    const orderId = match?.[1];
-    if (!orderId) return;
-
+    if (hasCompleteOrder || !tenantSlug) return;
     setIsLoading(true);
-    api.get<OrderResponseDTO>(`/public/orders/${orderId}`)
+    api.get<OrderResponseDTO>(`/public/orders/${orderId}/summary`)
       .then((response) => setOrder(response.data))
       .catch(() => {
         setOrder(null);
@@ -30,7 +30,7 @@ export function OrderConfirmationPage() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [order, tenantSlug, location.pathname]);
+  }, [hasCompleteOrder, tenantSlug, orderId]);
 
   if (isLoading) {
     return (
@@ -67,6 +67,16 @@ export function OrderConfirmationPage() {
   }
 
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  const pixPayment: PixPaymentDTO | undefined = order?.pixPayment;
+
+  const handleCopyPixCode = async () => {
+    if (!pixPayment?.qrCode) return;
+    try {
+      await navigator.clipboard.writeText(pixPayment.qrCode);
+    } catch {
+      // copy falhou, mas a tela continua útil com o código visível
+    }
+  };
 
   return (
     <div className="px-4 py-8 max-w-lg mx-auto">
@@ -143,6 +153,61 @@ export function OrderConfirmationPage() {
           </div>
         </div>
       </section>
+
+      {order.paymentMethod === 'pix' && (
+        <section className="bg-white rounded-2xl p-5 mb-6 border border-gray-100">
+          <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-4">Pagamento PIX</h2>
+          {pixPayment ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4 text-sm text-gray-600">
+                <p className="font-semibold text-gray-800">Escaneie o QR Code ou copie o código Pix.</p>
+                <p className="mt-1">Pedido {order.orderNumber} • {fmt(order.total)}</p>
+                {pixPayment.status && (
+                  <p className="mt-1">Status do pagamento: <strong className="uppercase">{pixPayment.status}</strong></p>
+                )}
+              </div>
+
+              {pixPayment.qrCodeBase64 ? (
+                <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                  <img
+                    src={`data:image/png;base64,${pixPayment.qrCodeBase64}`}
+                    alt="QR Code para pagamento Pix"
+                    className="w-full h-auto rounded-xl"
+                  />
+                </div>
+              ) : pixPayment.qrCode ? (
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-center">
+                  <QRCodeSVG
+                    value={pixPayment.qrCode}
+                    size={256}
+                    level="M"
+                    includeMargin
+                    className="w-full h-auto max-w-[256px]"
+                  />
+                </div>
+              ) : null}
+
+              {pixPayment.qrCode ? (
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <div className="bg-white border border-dashed border-gray-200 rounded-xl p-3 text-xs break-all font-mono text-gray-700">
+                    {pixPayment.qrCode}
+                  </div>
+                  <button
+                    onClick={handleCopyPixCode}
+                    className="mt-3 w-full h-12 rounded-xl bg-primary-600 text-white font-bold uppercase tracking-widest text-xs"
+                  >
+                    Copiar código Pix
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4 text-sm text-gray-600">
+              Pagamento PIX iniciado. Se esta tela foi recarregada, aguarde um instante para carregar os dados do Pix.
+            </div>
+          )}
+        </section>
+      )}
 
       {order.publicTrackingToken ? (
         <button

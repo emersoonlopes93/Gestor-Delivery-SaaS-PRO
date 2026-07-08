@@ -43,6 +43,7 @@ interface CatalogProduct {
   image: string | null;
   categoryName: string;
   categoryId: string;
+  categoryTemplateType?: string | null;
   type: 'simple' | 'configurable' | 'combo';
 }
 
@@ -220,6 +221,7 @@ export default function PosPage() {
         image: (p['image'] as string | null) || null,
         categoryId: ((p['category'] as Record<string, unknown>)?.['id'] as string) || 'uncategorized',
         categoryName: ((p['category'] as Record<string, unknown>)?.['name'] as string) || 'Sem Categoria',
+        categoryTemplateType: ((p['category'] as Record<string, unknown>)?.['templateType'] as string) || null,
         type: (p['type'] as 'simple' | 'configurable' | 'combo') || 'simple',
       }));
     },
@@ -456,7 +458,7 @@ export default function PosPage() {
 
   const addToCart = useCallback((product: CatalogProduct) => {
     // Produtos configuráveis/combos devem passar pelo fluxo de configuração.
-    if (product.type === 'configurable' || product.type === 'combo') {
+    if (product.type === 'configurable' || product.type === 'combo' || product.categoryTemplateType === 'pizza') {
       setConfigProductId(product.id);
       return;
     }

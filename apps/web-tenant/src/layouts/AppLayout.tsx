@@ -50,6 +50,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { BusinessGroupContext, Tenant, TenantLoginResponse, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
+import { useTenantCapabilities } from '../hooks/useTenantCapabilities';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { StoreStatusBadge } from '../components/store/StoreStatusControl';
 import { Toaster } from 'react-hot-toast';
@@ -62,6 +63,7 @@ type SidebarItem = {
   icon: LucideIcon;
   permission?: string;
   featureFlag?: string;
+  featureKey?: string;
   isExternal?: boolean;
   match?: (pathname: string) => boolean;
 };
@@ -72,7 +74,7 @@ type SidebarGroup = {
   items: readonly SidebarItem[];
 };
 
-const isFeatureVisible = (flag?: string) => {
+const isFeatureVisibleByEnv = (flag?: string) => {
   if (!flag) return true;
   // Acessa a flag no import.meta.env, lidando de forma segura
   const envValue = import.meta.env[flag];
@@ -125,7 +127,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
       { id: 'catalog-complements', label: 'Grupos de Opções', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
       { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
-      { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS' },
+      { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS', featureKey: 'upsells' },
       { id: 'catalog-inventory', label: 'Estoque & Ficha Técnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
     ],
   },
@@ -143,7 +145,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Logística',
     items: [
       { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
-      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read', featureFlag: 'VITE_FEATURE_DELIVERY_LIVE_MAP' },
+      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read', featureFlag: 'VITE_FEATURE_DELIVERY_LIVE_MAP', featureKey: 'delivery_live_map' },
       { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
       { id: 'delivery-zones', label: 'Zonas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
     ],
@@ -173,8 +175,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'CRM e Marketing',
     items: [
       { id: 'customers', label: 'Clientes (CRM)', to: '/customers', icon: Users, permission: 'crm.read' },
-      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED' },
-      { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS' },
+      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED', featureKey: 'crm_enterprise' },
+      { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' },
       { id: 'promotions', label: 'Promoções & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
     ],
   },
@@ -183,17 +185,17 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Gestão & Performance',
     items: [
       { id: 'analytics-reports', label: 'Relatórios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
-      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED' },
-      { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS' },
+      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED', featureKey: 'bi_advanced' },
+      { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS', featureKey: 'goals' },
     ],
   },
   {
     id: 'whatsapp',
     label: 'WhatsApp',
     items: [
-      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED' },
-      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS' },
-      { id: 'whatsapp-config', label: 'WhatsApp', to: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT' },
+      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED', featureKey: 'whatsapp_advanced' },
+      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' },
+      { id: 'whatsapp-config', label: 'WhatsApp', to: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT', featureKey: 'whatsapp_connect' },
     ],
   },
   {
@@ -202,7 +204,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
       { id: 'settings-network', label: 'Rede de Lojas', to: '/settings/network', icon: Building2, permission: 'settings.manage' },
-      { id: 'settings-integrations', label: 'Integrações', to: '/settings/integrations', icon: Link2, permission: 'settings.manage', match: (p) => p === '/settings/integrations' },
+      { id: 'settings-integrations', label: 'Integrações', to: '/settings/integrations', icon: Link2, permission: 'settings.manage', featureKey: 'ifood_marketplace', match: (p) => p === '/settings/integrations' },
       { id: 'settings-storefront', label: 'Personalizar Vitrine', to: '/settings/storefront', icon: Palette, permission: 'settings.manage' },
       { id: 'settings-scheduling', label: 'Agendamentos', to: '/settings/scheduling', icon: CalendarClock, permission: 'settings.manage' },
       { id: 'notifications', label: 'Notificações', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
@@ -353,6 +355,7 @@ function SidebarGroupView(props: {
 export function AppLayout() {
   const { user, clearUser, setUser } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore();
+  const { isFeatureVisible } = useTenantCapabilities();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -539,14 +542,14 @@ export function AppLayout() {
     const filtered: SidebarGroup[] = [];
     for (const g of SIDEBAR_GROUPS) {
       const items = g.items
-        .filter((it) => isFeatureVisible(it.featureFlag))
+        .filter((it) => (isFeatureVisible ? isFeatureVisible(it.featureFlag, it.featureKey) : isFeatureVisibleByEnv(it.featureFlag)))
         .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
         .map((it) => it);
 
       if (items.length) filtered.push({ ...g, items });
     }
     return filtered;
-  }, [userPermissions]);
+  }, [isFeatureVisible, userPermissions]);
 
   const activeGroupId = useMemo(() => {
     return firstActiveGroupId(groups, location.pathname);

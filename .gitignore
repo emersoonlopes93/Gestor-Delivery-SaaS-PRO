@@ -54,3 +54,9 @@ apps/api/uploads/**
 !apps/api/uploads/.gitkeep
 
 .codex-runtime/render.env
+.codex-logs/api.err
+.codex-logs/api2.err
+.codex-logs/api3.err
+.codex-logs/web-admin.err
+.codex-logs/web-storefront.err
+.codex-logs/web-tenant.err

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import { 
@@ -43,6 +44,25 @@ export class KdsService {
     private readonly tenantContext: TenantContextService,
     private readonly printerService: PrinterService,
   ) {}
+
+  private buildIdempotencyKey(prefix: string, parts: Array<string | number | null | undefined>) {
+    const normalized = parts
+      .map((part) => (part === null || part === undefined ? '' : String(part).trim()))
+      .join('|');
+    return `${prefix}_${createHash('sha1').update(normalized).digest('hex')}`;
+  }
+
+  private async createOrReusePrintJob(data: Prisma.PrintJobUncheckedCreateInput & { idempotencyKey?: string | null }) {
+    if (!data.idempotencyKey) {
+      return this.prisma.printJob.create({ data });
+    }
+
+    return this.prisma.printJob.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
 
   /**
    * Obtém as estações ativas de forma dinâmica (categorias e jobs pendentes)
@@ -531,16 +551,14 @@ export class KdsService {
         };
         const content = await this.printerService.formatTicket(mainReceiptOrder, 'customer');
 
-        jobs.push(this.prisma.printJob.create({
-          data: {
-            tenantId,
-            orderId,
-            station: 'MAIN',
-            type: PrismaPrintType.customer,
-            content,
-            idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.customer}_MAIN`,
-            status: PrismaPrintJobStatus.pending,
-          },
+        jobs.push(this.createOrReusePrintJob({
+          tenantId,
+          orderId,
+          station: 'MAIN',
+          type: PrismaPrintType.customer,
+          content,
+          idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.customer}_MAIN`,
+          status: PrismaPrintJobStatus.pending,
         }));
       }
 
@@ -613,16 +631,14 @@ export class KdsService {
 
         const content = await this.printerService.formatTicket(pseudoOrder, 'kitchen', station);
 
-        jobs.push(this.prisma.printJob.create({
-          data: {
-            tenantId,
-            orderId,
-            station,
-            type: PrismaPrintType.kitchen,
-            content,
-            idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.kitchen}_${station}`,
-            status: PrismaPrintJobStatus.pending,
-          },
+        jobs.push(this.createOrReusePrintJob({
+          tenantId,
+          orderId,
+          station,
+          type: PrismaPrintType.kitchen,
+          content,
+          idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.kitchen}_${station}`,
+          status: PrismaPrintJobStatus.pending,
         }));
       }
 
@@ -638,15 +654,14 @@ export class KdsService {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return;
 
-    return this.prisma.printJob.create({
-      data: {
-        tenantId,
-        orderId: data.orderId,
-        station: data.station,
-        type: PrismaPrintType.kitchen,
-        content: data.content,
-        status: PrismaPrintJobStatus.pending,
-      },
+    return this.createOrReusePrintJob({
+      tenantId,
+      orderId: data.orderId,
+      station: data.station,
+      type: PrismaPrintType.kitchen,
+      content: data.content,
+      status: PrismaPrintJobStatus.pending,
+      idempotencyKey: this.buildIdempotencyKey('incremental_print', [tenantId, data.orderId, data.station, data.content]),
     });
   }
 
@@ -657,15 +672,14 @@ export class KdsService {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return;
 
-    const jobs = data.items.map(item => this.prisma.printJob.create({
-      data: {
-        tenantId,
-        orderId: data.orderId,
-        station: data.station,
-        type: PrismaPrintType.kitchen,
-        content: item.content,
-        status: PrismaPrintJobStatus.pending,
-      },
+    const jobs = data.items.map((item) => this.createOrReusePrintJob({
+      tenantId,
+      orderId: data.orderId,
+      station: data.station,
+      type: PrismaPrintType.kitchen,
+      content: item.content,
+      status: PrismaPrintJobStatus.pending,
+      idempotencyKey: this.buildIdempotencyKey('incremental_print', [tenantId, data.orderId, data.station, item.content]),
     }));
 
     return Promise.all(jobs);

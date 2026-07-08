@@ -17,6 +17,7 @@ import { RevenueLedgerService } from '../../billing/revenue-ledger.service';
 import { BillingAddonService } from '../../billing/billing-addon.service';
 import * as bcrypt from 'bcryptjs';
 import { TenantDefaultRole } from '@gestor/core';
+import { ensureDefaultTenantRoles } from '../../tenant/default-tenant-roles';
 
 type BillingRevenueTierInput = {
   id?: string;
@@ -880,43 +881,17 @@ export class AdminBillingController {
         },
       });
 
-      let ownerRole = await tx.tenantRole.findFirst({
+      await ensureDefaultTenantRoles(tx, createdTenant.id);
+      const ownerRole = await tx.tenantRole.findFirstOrThrow({
         where: {
           tenantId: createdTenant.id,
           slug: TenantDefaultRole.TENANT_OWNER,
         },
       });
 
-      if (!ownerRole) {
-        ownerRole = await tx.tenantRole.create({
-          data: {
-            tenantId: createdTenant.id,
-            name: 'Dono',
-            slug: TenantDefaultRole.TENANT_OWNER,
-            isSystem: true,
-          },
-        });
-      }
-
       await tx.tenantUserRole.deleteMany({
         where: { userId: tenantUser.id },
       });
-
-      const permissions = await tx.tenantPermission.findMany({
-        select: { id: true },
-      });
-
-      if (permissions.length > 0) {
-        await tx.tenantRolePermission.deleteMany({
-          where: { roleId: ownerRole.id },
-        });
-        await tx.tenantRolePermission.createMany({
-          data: permissions.map((permission) => ({
-            roleId: ownerRole.id,
-            permissionId: permission.id,
-          })),
-        });
-      }
 
       await tx.tenantUserRole.create({
         data: {

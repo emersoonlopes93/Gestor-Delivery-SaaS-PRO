@@ -20,6 +20,7 @@ import { WhatsappService } from '../notifications/whatsapp.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
+  PixPaymentDTO,
   OrderListItemDTO,
   OrderBoardItemDTO,
   OrderKdsItemDTO,
@@ -685,6 +686,174 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
+    return this.mapOrderResponse(order);
+  }
+
+  async getPublicOrderSummary(identifier: string, token?: string): Promise<OrderResponseDTO> {
+    const order = await this.prisma.order.findFirst({
+      where: token
+        ? {
+            id: identifier,
+            publicTrackingToken: token,
+          }
+        : {
+            publicTrackingToken: identifier,
+          },
+      include: {
+        items: {
+          include: {},
+        },
+        deliveryAddress: true,
+        deliveryDriver: true,
+        timeline: { orderBy: { createdAt: 'asc' } },
+        paymentTransactions: {
+          where: { method: 'pix' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    const base = this.mapOrderResponse(order);
+    const pixPayment = this.mapPixPayment(order.paymentTransactions?.[0]);
+
+    return pixPayment ? { ...base, pixPayment } : base;
+  }
+
+  private mapPixPayment(paymentTransaction?: {
+    id: string;
+    status: string;
+    createdAt: Date;
+    metadata: Prisma.JsonValue | null;
+  }): PixPaymentDTO | undefined {
+    if (!paymentTransaction) return undefined;
+
+    const metadata =
+      paymentTransaction.metadata &&
+      typeof paymentTransaction.metadata === 'object' &&
+      !Array.isArray(paymentTransaction.metadata)
+        ? (paymentTransaction.metadata as Record<string, unknown>)
+        : null;
+
+    const localPixPayment = metadata?.pixPayment;
+    if (localPixPayment && typeof localPixPayment === 'object' && !Array.isArray(localPixPayment)) {
+      const payload = localPixPayment as Record<string, unknown>;
+      const qrCode = typeof payload.qrCode === 'string' ? payload.qrCode : '';
+      const qrCodeBase64 = typeof payload.qrCodeBase64 === 'string' ? payload.qrCodeBase64 : '';
+      const ticketUrl = typeof payload.ticketUrl === 'string' ? payload.ticketUrl : '';
+      const expiresAt = typeof payload.expiresAt === 'string'
+        ? payload.expiresAt
+        : new Date(paymentTransaction.createdAt.getTime() + 30 * 60 * 1000).toISOString();
+
+      if (qrCode || qrCodeBase64 || ticketUrl) {
+        return {
+          transactionId: paymentTransaction.id,
+          qrCode,
+          qrCodeBase64,
+          ticketUrl,
+          expiresAt,
+          status: paymentTransaction.status as PixPaymentDTO['status'],
+        };
+      }
+    }
+
+    const mpPayload = metadata?.mercadoPagoPayment ?? metadata?.mercadoPagoResponse;
+    if (!mpPayload || typeof mpPayload !== 'object' || Array.isArray(mpPayload)) return undefined;
+
+    const payload = mpPayload as Record<string, unknown>;
+    const poi = payload.point_of_interaction;
+    if (!poi || typeof poi !== 'object' || Array.isArray(poi)) return undefined;
+
+    const transactionData = (poi as Record<string, unknown>).transaction_data;
+    if (!transactionData || typeof transactionData !== 'object' || Array.isArray(transactionData)) return undefined;
+
+    const data = transactionData as Record<string, unknown>;
+    const qrCode = typeof data.qr_code === 'string' ? data.qr_code : '';
+    const qrCodeBase64 = typeof data.qr_code_base64 === 'string' ? data.qr_code_base64 : '';
+    const ticketUrl = typeof data.ticket_url === 'string' ? data.ticket_url : '';
+
+    if (!qrCode && !qrCodeBase64 && !ticketUrl) return undefined;
+
+    return {
+      transactionId: paymentTransaction.id,
+      qrCode,
+      qrCodeBase64,
+      ticketUrl,
+      expiresAt: new Date(paymentTransaction.createdAt.getTime() + 30 * 60 * 1000).toISOString(),
+      status: paymentTransaction.status as PixPaymentDTO['status'],
+    };
+  }
+
+  private mapOrderResponse(order: {
+    id: string;
+    orderNumber: string;
+    status: OrderStatus;
+    fulfillmentType: string;
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string | null;
+    itemsSubtotal: Prisma.Decimal | number;
+    discountTotal: Prisma.Decimal | number;
+    deliveryFee: Prisma.Decimal | number;
+    serviceFee: Prisma.Decimal | number;
+    total: Prisma.Decimal | number;
+    sourceChannel: string;
+    notes: string | null;
+    publicTrackingToken?: string | null;
+    paymentMethod: PrismaPaymentMethod | null;
+    changeFor: Prisma.Decimal | number | null;
+    scheduledFor?: Date | null;
+    isScheduled?: boolean | null;
+    customerId?: string | null;
+    couponId?: string | null;
+    cashbackUsed?: Prisma.Decimal | number | null;
+    deliveryDriverId?: string | null;
+    deliveryDriver?: { name?: string | null; phone?: string | null; status?: string | null } | null;
+    items: Array<{
+      id: string;
+      lineType: string;
+      productId: string | null;
+      comboId: string | null;
+      quantity: number;
+      unitPrice: Prisma.Decimal | number;
+      lineTotal: Prisma.Decimal | number;
+      notes: string | null;
+      snapshotName: string;
+      snapshotImage: string | null;
+      snapshotBasePrice: Prisma.Decimal | number;
+      snapshotExtrasTotal: Prisma.Decimal | number;
+      snapshotComposition: string | null;
+      snapshotCatalogV2Json?: unknown;
+    }>;
+    deliveryAddress?: {
+      street: string;
+      number: string;
+      complement: string | null;
+      neighborhood: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      reference?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+    } | null;
+    timeline: Array<{
+      id: string;
+      status: OrderStatus;
+      note: string | null;
+      createdAt: Date;
+    }>;
+    createdAt: Date;
+    updatedAt: Date;
+    paymentTransactions?: Array<{
+      id: string;
+      status: string;
+      createdAt: Date;
+      metadata: Prisma.JsonValue | null;
+    }>;
+  }): OrderResponseDTO {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -700,20 +869,18 @@ export class OrdersService {
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
       notes: order.notes,
-        publicTrackingToken: order.publicTrackingToken,
-        paymentMethod: this.mapPaymentMethod(order.paymentMethod),
-        changeFor: order.changeFor ? Number(order.changeFor) : null,
-        scheduledFor: order.scheduledFor ? order.scheduledFor.toISOString() : null,
-        isScheduled: order.isScheduled ?? false,
+      publicTrackingToken: order.publicTrackingToken ?? undefined,
+      paymentMethod: this.mapPaymentMethod(order.paymentMethod ?? 'cash'),
+      changeFor: order.changeFor ? Number(order.changeFor) : null,
+      scheduledFor: order.scheduledFor ? order.scheduledFor.toISOString() : null,
+      isScheduled: order.isScheduled ?? false,
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
-      
       deliveryDriverId: order.deliveryDriverId,
       deliveryDriverName: order.deliveryDriver?.name,
       deliveryDriverPhone: order.deliveryDriver?.phone,
       deliveryDriverStatus: order.deliveryDriver?.status,
-
       items: order.items.map((item) => ({
         id: item.id,
         lineType: item.lineType as 'product' | 'combo',
@@ -740,8 +907,8 @@ export class OrdersService {
             state: order.deliveryAddress.state,
             zipCode: order.deliveryAddress.zipCode,
             reference: order.deliveryAddress.reference || undefined,
-            lat: order.deliveryAddress.lat || undefined,
-            lng: order.deliveryAddress.lng || undefined,
+            lat: order.deliveryAddress.lat ?? undefined,
+            lng: order.deliveryAddress.lng ?? undefined,
           }
         : null,
       timeline: order.timeline.map((t) => ({
@@ -750,8 +917,8 @@ export class OrdersService {
         note: t.note,
         createdAt: t.createdAt.toISOString(),
       })),
-      createdAt: order.createdAt.toISOString(),
-      updatedAt: order.updatedAt.toISOString(),
+      createdAt: order.createdAt ? order.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: order.updatedAt ? order.updatedAt.toISOString() : new Date().toISOString(),
     };
   }
 

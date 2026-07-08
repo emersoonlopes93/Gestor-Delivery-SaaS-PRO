@@ -14,11 +14,13 @@ import { UpsellsService } from './upsells.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CreateUpsellDto, UpdateUpsellDto } from '@gestor/types';
 import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 
 @Controller('upsells')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('upsells')
 export class UpsellsController {
   constructor(private readonly upsellsService: UpsellsService) {}
 

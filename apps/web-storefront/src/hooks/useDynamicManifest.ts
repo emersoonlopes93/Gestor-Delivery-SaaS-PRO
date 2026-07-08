@@ -12,21 +12,22 @@ export function useDynamicManifest(tenantSlug?: string, tenant?: { name: string,
     }
 
     if (tenant && tenantSlug) {
+      const origin = window.location.origin;
       const manifest = {
         id: `/${tenantSlug}`,
         name: tenant.name,
         short_name: tenant.name.substring(0, 12),
         description: tenant.description || "Cardápio, pedidos, carteira, fidelidade e tracking em tempo real.",
-        start_url: `/${tenantSlug}`,
-        scope: `/${tenantSlug}`,
+        start_url: new URL(`/${tenantSlug}`, origin).toString(),
+        scope: new URL(`/${tenantSlug}/`, origin).toString(),
         display: "standalone",
         display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
         orientation: "portrait",
         background_color: "#ffffff",
         theme_color: "#111827",
         icons: [
-          { src: "/icons/app-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-          { src: "/icons/app-maskable.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" }
+          { src: new URL('/icons/app-icon.svg', origin).toString(), sizes: "any", type: "image/svg+xml", purpose: "any" },
+          { src: new URL('/icons/app-maskable.svg', origin).toString(), sizes: "any", type: "image/svg+xml", purpose: "maskable" }
         ]
       };
       

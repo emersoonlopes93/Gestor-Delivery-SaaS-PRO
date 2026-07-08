@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CreditCard,
   LayoutGrid,
+  Layers3,
   Menu,
   Search,
   Shield,
@@ -20,7 +21,7 @@ import {
   Images,
   LibraryBig,
   BookOpenCheck,
-  Activity
+  Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -45,25 +46,17 @@ type SidebarGroup = {
 
 const isFeatureVisible = (flag?: string) => {
   if (!flag) return true;
-  // TODO: implement actual feature flags from config/environment
   return true;
 };
 
 const SIDEBAR_STORAGE_KEY = 'admin_sidebar_state_v1';
 
-function isFeatureEnabled(flag: string): boolean {
-  if (!flag) return true;
-  const envMeta = import.meta as { env?: Record<string, string | undefined> };
-  const env = envMeta.env ?? {};
-  return env[flag] === 'true';
-}
-
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
     id: 'core',
-    label: 'Visão Geral',
+    label: 'Visao Geral',
     items: [
-      { id: 'dashboard', label: 'Dashboard Analítico', to: '/dashboard', icon: LayoutGrid },
+      { id: 'dashboard', label: 'Dashboard Analitico', to: '/dashboard', icon: LayoutGrid },
     ],
   },
   {
@@ -83,19 +76,20 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   },
   {
     id: 'operation',
-    label: 'Operação',
+    label: 'Operacao',
     items: [
-      { id: 'health', label: 'Saúde dos Tenants', to: '/health', icon: Activity, permission: 'saas.tenants.read' },
+      { id: 'health', label: 'Saude dos Tenants', to: '/health', icon: Activity, permission: 'saas.tenants.read' },
+      { id: 'features', label: 'Feature Control', to: '/features', icon: Layers3, permission: 'saas.modules.read' },
       { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read', featureFlag: 'VITE_FEATURE_ADMIN_INTEGRATIONS' },
       { id: 'media', label: 'Biblioteca Global', to: '/media', icon: Images, permission: 'saas.settings.read' },
-      { id: 'base-menus', label: 'Cardápios Base', to: '/base-menus', icon: BookOpenCheck, permission: 'saas.base_menu.read' },
+      { id: 'base-menus', label: 'Cardapios Base', to: '/base-menus', icon: BookOpenCheck, permission: 'saas.base_menu.read' },
       { id: 'base-media', label: 'Galeria Base', to: '/base-media', icon: LibraryBig, permission: 'saas.base_media.read' },
       { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read', featureFlag: 'VITE_FEATURE_AI_AGENT' },
     ],
   },
   {
     id: 'security',
-    label: 'Segurança',
+    label: 'Seguranca',
     items: [
       { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
@@ -141,22 +135,20 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
   pathname: string;
 }) {
   const { group, collapsed, isOpen, onToggle, pathname } = props;
-  const hasActive = useMemo(() => group.items.some(it => isItemActive(it.to, pathname)), [group.items, pathname]);
+  const hasActive = useMemo(() => group.items.some((it) => isItemActive(it.to, pathname)), [group.items, pathname]);
 
   return (
     <div className="select-none">
-      {!collapsed && (
+      {!collapsed ? (
         <button
           type="button"
           onClick={() => onToggle(group.id)}
-          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${hasActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`group flex w-full items-center justify-between rounded-xl px-3 py-3 transition-all ${hasActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
         >
-          <span className="text-[10px] font-black uppercase tracking-widest">
-            {group.label}
-          </span>
+          <span className="text-[10px] font-black uppercase tracking-widest">{group.label}</span>
           <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-90' : 'rotate-0'}`} />
         </button>
-      )}
+      ) : null}
 
       <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ${isOpen || collapsed ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="mt-1 space-y-1">
@@ -166,19 +158,19 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
               to={item.to}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition-all duration-300 ${
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 } ${collapsed ? 'justify-center' : ''}`
               }
             >
-              <span className={`transition-colors ${collapsed ? '' : 'w-6 flex items-center justify-center'}`} aria-hidden>
+              <span className={`transition-colors ${collapsed ? '' : 'flex w-6 items-center justify-center'}`} aria-hidden>
                 <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
               </span>
               {!collapsed ? <span className="truncate">{item.label}</span> : null}
               {collapsed ? (
-                <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-popover px-3.5 py-2 text-xs font-black text-popover-foreground opacity-0 shadow-2xl transition-all group-hover:opacity-100 z-50">
+                <span className="pointer-events-none absolute left-full z-50 ml-4 whitespace-nowrap rounded-xl bg-popover px-3.5 py-2 text-xs font-black text-popover-foreground opacity-0 shadow-2xl transition-all group-hover:opacity-100">
                   {item.label}
                 </span>
               ) : null}
@@ -204,7 +196,7 @@ export function AppLayout() {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
     if (saved) return saved;
     const openGroups: Record<string, boolean> = {};
-    for (const g of SIDEBAR_GROUPS) openGroups[g.id] = g.id === 'core';
+    for (const group of SIDEBAR_GROUPS) openGroups[group.id] = group.id === 'core';
     return { collapsed: false, openGroups } satisfies SidebarState;
   }, []);
 
@@ -219,11 +211,11 @@ export function AppLayout() {
   const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
   const groups = useMemo(() => {
     const filtered: SidebarGroup[] = [];
-    for (const g of SIDEBAR_GROUPS) {
-      const items = g.items
-        .filter((it) => isFeatureVisible(it.featureFlag))
-        .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true));
-      if (items.length) filtered.push({ ...g, items });
+    for (const group of SIDEBAR_GROUPS) {
+      const items = group.items
+        .filter((item) => isFeatureVisible(item.featureFlag))
+        .filter((item) => (item.permission ? hasPermission(userPermissions, item.permission) : true));
+      if (items.length) filtered.push({ ...group, items });
     }
     return filtered;
   }, [userPermissions]);
@@ -232,7 +224,7 @@ export function AppLayout() {
     setOpenGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
   }, []);
 
-  const toggleCollapsed = useCallback(() => setCollapsed((v) => !v), []);
+  const toggleCollapsed = useCallback(() => setCollapsed((value) => !value), []);
   const openMobile = useCallback(() => setIsMobileOpen(true), []);
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
 
@@ -245,35 +237,35 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-background transition-colors duration-300">
+    <div className="flex min-h-screen bg-background transition-colors duration-300">
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-30 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
+        <div className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm md:hidden" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-40 inset-y-0 left-0 bg-card border-r border-border flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-card transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
-        <div className={`p-6 border-b border-input100 dark:border-input800/60 ${collapsed ? 'flex justify-center' : ''}`}>
+        <div className={`border-b border-input100 p-6 dark:border-input800/60 ${collapsed ? 'flex justify-center' : ''}`}>
           {!collapsed ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-xl font-black text-primary-foreground shadow-lg shadow-primary/20">
                 {appInitial}
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-black text-foreground tracking-tight truncate">{appName}</h1>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
+                <h1 className="truncate text-sm font-black tracking-tight text-foreground">{appName}</h1>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{user?.name || 'Carregando...'}</p>
               </div>
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-xl font-black text-primary-foreground shadow-lg shadow-primary/20">
               {appInitial}
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+        <nav className="custom-scrollbar flex-1 space-y-1 overflow-y-auto p-3">
           {groups.map((group) => (
             <SidebarGroupView
               key={group.id}
@@ -286,75 +278,75 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-input100 dark:border-input800/60">
+        <div className="border-t border-input100 p-4 dark:border-input800/60">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10 transition-all ${collapsed ? 'justify-center' : ''}`}
+            className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-widest text-destructive transition-all hover:bg-destructive/10 ${collapsed ? 'justify-center' : ''}`}
           >
             <LogOut size={18} />
-            {!collapsed && <span>Encerrar Sessão</span>}
+            {!collapsed ? <span>Encerrar Sessao</span> : null}
           </button>
         </div>
       </aside>
 
-      <div className="relative z-0 flex-1 min-w-0 flex flex-col overflow-hidden">
-        <header className="hidden md:flex sticky top-0 z-10 h-16 bg-background/80 backdrop-blur-xl border-b border-border px-6 items-center gap-4">
-          <button onClick={toggleCollapsed} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all">
+      <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-10 hidden h-16 items-center gap-4 border-b border-border bg-background/80 px-6 backdrop-blur-xl md:flex">
+          <button onClick={toggleCollapsed} className="rounded-xl p-2 text-muted-foreground transition-all hover:bg-muted hover:text-foreground">
             <Menu size={20} />
           </button>
 
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={desktopSearch}
-              onChange={(e) => setDesktopSearch(e.target.value)}
+              onChange={(event) => setDesktopSearch(event.target.value)}
               placeholder="Pesquisar no sistema..."
-              className="w-full h-10 pl-10 pr-4 bg-card border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              className="h-10 w-full rounded-xl border border-input bg-card pl-10 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-muted-foreground hover:bg-muted transition-all"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-card text-muted-foreground transition-all hover:bg-muted"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-muted-foreground hover:bg-muted transition-all relative">
+            <button className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-card text-muted-foreground transition-all hover:bg-muted">
               <Bell size={18} />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full border-2 border-background bg-primary" />
             </button>
 
-            <div className="h-8 w-px bg-border mx-1" />
+            <div className="mx-1 h-8 w-px bg-border" />
 
-            <button className="flex items-center gap-3 pl-1 pr-3 py-1 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md transition-all">
-              <div className="w-8 h-8 rounded-xl bg-muted text-primary flex items-center justify-center">
+            <button className="flex items-center gap-3 rounded-2xl border border-border bg-card py-1 pl-1 pr-3 shadow-sm transition-all hover:shadow-md">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-primary">
                 <UserCircle size={20} />
               </div>
-              <span className="text-xs font-bold text-foreground hidden lg:block">{user?.name}</span>
+              <span className="hidden text-xs font-bold text-foreground lg:block">{user?.name}</span>
             </button>
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-10 h-14 bg-background backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
-          <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-foreground">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-background px-4 backdrop-blur-xl transition-colors md:hidden">
+          <button onClick={openMobile} className="flex h-10 w-10 items-center justify-center rounded-xl bg-card text-foreground">
             <Menu size={20} />
           </button>
           <div className="text-center">
-            <div className="text-sm font-black text-foreground uppercase tracking-tight">{appName}</div>
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
+            <div className="text-sm font-black uppercase tracking-tight text-foreground">{appName}</div>
+            <div className="mt-0.5 text-[10px] font-bold uppercase tracking-widest leading-none text-muted-foreground">Gestao Global</div>
           </div>
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-muted-foreground"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-card text-muted-foreground"
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </header>
 
         <main className="flex-1 overflow-y-auto bg-background/50">
-          <div key={location.pathname} className="animate-in fade-in duration-500 p-4 md:p-8">
+          <div key={location.pathname} className="animate-in fade-in p-4 duration-500 md:p-8">
             <Outlet />
           </div>
         </main>
@@ -362,4 +354,3 @@ export function AppLayout() {
     </div>
   );
 }
-

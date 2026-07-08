@@ -177,4 +177,5 @@ export function unmaskCurrency(value: string | undefined | null): number {
 }
 
 export * from './google-maps-address';
+export * from './pizza';
 

@@ -16,10 +16,12 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '@gestor/auth';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useAuthStore } from '../../stores/auth.store';
 import {
   DecimalLike,
   activateAiAddon,
@@ -126,6 +128,8 @@ export function BillingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const user = useAuthStore((state) => state.user);
+  const canWriteBilling = hasPermission(user?.permissions ?? [], 'billing.write');
 
   const overviewQuery = useQuery({
     queryKey: ['tenant-billing-overview'],
@@ -306,7 +310,12 @@ export function BillingPage() {
                 {trialMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
                 {trialAssistiveOnly ? 'Trial Pro por ativacao assistida' : 'Ativar Trial Pro'}
               </Button>
-              <Button type="button" variant="secondary" onClick={() => aiAddonMutation.mutate()} disabled={aiAddonMutation.isPending}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => aiAddonMutation.mutate()}
+                disabled={aiAddonMutation.isPending || !canWriteBilling}
+              >
                 {aiAddonMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
                 {aiAddonActive ? 'Cancelar Agente IA' : 'Adicionar Agente IA'}
               </Button>

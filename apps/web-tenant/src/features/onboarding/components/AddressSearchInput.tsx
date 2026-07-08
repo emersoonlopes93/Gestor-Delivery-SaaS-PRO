@@ -89,7 +89,7 @@ export function AddressSearchInput({
       autocompleteServiceRef.current?.getPlacePredictions(
         {
           input: currentQuery,
-          componentRestrictions: { country: 'br' },
+          componentRestrictions: { country: 'BR' },
           types: ['address'],
         },
         (predictions, status) => {

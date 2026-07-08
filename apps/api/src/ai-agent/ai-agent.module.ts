@@ -7,6 +7,7 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { OrdersModule } from '../orders/orders.module';
 import { StorefrontModule } from '../storefront/storefront.module';
 import { DeliveryModule } from '../delivery/delivery.module';
+import { LocationModule } from '../location/location.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AdminModulesModule } from '../admin/modules/admin-modules.module';
@@ -41,6 +42,7 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     forwardRef(() => OrdersModule),          // para as tools criarem pedidos
     forwardRef(() => StorefrontModule),      // para checkout e validação
     forwardRef(() => DeliveryModule),        // para calcular taxas de entrega
+    LocationModule,
     forwardRef(() => PromotionsModule),      // para cashback e cupons
     forwardRef(() => SchedulingModule),      // para agendamentos
     AdminModulesModule,                      // para verificar permissões de módulo

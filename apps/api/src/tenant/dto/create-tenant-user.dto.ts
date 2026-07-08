@@ -1,4 +1,13 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsBoolean, IsArray } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  ArrayMinSize,
+} from 'class-validator';
 
 export class CreateTenantUserDto {
   @IsEmail()
@@ -18,6 +27,14 @@ export class CreateTenantUserDto {
 
   @IsArray()
   @IsString({ each: true })
+  @ArrayMinSize(1)
+  roles!: string[];
+
+  @IsString()
   @IsOptional()
-  roles?: string[]; // Array of role slugs
+  ownerConfirmationText?: string;
+
+  @IsString()
+  @IsOptional()
+  actorUserId?: string;
 }

@@ -15,11 +15,13 @@ import { PrismaService } from '../../database/prisma.service';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 
 import { AuthenticatedRequest } from '../../common/interfaces/request.interface';
 
 @Controller('whatsapp/instance')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('whatsapp_connect')
 export class WhatsAppInstanceController {
   private readonly logger = new Logger('WhatsAppInstanceController');
 

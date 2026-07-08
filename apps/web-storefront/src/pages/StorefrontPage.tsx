@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload, StorefrontCategoryPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Award,
@@ -29,6 +29,7 @@ import { ProductSkeleton, ComboSkeleton } from '../components/ProductSkeleton';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
 import { Link } from 'react-router-dom';
+import { isPizzaCategory } from '@gestor/utils';
 import {
   StorefrontButton,
   ProductRenderer,
@@ -134,6 +135,31 @@ export function StorefrontPage() {
       : customer?.name?.trim() && customer.name !== 'Cliente Novo'
         ? customer.name
         : '';
+
+  const productCategoryIndex = useMemo(() => {
+    const index = new Map<string, StorefrontCategoryPayload>();
+
+    for (const category of data?.categories ?? []) {
+      for (const product of category.products) {
+        const current = index.get(product.id);
+        if (!current) {
+          index.set(product.id, category);
+          continue;
+        }
+
+        if (current.isVirtual && !category.isVirtual) {
+          index.set(product.id, category);
+          continue;
+        }
+
+        if (!isPizzaCategory(current) && isPizzaCategory(category)) {
+          index.set(product.id, category);
+        }
+      }
+    }
+
+    return index;
+  }, [data?.categories]);
 
   useEffect(() => {
     if (data?.tenant) {
@@ -510,7 +536,7 @@ export function StorefrontPage() {
                     showBadges={layoutSettings.showBadges}
                     onSelectProduct={() => {
                       setSelectedProduct(product);
-                      setSelectedProductCategory(categories.find((category) => category.id === product.categoryId) ?? null);
+                      setSelectedProductCategory(productCategoryIndex.get(product.id) ?? category ?? null);
                     }}
                   />
                 ))}
@@ -533,6 +559,7 @@ export function StorefrontPage() {
         <ProductDetailsModal
           product={selectedProduct}
           category={selectedProductCategory}
+          pizzaFlavorCandidates={selectedProductCategory && isPizzaCategory(selectedProductCategory) ? selectedProductCategory.products : []}
           isStoreClosed={!data.tenant.isOpen}
           onClose={() => {
             setSelectedProduct(null);

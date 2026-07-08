@@ -446,26 +446,10 @@ function SectionHeader(props: { title: string; subtitle?: string; right?: React.
   );
 }
 
-async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-    const response = await fetch(url, {
-      headers: {
-        'Accept-Language': 'pt-BR',
-        'User-Agent': 'PedeHub-App',
-      },
-    });
-    const data = await response.json();
-    if (data && data.length > 0) {
-      return {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-      };
-    }
-  } catch (err) {
-    console.error('Nominatim geocoding error:', err);
-  }
-  return null;
+interface BackendGeocodeResponse {
+  provider?: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 export function DeliveryZonesPage() {
@@ -608,9 +592,15 @@ export function DeliveryZonesPage() {
             setFitToStoreSeq((v) => v + 1);
           } else if (settings.street && settings.number && settings.city) {
             const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
-            const coords = await geocodeNominatim(addressStr);
-            if (coords) {
-              setCoverageDraft((d) => ({ ...d, storeLat: coords.lat, storeLng: coords.lng }));
+            const geocodeResponse = await api.post<BackendGeocodeResponse>('/delivery/coverage/geocode', {
+              query: addressStr,
+              source: 'settings',
+            });
+            const coords = geocodeResponse.success ? geocodeResponse.data : null;
+            if (coords?.lat != null && coords?.lng != null) {
+              const nextLat = coords.lat;
+              const nextLng = coords.lng;
+              setCoverageDraft((d) => ({ ...d, storeLat: nextLat, storeLng: nextLng }));
               setFitToStoreSeq((v) => v + 1);
             } else {
               setToast('Aviso: Não foi possível geocodificar o endereço. Mapa não centralizado com precisão.');

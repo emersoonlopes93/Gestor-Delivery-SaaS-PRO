@@ -6,6 +6,7 @@ import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { PublicTrackingPage } from './pages/PublicTrackingPage';
 import { PublicFeedbackPage } from './pages/PublicFeedbackPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
+import { PaymentPage } from './pages/PaymentPage';
 import { OrdersHistoryPage } from './pages/OrdersHistoryPage';
 import { CustomerProfilePage } from './pages/CustomerProfilePage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
@@ -46,6 +47,7 @@ export function App() {
             <Route path="/:tenantSlug/checkout" element={<CheckoutPage />} />
             <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
             <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
+            <Route path="/:tenantSlug/payment/:transactionId" element={<PaymentPage />} />
             <Route path="/:tenantSlug/orders" element={<OrdersHistoryPage />} />
             <Route path="/:tenantSlug/profile" element={<CustomerProfilePage />} />
             <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />

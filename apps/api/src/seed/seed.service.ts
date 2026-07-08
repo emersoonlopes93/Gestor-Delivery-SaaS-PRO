@@ -2,14 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import {
-  TENANT_PERMISSIONS,
   ADMIN_PERMISSIONS,
-  TENANT_ROLE_PERMISSIONS,
   ADMIN_ROLE_PERMISSIONS,
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
 import { seedDemoAiAgentAccess } from './demo-ai-agent.seed';
 import { CatalogTemplatesService } from '../catalog/catalog-templates.service';
+import {
+  ensureDefaultTenantRoles,
+  ensureTenantPermissionCatalog,
+} from '../tenant/default-tenant-roles';
 
 @Injectable()
 export class SeedService {
@@ -32,17 +34,8 @@ export class SeedService {
 
   private async seedTenantPermissions() {
     console.log('Seeding tenant permissions...');
-    const entries = Object.entries(TENANT_PERMISSIONS) as [string, string][];
-
-    for (const [slug, description] of entries) {
-      const [module, action] = slug.split('.');
-      await this.prisma.tenantPermission.upsert({
-        where: { slug },
-        update: { description },
-        create: { module, action, slug, description },
-      });
-    }
-    console.log(`   ${entries.length} tenant permissions seeded`);
+    await ensureTenantPermissionCatalog(this.prisma);
+    console.log('   Tenant permissions seeded');
   }
 
   private async seedAdminPermissions() {
@@ -203,46 +196,7 @@ export class SeedService {
     });
 
     // Create tenant roles
-    const roleEntries = Object.values(TenantDefaultRole) as string[];
-    for (const roleSlug of roleEntries) {
-      const roleName = roleSlug
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (l) => l.toUpperCase());
-
-      const role = await this.prisma.tenantRole.upsert({
-        where: { tenantId_slug: { tenantId: tenant.id, slug: roleSlug } },
-        update: { name: roleName },
-        create: {
-          tenantId: tenant.id,
-          name: roleName,
-          slug: roleSlug,
-          description: `Default ${roleName} role`,
-          isSystem: true,
-        },
-      });
-
-      const permSlugs = TENANT_ROLE_PERMISSIONS[roleSlug] || [];
-      for (const permSlug of permSlugs) {
-        const permission = await this.prisma.tenantPermission.findUnique({
-          where: { slug: permSlug },
-        });
-        if (permission) {
-          await this.prisma.tenantRolePermission.upsert({
-            where: {
-              roleId_permissionId: {
-                roleId: role.id,
-                permissionId: permission.id,
-              },
-            },
-            update: {},
-            create: {
-              roleId: role.id,
-              permissionId: permission.id,
-            },
-          });
-        }
-      }
-    }
+    await ensureDefaultTenantRoles(this.prisma, tenant.id);
 
     // Create tenant owner user
     const ownerEmail = 'owner@pizzariademo.com';

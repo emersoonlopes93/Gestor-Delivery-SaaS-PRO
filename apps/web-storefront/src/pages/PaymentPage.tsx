@@ -1,9 +1,13 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, QrCode, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../lib/api-client';
 
 interface PixPaymentData {
+  orderId?: string;
+  orderNumber?: string;
+  publicTrackingToken?: string;
   transactionId: string;
   qrCode: string;
   qrCodeBase64: string;
@@ -56,13 +60,18 @@ export function PaymentPage() {
             setStatus('confirmed');
             setPollingInterval(null);
             
-            // Redirecionar para página do pedido
+            // Redirecionar para o resumo público do pedido
             setTimeout(() => {
-              navigate(`/${tenantSlug}/order/success`, { 
-                state: { 
-                  message: 'Pagamento confirmado com sucesso!',
-                  orderData: response.data 
-                } 
+              const targetIdentifier = response.data.publicTrackingToken || response.data.orderId || transactionId;
+              navigate(`/${tenantSlug}/order/${targetIdentifier}`, {
+                state: {
+                  order: {
+                    id: response.data.orderId,
+                    orderNumber: response.data.orderNumber,
+                    publicTrackingToken: response.data.publicTrackingToken,
+                    pixPayment: response.data,
+                  },
+                },
               });
             }, 2000);
           } else if (updatedStatus === 'failed' || updatedStatus === 'expired') {
@@ -226,12 +235,22 @@ export function PaymentPage() {
             <div className="p-8">
               <div className="max-w-sm mx-auto">
                 {/* QR Code Image */}
-                <div className="bg-white p-4 rounded-2xl shadow-inner mb-6">
-                  <img 
-                    src={`data:image/png;base64,${paymentData.qrCodeBase64}`}
-                    alt="QR Code para pagamento PIX"
-                    className="w-full h-auto"
-                  />
+                <div className="bg-white p-4 rounded-2xl shadow-inner mb-6 flex items-center justify-center">
+                  {paymentData.qrCodeBase64 ? (
+                    <img 
+                      src={`data:image/png;base64,${paymentData.qrCodeBase64}`}
+                      alt="QR Code para pagamento PIX"
+                      className="w-full h-auto"
+                    />
+                  ) : paymentData.qrCode ? (
+                    <QRCodeSVG
+                      value={paymentData.qrCode}
+                      size={256}
+                      level="M"
+                      includeMargin
+                      className="w-full h-auto max-w-[256px]"
+                    />
+                  ) : null}
                 </div>
 
                 {/* PIX Code */}

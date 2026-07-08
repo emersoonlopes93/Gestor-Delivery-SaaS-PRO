@@ -12,9 +12,14 @@ WORKDIR /app
 
 # Stage 2: Dependencies
 FROM base AS dependencies
+RUN apt-get update -y && \
+    apt-get install -y python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
 COPY packages/ ./packages/
 COPY apps/api/package.json apps/api/
+COPY apps/api/prisma/ ./apps/api/prisma/
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
 RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build API

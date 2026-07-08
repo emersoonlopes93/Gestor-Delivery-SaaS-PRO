@@ -38,6 +38,20 @@ export class PublicOrdersController {
   }
 
   @Public()
+  @Get(':identifier/summary')
+  @Throttle({ public: { limit: 60, ttl: 60 } })
+  async publicSummary(
+    @Param('identifier') identifier: string,
+    @Query('token') token?: string,
+  ) {
+    if (!identifier) {
+      throw new NotFoundException('Pedido não encontrado');
+    }
+
+    return this.ordersService.getPublicOrderSummary(identifier, token?.trim() || undefined);
+  }
+
+  @Public()
   @Get(':token/tracking')
   @Throttle({ public: { limit: 60, ttl: 60 } })
   async tracking(@Param('token') token: string) {
