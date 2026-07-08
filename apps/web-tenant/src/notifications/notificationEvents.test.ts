@@ -40,6 +40,28 @@ describe('NotificationDeduper', () => {
     expect(deduper.shouldProcess(pollingEvent, 1001)).toBe(false);
   });
 
+  it('deduplicates order events when socket only has order number in the title', () => {
+    const deduper = new NotificationDeduper();
+    const socketEvent = createNotificationEvent({
+      id: 'socket-ready-1',
+      type: 'order.kds_ready',
+      title: 'Pedido #0003 pronto',
+      priority: 'high',
+      source: 'socket',
+    });
+    const pollingEvent = createNotificationEvent({
+      id: 'polling-ready-1',
+      type: 'order.kds_ready',
+      orderId: '#0003',
+      title: 'Pedido #0003 pronto',
+      priority: 'high',
+      source: 'polling',
+    });
+
+    expect(deduper.shouldProcess(socketEvent, 1000)).toBe(true);
+    expect(deduper.shouldProcess(pollingEvent, 1001)).toBe(false);
+  });
+
   it('allows same order to notify again after dedupe ttl expires', () => {
     const deduper = new NotificationDeduper(60_000, 20_000);
     const event = createNotificationEvent({

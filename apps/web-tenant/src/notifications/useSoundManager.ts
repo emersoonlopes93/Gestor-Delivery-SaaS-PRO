@@ -157,11 +157,16 @@ export function useSoundManager() {
   }, []);
 
   const testSound = useCallback(async () => {
-    if (!readSnapshot().unlocked) {
+    const current = readSnapshot();
+    if (!current.enabled) {
+      return false;
+    }
+
+    if (!current.unlocked) {
       const unlocked = await unlockAudio();
       if (!unlocked) return false;
     }
-    return playEvent('order.new', { force: true });
+    return playEvent('order.new');
   }, [playEvent, unlockAudio]);
 
   return useMemo(() => ({

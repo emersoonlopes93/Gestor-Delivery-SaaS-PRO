@@ -15,6 +15,19 @@ export type NotificationEvent = {
 
 const NOTIFICATION_EVENT_NAME = 'tenant:notification-event';
 
+function extractOrderReference(event: NotificationEvent) {
+  if (event.orderId) {
+    return event.orderId;
+  }
+
+  if (!event.type.startsWith('order.')) {
+    return null;
+  }
+
+  const match = event.title.match(/#\d+/);
+  return match?.[0] ?? null;
+}
+
 function getEventTarget() {
   if (typeof window !== 'undefined') {
     return window;
@@ -78,8 +91,9 @@ export class NotificationDeduper {
       return false;
     }
 
-    if (event.orderId) {
-      const orderTypeKey = `${event.orderId}:${event.type}`;
+    const orderReference = extractOrderReference(event);
+    if (orderReference) {
+      const orderTypeKey = `${orderReference}:${event.type}`;
       if (this.seenOrderTypes.has(orderTypeKey)) {
         this.seenIds.set(event.id, now);
         return false;
