@@ -637,17 +637,18 @@ export function AppLayout() {
     if (previousStatus !== storeStatus) {
       if (storeStatus === 'open') {
         emitNotificationEvent(createNotificationEvent({
-          id: `store:opened:${tenantData?.id ?? 'tenant'}`,
-          type: 'store.opened',
+          id: `store:${previousStatus === 'paused' ? 'resumed' : 'opened'}:${tenantData?.id ?? 'tenant'}`,
+          type: previousStatus === 'paused' ? 'store.resumed' : 'store.opened',
           title: 'Loja aberta',
           message: 'A operacao voltou a receber pedidos.',
           priority: 'low',
           source: 'local',
         }));
       } else if (previousStatus === 'open') {
+        const type = storeStatus === 'paused' ? 'store.paused' : 'store.closed';
         emitNotificationEvent(createNotificationEvent({
-          id: `store:closed:${tenantData?.id ?? 'tenant'}`,
-          type: 'store.closed',
+          id: `store:${storeStatus}:${tenantData?.id ?? 'tenant'}`,
+          type,
           title: 'Loja indisponivel para novos pedidos',
           message: storeStatus === 'paused' ? 'A loja foi pausada manualmente.' : 'A loja esta fora do horario configurado.',
           priority: 'high',

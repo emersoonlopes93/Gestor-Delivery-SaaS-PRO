@@ -6,7 +6,7 @@ describe('NotificationDeduper', () => {
     const deduper = new NotificationDeduper();
     const event = createNotificationEvent({
       id: 'evt-1',
-      type: 'order.new',
+      type: 'order.created',
       orderId: 'order-1',
       title: 'Novo pedido',
       priority: 'critical',
@@ -21,7 +21,7 @@ describe('NotificationDeduper', () => {
     const deduper = new NotificationDeduper();
     const socketEvent = createNotificationEvent({
       id: 'socket-1',
-      type: 'order.new',
+      type: 'order.created',
       orderId: 'order-1',
       title: 'Novo pedido',
       priority: 'critical',
@@ -29,7 +29,7 @@ describe('NotificationDeduper', () => {
     });
     const pollingEvent = createNotificationEvent({
       id: 'polling-1',
-      type: 'order.new',
+      type: 'order.created',
       orderId: 'order-1',
       title: 'Novo pedido',
       priority: 'critical',
@@ -44,14 +44,14 @@ describe('NotificationDeduper', () => {
     const deduper = new NotificationDeduper();
     const socketEvent = createNotificationEvent({
       id: 'socket-ready-1',
-      type: 'order.kds_ready',
+      type: 'order.ready',
       title: 'Pedido #0003 pronto',
       priority: 'high',
       source: 'socket',
     });
     const pollingEvent = createNotificationEvent({
       id: 'polling-ready-1',
-      type: 'order.kds_ready',
+      type: 'order.ready',
       orderId: '#0003',
       title: 'Pedido #0003 pronto',
       priority: 'high',
@@ -83,5 +83,18 @@ describe('NotificationDeduper', () => {
 
     expect(deduper.shouldProcess(event, 1000)).toBe(true);
     expect(deduper.shouldProcess(laterEvent, 25_500)).toBe(true);
+  });
+
+  it('normalizes legacy aliases before dispatch', () => {
+    const event = createNotificationEvent({
+      id: 'legacy-1',
+      type: 'order.new',
+      orderId: 'order-1',
+      title: 'Novo pedido',
+      priority: 'critical',
+      source: 'socket',
+    });
+
+    expect(event.type).toBe('order.created');
   });
 });

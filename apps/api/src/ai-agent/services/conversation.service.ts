@@ -757,6 +757,7 @@ export class ConversationService {
 
     // Emit WebSocket event for session update
     ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitWhatsAppHandoff(session.tenantId, session);
 
     // Log system message
     await this.addMessage({

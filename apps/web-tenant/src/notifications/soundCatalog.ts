@@ -1,16 +1,6 @@
-export type SystemSoundEvent =
-  | 'order.new'
-  | 'order.cancelled'
-  | 'order.accepted'
-  | 'order.auto_accepted'
-  | 'order.kds_ready'
-  | 'order.out_for_delivery'
-  | 'store.closed'
-  | 'store.opened'
-  | 'connection.lost'
-  | 'connection.restored'
-  | 'error.critical'
-  | 'whatsapp.handoff';
+import type { NotificationCanonicalEvent } from '../../../../packages/types/src/notifications';
+
+export type SystemSoundEvent = NotificationCanonicalEvent;
 
 export type SoundPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -48,8 +38,8 @@ const ALERT = 'square' as const;
 const BRIGHT = 'sawtooth' as const;
 
 export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
-  'order.new': {
-    event: 'order.new',
+  'order.created': {
+    event: 'order.created',
     pattern: {
       steps: [
         { frequency: 784, durationMs: 120, waveform: CHIME, gain: 0.45, attackMs: 8, releaseMs: 24 },
@@ -74,8 +64,8 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
     priority: 'high',
     cooldownMs: 5_000,
   },
-  'order.accepted': {
-    event: 'order.accepted',
+  'order.confirmed': {
+    event: 'order.confirmed',
     pattern: {
       steps: [
         { frequency: 523.25, durationMs: 120, waveform: CHIME, gain: 0.42, attackMs: 10, releaseMs: 28 },
@@ -100,8 +90,21 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
     priority: 'medium',
     cooldownMs: 4_000,
   },
-  'order.kds_ready': {
-    event: 'order.kds_ready',
+  'order.sent_to_kitchen': {
+    event: 'order.sent_to_kitchen',
+    pattern: {
+      steps: [
+        { frequency: 523.25, durationMs: 120, waveform: CHIME, gain: 0.42, attackMs: 10, releaseMs: 28 },
+        { frequency: 659.25, durationMs: 150, waveform: CHIME, gain: 0.48, attackMs: 10, releaseMs: 30 },
+        { frequency: 783.99, durationMs: 180, waveform: CHIME, gain: 0.5, attackMs: 12, releaseMs: 36 },
+      ],
+      gapMs: 24,
+    },
+    priority: 'medium',
+    cooldownMs: 4_000,
+  },
+  'order.ready': {
+    event: 'order.ready',
     pattern: {
       steps: [
         { frequency: 880, durationMs: 90, waveform: ALERT, gain: 0.32, attackMs: 4, releaseMs: 12 },
@@ -126,6 +129,33 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
     priority: 'medium',
     cooldownMs: 4_000,
   },
+  'order.delivered': {
+    event: 'order.delivered',
+    pattern: {
+      steps: [
+        { frequency: 523.25, durationMs: 110, waveform: CHIME, gain: 0.28, attackMs: 10, releaseMs: 20 },
+        { frequency: 659.25, durationMs: 120, waveform: CHIME, gain: 0.34, attackMs: 10, releaseMs: 22 },
+        { frequency: 783.99, durationMs: 160, waveform: CHIME, gain: 0.4, attackMs: 12, releaseMs: 30 },
+      ],
+      gapMs: 22,
+    },
+    priority: 'low',
+    cooldownMs: 8_000,
+  },
+  'order.failed': {
+    event: 'order.failed',
+    pattern: {
+      steps: [
+        { noise: true, noiseFilter: 'bandpass', durationMs: 60, gain: 0.32, attackMs: 1, releaseMs: 14 },
+        { frequency: 220, durationMs: 150, waveform: BRIGHT, gain: 0.35, attackMs: 4, releaseMs: 18 },
+        { noise: true, noiseFilter: 'highpass', durationMs: 60, gain: 0.32, attackMs: 1, releaseMs: 14 },
+        { frequency: 196, durationMs: 160, waveform: BRIGHT, gain: 0.4, attackMs: 4, releaseMs: 22 },
+      ],
+      gapMs: 16,
+    },
+    priority: 'critical',
+    cooldownMs: 10_000,
+  },
   'store.closed': {
     event: 'store.closed',
     pattern: {
@@ -140,6 +170,31 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
   },
   'store.opened': {
     event: 'store.opened',
+    pattern: {
+      steps: [
+        { frequency: 523.25, durationMs: 120, waveform: CHIME, gain: 0.28, attackMs: 10, releaseMs: 24 },
+        { frequency: 659.25, durationMs: 130, waveform: CHIME, gain: 0.34, attackMs: 10, releaseMs: 26 },
+        { frequency: 783.99, durationMs: 170, waveform: CHIME, gain: 0.4, attackMs: 12, releaseMs: 32 },
+      ],
+      gapMs: 22,
+    },
+    priority: 'low',
+    cooldownMs: 10_000,
+  },
+  'store.paused': {
+    event: 'store.paused',
+    pattern: {
+      steps: [
+        { frequency: 293.66, durationMs: 180, waveform: SOFT, gain: 0.28, attackMs: 10, releaseMs: 42 },
+        { frequency: 246.94, durationMs: 220, waveform: SOFT, gain: 0.24, attackMs: 12, releaseMs: 48 },
+      ],
+      gapMs: 26,
+    },
+    priority: 'high',
+    cooldownMs: 10_000,
+  },
+  'store.resumed': {
+    event: 'store.resumed',
     pattern: {
       steps: [
         { frequency: 523.25, durationMs: 120, waveform: CHIME, gain: 0.28, attackMs: 10, releaseMs: 24 },
@@ -177,8 +232,35 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
     priority: 'low',
     cooldownMs: 8_000,
   },
-  'error.critical': {
-    event: 'error.critical',
+  'print.completed': {
+    event: 'print.completed',
+    pattern: {
+      steps: [
+        { frequency: 523.25, durationMs: 110, waveform: CHIME, gain: 0.28, attackMs: 10, releaseMs: 20 },
+        { frequency: 659.25, durationMs: 120, waveform: CHIME, gain: 0.34, attackMs: 10, releaseMs: 22 },
+        { frequency: 783.99, durationMs: 160, waveform: CHIME, gain: 0.4, attackMs: 12, releaseMs: 30 },
+      ],
+      gapMs: 22,
+    },
+    priority: 'low',
+    cooldownMs: 8_000,
+  },
+  'print.failed': {
+    event: 'print.failed',
+    pattern: {
+      steps: [
+        { noise: true, noiseFilter: 'bandpass', durationMs: 60, gain: 0.32, attackMs: 1, releaseMs: 14 },
+        { frequency: 220, durationMs: 150, waveform: BRIGHT, gain: 0.35, attackMs: 4, releaseMs: 18 },
+        { noise: true, noiseFilter: 'highpass', durationMs: 60, gain: 0.32, attackMs: 1, releaseMs: 14 },
+        { frequency: 196, durationMs: 160, waveform: BRIGHT, gain: 0.4, attackMs: 4, releaseMs: 22 },
+      ],
+      gapMs: 16,
+    },
+    priority: 'critical',
+    cooldownMs: 10_000,
+  },
+  'system.error': {
+    event: 'system.error',
     pattern: {
       steps: [
         { noise: true, noiseFilter: 'bandpass', durationMs: 60, gain: 0.32, attackMs: 1, releaseMs: 14 },
@@ -202,6 +284,19 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
       gapMs: 20,
     },
     priority: 'high',
+    cooldownMs: 5_000,
+  },
+  'whatsapp.message_received': {
+    event: 'whatsapp.message_received',
+    pattern: {
+      steps: [
+        { frequency: 440, durationMs: 110, waveform: SOFT, gain: 0.28, attackMs: 10, releaseMs: 20, glideTo: 554.37 },
+        { frequency: 554.37, durationMs: 130, waveform: SOFT, gain: 0.34, attackMs: 10, releaseMs: 22, glideTo: 440 },
+        { frequency: 659.25, durationMs: 180, waveform: SOFT, gain: 0.38, attackMs: 12, releaseMs: 30 },
+      ],
+      gapMs: 20,
+    },
+    priority: 'medium',
     cooldownMs: 5_000,
   },
 };

@@ -1124,12 +1124,10 @@ export class OrdersService {
       if (nextStatus === 'cancelled') {
         this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken || '', order.orderNumber, OrderStatus.cancelled, dto.note);
         // Também emitimos para o tenant room caso o painel administrativo queira ouvir por lá
-        if (this.ordersGateway.server) {
-          this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderCancelled', { 
-            orderId, 
-            orderNumber: order.orderNumber 
-          });
-        }
+        this.ordersGateway.emitOrderCancelled(tenantId, {
+          orderId,
+          orderNumber: order.orderNumber,
+        });
 
         // Reverter estoque teórico
         await this.inventoryService.reverseOrderDepletion(tenantId, orderId).catch(e => {

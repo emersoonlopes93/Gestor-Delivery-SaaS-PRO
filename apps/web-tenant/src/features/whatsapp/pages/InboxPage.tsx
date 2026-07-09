@@ -5,7 +5,6 @@ import type { ChatSessionListItem, ChatSession, ChatInboxStats, PaginatedChatSes
 import { ChatArea } from '../components/ChatArea';
 import { useChatSocket } from '../hooks/useChatSocket';
 import { useTenantAuth } from '../../../hooks/use-tenant-auth';
-import { useHandoffNotification } from '../hooks/useHandoffNotification';
 import { Search, Loader2, Bot, UserCircle, AlertCircle, CheckCircle } from 'lucide-react';
 
 export function InboxPage() {
@@ -21,9 +20,6 @@ export function InboxPage() {
 
   // Enable WebSocket for real-time updates
   useChatSocket(user?.tenantId);
-
-  // Handoff notifications (sound + toast)
-  useHandoffNotification(true);
 
   const [socketConnected, setSocketConnected] = useState<boolean>(
     typeof window !== 'undefined' ? !!window.__CHAT_SOCKET_CONNECTED : false,

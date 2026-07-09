@@ -157,7 +157,7 @@ export function useSoundManager() {
       const unlocked = await unlockAudio();
       if (!unlocked) return false;
     }
-    return playEvent('order.new');
+    return playEvent('order.created');
   }, [playEvent, unlockAudio]);
 
   return useMemo(() => ({

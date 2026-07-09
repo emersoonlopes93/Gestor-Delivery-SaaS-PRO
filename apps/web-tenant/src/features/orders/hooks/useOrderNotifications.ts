@@ -16,10 +16,11 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
     const prevOrders = prevOrdersRef.current;
     const newOrders = orders.filter((order) => !prevOrders.some((previous) => previous.id === order.id));
 
+    // Polling is only a transport fallback for missed socket domain events.
     for (const order of newOrders) {
       emitNotificationEvent(createNotificationEvent({
-        id: `polling:order.new:${order.id}`,
-        type: 'order.new',
+        id: `polling:order.created:${order.id}`,
+        type: 'order.created',
         orderId: order.id,
         title: `Novo pedido #${order.orderNumber}`,
         message: `${order.customerName} - fallback do painel operacional.`,
@@ -46,8 +47,8 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
 
       if (order.status === 'ready_for_delivery' || order.status === 'ready_for_pickup') {
         emitNotificationEvent(createNotificationEvent({
-          id: `polling:order.kds_ready:${order.id}`,
-          type: 'order.kds_ready',
+          id: `polling:order.ready:${order.id}`,
+          type: 'order.ready',
           orderId: order.id,
           title: `Pedido #${order.orderNumber} pronto`,
           message: 'Atualizacao recebida pelo polling do painel.',

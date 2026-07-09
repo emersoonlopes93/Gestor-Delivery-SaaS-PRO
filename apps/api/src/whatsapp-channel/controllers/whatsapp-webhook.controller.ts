@@ -419,6 +419,9 @@ export class WhatsAppWebhookController {
         const updatedSession = await this.prisma.chatSession.findUnique({ where: { id: session.id } });
         if (updatedSession) {
           ChatGateway.instance?.emitSessionUpdated(tenantId, updatedSession);
+          if (!session.handoffActive && updatedSession.handoffActive) {
+            ChatGateway.instance?.emitWhatsAppHandoff(tenantId, updatedSession);
+          }
           this.logger.log(`[WA_WEBHOOK] socket_emit_success event=sessionUpdated sessionId=${session.id}`);
         }
       } catch (emitErr) {

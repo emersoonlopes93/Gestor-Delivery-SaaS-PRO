@@ -9,7 +9,13 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
-import { OrderListItemDTO, OrderStatusUpdatedEvent, OrderStatus } from '@gestor/types';
+import {
+  OrderListItemDTO,
+  OrderStatusUpdatedEvent,
+  OrderStatus,
+  type NotificationDomainEvent,
+  type TenantNotificationEventPayload,
+} from '@gestor/types';
 
 @WebSocketGateway({
   cors: true,
@@ -76,9 +82,18 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.warn('WebSocket server not initialized. Skipping emitNewOrder.');
       return;
     }
+    const timestamp = new Date().toISOString();
+    this.server.to(`tenant:${tenantId}`).emit('order.created', {
+      type: 'order.created',
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      total: order.total,
+      timestamp,
+    } satisfies TenantNotificationEventPayload);
     this.server.to(`tenant:${tenantId}`).emit('newOrder', {
       order,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
   }
 
@@ -90,9 +105,15 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.warn('WebSocket server not initialized. Skipping emitOrderAutoAccepted.');
       return;
     }
+    const timestamp = new Date().toISOString();
+    this.server.to(`tenant:${tenantId}`).emit('order.auto_accepted', {
+      type: 'order.auto_accepted',
+      ...input,
+      timestamp,
+    } satisfies TenantNotificationEventPayload);
     this.server.to(`tenant:${tenantId}`).emit('orderAutoAccepted', {
       ...input,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
   }
 
@@ -104,12 +125,37 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.warn('WebSocket server not initialized. Skipping emitAiHandoff.');
       return;
     }
+    const timestamp = new Date().toISOString();
     this.logger.log(`[Handoff] AI transferring session ${sessionId} to human agent for tenant ${tenantId}`);
+    this.server.to(`tenant:${tenantId}`).emit('whatsapp.handoff', {
+      type: 'whatsapp.handoff',
+      sessionId,
+      sessionName,
+      customerName,
+      timestamp,
+    } satisfies TenantNotificationEventPayload);
     this.server.to(`tenant:${tenantId}`).emit('aiHandoff', {
       sessionId,
       sessionName,
       customerName,
-      timestamp: new Date().toISOString(),
+      timestamp,
+    });
+  }
+
+  emitOrderCancelled(tenantId: string, input: { orderId: string; orderNumber: string }) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitOrderCancelled.');
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    this.server.to(`tenant:${tenantId}`).emit('order.cancelled', {
+      type: 'order.cancelled',
+      ...input,
+      timestamp,
+    } satisfies TenantNotificationEventPayload);
+    this.server.to(`tenant:${tenantId}`).emit('orderCancelled', {
+      ...input,
+      timestamp,
     });
   }
 
@@ -126,12 +172,36 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.warn('WebSocket server not initialized. Skipping emitOrderReady.');
       return;
     }
+    const timestamp = new Date().toISOString();
     this.logger.log(`[Ready] Order ${orderNumber} marked as ready for tenant ${tenantId}`);
+    this.server.to(`tenant:${tenantId}`).emit('order.ready', {
+      type: 'order.ready',
+      orderNumber,
+      customerName,
+      fulfillmentType,
+      timestamp,
+    } satisfies TenantNotificationEventPayload);
     this.server.to(`tenant:${tenantId}`).emit('orderReady', {
       orderNumber,
       customerName,
       fulfillmentType,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
+  }
+
+  emitOrderDomainEvent(
+    tenantId: string,
+    type: NotificationDomainEvent,
+    input: Omit<TenantNotificationEventPayload, 'type' | 'timestamp'>,
+  ) {
+    if (!this.server) {
+      this.logger.warn(`WebSocket server not initialized. Skipping ${type}.`);
+      return;
+    }
+    this.server.to(`tenant:${tenantId}`).emit(type, {
+      type,
+      ...input,
+      timestamp: new Date().toISOString(),
+    } satisfies TenantNotificationEventPayload);
   }
 }

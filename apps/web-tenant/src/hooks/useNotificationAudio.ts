@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import type { TenantNotificationEventPayload } from '@gestor/types';
 import { requestNotificationPermission } from '../lib/notification-support';
 import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
@@ -11,6 +12,7 @@ export function useNotificationAudio(
   const socketRef = useRef<Socket | null>(null);
   const hadConnectionRef = useRef(false);
   const isConnectionLostRef = useRef(false);
+  const processedSocketEventsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!tenantId) {
@@ -73,34 +75,77 @@ export function useNotificationAudio(
       }
     });
 
-    socket.on('newOrder', (data: { order: { id?: string; orderNumber: string; customerName: string; total: number } }) => {
-      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.order.total);
+    const shouldProcessSocketEvent = (key: string) => {
+      const now = Date.now();
+      for (const [eventKey, timestamp] of processedSocketEventsRef.current.entries()) {
+        if (now - timestamp > 20_000) {
+          processedSocketEventsRef.current.delete(eventKey);
+        }
+      }
+
+      if (processedSocketEventsRef.current.has(key)) {
+        return false;
+      }
+
+      processedSocketEventsRef.current.set(key, now);
+      return true;
+    };
+
+    const emitOrderCreated = (
+      data: { orderId?: string; orderNumber: string; customerName: string; total: number | string },
+    ) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!shouldProcessSocketEvent(`order.created:${orderId}`)) return;
+      const total = typeof data.total === 'number' ? data.total : Number(data.total);
+      const safeTotal = Number.isFinite(total) ? total : 0;
+      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(safeTotal);
 
       emitNotificationEvent(createNotificationEvent({
-        id: `socket:order.new:${data.order.id ?? data.order.orderNumber}`,
-        type: 'order.new',
-        orderId: data.order.id ?? data.order.orderNumber,
-        title: `Novo pedido #${data.order.orderNumber}`,
-        message: `${data.order.customerName} - ${totalFmt}`,
+        id: `socket:order.created:${orderId}`,
+        type: 'order.created',
+        orderId,
+        title: `Novo pedido #${data.orderNumber}`,
+        message: `${data.customerName} - ${totalFmt}`,
         priority: 'critical',
         source: 'socket',
       }));
 
       showNewOrderNotification({
-        id: data.order.id,
-        orderNumber: data.order.orderNumber,
-        customerName: data.order.customerName,
-        total: data.order.total,
+        id: data.orderId,
+        orderNumber: data.orderNumber,
+        customerName: data.customerName,
+        total: safeTotal,
       }).catch((err) => {
         console.warn('[NativeNotifications] Falha ao exibir notificacao de novo pedido:', err);
       });
+    };
+
+    socket.on('order.created', (data: TenantNotificationEventPayload) => {
+      if (!data.orderNumber || !data.customerName || typeof data.total === 'undefined') return;
+      emitOrderCreated({
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        customerName: data.customerName,
+        total: data.total,
+      });
     });
 
-    socket.on('orderAutoAccepted', (data: { orderId: string; orderNumber: string; customerName?: string; total?: number | string }) => {
+    socket.on('newOrder', (data: { order: { id?: string; orderNumber: string; customerName: string; total: number } }) => {
+      emitOrderCreated({
+        orderId: data.order.id,
+        orderNumber: data.order.orderNumber,
+        customerName: data.order.customerName,
+        total: data.order.total,
+      });
+    });
+
+    socket.on('order.auto_accepted', (data: TenantNotificationEventPayload) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!orderId || !shouldProcessSocketEvent(`order.auto_accepted:${orderId}`)) return;
       emitNotificationEvent(createNotificationEvent({
-        id: `socket:order.auto_accepted:${data.orderId ?? data.orderNumber}`,
+        id: `socket:order.auto_accepted:${orderId}`,
         type: 'order.auto_accepted',
-        orderId: data.orderId ?? data.orderNumber,
+        orderId,
         title: `Pedido ${data.orderNumber} aceito automaticamente`,
         message: `${data.customerName || 'Cliente'} - pronto para seguir no fluxo operacional.`,
         priority: 'high',
@@ -108,11 +153,27 @@ export function useNotificationAudio(
       }));
     });
 
-    socket.on('orderCancelled', (data: { orderId?: string; orderNumber?: string }) => {
+    socket.on('orderAutoAccepted', (data: { orderId: string; orderNumber: string; customerName?: string; total?: number | string }) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!shouldProcessSocketEvent(`order.auto_accepted:${orderId}`)) return;
       emitNotificationEvent(createNotificationEvent({
-        id: `socket:order.cancelled:${data.orderId ?? data.orderNumber ?? 'unknown'}`,
+        id: `socket:order.auto_accepted:${orderId}`,
+        type: 'order.auto_accepted',
+        orderId,
+        title: `Pedido ${data.orderNumber} aceito automaticamente`,
+        message: `${data.customerName || 'Cliente'} - pronto para seguir no fluxo operacional.`,
+        priority: 'high',
+        source: 'socket',
+      }));
+    });
+
+    socket.on('order.cancelled', (data: TenantNotificationEventPayload) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!orderId || !shouldProcessSocketEvent(`order.cancelled:${orderId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.cancelled:${orderId}`,
         type: 'order.cancelled',
-        orderId: data.orderId ?? data.orderNumber,
+        orderId,
         title: data.orderNumber ? `Pedido #${data.orderNumber} cancelado` : 'Pedido cancelado',
         message: 'Revise o pedido e a operacao no painel.',
         priority: 'high',
@@ -120,7 +181,22 @@ export function useNotificationAudio(
       }));
     });
 
-    socket.on('aiHandoff', (data: { sessionId: string; customerName?: string }) => {
+    socket.on('orderCancelled', (data: { orderId?: string; orderNumber?: string }) => {
+      const orderId = data.orderId ?? data.orderNumber ?? 'unknown';
+      if (!shouldProcessSocketEvent(`order.cancelled:${orderId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.cancelled:${orderId}`,
+        type: 'order.cancelled',
+        orderId,
+        title: data.orderNumber ? `Pedido #${data.orderNumber} cancelado` : 'Pedido cancelado',
+        message: 'Revise o pedido e a operacao no painel.',
+        priority: 'high',
+        source: 'socket',
+      }));
+    });
+
+    const emitWhatsAppHandoff = (data: { sessionId: string; customerName?: string }) => {
+      if (!shouldProcessSocketEvent(`whatsapp.handoff:${data.sessionId}`)) return;
       emitNotificationEvent(createNotificationEvent({
         id: `socket:whatsapp.handoff:${data.sessionId}`,
         type: 'whatsapp.handoff',
@@ -129,20 +205,40 @@ export function useNotificationAudio(
         priority: 'high',
         source: 'socket',
       }));
+    };
+
+    socket.on('whatsapp.handoff', (data: TenantNotificationEventPayload) => {
+      if (!data.sessionId) return;
+      emitWhatsAppHandoff({ sessionId: data.sessionId, customerName: data.customerName ?? data.sessionName });
     });
 
-    socket.on('orderReady', (data: { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
+    socket.on('aiHandoff', (data: { sessionId: string; customerName?: string }) => {
+      emitWhatsAppHandoff(data);
+    });
+
+    const emitOrderReady = (data: { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!shouldProcessSocketEvent(`order.ready:${orderId}`)) return;
       const fulfillmentText = data.fulfillmentType === 'delivery' ? 'para entrega' : 'para retirada';
 
       emitNotificationEvent(createNotificationEvent({
-        id: `socket:order.kds_ready:${data.orderId ?? data.orderNumber}`,
-        type: 'order.kds_ready',
-        orderId: data.orderId ?? data.orderNumber,
+        id: `socket:order.ready:${orderId}`,
+        type: 'order.ready',
+        orderId,
         title: `Pedido #${data.orderNumber} pronto`,
         message: `${data.customerName || 'Cliente'} - ${fulfillmentText}.`,
         priority: 'high',
         source: 'socket',
       }));
+    };
+
+    socket.on('order.ready', (data: TenantNotificationEventPayload) => {
+      if (!data.orderNumber) return;
+      emitOrderReady(data as { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string });
+    });
+
+    socket.on('orderReady', (data: { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
+      emitOrderReady(data);
     });
 
     socketRef.current = socket;
@@ -162,10 +258,10 @@ export function useNotificationAudio(
     });
   }, []);
 
-  const playTestNewOrder = useCallback(() => playNotificationSound('order.new', 1), []);
+  const playTestNewOrder = useCallback(() => playNotificationSound('order.created', 1), []);
   const playTestCancellation = useCallback(() => playNotificationSound('order.cancelled', 1), []);
   const playTestHandoff = useCallback(() => playNotificationSound('whatsapp.handoff', 1), []);
-  const playTestReady = useCallback(() => playNotificationSound('order.kds_ready', 1), []);
+  const playTestReady = useCallback(() => playNotificationSound('order.ready', 1), []);
 
   return { requestPermission, playTestNewOrder, playTestCancellation, playTestHandoff, playTestReady };
 }

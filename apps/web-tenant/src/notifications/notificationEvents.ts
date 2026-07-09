@@ -1,6 +1,9 @@
-import type { SystemSoundEvent, SoundPriority } from './soundCatalog';
+import type { NotificationCanonicalEvent, NotificationLegacyEvent } from '../../../../packages/types/src/notifications';
+import { normalizeNotificationEvent } from '../../../../packages/types/src/notifications';
+import type { SoundPriority } from './soundCatalog';
 
-export type NotificationEventType = SystemSoundEvent;
+export type NotificationEventType = NotificationCanonicalEvent;
+export type NotificationEventInputType = NotificationCanonicalEvent | NotificationLegacyEvent;
 
 export type NotificationEvent = {
   id: string;
@@ -36,20 +39,27 @@ function getEventTarget() {
 }
 
 export function buildNotificationEventId(
-  type: NotificationEventType,
+  type: NotificationEventInputType,
   source: NotificationEvent['source'],
   orderId?: string,
 ) {
   const suffix = orderId ? `:${orderId}` : '';
-  return `${source}:${type}${suffix}:${Date.now()}`;
+  return `${source}:${normalizeNotificationEvent(type)}${suffix}:${Date.now()}`;
 }
 
 export function createNotificationEvent(
-  input: Omit<NotificationEvent, 'id' | 'createdAt'> & { id?: string; createdAt?: string },
+  input: Omit<NotificationEvent, 'id' | 'createdAt' | 'type'> & {
+    id?: string;
+    createdAt?: string;
+    type: NotificationEventInputType;
+  },
 ): NotificationEvent {
+  const type = normalizeNotificationEvent(input.type);
+
   return {
     ...input,
-    id: input.id ?? buildNotificationEventId(input.type, input.source, input.orderId),
+    type,
+    id: input.id ?? buildNotificationEventId(type, input.source, input.orderId),
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
 }

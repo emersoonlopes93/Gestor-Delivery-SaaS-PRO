@@ -11,13 +11,13 @@ describe('SoundPlaybackController', () => {
 
   it('respects mute/disabled preference', () => {
     const controller = new SoundPlaybackController();
-    expect(controller.canPlay('order.new', { enabled: false, unlocked: true }, 1000)).toBe(false);
+    expect(controller.canPlay('order.created', { enabled: false, unlocked: true }, 1000)).toBe(false);
   });
 
   it('respects cooldown between repeated plays of the same event', () => {
     const controller = new SoundPlaybackController();
-    expect(controller.canPlay('order.new', { enabled: true, unlocked: true }, 1000)).toBe(true);
-    expect(controller.canPlay('order.new', { enabled: true, unlocked: true }, 2000)).toBe(false);
-    expect(controller.canPlay('order.new', { enabled: true, unlocked: true }, 10_000)).toBe(true);
+    expect(controller.canPlay('order.created', { enabled: true, unlocked: true }, 1000)).toBe(true);
+    expect(controller.canPlay('order.created', { enabled: true, unlocked: true }, 2000)).toBe(false);
+    expect(controller.canPlay('order.created', { enabled: true, unlocked: true }, 10_000)).toBe(true);
   });
 });
