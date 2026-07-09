@@ -162,7 +162,7 @@ export function NotificationSettings() {
               <div className="min-w-0">
                 <h2 className="text-base sm:text-lg font-black text-foreground">Alertas sonoros</h2>
                 <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                  Os sons do sistema sao padronizados por tipo de evento para garantir operacao consistente.
+                  Os sons do sistema sao personalizados por tipo de evento para garantir uma operacao consistente e clara.
                 </p>
               </div>
             </div>
@@ -284,7 +284,7 @@ export function NotificationSettings() {
         <div className="bg-primary/5 border border-primary/20 p-4 sm:p-6 rounded-3xl flex gap-3 sm:gap-4 text-foreground">
           <Info className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 shrink-0 mt-0.5" />
           <div className="text-xs sm:text-sm text-primary-800 dark:text-primary-400 leading-relaxed font-medium">
-            <strong>Como funciona?</strong> As variaveis em chaves duplas como <code>{'{{orderNumber}}'}</code> sao substituidas automaticamente pelos dados reais do pedido antes do envio. Os campos legados de audio continuam no backend apenas por compatibilidade e nao sao mais expostos ao tenant.
+            <strong>Como funciona?</strong> As variaveis em chaves duplas como <code>{'{{orderNumber}}'}</code> sao substituidas automaticamente pelos dados reais do pedido antes do envio. Os alertas sonoros do sistema agora sao gerados internamente por evento, sem depender de arquivos de audio antigos.
           </div>
         </div>
       </div>

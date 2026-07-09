@@ -3,38 +3,10 @@ import { io, Socket } from 'socket.io-client';
 import { requestNotificationPermission } from '../lib/notification-support';
 import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
-
-interface AudioSettings {
-  enabled: boolean;
-  volume: number;
-  newOrderSound?: string;
-  cancellationSound?: string;
-  handoffSound?: string;
-  readySound?: string;
-}
-
-function playAudio(url: string, volume: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      const audio = new Audio(url);
-      audio.volume = Math.max(0, Math.min(1, volume || 1));
-      const playPromise = audio.play();
-
-      if (playPromise !== undefined) {
-        playPromise.then(() => resolve()).catch(reject);
-        return;
-      }
-
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
+import { playNotificationSound } from '../notifications/soundEngine';
 
 export function useNotificationAudio(
   tenantId: string | undefined,
-  _settings?: AudioSettings,
 ) {
   const socketRef = useRef<Socket | null>(null);
   const hadConnectionRef = useRef(false);
@@ -190,10 +162,10 @@ export function useNotificationAudio(
     });
   }, []);
 
-  const playTestNewOrder = useCallback(() => playAudio('/sounds/Novo Pedido (M).mp3', 1), []);
-  const playTestCancellation = useCallback(() => playAudio('/sounds/pedido de cancelamento(M).mp3', 1), []);
-  const playTestHandoff = useCallback(() => playAudio('/sounds/transferindo para atendente (H).mp3', 1), []);
-  const playTestReady = useCallback(() => playAudio('/sounds/Pedido Pronto (M).mp3', 1), []);
+  const playTestNewOrder = useCallback(() => playNotificationSound('order.new', 1), []);
+  const playTestCancellation = useCallback(() => playNotificationSound('order.cancelled', 1), []);
+  const playTestHandoff = useCallback(() => playNotificationSound('whatsapp.handoff', 1), []);
+  const playTestReady = useCallback(() => playNotificationSound('order.kds_ready', 1), []);
 
   return { requestPermission, playTestNewOrder, playTestCancellation, playTestHandoff, playTestReady };
 }

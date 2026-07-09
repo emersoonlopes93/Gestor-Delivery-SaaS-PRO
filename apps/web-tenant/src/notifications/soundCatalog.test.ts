@@ -18,4 +18,10 @@ describe('soundCatalog', () => {
       'whatsapp.handoff': expect.any(Object),
     });
   });
+
+  it('uses generated sound patterns instead of legacy audio assets', () => {
+    expect(SOUND_CATALOG['order.new'].pattern.steps.length).toBeGreaterThan(0);
+    expect(SOUND_CATALOG['connection.lost'].pattern.steps.some((step) => step.noise)).toBe(true);
+    expect(SOUND_CATALOG['order.auto_accepted'].pattern.steps.every((step) => typeof step.durationMs === 'number')).toBe(true);
+  });
 });

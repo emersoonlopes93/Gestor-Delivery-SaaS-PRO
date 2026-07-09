@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSoundCatalogEntry, type SystemSoundEvent } from './soundCatalog';
+import { playNotificationSound, unlockNotificationAudio } from './soundEngine';
 
 export const TENANT_NOTIFICATION_SOUND_ENABLED_KEY = 'tenantNotificationSoundEnabled';
 export const TENANT_NOTIFICATION_VOLUME_KEY = 'tenantNotificationVolume';
@@ -86,13 +87,6 @@ export class SoundPlaybackController {
 
 const playbackController = new SoundPlaybackController();
 
-async function playAudioAsset(asset: string, volume: number) {
-  const audio = new Audio(asset);
-  audio.volume = clampVolume(volume);
-  await audio.play();
-  return audio;
-}
-
 export function useSoundManager() {
   const [snapshot, setSnapshot] = useState<SoundManagerSnapshot>(() => readSnapshot());
   const [lastPlaybackBlocked, setLastPlaybackBlocked] = useState<string | null>(null);
@@ -124,9 +118,7 @@ export function useSoundManager() {
 
   const unlockAudio = useCallback(async () => {
     try {
-      const audio = await playAudioAsset('/sounds/notification.mp3', 0);
-      audio.pause();
-      audio.currentTime = 0;
+      await unlockNotificationAudio();
       persistSnapshot({ unlocked: true });
       setSnapshot((prev) => ({ ...prev, unlocked: true }));
       setLastPlaybackBlocked(null);
@@ -145,8 +137,7 @@ export function useSoundManager() {
     }
 
     try {
-      const definition = getSoundCatalogEntry(event);
-      await playAudioAsset(definition.asset, current.volume);
+      await playNotificationSound(event, current.volume);
       setLastPlaybackBlocked(null);
       return true;
     } catch (error) {
