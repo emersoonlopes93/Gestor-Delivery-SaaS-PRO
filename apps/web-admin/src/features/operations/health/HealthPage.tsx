@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../../../lib/api-client';
-import { Activity, AlertTriangle, Building2, CheckCircle2, Clock, ExternalLink, RefreshCw, Search } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, CheckCircle2, Clock, RefreshCw, Search } from 'lucide-react';
 
 interface HealthAlert {
   type: string;
@@ -48,10 +47,9 @@ interface HealthOverviewResponse {
 }
 
 export function HealthPage() {
-  const navigate = useNavigate();
-  const [tenants, setTenants] = useState<HealthTenantListItem[]>([]);
+    const [tenants, setTenants] = useState<HealthTenantListItem[]>([]);
   const [stats, setStats] = useState({ total: 0, active: 0, suspended: 0, pastDue: 0, trailing: 0 });
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');

@@ -54,6 +54,14 @@ export class PaymentInput {
   @IsNumber() @IsOptional() installments?: number;
 }
 
+// --- Queue Constants ---
+export const ORDERS_QUEUE = 'orders';
+export const ORDERS_QUEUE_EVENTS = {
+  AUTO_ACCEPT: 'auto-accept',
+  PRINT: 'print',
+  KDS_SYNC: 'kds-sync',
+} as const;
+
 // --- Valid status transitions ---
 
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {

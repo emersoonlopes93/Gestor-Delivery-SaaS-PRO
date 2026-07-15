@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import type {
   AdminTenantFeatureItem,
   FeaturePresetPreviewResponse,

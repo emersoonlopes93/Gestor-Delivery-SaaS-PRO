@@ -61,8 +61,13 @@ export class CampaignProcessor extends WorkerHost {
       try {
         const campaignMeta = await this.prisma.campaign.findUnique({
           where: { id: campaignId },
-          select: { startedAt: true, tenant: { select: { name: true, slug: true } } },
+          select: { status: true, startedAt: true, tenant: { select: { name: true, slug: true } } },
         });
+        
+        if (campaignMeta?.status === 'completed' || campaignMeta?.status === 'cancelled') {
+           this.logger.warn(`Idempotency skip: Campaign ${campaignId} already processed (status: ${campaignMeta.status})`);
+           return { success: true, skipped: true, reason: 'already_processed' };
+        }
         const publishStartedAt = Date.now();
         const statusTemplate = messageTemplate || '';
         const resolvedStatusMessage = applyCampaignTemplate(statusTemplate, {
@@ -254,12 +259,16 @@ export class CampaignProcessor extends WorkerHost {
   }
 
   private async checkAntiSpam(tenantId: string, customerId: string, dispatchId: string) {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { automationCooldownHours: true, automationMaxMessagesPerDay: true, timezone: true },
+    });
+
+    const tenantTimezone = settings?.timezone || 'America/Sao_Paulo';
+
     // Verificacao de janela de silencio central (08:00 - 21:00)
-    // TODO P1-TECH: buscar tenantSettings.timezone para suportar múltiplos fusos horários.
-    // Por enquanto, America/Sao_Paulo como fallback — impacto zero para tenants brasileiros.
-    // Quando implementado: const tz = (await prisma.tenantSettings.findUnique(...))?.timezone ?? 'America/Sao_Paulo';
     const hourFormatter = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo', // TODO P1-TECH: substituir por tenantSettings.timezone
+      timeZone: tenantTimezone,
       hour: 'numeric',
       hour12: false,
     });
@@ -267,20 +276,15 @@ export class CampaignProcessor extends WorkerHost {
     try {
       const currentHour = parseInt(hourFormatter.format(new Date()), 10);
       if (currentHour < 8 || currentHour >= 21) {
-        return { allowed: false, reason: 'outside_quiet_hours - Horário não permitido (Silêncio Noturno)' };
+        return { allowed: false, reason: `outside_quiet_hours - Horário não permitido (Silêncio Noturno, timezone: ${tenantTimezone})` };
       }
     } catch (e) {
-      this.logger.error('Failed to parse timezone hour, falling back to local system hour', e);
+      this.logger.error(`Failed to parse timezone hour for ${tenantTimezone}, falling back to local system hour`, e);
       const currentHour = new Date().getHours();
       if (currentHour < 8 || currentHour >= 21) {
-        return { allowed: false, reason: 'outside_quiet_hours - Horário não permitido (Silêncio Noturno)' };
+        return { allowed: false, reason: `outside_quiet_hours - Horário não permitido (Silêncio Noturno, timezone fallback)` };
       }
     }
-
-    const settings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId },
-      select: { automationCooldownHours: true, automationMaxMessagesPerDay: true },
-    });
     const cooldownHours = settings?.automationCooldownHours ?? 24;
     const maxPerDay = settings?.automationMaxMessagesPerDay ?? 1;
     const cooldownSince = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);

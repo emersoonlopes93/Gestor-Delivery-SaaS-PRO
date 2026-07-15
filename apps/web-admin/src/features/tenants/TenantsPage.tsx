@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PaginatedResponse, Tenant } from '@gestor/types';
-import { Bot, CreditCard, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { api } from '../../lib/api-client';
 
 interface TenantListItem extends Tenant {

@@ -75,7 +75,8 @@ export function FranchiseDashboard() {
   useEffect(() => {
     fetchGroups();
     fetchAllTenants();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchGroups]);
 
   useEffect(() => {
     if (!selectedGroupId) return;

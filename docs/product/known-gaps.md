@@ -20,13 +20,11 @@ verified_against: main-copy / c63d394
 - **Impacto:** Clientes não recebem avisos push em seus dispositivos ao minimizar a aba.
 - **Ação:** Implementar biblioteca `web-push`, model Prisma e handlers Service Worker.
 
-## 2. Timezone Hardcoded nas Automações
+## 2. Timezone Hardcoded em Automações (RESOLVIDO)
 
-- **Severidade:** Alta
+- **Severidade:** Resolvido (anteriormente Alta)
 - **Componente:** `CampaignProcessor` (`apps/api/src/campaigns/services/campaign.processor.ts`)
-- **Problema:** Ao avaliar gatilhos de tempo para campanhas e automações (como "enviar X horas após pedido"), o timezone é fixado no código como `America/Sao_Paulo`.
-- **Impacto:** Lojas localizadas em outros fusos horários (Manaus, exterior, etc.) terão automações disparadas nos momentos errados.
-- **Ação:** Adicionar campo `timezone` ao `TenantSettings` e passá-lo ao construtor de data do processador (TODO já marcado no código).
+- **Resolução:** A janela de silêncio (08h às 21h) agora respeita a configuração de `timezone` definida no `TenantSettings`. Caso o tenant não possua configuração explícita, a aplicação fará o fallback para `America/Sao_Paulo`.
 
 ## 3. Swagger Inconsistente
 

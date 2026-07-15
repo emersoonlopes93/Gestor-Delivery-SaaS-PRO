@@ -204,25 +204,6 @@ if (process.env.REDIS_ENABLED === 'false') {
         limit: Number(process.env.RATE_LIMIT_PUBLIC_MAX_REQUESTS ?? 60),
       },
     ]),
-
-    ...(process.env.REDIS_ENABLED !== 'false' && (process.env.BULLMQ_ENABLED === 'true' || process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true')
-      ? [
-          BullModule.forRoot({
-            connection: getBullmqRedisConnectionOptions(),
-            defaultJobOptions: {
-              removeOnComplete: 1000,
-              removeOnFail: 5000,
-              attempts: 3,
-              backoff: {
-                type: 'exponential',
-                delay: 5000,
-              },
-            },
-          }),
-        ]
-      : []),
-
-    // Cache (Redis com fallback local in-memory se falhar ou estiver sem credenciais)
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {

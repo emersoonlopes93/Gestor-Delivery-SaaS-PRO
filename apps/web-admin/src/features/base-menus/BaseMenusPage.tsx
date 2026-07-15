@@ -255,6 +255,7 @@ function BaseMenuListView() {
 
   useEffect(() => {
     void loadItems();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const segments = useMemo(() => Array.from(new Set(items.map((item) => item.segment))).sort(), [items]);

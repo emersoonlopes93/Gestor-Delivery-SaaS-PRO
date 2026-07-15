@@ -247,7 +247,7 @@ function mockApis({ createDraft = false, baseMediaItems = [] as Array<Record<str
     return Promise.reject(new Error(`Unhandled GET ${endpoint}`));
   });
 
-  vi.mocked(api.post).mockImplementation(<T,>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> => {
+  vi.mocked(api.post).mockImplementation(<T,>(endpoint: string, _body?: unknown): Promise<ApiResponse<T>> => {
     if (endpoint === '/admin/base-menus/acai/draft-version') {
       return Promise.resolve(ok({
         template: { ...draftVersionTemplate, currentPublishedVersionId: 'version-1' },

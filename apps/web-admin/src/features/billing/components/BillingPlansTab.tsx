@@ -1,6 +1,6 @@
 import { BillingPlanV2, BillingRevenueTier } from '../admin-billing-api';
 import { BillingPlanFormState, BillingTierForm, shortId } from '../types';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowDown, ArrowUp, Layers3, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { Panel, EmptyState, InfoPill, ToggleField, NumberField, MoneyInput, IconButton } from './BillingShared';
 

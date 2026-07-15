@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
-import { Bot, Calendar, CreditCard, ExternalLink, Shield, Store, Puzzle, Package, Activity, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Bot, Calendar, CreditCard, ExternalLink, Shield, Store, Package, Activity, AlertTriangle, ArrowLeft } from 'lucide-react';
 import type { Tenant } from '@gestor/types';
 
 interface TenantDetail extends Tenant {

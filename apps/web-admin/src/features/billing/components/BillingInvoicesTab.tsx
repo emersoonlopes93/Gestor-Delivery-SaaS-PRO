@@ -1,5 +1,5 @@
 import { BillingPaymentConfig, DecimalLike, InvoiceDetails, InvoiceItem, InvoiceSummary, PaymentAttempt } from '../admin-billing-api';
-import { money, formatDate, shortId, metadataText, TabId, TABS, statusLabels } from '../types';
+import { money, formatDate, shortId, metadataText, statusLabels } from '../types';
 import { CreditCard, Eye, Loader2, Receipt, X } from 'lucide-react';
 import { StatusBadge } from './BillingStatusBadge';
 import { Panel, EmptyState, LoadingBlock, InfoPill } from './BillingShared';
