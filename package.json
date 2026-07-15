@@ -32,6 +32,7 @@
     "check:boundaries": "node scripts/check-package-boundaries.js",
     "check:theme:write-baseline": "node scripts/check-theme-hardcoded-classes.js --report --write-baseline",
     "check:theme": "pnpm check:theme:critical",
+    "check:features": "node scripts/check-stub-features.js",
     "smoke:p1": "pnpm -C apps/api smoke:p1",
     "smoke:media": "pnpm -C apps/api smoke:media",
     "qa:visual": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts",

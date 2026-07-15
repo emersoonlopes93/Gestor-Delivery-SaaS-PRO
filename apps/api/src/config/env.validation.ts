@@ -43,6 +43,17 @@ const baseEnvSchema = z.object({
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
 
+  // IFood
+  MARKETPLACE_IFOOD_WEBHOOK_TOKEN: z.string().default(''),
+
+  // Upload
+  MEDIA_MAX_SIZE_BYTES: z.string().optional(),
+  MEDIA_MAX_FILE_SIZE_MB: z.string().optional(),
+
+  // Campaigns & Upsell
+  CAMPAIGN_AUTOMATION_ENABLED: z.enum(['true', 'false']).default('false'),
+  POST_PURCHASE_UPSELL_DELAY_MINUTES: z.string().default('60'),
+
   // AI Providers. SaaS Admin database config has runtime priority; ENV is fallback.
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default(''),
@@ -73,28 +84,22 @@ const baseEnvSchema = z.object({
 
 export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
   if (data.NODE_ENV === 'production') {
-    if (data.REDIS_ENABLED === 'false') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['REDIS_ENABLED'],
-        message: `REDIS_ENABLED must be 'true' in production.`,
-      });
+    if (data.REDIS_ENABLED === 'true') {
+      if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REDIS_HOST'],
+          message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
+        });
+      }
     }
-
-    if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['REDIS_HOST'],
-        message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
-      });
-    }
-
-    if (data.BULLMQ_ENABLED !== 'true') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['BULLMQ_ENABLED'],
-        message: `BULLMQ_ENABLED must be 'true' in production.`,
-      });
+    
+    if (data.CAMPAIGNS_DISPATCH_ENABLED === 'true' && data.BULLMQ_ENABLED !== 'true') {
+       ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['BULLMQ_ENABLED'],
+          message: `BULLMQ_ENABLED deve ser 'true' se CAMPAIGNS_DISPATCH_ENABLED estiver ativo.`,
+        });
     }
   }
 });
