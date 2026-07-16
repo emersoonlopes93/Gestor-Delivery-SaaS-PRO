@@ -77,8 +77,9 @@ export class PushService {
       await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
       this.logger.debug(`Push sent to ${subscription.recipientType} ${subscription.recipientId}`);
       return true;
-    } catch (error: any) {
-      const statusCode = error.statusCode;
+    } catch (error: unknown) {
+      const err = error as { statusCode?: number; message?: string };
+      const statusCode = err.statusCode;
 
       if (statusCode === 404 || statusCode === 410) {
         this.logger.warn(`Subscription for endpoint ${subscription.endpoint} has expired or is invalid. Deleting.`);
@@ -86,7 +87,7 @@ export class PushService {
         return false;
       }
 
-      const message = error.message || 'Unknown error';
+      const message = err.message || 'Unknown error';
       this.logger.error(`Failed to send push notification: ${message}`);
       return false;
     }

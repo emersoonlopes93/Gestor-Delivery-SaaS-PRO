@@ -55,8 +55,9 @@ export class PushController {
     try {
       await this.pushSubService.unsubscribe(tenantId, recipientType, recipientId, endpoint);
       return { success: true };
-    } catch (e: any) {
-      return { success: false, message: e.message };
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      return { success: false, message: errorMessage };
     }
   }
 
