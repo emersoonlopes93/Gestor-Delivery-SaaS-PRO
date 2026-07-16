@@ -76,7 +76,7 @@ type SidebarGroup = {
 
 const isFeatureVisibleByEnv = (flag?: string) => {
   if (!flag) return true;
-  // Acessa a flag no import.meta.env, lidando de forma segura
+  // Acessa a flag no import.meta.env, lidando de forma segura 
   const envValue = import.meta.env[flag];
   if (envValue === undefined) {
     return false; // Se a flag não existe, não mostrar.
@@ -270,8 +270,8 @@ function SidebarGroupView(props: {
           type="button"
           onClick={() => onToggle(group.id)}
           className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${isAnyItemActive
-              ? 'bg-sidebar-active text-sidebar-active-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+            ? 'bg-sidebar-active text-sidebar-active-foreground'
+            : 'text-muted-foreground hover:text-foreground'
             }`}
         >
           <span className="text-[10px] font-black uppercase tracking-[0.25em] transition-colors">
@@ -320,8 +320,8 @@ function SidebarGroupView(props: {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
-                      ? 'bg-primary text-primary-foreground shadow-lg dark:bg-sidebar-active dark:text-sidebar-active-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground shadow-lg dark:bg-sidebar-active dark:text-sidebar-active-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
@@ -408,7 +408,7 @@ export function AppLayout() {
 
     const operatingHours = tenantData.operatingHours || [];
     const timezone = settings?.timezone || 'America/Sao_Paulo';
-    
+
     let localTimeStr: string;
     let localDayStr: string;
     try {
@@ -719,9 +719,8 @@ export function AppLayout() {
       ) : null}
 
       <aside
-        className={`tenant-sidebar fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
-          collapsed ? 'w-[72px]' : 'w-64'
-        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`tenant-sidebar fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${collapsed ? 'w-[72px]' : 'w-64'
+          } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
       >
@@ -913,7 +912,7 @@ export function AppLayout() {
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 className="w-8 h-8 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all"
               >
-                 {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
               </button>
               <div className="w-7 h-7 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
                 <UserCircle className="h-4.5 w-4.5" aria-hidden />
