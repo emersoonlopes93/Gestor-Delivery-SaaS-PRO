@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, MapPin, Navigation } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { AddressSearchInput } from '../components/AddressSearchInput';
@@ -133,6 +133,53 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     void loadData();
   }, []);
 
+  const geocodeCurrentAddress = useCallback(async () => {
+    const currentRequest = geocodeRequestRef.current + 1;
+    geocodeRequestRef.current = currentRequest;
+
+    setGeocoding(true);
+    setAddressNotice('Validando a localizacao da loja...');
+
+    try {
+      const response = await api.post<GeocodeResult>('/delivery/coverage/geocode', {
+        query: buildFullAddress(form),
+        source: 'onboarding',
+      });
+
+      if (geocodeRequestRef.current !== currentRequest) return;
+
+      const nextLat = response.data?.lat ?? null;
+      const nextLng = response.data?.lng ?? null;
+
+      setForm((current) => ({
+        ...current,
+        lat: nextLat,
+        lng: nextLng,
+      }));
+
+      if (hasRealCoordinates(nextLat, nextLng)) {
+        setCoordinatesDirty(false);
+        setAddressNotice('Endereco validado com sucesso.');
+      } else {
+        setCoordinatesDirty(true);
+        setAddressNotice('Nao foi possivel localizar esse endereco. Revise os campos ou use outra busca.');
+      }
+    } catch {
+      if (geocodeRequestRef.current !== currentRequest) return;
+      setForm((current) => ({
+        ...current,
+        lat: null,
+        lng: null,
+      }));
+      setCoordinatesDirty(true);
+      setAddressNotice('A geocodificacao falhou. Revise o endereco para continuar.');
+    } finally {
+      if (geocodeRequestRef.current === currentRequest) {
+        setGeocoding(false);
+      }
+    }
+  }, [form]);
+
   useEffect(() => {
     onMarkValid(isAddressStepValid(form));
   }, [form, onMarkValid]);
@@ -186,53 +233,6 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
       setLoading(false);
     }
   };
-
-  const geocodeCurrentAddress = useCallback(async () => {
-    const currentRequest = geocodeRequestRef.current + 1;
-    geocodeRequestRef.current = currentRequest;
-
-    setGeocoding(true);
-    setAddressNotice('Validando a localizacao da loja...');
-
-    try {
-      const response = await api.post<GeocodeResult>('/delivery/coverage/geocode', {
-        query: buildFullAddress(form),
-        source: 'onboarding',
-      });
-
-      if (geocodeRequestRef.current !== currentRequest) return;
-
-      const nextLat = response.data?.lat ?? null;
-      const nextLng = response.data?.lng ?? null;
-
-      setForm((current) => ({
-        ...current,
-        lat: nextLat,
-        lng: nextLng,
-      }));
-
-      if (hasRealCoordinates(nextLat, nextLng)) {
-        setCoordinatesDirty(false);
-        setAddressNotice('Endereco validado com sucesso.');
-      } else {
-        setCoordinatesDirty(true);
-        setAddressNotice('Nao foi possivel localizar esse endereco. Revise os campos ou use outra busca.');
-      }
-    } catch {
-      if (geocodeRequestRef.current !== currentRequest) return;
-      setForm((current) => ({
-        ...current,
-        lat: null,
-        lng: null,
-      }));
-      setCoordinatesDirty(true);
-      setAddressNotice('A geocodificacao falhou. Revise o endereco para continuar.');
-    } finally {
-      if (geocodeRequestRef.current === currentRequest) {
-        setGeocoding(false);
-      }
-    }
-  }, [form]);
 
   const handleAddressSelected = (
     address: {

@@ -149,16 +149,6 @@ export function useOnboardingState() {
     saveToStorage({ currentStep, visitedSteps, validation, ifoodChoice });
   }, [currentStep, visitedSteps, validation, ifoodChoice]);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      void Promise.all([
-        checkValidationFromApi(),
-        syncProgressFromBackend(),
-      ]);
-    }
-  }, [checkValidationFromApi, syncProgressFromBackend]);
-
   const syncProgressFromBackend = useCallback(async () => {
     try {
       const res = await api.get<BackendOnboardingStatus>('/tenant/onboarding');
@@ -233,6 +223,16 @@ export function useOnboardingState() {
       // silent - keep existing validation state
     }
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      void Promise.all([
+        checkValidationFromApi(),
+        syncProgressFromBackend(),
+      ]);
+    }
+  }, [checkValidationFromApi, syncProgressFromBackend]);
 
   const syncCurrentStepToBackend = useCallback(async (stepIndex: number) => {
     const backendSteps = STEP_BACKEND_MAPPING[stepIndex] ?? [];
