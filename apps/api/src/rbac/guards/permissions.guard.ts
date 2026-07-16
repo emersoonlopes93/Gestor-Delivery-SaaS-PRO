@@ -11,7 +11,8 @@ import { RbacService } from '../rbac.service';
 
 /**
  * Guard that checks if the authenticated tenant user has the required permissions.
- * Use with @RequirePermissions('orders.read', 'orders.create')
+ * Usage: @RequirePermissions('orders.read', 'orders.create')
+ * Semantics: OR — the user must have at least ONE of the listed permissions.
  */
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -56,13 +57,14 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const hasAll = requiredPermissions.every((p) =>
+    // OR lógico: basta ter qualquer uma das permissões listadas
+    const hasAny = requiredPermissions.some((p) =>
       userPermissions.includes(p),
     );
 
-    if (!hasAll) {
+    if (!hasAny) {
       this.logger.warn(
-        `Permission denied for user ${user.sub}. Required: ${requiredPermissions.join(', ')}`,
+        `Permission denied for user ${user.sub}. Required any of: [${requiredPermissions.join(', ')}]`,
       );
       throw new ForbiddenException('Insufficient permissions');
     }
