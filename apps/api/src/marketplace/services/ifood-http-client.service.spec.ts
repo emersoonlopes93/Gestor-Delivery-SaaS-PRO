@@ -54,7 +54,7 @@ describe('IfoodHttpClientService', () => {
 
   it('polls a single merchant and accepts a 204 empty cycle', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(null, { status: 204 }));
-    await expect(service.pollEvents(connection, 'merchant-1', 'corr-poll')).resolves.toEqual([]);
+    await expect(service.pollEvents(connection, ['merchant-1'], 'corr-poll')).resolves.toEqual([]);
     expect(fetchMock.mock.calls[0][0]).toBe('https://ifood.test/events/v1.0/events:polling');
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('x-polling-merchants')).toBe('merchant-1');
   });

@@ -36,8 +36,11 @@ export class AdminHealthService {
       && !Array.isArray(connection.settingsJson)
       && 'pollingFallbackEnabled' in connection.settingsJson
       && connection.settingsJson.pollingFallbackEnabled === true
+      && 'presenceMode' in connection.settingsJson
+      && connection.settingsJson.presenceMode === 'POLLING'
     ));
-    const pollingStaleThreshold = Date.now() - 90_000;
+    const pollingStaleAfterMs = 90_000;
+    const pollingStaleThreshold = Date.now() - pollingStaleAfterMs;
     const stalePollingConnections = pollingConnections.filter((connection) => (
       !connection.pollingLastSuccessAt || connection.pollingLastSuccessAt.getTime() < pollingStaleThreshold
     ));
@@ -50,16 +53,17 @@ export class AdminHealthService {
       marketplacePollingEnabled && (!redisEnabled || !bullmqEnabled)
         ? 'iFood polling requires Redis and BullMQ'
         : null,
-      marketplacePollingEnabled && pollingConnections.some((connection) => connection.pollingStatus === 'BLOCKED')
-        ? 'One or more iFood polling connections are blocked'
-        : null,
       process.env.NODE_ENV === 'production' && !redisEnabled ? 'Production requires REDIS_ENABLED=true' : null,
       process.env.NODE_ENV === 'production' && !bullmqEnabled ? 'Production requires BULLMQ_ENABLED=true' : null,
     ].filter((reason): reason is string => Boolean(reason));
     const productionReady = databaseOk && redisEnabled && redisConfigured && bullmqEnabled && readinessReasons.length === 0;
+    const marketplaceDegraded = marketplacePollingEnabled && (
+      stalePollingConnections.length > 0
+      || pollingConnections.some((connection) => connection.pollingStatus === 'DEGRADED' || connection.pollingStatus === 'BLOCKED')
+    );
 
     return {
-      status: productionReady ? 'ok' : 'degraded',
+      status: productionReady && !marketplaceDegraded ? 'ok' : 'degraded',
       checkedAt: new Date().toISOString(),
       services: {
         database: {
@@ -88,6 +92,8 @@ export class AdminHealthService {
           degradedConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'DEGRADED').length,
           blockedConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'BLOCKED').length,
           staleConnections: stalePollingConnections.length,
+          staleAfterMs: pollingStaleAfterMs,
+          affectsGlobalReadiness: false,
         },
       },
       productionReadiness: {

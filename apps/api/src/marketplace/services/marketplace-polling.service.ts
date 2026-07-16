@@ -19,9 +19,9 @@ import { MarketplaceEventInboxService } from './marketplace-event-inbox.service'
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
 
 export type MarketplacePollingJob = {
-  schemaVersion: 1;
-  tenantId: string;
-  connectionId: string;
+  schemaVersion: 2;
+  tokenDeviceKey: string;
+  connections: Array<{ tenantId: string; connectionId: string }>;
   scheduledAt: string;
 };
 
@@ -115,7 +115,7 @@ export class MarketplacePollingService implements OnModuleInit {
       : [];
     const now = Date.now();
     const bucket = Math.floor(now / this.intervalMs());
-    let scheduled = 0;
+    const groups = new Map<string, typeof connections>();
     for (const connection of connections) {
       if (!this.connectionPollingEnabled(connection.settingsJson)) continue;
       if (connection.pollingNextAttemptAt && connection.pollingNextAttemptAt.getTime() > now) continue;
@@ -125,24 +125,32 @@ export class MarketplacePollingService implements OnModuleInit {
         requiredPermission: [],
       });
       if (!capability.enabled) continue;
-      const delay = this.jitterMs(connection.id);
+      const tokenDeviceKey = connection.refreshTokenEnc ? `connection:${connection.id}` : 'centralized-application';
+      const group = groups.get(tokenDeviceKey) ?? [];
+      group.push(connection);
+      groups.set(tokenDeviceKey, group);
+    }
+
+    let scheduled = 0;
+    for (const [tokenDeviceKey, group] of groups) {
+      const delay = this.jitterMs(tokenDeviceKey);
       await this.queue.add(
-        'ifood-poll-connection',
+        'ifood-poll-token-device',
         {
-          schemaVersion: 1,
-          tenantId: connection.tenantId,
-          connectionId: connection.id,
+          schemaVersion: 2,
+          tokenDeviceKey,
+          connections: group.map((connection) => ({ tenantId: connection.tenantId, connectionId: connection.id })),
           scheduledAt: new Date(now).toISOString(),
         } satisfies MarketplacePollingJob,
         {
-          jobId: `ifood-poll-${connection.id}-${bucket}`,
+          jobId: `ifood-poll-${tokenDeviceKey}-${bucket}`,
           delay,
           attempts: 3,
           backoff: { type: 'ifood-retry-after', delay: 5000 },
         },
       );
       await this.prisma.marketplaceConnection.updateMany({
-        where: { id: connection.id, tenantId: connection.tenantId },
+        where: { id: { in: group.map((connection) => connection.id) } },
         data: { pollingNextAttemptAt: new Date(now + this.intervalMs() + delay) },
       });
       scheduled += 1;
@@ -157,29 +165,31 @@ export class MarketplacePollingService implements OnModuleInit {
     acknowledged: number;
   }> {
     if (!this.isEnabled()) throw new ServiceUnavailableException('iFood polling fallback is disabled.');
-    const connection = await this.prisma.marketplaceConnection.findFirst({
+    const requested = await this.prisma.marketplaceConnection.findMany({
       where: {
-        id: job.connectionId,
-        tenantId: job.tenantId,
         provider: MarketplaceProvider.IFOOD,
+        OR: job.connections.map((item) => ({ id: item.connectionId, tenantId: item.tenantId })),
       },
       include: { tenant: { select: { status: true } } },
     });
-    if (
-      !connection
-      || connection.status !== MarketplaceConnectionStatus.CONNECTED
-      || connection.pollingStatus === MarketplacePollingStatus.BLOCKED
-      || connection.tenant.status !== TenantStatus.active
-      || !connection.externalMerchantId
-      || !this.connectionPollingEnabled(connection.settingsJson)
-    ) return { received: 0, persisted: 0, duplicates: 0, acknowledged: 0 };
-
-    const capability = await this.featureControl.resolveTenantFeature({
-      tenantId: connection.tenantId,
-      featureKey: 'ifood_marketplace',
-      requiredPermission: [],
-    });
-    if (!capability.enabled) return { received: 0, persisted: 0, duplicates: 0, acknowledged: 0 };
+    const connections = [] as typeof requested;
+    for (const connection of requested) {
+      if (
+        connection.status !== MarketplaceConnectionStatus.CONNECTED
+        || connection.pollingStatus === MarketplacePollingStatus.BLOCKED
+        || connection.tenant.status !== TenantStatus.active
+        || !connection.externalMerchantId
+        || !this.connectionPollingEnabled(connection.settingsJson)
+        || !this.matchesTokenDevice(job.tokenDeviceKey, connection)
+      ) continue;
+      const capability = await this.featureControl.resolveTenantFeature({
+        tenantId: connection.tenantId,
+        featureKey: 'ifood_marketplace',
+        requiredPermission: [],
+      });
+      if (capability.enabled) connections.push(connection);
+    }
+    if (connections.length === 0) return { received: 0, persisted: 0, duplicates: 0, acknowledged: 0 };
 
     const provider = this.providers.get(MarketplaceProvider.IFOOD);
     if (!provider.pollEvents || !provider.parsePollingEvent || !provider.acknowledgeEvents) {
@@ -190,10 +200,9 @@ export class MarketplacePollingService implements OnModuleInit {
     const attemptedAt = new Date();
     const claim = await this.prisma.marketplaceConnection.updateMany({
       where: isRetry
-        ? { id: connection.id, tenantId: connection.tenantId }
+        ? { id: { in: connections.map((connection) => connection.id) } }
         : {
-            id: connection.id,
-            tenantId: connection.tenantId,
+            id: { in: connections.map((connection) => connection.id) },
             OR: [
               { pollingLastAttemptAt: null },
               { pollingLastAttemptAt: { lt: new Date(attemptedAt.getTime() - Math.min(25_000, this.intervalMs() - 1000)) } },
@@ -204,12 +213,17 @@ export class MarketplacePollingService implements OnModuleInit {
     if (claim.count === 0) return { received: 0, persisted: 0, duplicates: 0, acknowledged: 0 };
 
     try {
-      const rawEvents = await provider.pollEvents({
-        connection,
-        merchantId: connection.externalMerchantId,
-        correlationId,
-        filters: this.filters(),
-      });
+      const connectionByMerchant = new Map(connections.map((connection) => [connection.externalMerchantId!, connection]));
+      const representative = connections[0];
+      const rawEvents: Record<string, unknown>[] = [];
+      for (const merchantIds of this.chunks([...connectionByMerchant.keys()], 100)) {
+        rawEvents.push(...await provider.pollEvents({
+          connection: representative,
+          merchantIds,
+          correlationId,
+          filters: this.filters(),
+        }));
+      }
       const parsedEvents = await Promise.all(rawEvents.map((event) => provider.parsePollingEvent!(event)));
       parsedEvents.sort((left, right) => this.compareEvents(left, right));
 
@@ -217,7 +231,8 @@ export class MarketplacePollingService implements OnModuleInit {
       let persisted = 0;
       let duplicates = 0;
       for (const parsed of parsedEvents) {
-        if (parsed.externalMerchantId !== connection.externalMerchantId) {
+        const connection = parsed.externalMerchantId ? connectionByMerchant.get(parsed.externalMerchantId) : undefined;
+        if (!connection) {
           throw new IfoodApiError('Polling event merchant does not match the requested connection.', false, 409, 'MERCHANT_MISMATCH');
         }
         const process = Boolean(
@@ -239,10 +254,10 @@ export class MarketplacePollingService implements OnModuleInit {
       let acknowledged = 0;
       for (const batch of this.chunks([...new Set(acknowledgmentIds)], 2000)) {
         try {
-          await provider.acknowledgeEvents({ connection, eventIds: batch, correlationId });
+          await provider.acknowledgeEvents({ connection: representative, eventIds: batch, correlationId });
         } catch (error) {
           await this.prisma.marketplaceConnection.updateMany({
-            where: { id: connection.id, tenantId: connection.tenantId },
+            where: { id: { in: connections.map((connection) => connection.id) } },
             data: { pollingAcknowledgmentFailures: { increment: 1 } },
           });
           throw error;
@@ -251,7 +266,7 @@ export class MarketplacePollingService implements OnModuleInit {
       }
       const completedAt = new Date();
       await this.prisma.marketplaceConnection.updateMany({
-        where: { id: connection.id, tenantId: connection.tenantId },
+        where: { id: { in: connections.map((connection) => connection.id) } },
         data: {
           pollingStatus: MarketplacePollingStatus.HEALTHY,
           pollingLastSuccessAt: completedAt,
@@ -268,9 +283,8 @@ export class MarketplacePollingService implements OnModuleInit {
       });
       this.logger.log({
         message: 'ifood_polling_cycle_completed',
-        tenantId: connection.tenantId,
-        connectionId: connection.id,
-        merchantId: connection.externalMerchantId,
+        tokenDeviceKey: job.tokenDeviceKey,
+        connections: connections.length,
         correlationId,
         received: rawEvents.length,
         persisted,
@@ -279,7 +293,9 @@ export class MarketplacePollingService implements OnModuleInit {
       });
       return { received: rawEvents.length, persisted, duplicates, acknowledged };
     } catch (error) {
-      await this.recordFailure(connection.id, connection.tenantId, error, correlationId);
+      await Promise.all(connections.map((connection) => (
+        this.recordFailure(connection.id, connection.tenantId, error, correlationId)
+      )));
       if (this.isPermanent(error)) return { received: 0, persisted: 0, duplicates: 0, acknowledged: 0 };
       throw error;
     }
@@ -294,14 +310,19 @@ export class MarketplacePollingService implements OnModuleInit {
     if (!this.isEnabled() || !this.queue) throw new ServiceUnavailableException('iFood polling fallback is unavailable.');
     const connection = await this.prisma.marketplaceConnection.findFirst({
       where: { id: input.connectionId, tenantId: input.tenantId, provider: MarketplaceProvider.IFOOD },
-      select: { id: true },
+      select: { id: true, tenantId: true, refreshTokenEnc: true },
     });
     if (!connection) throw new ServiceUnavailableException('iFood connection not found.');
-    const jobId = `ifood-poll-${connection.id}-${Math.floor(Date.now() / this.intervalMs())}`;
-    await this.queue.add('ifood-poll-connection', {
-      schemaVersion: 1,
-      tenantId: input.tenantId,
-      connectionId: connection.id,
+    const tokenDeviceKey = connection.refreshTokenEnc ? `connection:${connection.id}` : 'centralized-application';
+    const group = connection.refreshTokenEnc ? [connection] : await this.prisma.marketplaceConnection.findMany({
+      where: { provider: MarketplaceProvider.IFOOD, refreshTokenEnc: null },
+      select: { id: true, tenantId: true, refreshTokenEnc: true },
+    });
+    const jobId = `ifood-poll-${tokenDeviceKey}-${Math.floor(Date.now() / this.intervalMs())}`;
+    await this.queue.add('ifood-poll-token-device', {
+      schemaVersion: 2,
+      tokenDeviceKey,
+      connections: group.map((item) => ({ tenantId: item.tenantId, connectionId: item.id })),
       scheduledAt: new Date().toISOString(),
     } satisfies MarketplacePollingJob, { jobId, attempts: 1 });
     await this.prisma.auditLog.create({
@@ -391,7 +412,15 @@ export class MarketplacePollingService implements OnModuleInit {
   private connectionPollingEnabled(settings: unknown): boolean {
     return typeof settings === 'object' && settings !== null && !Array.isArray(settings)
       && 'pollingFallbackEnabled' in settings
-      && settings.pollingFallbackEnabled === true;
+      && settings.pollingFallbackEnabled === true
+      && 'presenceMode' in settings
+      && settings.presenceMode === 'POLLING';
+  }
+
+  private matchesTokenDevice(tokenDeviceKey: string, connection: { id: string; refreshTokenEnc: string | null }): boolean {
+    return tokenDeviceKey === 'centralized-application'
+      ? connection.refreshTokenEnc === null
+      : tokenDeviceKey === `connection:${connection.id}` && connection.refreshTokenEnc !== null;
   }
 
   private jitterMs(connectionId: string): number {

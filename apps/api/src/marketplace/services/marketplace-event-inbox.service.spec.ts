@@ -167,8 +167,8 @@ describe('MarketplaceEventInboxService', () => {
       rawPayload: { merchantIds: ['merchant-webhook', 'merchant-polling'] },
     });
     prisma.marketplaceConnection.findMany.mockResolvedValueOnce([
-      { externalMerchantId: 'merchant-webhook', settingsJson: { pollingFallbackEnabled: false } },
-      { externalMerchantId: 'merchant-polling', settingsJson: { pollingFallbackEnabled: true } },
+      { externalMerchantId: 'merchant-webhook', settingsJson: { pollingFallbackEnabled: false, presenceMode: 'WEBHOOK' } },
+      { externalMerchantId: 'merchant-polling', settingsJson: { pollingFallbackEnabled: true, presenceMode: 'POLLING' } },
     ]);
     const service = new MarketplaceEventInboxService(
       prisma as never,

@@ -1,4 +1,5 @@
 import { MarketplaceConnectionStatus, MarketplaceProvider } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 import { MarketplaceConnectionService } from './marketplace-connection.service';
 
 describe('MarketplaceConnectionService', () => {
@@ -97,5 +98,15 @@ describe('MarketplaceConnectionService', () => {
         refreshTokenEnc: 'encrypted:refresh-secret',
       }),
     }));
+  });
+
+  it('rejects contradictory webhook presence with polling enabled', async () => {
+    const { service, prisma } = makeService();
+    prisma.marketplaceConnection.findFirst.mockResolvedValueOnce(null);
+
+    await expect(service.connectManual('tenant-1', MarketplaceProvider.IFOOD, {
+      settingsJson: { pollingFallbackEnabled: true, presenceMode: 'WEBHOOK' },
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.marketplaceConnection.create).not.toHaveBeenCalled();
   });
 });

@@ -44,7 +44,7 @@ export class MarketplaceEventProcessor extends WorkerHost {
       return this.pollingService.scheduleEligibleConnections();
     }
 
-    if (job.name === 'ifood-poll-connection') {
+    if (job.name === 'ifood-poll-token-device') {
       return this.pollingService.runConnection(job.data as MarketplacePollingJob, job.attemptsMade > 0);
     }
 

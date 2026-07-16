@@ -136,9 +136,18 @@ export class MarketplaceConnectionService {
       ? Object.fromEntries(Object.entries(settings))
       : {};
     const importAsStatus = record.importAsStatus;
+    const pollingFallbackEnabled = record.pollingFallbackEnabled === true;
+    const presenceMode = record.presenceMode ?? 'WEBHOOK';
+    if (presenceMode !== 'WEBHOOK' && presenceMode !== 'POLLING' && presenceMode !== 'DISABLED') {
+      throw new BadRequestException('Marketplace presenceMode must be WEBHOOK, POLLING or DISABLED.');
+    }
+    if (pollingFallbackEnabled !== (presenceMode === 'POLLING')) {
+      throw new BadRequestException('iFood polling and presence mode must be enabled or disabled together.');
+    }
     return {
       autoConfirmOrders: record.autoConfirmOrders === true,
-      pollingFallbackEnabled: record.pollingFallbackEnabled === true,
+      pollingFallbackEnabled,
+      presenceMode,
       importAsStatus: importAsStatus === 'confirmed' || importAsStatus === 'preparing'
         ? importAsStatus
         : 'pending',

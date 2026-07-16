@@ -21,7 +21,7 @@ export interface MarketplaceProviderAdapter {
   parsePollingEvent?(body: Record<string, unknown>): Promise<ParsedMarketplaceEvent>;
   pollEvents?(input: {
     connection: MarketplaceConnection;
-    merchantId: string;
+    merchantIds: string[];
     correlationId: string;
     filters?: { categories?: string; types?: string; groups?: string };
   }): Promise<Record<string, unknown>[]>;

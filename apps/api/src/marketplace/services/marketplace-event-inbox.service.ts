@@ -265,7 +265,9 @@ export class MarketplaceEventInboxService {
         && settings !== null
         && !Array.isArray(settings)
         && 'pollingFallbackEnabled' in settings
-        && settings.pollingFallbackEnabled === true;
+        && settings.pollingFallbackEnabled === true
+        && 'presenceMode' in settings
+        && settings.presenceMode === 'POLLING';
       return connection.externalMerchantId && !pollingPresenceActive ? [connection.externalMerchantId] : [];
     });
   }

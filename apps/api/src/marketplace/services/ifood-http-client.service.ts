@@ -40,10 +40,14 @@ export class IfoodHttpClientService {
 
   async pollEvents(
     connection: MarketplaceConnection,
-    merchantId: string,
+    merchantIds: string[],
     correlationId: string,
     filters: IfoodPollingFilters = {},
   ): Promise<Record<string, unknown>[]> {
+    const uniqueMerchantIds = [...new Set(merchantIds.map((id) => id.trim()).filter(Boolean))];
+    if (uniqueMerchantIds.length === 0 || uniqueMerchantIds.length > 100) {
+      throw new IfoodApiError('iFood polling request must contain between 1 and 100 unique merchants.', false, 400, 'INVALID_MERCHANT_BATCH');
+    }
     const query = new URLSearchParams();
     if (filters.categories) query.set('categories', filters.categories);
     if (filters.types) query.set('types', filters.types);
@@ -53,7 +57,7 @@ export class IfoodHttpClientService {
       method: 'GET',
       path: `/events/v1.0/events:polling${suffix}`,
       correlationId,
-      headers: { 'x-polling-merchants': merchantId },
+      headers: { 'x-polling-merchants': uniqueMerchantIds.join(',') },
     });
     if (response.status === 204) return [];
     if (!response.ok) throw await this.toError(response);

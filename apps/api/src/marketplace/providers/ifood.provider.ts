@@ -69,11 +69,11 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
 
   async pollEvents(input: {
     connection: MarketplaceConnection;
-    merchantId: string;
+    merchantIds: string[];
     correlationId: string;
     filters?: { categories?: string; types?: string; groups?: string };
   }): Promise<Record<string, unknown>[]> {
-    return this.client.pollEvents(input.connection, input.merchantId, input.correlationId, input.filters);
+    return this.client.pollEvents(input.connection, input.merchantIds, input.correlationId, input.filters);
   }
 
   async acknowledgeEvents(input: {
