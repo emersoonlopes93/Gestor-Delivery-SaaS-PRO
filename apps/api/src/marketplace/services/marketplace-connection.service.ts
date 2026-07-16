@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceConnectionStatus, MarketplaceProvider, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { MarketplaceCredentialService } from './marketplace-credential.service';
 
 @Injectable()
 export class MarketplaceConnectionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credentials: MarketplaceCredentialService,
+  ) {}
 
   listTenantConnections(tenantId: string) {
     return this.prisma.marketplaceConnection.findMany({
@@ -30,9 +34,18 @@ export class MarketplaceConnectionService {
       authType?: string;
       accessToken?: string;
       refreshToken?: string;
+      tokenExpiresAt?: string;
       settingsJson?: Prisma.InputJsonValue;
     },
   ): Promise<MarketplaceConnection> {
+    const existing = await this.prisma.marketplaceConnection.findFirst({
+      where: { tenantId, provider },
+    });
+    const tokenExpiresAt = input.tokenExpiresAt ? new Date(input.tokenExpiresAt) : existing?.tokenExpiresAt ?? null;
+    if (input.tokenExpiresAt && Number.isNaN(tokenExpiresAt?.getTime())) {
+      throw new BadRequestException('Invalid marketplace token expiration.');
+    }
+
     const data = {
       tenantId,
       provider,
@@ -41,21 +54,19 @@ export class MarketplaceConnectionService {
       externalStoreId: input.externalStoreId?.trim() || null,
       displayName: input.displayName?.trim() || null,
       authType: input.authType?.trim() || null,
-      accessTokenEnc: input.accessToken?.trim() || null,
-      refreshTokenEnc: input.refreshToken?.trim() || null,
-      settingsJson: input.settingsJson ?? {
-        autoConfirmOrders: false,
-        importAsStatus: 'pending',
-      },
+      accessTokenEnc: input.accessToken?.trim()
+        ? this.credentials.encrypt(input.accessToken.trim())
+        : existing?.accessTokenEnc ?? null,
+      refreshTokenEnc: input.refreshToken?.trim()
+        ? this.credentials.encrypt(input.refreshToken.trim())
+        : existing?.refreshTokenEnc ?? null,
+      tokenExpiresAt,
+      settingsJson: this.sanitizeSettings(input.settingsJson),
     };
-
-    const existing = await this.prisma.marketplaceConnection.findFirst({
-      where: { tenantId, provider },
-    });
 
     if (existing) {
       return this.prisma.marketplaceConnection.update({
-        where: { id: existing.id },
+        where: { id: existing.id, tenantId },
         data,
       });
     }
@@ -72,7 +83,7 @@ export class MarketplaceConnectionService {
     if (!connection) throw new NotFoundException('Marketplace connection not found.');
 
     return this.prisma.marketplaceConnection.update({
-      where: { id: connection.id },
+      where: { id: connection.id, tenantId },
       data: {
         status: MarketplaceConnectionStatus.DISCONNECTED,
         accessTokenEnc: null,
@@ -117,6 +128,19 @@ export class MarketplaceConnectionService {
       ...connection,
       accessTokenEnc: connection.accessTokenEnc ? '***' : null,
       refreshTokenEnc: connection.refreshTokenEnc ? '***' : null,
+    };
+  }
+
+  private sanitizeSettings(settings?: Prisma.InputJsonValue): Prisma.InputJsonObject {
+    const record: Record<string, unknown> = typeof settings === 'object' && settings !== null && !Array.isArray(settings)
+      ? Object.fromEntries(Object.entries(settings))
+      : {};
+    const importAsStatus = record.importAsStatus;
+    return {
+      autoConfirmOrders: record.autoConfirmOrders === true,
+      importAsStatus: importAsStatus === 'confirmed' || importAsStatus === 'preparing'
+        ? importAsStatus
+        : 'pending',
     };
   }
 }

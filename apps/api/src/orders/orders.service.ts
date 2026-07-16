@@ -1051,7 +1051,13 @@ export class OrdersService {
     };
   }
 
-  async updateOrderStatus(orderId: string, tenantId: string, dto: UpdateOrderStatusDTO, actorId?: string) {
+  async updateOrderStatus(
+    orderId: string,
+    tenantId: string,
+    dto: UpdateOrderStatusDTO,
+    actorId?: string,
+    options?: { marketplaceEvent?: boolean },
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
     });
@@ -1065,6 +1071,18 @@ export class OrdersService {
       throw new BadRequestException(
         `Transição inválida de ${currentStatus} para ${nextStatus}`,
       );
+    }
+
+    if (!options?.marketplaceEvent) {
+      const marketplaceSync = await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+        tenantId,
+        orderId,
+        status: nextStatus,
+        reason: dto.marketplaceReasonCode ?? null,
+      });
+      if (marketplaceSync.deferred) {
+        return order;
+      }
     }
 
     // Validation: if delivery and going out_for_delivery, must have driver
@@ -1185,16 +1203,6 @@ export class OrdersService {
         this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
       ]);
     }
-
-    await this.marketplaceStatusSyncService.handleInternalStatusChanged({
-      tenantId,
-      orderId,
-      status: nextStatus,
-      reason: dto.note ?? null,
-    }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Unknown marketplace status sync error';
-      this.logger.warn(`Marketplace status sync failed for order ${orderId}: ${message}`);
-    });
 
     return updated;
   }

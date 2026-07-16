@@ -1,5 +1,11 @@
 import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
-import { ExternalMarketplaceOrder, NormalizedMarketplaceOrder, ParsedMarketplaceEvent } from '../marketplace.types';
+import {
+  ExternalMarketplaceOrder,
+  MarketplaceProviderOperationResult,
+  MarketplaceCancellationReason,
+  NormalizedMarketplaceOrder,
+  ParsedMarketplaceEvent,
+} from '../marketplace.types';
 
 export interface MarketplaceProviderAdapter {
   provider: MarketplaceProvider;
@@ -21,13 +27,20 @@ export interface MarketplaceProviderAdapter {
     connection: MarketplaceConnection;
     externalOrder: ExternalMarketplaceOrder;
   }): Promise<NormalizedMarketplaceOrder>;
+  getCancellationReasons?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<MarketplaceCancellationReason[]>;
   confirmOrder?(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
-  }): Promise<void>;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
   cancelOrder?(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
-    reason?: string;
-  }): Promise<void>;
+    reason: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
 }

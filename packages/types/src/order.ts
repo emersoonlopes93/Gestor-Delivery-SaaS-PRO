@@ -363,6 +363,7 @@ export interface OrderListItemDTO {
 export class UpdateOrderStatusDTO {
   @IsString() @IsNotEmpty() status!: OrderStatus;
   @IsString() @IsOptional() note?: string;
+  @IsString() @IsOptional() marketplaceReasonCode?: string;
 }
 
 // --- Operation (Phase 5) DTOs ---

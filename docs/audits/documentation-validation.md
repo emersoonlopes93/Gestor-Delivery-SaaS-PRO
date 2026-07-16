@@ -27,7 +27,7 @@ last_verified: 2026-07-15
 | V-001 | Alta | `feature-matrix.md` | Feature `scheduling` marcada como `Stable`. | `apps/api/src/scheduling/scheduling.controller.ts` (linhas 138, 144, 151, 186, 192) lança `NotImplementedException` para as rotas. | Reclassificar `scheduling` como `Beta` ou `Stub` e adicionar ao `known-gaps.md`. |
 | V-002 | Alta | `feature-matrix.md` | `kds` marcado como `Beta`. | `apps/api/src/kds/kds.controller.ts` lança `NotImplementedException('Not implemented yet')`. | Reclassificar como `Stub` ou adicionar nota de não-funcional. |
 | V-003 | Média | `feature-matrix.md` | (Omissão) `split_payment` não listado. | `split-payment.controller.ts` lança `NotImplementedException` para endpoints e não tem feature flag explícita na matriz. | Listar feature na matriz como `Stub`. |
-| V-004 | Média | `feature-matrix.md` | `ifood_marketplace` marcado como `Beta`. | `apps/api/src/marketplace/providers/ifood.provider.ts` possui logs de stub: `ifood_confirm_order_stub` e `ifood_cancel_order_stub`. | Documentar no `known-gaps.md` que fluxos bidirecionais de iFood (confirmação/cancelamento) são stubs. |
+| V-004 | Resolvido | `feature-matrix.md` | `ifood_marketplace` permanece `Beta`. | Stubs removidos na Sprint 5A; confirmação/cancelamento são reais por contrato, com homologação externa pendente. | Manter Beta até homologação oficial. |
 | V-005 | Baixa | `known-gaps.md` | Refere-se a `drop_models.js` apagando o banco. | O script na verdade faz replace com regex no arquivo `schema.prisma` diretamente, removendo as definições de model. | Atualizar a descrição do risco de `drop_models.js` (apaga definições do schema.prisma). |
 
 ---
@@ -66,7 +66,7 @@ Os comandos descritos no `AGENTS.md` e `docs/getting-started/local-development.m
 
 | Contrato | Informação ausente | Risco |
 | -------- | ------------------ | ----- |
-| `order-lifecycle.md` | Não menciona que integrações (ex: iFood) possuem stubs para transição final de confirmar e cancelar via provider. | Alto. Entregadores e painéis podem ficar com pedidos travados pendentes da integração finalizar o ciclo. |
+| `order-lifecycle.md` | Resolvido na Sprint 5A: documenta deferimento local, `202` assíncrono e conclusão somente por evento oficial. | Homologação externa ainda pendente. |
 
 ---
 

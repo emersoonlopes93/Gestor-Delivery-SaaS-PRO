@@ -44,7 +44,7 @@ source_of_truth:
 |-------------|--------|-----------|--------------------|
 | `orders_core` | **Stable** | Gestão de pedidos e checkout base. | N/A (Core) |
 | `checkout_core` | **Stable** | Finalização de pedidos. | N/A (Core) |
-| `marketplace_orders` | **Beta** (Stub parcial) | Listagem e reprocessamento de pedidos externos. | `orders.read` |
+| `marketplace_orders` | **Beta** | Inbox idempotente, importação, operações e reprocessamento de pedidos externos. | `orders.read` |
 | `kds` | **Stub** | Kitchen Display System (Telas de produção). | `kds.use` |
 | `printing` | **Beta** | Impressão e spooler local. | `printing.read` |
 | `scheduling` | **Beta** | Janelas tenant-safe, slots com timezone/capacidade e checkout transacional; edição de horário exige cancelar e reagendar. | `scheduling.view` |
@@ -115,7 +115,7 @@ source_of_truth:
 | Feature Key | Status | Descrição | Entitlement requerido |
 |-------------|--------|-----------|-----------------------|
 | `storefront_core` | **Stable** | Cardápio público PWA com link próprio. | N/A |
-| `ifood_marketplace` | **Beta** | Sincronização de catálogo e pedidos do iFood. | `ifood_integration` |
+| `ifood_marketplace` | **Beta** | Pedidos bidirecionais implementados e testados por contrato; homologação iFood pendente. Catálogo fora do escopo. | `ifood_integration` |
 | `franchise` | **Beta** | Agrupamento de lojas para franqueadoras. | N/A |
 | `admin_integrations` | **Beta** | Integrações globais para todo o SaaS. | N/A |
 

@@ -9,6 +9,8 @@ import { OrdersGateway } from '../../orders/orders.gateway';
 import { OrdersService } from '../../orders/orders.service';
 import { generatePublicTrackingToken } from '../../common/utils/tracking-token.util';
 import { NormalizedMarketplaceOrder } from '../marketplace.types';
+import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
+import { MarketplaceStatusSyncService } from './marketplace-status-sync.service';
 
 @Injectable()
 export class MarketplaceOrderIngestionService {
@@ -21,6 +23,7 @@ export class MarketplaceOrderIngestionService {
     private readonly customerService: CustomerService,
     private readonly ordersGateway: OrdersGateway,
     private readonly ordersService: OrdersService,
+    private readonly statusSyncService: MarketplaceStatusSyncService,
   ) {}
 
   async processInboxEvent(eventInboxId: string) {
@@ -100,9 +103,18 @@ export class MarketplaceOrderIngestionService {
             internalOrderId,
             connection.tenantId,
             { status: initialStatus, note: 'Status inicial importado do marketplace.' },
+            undefined,
+            { marketplaceEvent: true },
           );
         }
       }
+
+      await this.statusSyncService.reconcileExternalEvent({
+        tenantId: connection.tenantId,
+        externalOrderId,
+        topic: inbox.topic,
+      });
+      await this.applyExternalLifecycleEvent(connection.tenantId, externalOrderId, inbox.topic);
 
       await this.prisma.marketplaceEventInbox.update({
         where: { id: inbox.id },
@@ -322,6 +334,61 @@ export class MarketplaceOrderIngestionService {
         status: MarketplaceEventStatus.FAILED,
         lastError: message,
       },
+    });
+  }
+
+  private async applyExternalLifecycleEvent(
+    tenantId: string,
+    externalOrderId: string,
+    topic?: string | null,
+  ): Promise<void> {
+    const normalizedTopic = topic?.trim().toUpperCase();
+    const targetStatus = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED'
+      ? OrderStatus.confirmed
+      : normalizedTopic === 'CANCELLED' || normalizedTopic === 'ORDER_CANCELLED'
+        ? OrderStatus.cancelled
+        : null;
+    if (!targetStatus) return;
+
+    const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
+      where: { tenantId, provider: MarketplaceProvider.IFOOD, externalOrderId },
+      select: { id: true, internalOrderId: true },
+    });
+    if (!marketplaceOrder?.internalOrderId) return;
+    const order = await this.prisma.order.findFirst({
+      where: { id: marketplaceOrder.internalOrderId, tenantId },
+      select: { status: true },
+    });
+    if (!order) return;
+    if (order.status === targetStatus) {
+      await this.prisma.marketplaceOrder.updateMany({
+        where: { id: marketplaceOrder.id, tenantId },
+        data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
+      });
+      return;
+    }
+    if (!ORDER_STATUS_TRANSITIONS[order.status]?.includes(targetStatus)) {
+      this.logger.warn({
+        message: 'marketplace_event_transition_blocked',
+        tenantId,
+        orderId: marketplaceOrder.internalOrderId,
+        externalOrderId,
+        currentStatus: order.status,
+        targetStatus,
+      });
+      return;
+    }
+
+    await this.ordersService.updateOrderStatus(
+      marketplaceOrder.internalOrderId,
+      tenantId,
+      { status: targetStatus, note: `Status confirmado por evento iFood (${normalizedTopic}).` },
+      undefined,
+      { marketplaceEvent: true },
+    );
+    await this.prisma.marketplaceOrder.updateMany({
+      where: { id: marketplaceOrder.id, tenantId },
+      data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
     });
   }
 

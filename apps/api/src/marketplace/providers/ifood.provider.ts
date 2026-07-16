@@ -1,13 +1,21 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { MarketplaceProviderAdapter } from './marketplace-provider.interface';
 import { ExternalMarketplaceOrder, NormalizedMarketplaceOrder, ParsedMarketplaceEvent } from '../marketplace.types';
+import { IfoodHttpClientService } from '../services/ifood-http-client.service';
+import { MarketplaceCredentialService } from '../services/marketplace-credential.service';
 
 @Injectable()
 export class IfoodProvider implements MarketplaceProviderAdapter {
-  private readonly logger = new Logger(IfoodProvider.name);
   provider = MarketplaceProvider.IFOOD;
+
+  constructor(
+    private readonly client: IfoodHttpClientService,
+    private readonly credentials: MarketplaceCredentialService,
+    private readonly config: ConfigService,
+  ) {}
 
   async validateWebhook(input: {
     headers: Record<string, string | string[] | undefined>;
@@ -20,12 +28,18 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       return this.isSmokeModeEnabled();
     }
 
-    const configuredSecret = process.env.MARKETPLACE_IFOOD_WEBHOOK_TOKEN?.trim();
-    if (!configuredSecret) return true;
-
-    const headerValue = input.headers['x-ifood-token'] ?? input.headers['x-marketplace-token'];
-    const candidate = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-    return candidate === configuredSecret;
+    let clientSecret: string;
+    try {
+      clientSecret = this.credentials.getIfoodClientCredentials().clientSecret;
+    } catch {
+      return false;
+    }
+    const headerValue = input.headers['x-ifood-signature'];
+    const signature = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+    if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+    const rawBody = typeof input.rawBody === 'string' ? Buffer.from(input.rawBody) : input.rawBody;
+    const expected = createHmac('sha256', clientSecret).update(rawBody).digest();
+    return timingSafeEqual(expected, Buffer.from(signature, 'hex'));
   }
 
   async parseWebhookEvent(input: {
@@ -38,7 +52,7 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     return {
       provider: MarketplaceProvider.IFOOD,
       eventId: this.readString(payload, ['id', 'eventId', 'event_id']),
-      topic: this.readString(payload, ['topic', 'type', 'eventType']),
+      topic: this.readString(payload, ['fullCode', 'code', 'topic', 'type', 'eventType']),
       externalMerchantId: this.readString(payload, ['merchantId', 'merchant_id']),
       externalStoreId: this.readString(payload, ['storeId', 'store_id']),
       externalOrderId: this.readString(orderPayload, ['id', 'orderId', 'order_id', 'displayId']),
@@ -67,7 +81,6 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     const customer = this.asRecord(order.customer);
     const delivery = this.asRecord(order.deliveryAddress) ?? this.asRecord(order.delivery_address) ?? this.asRecord(order.address);
     const items = Array.isArray(order.items) ? order.items : [];
-    const totalFromPayload = this.toNumber(order.total);
     const normalizedItems = items.map((item, index) => {
       const record = this.asRecord(item) ?? {};
       const quantity = Math.max(1, this.toNumber(record.quantity) || 1);
@@ -120,16 +133,26 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
   async confirmOrder(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
-  }): Promise<void> {
-    this.logger.log(`ifood_confirm_order_stub externalOrderId=${input.externalOrderId} tenantId=${input.connection.tenantId}`);
+    correlationId: string;
+  }) {
+    return this.client.confirmOrder(input.connection, input.externalOrderId, input.correlationId);
+  }
+
+  async getCancellationReasons(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }) {
+    return this.client.getCancellationReasons(input.connection, input.externalOrderId, input.correlationId);
   }
 
   async cancelOrder(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
-    reason?: string;
-  }): Promise<void> {
-    this.logger.log(`ifood_cancel_order_stub externalOrderId=${input.externalOrderId} tenantId=${input.connection.tenantId} reason=${input.reason ?? 'n/a'}`);
+    reason: string;
+    correlationId: string;
+  }) {
+    return this.client.cancelOrder(input.connection, input.externalOrderId, input.reason, input.correlationId);
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {
@@ -176,6 +199,7 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
   }
 
   private isSmokeModeEnabled(): boolean {
-    return process.env.NODE_ENV !== 'production' || process.env.MARKETPLACE_SMOKE_ENABLED === 'true';
+    return this.config.get<string>('NODE_ENV') !== 'production'
+      || this.config.get<string>('MARKETPLACE_SMOKE_ENABLED') === 'true';
   }
 }

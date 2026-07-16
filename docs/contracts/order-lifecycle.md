@@ -54,7 +54,7 @@ await this.ordersService.updateStatus(tenantId, orderId, newStatus, actorPayload
 Uma vez que um pedido alcança um destes estados, ele é travado.
 Nenhuma alteração em itens, quantidades ou pagamento deve ocorrer.
 
-> Observação sobre integrações: Pedidos originários do iFood podem receber status final no iFood e disparar o webhook de terminalidade. O sistema sincroniza forçando a terminalidade e registrando a origem da mudança no `OrderHistory`.
+> Observação sobre integrações: em pedidos iFood, solicitações locais de confirmação/cancelamento são deferidas. O `202` externo não altera o `Order`; somente o evento oficial final aplica uma transição permitida por `ORDER_STATUS_TRANSITIONS`. Eventos incompatíveis não forçam terminalidade e geram evidência de divergência.
 
 ## 4. O Fluxo Padrão (Delivery Próprio)
 

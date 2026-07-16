@@ -98,6 +98,20 @@ source_of_truth:
 
 > Todos os três devem ser `true` para automações funcionarem. Requerem Redis configurado.
 
+### iFood bidirecional (Beta)
+
+| Variável | Obrigatória | Ambiente | Descrição | Sensível |
+|---|---|---|---|---|
+| `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED` | Sim para ativar | Todos | Kill switch técnico; default `false` | Não |
+| `MARKETPLACE_IFOOD_CLIENT_ID` | Cond. | Staging/Prod | ID do aplicativo no Developer Portal | Sim |
+| `MARKETPLACE_IFOOD_CLIENT_SECRET` | Cond. | Staging/Prod | Secret OAuth e chave HMAC oficial do webhook | **Sim** |
+| `MARKETPLACE_IFOOD_API_BASE_URL` | Não | Todos | Default `https://merchant-api.ifood.com.br` | Não |
+| `MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS` | Não | Todos | Timeout por request; default `10000` | Não |
+| `MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY` | Cond. | Todos | Chave AES de 32 bytes em base64; gerar e guardar no secret manager | **Sim** |
+| `MARKETPLACE_SMOKE_ENABLED` | Não | Staging | Permite bypass exclusivo do smoke; manter `false` em produção | Não |
+
+Ativar o kill switch exige também `REDIS_ENABLED=true`, `BULLMQ_ENABLED=true`, credenciais oficiais e migration aplicada. `MARKETPLACE_IFOOD_WEBHOOK_TOKEN` é legado e não substitui `X-IFood-Signature`.
+
 ---
 
 ## 7. Storage de mídia

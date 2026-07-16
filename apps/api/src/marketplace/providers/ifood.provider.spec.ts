@@ -1,8 +1,17 @@
 import { MarketplaceConnectionStatus, MarketplaceProvider } from '@prisma/client';
 import { IfoodProvider } from './ifood.provider';
+import { createHmac } from 'crypto';
 
 describe('IfoodProvider', () => {
-  const provider = new IfoodProvider();
+  const client = {
+    confirmOrder: jest.fn().mockResolvedValue({ accepted: true, httpStatus: 202 }),
+    cancelOrder: jest.fn().mockResolvedValue({ accepted: true, httpStatus: 202 }),
+  };
+  const credentials = {
+    getIfoodClientCredentials: jest.fn().mockReturnValue({ clientId: 'client', clientSecret: 'secret' }),
+  };
+  const config = { get: jest.fn().mockReturnValue('test') };
+  const provider = new IfoodProvider(client as never, credentials as never, config as never);
 
   it('parses webhook payload into a normalized event envelope', async () => {
     const parsed = await provider.parseWebhookEvent({
@@ -112,5 +121,30 @@ describe('IfoodProvider', () => {
     });
 
     expect(normalized.fulfillmentType).toBe('pickup');
+  });
+
+  it('delegates confirmation and cancellation to the authenticated HTTP client', async () => {
+    const connection = {
+      id: 'conn-1', tenantId: 'tenant-1', provider: MarketplaceProvider.IFOOD,
+    } as never;
+    await provider.confirmOrder({ connection, externalOrderId: 'order-1', correlationId: 'corr-1' });
+    await provider.cancelOrder({ connection, externalOrderId: 'order-1', reason: '503', correlationId: 'corr-2' });
+    expect(client.confirmOrder).toHaveBeenCalledWith(connection, 'order-1', 'corr-1');
+    expect(client.cancelOrder).toHaveBeenCalledWith(connection, 'order-1', '503', 'corr-2');
+  });
+
+  it('validates the official HMAC-SHA256 webhook signature against the raw body', async () => {
+    const rawBody = Buffer.from(JSON.stringify({ id: 'evt-1' }));
+    const signature = createHmac('sha256', 'secret').update(rawBody).digest('hex');
+    await expect(provider.validateWebhook({
+      headers: { 'x-ifood-signature': signature },
+      rawBody,
+      body: { id: 'evt-1' },
+    })).resolves.toBe(true);
+    await expect(provider.validateWebhook({
+      headers: { 'x-ifood-signature': '0'.repeat(64) },
+      rawBody,
+      body: { id: 'evt-1' },
+    })).resolves.toBe(false);
   });
 });

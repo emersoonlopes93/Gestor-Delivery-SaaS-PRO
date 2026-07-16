@@ -15,7 +15,11 @@ describe('MarketplaceConnectionService', () => {
 
     return {
       prisma,
-      service: new MarketplaceConnectionService(prisma as never),
+      credentials: { encrypt: jest.fn((value: string) => `encrypted:${value}`) },
+      service: new MarketplaceConnectionService(
+        prisma as never,
+        { encrypt: jest.fn((value: string) => `encrypted:${value}`) } as never,
+      ),
     };
   };
 
@@ -68,12 +72,30 @@ describe('MarketplaceConnectionService', () => {
     });
 
     expect(prisma.marketplaceConnection.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'connection-1' },
+      where: { id: 'connection-1', tenantId: 'tenant-1' },
       data: expect.objectContaining({
         tenantId: 'tenant-1',
         provider: MarketplaceProvider.IFOOD,
       }),
     }));
     expect(updated.id).toBe('connection-1');
+  });
+
+  it('encrypts tokens before persistence', async () => {
+    const { service, prisma } = makeService();
+    prisma.marketplaceConnection.findFirst.mockResolvedValueOnce(null);
+    prisma.marketplaceConnection.create.mockResolvedValueOnce({ id: 'connection-1' });
+
+    await service.connectManual('tenant-1', MarketplaceProvider.IFOOD, {
+      accessToken: 'access-secret',
+      refreshToken: 'refresh-secret',
+    });
+
+    expect(prisma.marketplaceConnection.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        accessTokenEnc: 'encrypted:access-secret',
+        refreshTokenEnc: 'encrypted:refresh-secret',
+      }),
+    }));
   });
 });

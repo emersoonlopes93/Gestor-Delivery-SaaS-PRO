@@ -160,3 +160,13 @@ verified_against: main-copy / c63d394
 - **Correção técnica recomendada:** Nenhuma mudança de código necessária; atualizar documentação.
 - **Responsável:** Não atribuído
 - **Status:** Requer validação
+
+---
+
+## C-011 — iFood descrito como sincronização de catálogo e pedidos
+
+- **Documento:** `docs/product/feature-matrix.md` (descrição anterior).
+- **Comportamento verificado:** Não existe sincronização de catálogo. O núcleo de pedidos agora possui confirmação/cancelamento reais por contrato, OAuth, operação persistente e reconciliação por evento.
+- **Risco:** Alto — promessa comercial maior que o produto e confusão entre implementação testada e homologação externa.
+- **Decisão:** Descrição corrigida para pedidos bidirecionais Beta; catálogo explicitamente fora do escopo; homologação iFood registrada como pendente.
+- **Status:** Resolvido documentalmente em 2026-07-16.

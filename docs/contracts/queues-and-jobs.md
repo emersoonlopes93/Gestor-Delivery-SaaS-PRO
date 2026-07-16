@@ -9,7 +9,7 @@ Atualmente operamos com as seguintes filas canônicas:
 | Fila | Finalidade | Principais Jobs | Consumer | Idempotência Esperada |
 |------|------------|-----------------|----------|-----------------------|
 | `campaign-dispatch` | Disparo e automação de campanhas via WhatsApp | `system-feed-queue`, `system-automation-scan`, (default/dispatch) | `CampaignProcessor` | Sim (verificar status prévio e cooldown/opt-out) |
-| `marketplace-events` | Ingestão e sincronização de eventos de integrações externas | `order-status-sync`, (inbox event) | `MarketplaceEventProcessor` | Sim (verificar transição de estado na DB) |
+| `marketplace-event-ingest` | Ingestão e sincronização de eventos externos | `order-status-sync`, `event-inbox-process` | `MarketplaceEventProcessor` | Sim (`MarketplaceOperation`, inbox e constraints) |
 | `orders` | (Reservada) Confirmações automáticas, KDS, Spooler | (Reservada) | (A ser implementado) | Sim |
 
 ## 2. Configurações Globais (Defaults)
@@ -57,6 +57,6 @@ Todo Consumer (`@Processor`) para eventos com efeitos colaterais críticos (webh
 
 ## 6. Dead-Letter e Falhas Permanentes
 
-Quando um job esgota as 5 tentativas de Retry, ele permanecerá na fila com status `failed`.
+Quando um job esgota as tentativas de retry, ele permanece na fila com status `failed`. O job iFood bidirecional usa 3 tentativas, backoff exponencial mínimo de 5s e respeita `Retry-After`; erros permanentes não são repetidos.
 - Estes jobs estarão disponíveis para leitura via endpoints de auditoria administrativa (`/admin/queues` ou similar).
 - Não há processamento automático de dead-letters nativo; a re-execução (`retry()`) de um job retido dependerá de intervenção manual da equipe ou de ferramentas de console de Admin SaaS baseados na visibilidade exposta na API.

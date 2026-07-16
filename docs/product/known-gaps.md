@@ -22,6 +22,16 @@ verified_against: main-copy / c63d394
 | Alteração de data/slot exige cancelar e recriar | Baixa | Preserva consistência de capacidade; adicionar reschedule transacional futuramente. |
 | Geração concorrente não possui constraint única de intervalo | Baixa | Operação normal é idempotente em aplicação; avaliar migration com deduplicação segura. |
 
+## iFood bidirecional (Beta)
+
+| Gap | Severidade | Impacto / recomendação |
+|---|---|---|
+| Homologação oficial pendente | Alta | Confirmação, cancelamento, OAuth e HMAC estão cobertos por mocks contratuais, mas exigem tenant/merchant oficial e evidências do portal iFood antes de produção. |
+| Credenciais legadas em texto puro não são migradas automaticamente | Alta | O runtime falha fechado; reconectar cada integração para gravar tokens com AES-256-GCM. |
+| UI ainda não apresenta reconciliação completa | Média | Operações são consultáveis pela API; criar painel operacional em sprint futura. |
+| Ingestão usa o payload do evento como detalhe quando disponível | Média | Avaliar busca oficial completa por tipo de evento na homologação sem ampliar a Sprint 5A. |
+| Sem métricas Prometheus dedicadas | Baixa | Logs estruturados e persistência existem; integrar contadores ao stack de métricas futuro. |
+
 ---
 
 ## 1. Notificações Push Não Funcionais (Stub)

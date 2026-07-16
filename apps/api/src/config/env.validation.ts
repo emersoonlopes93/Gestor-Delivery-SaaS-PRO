@@ -45,6 +45,12 @@ const baseEnvSchema = z.object({
 
   // IFood
   MARKETPLACE_IFOOD_WEBHOOK_TOKEN: z.string().default(''),
+  MARKETPLACE_IFOOD_CLIENT_ID: z.string().default(''),
+  MARKETPLACE_IFOOD_CLIENT_SECRET: z.string().default(''),
+  MARKETPLACE_IFOOD_API_BASE_URL: z.string().url().default('https://merchant-api.ifood.com.br'),
+  MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: z.string().default(''),
 
   // Upload
   MEDIA_MAX_SIZE_BYTES: z.string().optional(),
@@ -109,6 +115,31 @@ export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
           code: z.ZodIssueCode.custom,
           path: ['VAPID_PUBLIC_KEY'],
           message: `VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY são obrigatórios se PUSH_NOTIFICATIONS_ENABLED for 'true'.`,
+        });
+      }
+    }
+
+    if (data.MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED === 'true') {
+      if (data.BULLMQ_ENABLED !== 'true' || data.REDIS_ENABLED !== 'true') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED'],
+          message: `iFood bidirecional exige REDIS_ENABLED=true e BULLMQ_ENABLED=true.`,
+        });
+      }
+      if (!data.MARKETPLACE_IFOOD_CLIENT_ID || !data.MARKETPLACE_IFOOD_CLIENT_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['MARKETPLACE_IFOOD_CLIENT_ID'],
+          message: `Credenciais de aplicativo iFood sao obrigatorias para o fluxo bidirecional.`,
+        });
+      }
+      const encryptionKey = Buffer.from(data.MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY, 'base64');
+      if (encryptionKey.length !== 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY'],
+          message: `A chave de credenciais deve conter 32 bytes codificados em base64.`,
         });
       }
     }

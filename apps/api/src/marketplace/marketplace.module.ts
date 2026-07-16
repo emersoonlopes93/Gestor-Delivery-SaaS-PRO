@@ -5,6 +5,7 @@ import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { CrmModule } from '../crm/crm.module';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
 import { MARKETPLACE_EVENT_QUEUE } from './marketplace.constants';
 import { MarketplaceWebhookController } from './controllers/marketplace-webhook.controller';
 import { MarketplaceTenantController } from './controllers/marketplace-tenant.controller';
@@ -15,6 +16,9 @@ import { MarketplaceEventInboxService } from './services/marketplace-event-inbox
 import { MarketplaceOrderIngestionService } from './services/marketplace-order-ingestion.service';
 import { MarketplaceStatusSyncService } from './services/marketplace-status-sync.service';
 import { MarketplaceEventProcessor } from './processors/marketplace-event.processor';
+import { MarketplaceCredentialService } from './services/marketplace-credential.service';
+import { IfoodTokenService } from './services/ifood-token.service';
+import { IfoodHttpClientService } from './services/ifood-http-client.service';
 
 const enableMarketplaceQueue =
   process.env.REDIS_ENABLED !== 'false' &&
@@ -26,6 +30,7 @@ const enableMarketplaceQueue =
     AuthModule,
     RbacModule,
     CrmModule,
+    FeatureControlModule,
     forwardRef(() => OrdersModule),
     ...(enableMarketplaceQueue
       ? [
@@ -47,6 +52,9 @@ const enableMarketplaceQueue =
   controllers: [MarketplaceWebhookController, MarketplaceTenantController],
   providers: [
     IfoodProvider,
+    MarketplaceCredentialService,
+    IfoodTokenService,
+    IfoodHttpClientService,
     MarketplaceProviderRegistryService,
     MarketplaceConnectionService,
     MarketplaceEventInboxService,

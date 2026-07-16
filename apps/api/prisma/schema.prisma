@@ -79,6 +79,7 @@ model Tenant {
   marketplaceConnections         MarketplaceConnection[]
   marketplaceEventInboxes        MarketplaceEventInbox[]
   marketplaceOrders              MarketplaceOrder[]
+  marketplaceOperations          MarketplaceOperation[]
   mediaAssets                    MediaAsset[]
   mediaCategories                MediaCategory[]
   optionGroups                   OptionGroup[]
@@ -1553,6 +1554,7 @@ model MarketplaceConnection {
   tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   events             MarketplaceEventInbox[]
   orders             MarketplaceOrder[]
+  operations         MarketplaceOperation[]
 
   @@unique([tenantId, provider])
   @@unique([provider, externalMerchantId])
@@ -1591,29 +1593,62 @@ model MarketplaceEventInbox {
 }
 
 model MarketplaceOrder {
-  id                String                @id @default(uuid())
-  tenantId          String                @map("tenant_id")
-  connectionId      String                @map("connection_id")
+  id                String                 @id @default(uuid())
+  tenantId          String                 @map("tenant_id")
+  connectionId      String                 @map("connection_id")
   provider          MarketplaceProvider
-  externalOrderId   String                @map("external_order_id") @db.VarChar(120)
-  externalDisplayId String?               @map("external_display_id") @db.VarChar(120)
-  internalOrderId   String?               @map("internal_order_id")
-  statusExternal    String?               @map("status_external") @db.VarChar(60)
-  statusInternal    String?               @map("status_internal") @db.VarChar(60)
-  rawPayload        Json                  @map("raw_payload")
-  normalizedPayload Json?                 @map("normalized_payload")
-  importedAt        DateTime?             @map("imported_at")
-  lastSyncedAt      DateTime?             @map("last_synced_at")
-  createdAt         DateTime              @default(now()) @map("created_at")
-  updatedAt         DateTime              @updatedAt @map("updated_at")
-  connection        MarketplaceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  internalOrder     Order?                @relation(fields: [internalOrderId], references: [id])
-  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalOrderId   String                 @map("external_order_id") @db.VarChar(120)
+  externalDisplayId String?                @map("external_display_id") @db.VarChar(120)
+  internalOrderId   String?                @map("internal_order_id")
+  statusExternal    String?                @map("status_external") @db.VarChar(60)
+  statusInternal    String?                @map("status_internal") @db.VarChar(60)
+  rawPayload        Json                   @map("raw_payload")
+  normalizedPayload Json?                  @map("normalized_payload")
+  importedAt        DateTime?              @map("imported_at")
+  lastSyncedAt      DateTime?              @map("last_synced_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  connection        MarketplaceConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  internalOrder     Order?                 @relation(fields: [internalOrderId], references: [id])
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operations        MarketplaceOperation[]
 
   @@unique([tenantId, provider, externalOrderId])
   @@index([internalOrderId])
   @@index([connectionId])
   @@map("marketplace_orders")
+}
+
+model MarketplaceOperation {
+  id                 String                     @id @default(uuid())
+  tenantId           String                     @map("tenant_id")
+  connectionId       String                     @map("connection_id")
+  marketplaceOrderId String                     @map("marketplace_order_id")
+  provider           MarketplaceProvider
+  externalOrderId    String                     @map("external_order_id") @db.VarChar(120)
+  operation          MarketplaceOperationType
+  status             MarketplaceOperationStatus @default(PENDING)
+  idempotencyKey     String                     @map("idempotency_key") @db.VarChar(300)
+  payloadVersion     Int                        @default(1) @map("payload_version")
+  cancellationReason String?                    @map("cancellation_reason") @db.VarChar(40)
+  correlationId      String                     @map("correlation_id") @db.VarChar(120)
+  attempts           Int                        @default(0)
+  lastAttemptAt      DateTime?                  @map("last_attempt_at")
+  acceptedAt         DateTime?                  @map("accepted_at")
+  completedAt        DateTime?                  @map("completed_at")
+  httpStatus         Int?                       @map("http_status")
+  providerCode       String?                    @map("provider_code") @db.VarChar(120)
+  lastError          String?                    @map("last_error") @db.VarChar(500)
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  updatedAt          DateTime                   @updatedAt @map("updated_at")
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection         MarketplaceConnection      @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  marketplaceOrder   MarketplaceOrder           @relation(fields: [marketplaceOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([marketplaceOrderId, operation, status], map: "marketplace_ops_order_operation_status_idx")
+  @@map("marketplace_operations")
 }
 
 model PaymentTransaction {
@@ -3289,6 +3324,21 @@ enum MarketplaceEventStatus {
   DUPLICATE
   FAILED
   IGNORED
+}
+
+enum MarketplaceOperationType {
+  CONFIRM
+  CANCEL
+}
+
+enum MarketplaceOperationStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  ACCEPTED
+  SUCCEEDED
+  FAILED
+  INTERVENTION_REQUIRED
 }
 
 enum PaymentAttemptStatus {

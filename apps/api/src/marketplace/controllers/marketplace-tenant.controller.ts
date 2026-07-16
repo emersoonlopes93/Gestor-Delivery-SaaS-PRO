@@ -11,6 +11,7 @@ import { MarketplaceConnectionService } from '../services/marketplace-connection
 import { MarketplaceEventInboxService } from '../services/marketplace-event-inbox.service';
 import { MarketplaceOrderIngestionService } from '../services/marketplace-order-ingestion.service';
 import { PrismaService } from '../../database/prisma.service';
+import { MarketplaceStatusSyncService } from '../services/marketplace-status-sync.service';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -24,6 +25,7 @@ export class MarketplaceTenantController {
     private readonly inboxService: MarketplaceEventInboxService,
     private readonly ingestionService: MarketplaceOrderIngestionService,
     private readonly prisma: PrismaService,
+    private readonly statusSyncService: MarketplaceStatusSyncService,
   ) {}
 
   @Get('connections')
@@ -53,6 +55,7 @@ export class MarketplaceTenantController {
       authType?: string;
       accessToken?: string;
       refreshToken?: string;
+      tokenExpiresAt?: string;
       settingsJson?: Record<string, unknown>;
     },
   ) {
@@ -102,6 +105,16 @@ export class MarketplaceTenantController {
     });
   }
 
+  @Get('operations')
+  @RequirePermissions('settings.manage')
+  async listMarketplaceOperations(@Req() req: TenantRequest) {
+    return this.prisma.marketplaceOperation.findMany({
+      where: { tenantId: req.user.tenantId },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
   @Post('events/:eventInboxId/reprocess')
   @RequirePermissions('settings.manage')
   async reprocessEvent(@Req() req: TenantRequest, @Param('eventInboxId') eventInboxId: string) {
@@ -112,5 +125,14 @@ export class MarketplaceTenantController {
   @RequirePermissions('settings.manage')
   async reprocessOrder(@Req() req: TenantRequest, @Param('marketplaceOrderId') marketplaceOrderId: string) {
     return this.ingestionService.reprocessMarketplaceOrder(marketplaceOrderId, req.user.tenantId);
+  }
+
+  @Get('orders/:marketplaceOrderId/cancellation-reasons')
+  @RequirePermissions('orders.cancel')
+  async getCancellationReasons(
+    @Req() req: TenantRequest,
+    @Param('marketplaceOrderId') marketplaceOrderId: string,
+  ) {
+    return this.statusSyncService.getCancellationReasons(req.user.tenantId, marketplaceOrderId);
   }
 }

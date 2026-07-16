@@ -13,6 +13,17 @@ export type ParsedMarketplaceEvent = {
 
 export type ExternalMarketplaceOrder = Record<string, unknown>;
 
+export type MarketplaceProviderOperationResult = {
+  accepted: true;
+  httpStatus: number;
+  providerCode?: string | null;
+};
+
+export type MarketplaceCancellationReason = {
+  code: string;
+  description: string;
+};
+
 export type NormalizedMarketplaceOrderItem = {
   externalItemId?: string | null;
   name: string;

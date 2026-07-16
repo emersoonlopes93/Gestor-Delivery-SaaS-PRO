@@ -16,6 +16,7 @@ describe('MarketplaceOrderIngestionService', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(service.reprocessMarketplaceOrder('marketplace-order-1', 'tenant-other')).rejects.toThrow(
@@ -56,6 +57,7 @@ describe('MarketplaceOrderIngestionService', () => {
 
     const service = new MarketplaceOrderIngestionService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
