@@ -288,3 +288,57 @@ Ações tomadas: nenhuma outra chamada Prisma foi feita até identificar a causa
 - novo [runbook de staging](../operations/runbooks/ifood-staging-rollout.md) com piloto, go/no-go e rollback.
 
 Próximo passo: obter aprovação para a migration aditiva de branding, validar novamente as quatro trajetórias e o smoke de startup, concluir gates, criar commits de migration/documentação e somente então classificar o RC como go para staging. Não ativar tenant real nem iniciar nova sprint.
+
+---
+
+## Atualização RC — migration de branding aprovada e validada
+
+Data: 2026-07-16
+Branch: `release/ifood-staging-rc`
+
+### Alteração entregue
+
+Migration exclusivamente aditiva: `20260716210000_add_system_config_platform_logo_media`.
+
+```sql
+ALTER TABLE "system_configs"
+  ADD COLUMN "platform_logo_media_id" TEXT;
+
+CREATE INDEX "system_configs_platform_logo_media_id_idx"
+  ON "system_configs"("platform_logo_media_id");
+
+ALTER TABLE "system_configs"
+  ADD CONSTRAINT "system_configs_platform_logo_media_id_fkey"
+  FOREIGN KEY ("platform_logo_media_id")
+  REFERENCES "media_assets"("id")
+  ON DELETE SET NULL
+  ON UPDATE CASCADE;
+```
+
+Não houve `prisma db push`, alteração destrutiva, acesso remoto adicional, nem mudança de schema fora desta coluna, índice e FK. A confirmação no PostgreSQL local foi: `media_assets.id = text`, compatível exatamente com a nova coluna `text`.
+
+### Validação local/efêmera
+
+Antes de cada comando Prisma, `DATABASE_URL` e `DIRECT_URL` foram sobrescritas e validadas como PostgreSQL local em `127.0.0.1:55433`, apontando para o mesmo banco efêmero. A execução abortaria para host/porta/esquema diferentes.
+
+| Cenário | Resultado |
+|---|---|
+| Banco vazio | PASS, 47 migrations |
+| Upgrade pré-5A | PASS, 47 migrations |
+| Upgrade 5B | PASS, 47 migrations |
+| Upgrade 5C | PASS, 47 migrations |
+| Redeploy sobre 5C + branding | PASS, sem migrations pendentes |
+| `prisma migrate diff` pós-migration | PASS, migration vazia |
+| `pnpm prisma:validate` | PASS |
+| Smoke de startup que falhava em `P2022` | PASS, Nest iniciou sem `P2022`; filas e automações desabilitadas |
+| `pnpm --filter @gestor/api test` | PASS |
+| `pnpm typecheck` | PASS |
+| `pnpm build` | PASS |
+
+Checksum SHA-256 do arquivo e checksum registrado pelo Prisma: `510ce2bc60f3467cfe48614f7dbc9fc9cafe82e38c423d45f02d1c8dbef5dcf2`.
+
+### Go/no-go e incidente separado
+
+O RC passa a **go para staging somente como artefato validado localmente**; não autoriza aplicar migrations ou ativar polling em staging/produção. Polling continua desabilitado por padrão e protegido pelos kill switches.
+
+O incidente histórico de `DIRECT_URL` permanece separado e aberto: antes de qualquer staging ou produção, o responsável pelo banco deve identificar formalmente o banco remoto afetado, conferir `_prisma_migrations`, confirmar backup recuperável e demonstrar que apenas as migrations aditivas 5A–5C foram aplicadas. Esta sessão não realizou nova consulta nem qualquer alteração remota.
