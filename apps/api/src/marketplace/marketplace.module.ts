@@ -22,6 +22,7 @@ import { IfoodHttpClientService } from './services/ifood-http-client.service';
 import { MarketplaceDivergenceService } from './services/marketplace-divergence.service';
 import { MarketplaceReconciliationService } from './services/marketplace-reconciliation.service';
 import { MarketplaceAdminOperationsService } from './services/marketplace-admin-operations.service';
+import { MarketplacePollingService } from './services/marketplace-polling.service';
 
 const enableMarketplaceQueue =
   process.env.REDIS_ENABLED !== 'false' &&
@@ -66,6 +67,7 @@ const enableMarketplaceQueue =
     MarketplaceDivergenceService,
     MarketplaceReconciliationService,
     MarketplaceAdminOperationsService,
+    MarketplacePollingService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),
   ],
   exports: [
@@ -76,6 +78,7 @@ const enableMarketplaceQueue =
     MarketplaceCredentialService,
     MarketplaceReconciliationService,
     MarketplaceAdminOperationsService,
+    MarketplacePollingService,
   ],
 })
 export class MarketplaceModule {}

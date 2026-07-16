@@ -1,4 +1,4 @@
-import { MarketplaceEventStatus, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceEventChannel, MarketplaceEventStatus, MarketplaceProvider } from '@prisma/client';
 import { MarketplaceEventInboxService } from './marketplace-event-inbox.service';
 
 describe('MarketplaceEventInboxService', () => {
@@ -27,6 +27,9 @@ describe('MarketplaceEventInboxService', () => {
   };
 
   const prisma = {
+    marketplaceConnection: {
+      findMany: jest.fn(),
+    },
     marketplaceEventInbox: {
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -93,6 +96,13 @@ describe('MarketplaceEventInboxService', () => {
     expect(result).toEqual({ accepted: true, duplicate: true, inboxId: 'inbox-1' });
     expect(prisma.marketplaceEventInbox.create).not.toHaveBeenCalled();
     expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
+    expect(prisma.marketplaceEventInbox.update).toHaveBeenCalledWith({
+      where: { id: 'inbox-1' },
+      data: expect.objectContaining({
+        deliveryCount: { increment: 1 },
+        lastDeliveryChannel: MarketplaceEventChannel.WEBHOOK,
+      }),
+    });
   });
 
   it('rejects reprocess when the event does not belong to the tenant', async () => {
@@ -147,5 +157,32 @@ describe('MarketplaceEventInboxService', () => {
       reason: 'already_processed',
     });
     expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
+  });
+
+  it('answers per-merchant webhook presence without overlapping polling presence', async () => {
+    provider.parseWebhookEvent.mockResolvedValueOnce({
+      provider: MarketplaceProvider.IFOOD,
+      eventId: 'heartbeat-1',
+      topic: 'KEEPALIVE',
+      rawPayload: { merchantIds: ['merchant-webhook', 'merchant-polling'] },
+    });
+    prisma.marketplaceConnection.findMany.mockResolvedValueOnce([
+      { externalMerchantId: 'merchant-webhook', settingsJson: { pollingFallbackEnabled: false } },
+      { externalMerchantId: 'merchant-polling', settingsJson: { pollingFallbackEnabled: true } },
+    ]);
+    const service = new MarketplaceEventInboxService(
+      prisma as never,
+      registry as never,
+      connectionService as never,
+      ingestionService as never,
+      undefined,
+    );
+    await expect(service.receiveWebhook({
+      provider: MarketplaceProvider.IFOOD,
+      headers: {},
+      rawBody: Buffer.from('{}'),
+      body: {},
+    })).resolves.toEqual({ accepted: true, heartbeat: true, merchantIds: ['merchant-webhook'] });
+    expect(prisma.marketplaceEventInbox.create).not.toHaveBeenCalled();
   });
 });

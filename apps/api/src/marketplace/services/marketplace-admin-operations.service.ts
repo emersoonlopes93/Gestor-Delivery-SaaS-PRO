@@ -23,6 +23,38 @@ export class MarketplaceAdminOperationsService {
     private readonly credentials: MarketplaceCredentialService,
   ) {}
 
+  async listPollingConnections(tenantId: string) {
+    return this.prisma.marketplaceConnection.findMany({
+      where: { tenantId, provider: MarketplaceProvider.IFOOD },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        id: true,
+        tenantId: true,
+        provider: true,
+        status: true,
+        externalMerchantId: true,
+        externalStoreId: true,
+        displayName: true,
+        pollingStatus: true,
+        pollingLastAttemptAt: true,
+        pollingLastSuccessAt: true,
+        pollingLastFailureAt: true,
+        pollingNextAttemptAt: true,
+        pollingLastError: true,
+        pollingBlockedReason: true,
+        pollingConsecutiveFailures: true,
+        pollingCycles: true,
+        pollingEventsReceived: true,
+        pollingEventsPersisted: true,
+        pollingDuplicateEvents: true,
+        pollingAcknowledgedEvents: true,
+        pollingAcknowledgmentFailures: true,
+        settingsJson: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async listOperations(input: MarketplaceAdminPage & {
     status?: MarketplaceOperationStatus;
     operation?: MarketplaceOperationType;

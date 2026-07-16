@@ -152,4 +152,46 @@ describe('MarketplaceOrderIngestionService', () => {
       data: expect.objectContaining({ status: MarketplaceEventStatus.FAILED }),
     }));
   });
+
+  it('suppresses a lower-precedence event with the same createdAt', async () => {
+    const connection = { id: 'conn-1', tenantId: 'tenant-1', provider: MarketplaceProvider.IFOOD };
+    const prisma = {
+      marketplaceEventInbox: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'inbox-equal',
+          provider: MarketplaceProvider.IFOOD,
+          status: MarketplaceEventStatus.QUEUED,
+          connection,
+          externalOrderId: 'external-1',
+          eventId: 'event-placed',
+          eventCreatedAt: new Date('2026-07-16T11:00:00.000Z'),
+          eventSequence: null,
+          topic: 'PLACED',
+          correlationId: 'correlation-equal',
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      marketplaceOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          lastExternalEventAt: new Date('2026-07-16T11:00:00.000Z'),
+          lastExternalEventSequence: null,
+          lastExternalEventTopic: 'CONFIRMED',
+        }),
+      },
+    };
+    const provider = { fetchOrderDetails: jest.fn() };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never,
+      { get: jest.fn().mockReturnValue(provider) } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    await expect(service.processInboxEvent('inbox-equal')).resolves.toMatchObject({ ignored: true });
+    expect(provider.fetchOrderDetails).not.toHaveBeenCalled();
+  });
 });

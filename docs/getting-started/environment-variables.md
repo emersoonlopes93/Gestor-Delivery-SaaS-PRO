@@ -103,6 +103,13 @@ source_of_truth:
 | Variável | Obrigatória | Ambiente | Descrição | Sensível |
 |---|---|---|---|---|
 | `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED` | Sim para ativar | Todos | Kill switch técnico; default `false` | Não |
+| `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED` | Sim para polling | Todos | Kill switch adicional; default `false` | Não |
+| `MARKETPLACE_IFOOD_POLLING_INTERVAL_MS` | Não | Todos | Intervalo oficial; mínimo/default `30000` | Não |
+| `MARKETPLACE_IFOOD_POLLING_JITTER_MS` | Não | Todos | Jitter determinístico; default `5000` | Não |
+| `MARKETPLACE_IFOOD_POLLING_CONNECTIONS_PER_SCAN` | Não | Todos | Limite por varredura; default `100` | Não |
+| `MARKETPLACE_IFOOD_POLLING_CATEGORIES` | Não | Todos | Default `ALL`; filtros causam auto-ACK dos excluídos | Não |
+| `MARKETPLACE_IFOOD_POLLING_TYPES` | Não | Todos | Vazio por padrão; não combinar com groups | Não |
+| `MARKETPLACE_IFOOD_POLLING_GROUPS` | Não | Todos | Vazio por padrão; não combinar com types | Não |
 | `MARKETPLACE_IFOOD_CLIENT_ID` | Cond. | Staging/Prod | ID do aplicativo no Developer Portal | Sim |
 | `MARKETPLACE_IFOOD_CLIENT_SECRET` | Cond. | Staging/Prod | Secret OAuth e chave HMAC oficial do webhook | **Sim** |
 | `MARKETPLACE_IFOOD_API_BASE_URL` | Não | Todos | Default `https://merchant-api.ifood.com.br` | Não |
@@ -113,7 +120,7 @@ source_of_truth:
 | `MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION` | Não | Rotação | Identificador exato da chave anterior | Não |
 | `MARKETPLACE_SMOKE_ENABLED` | Não | Staging | Permite bypass exclusivo do smoke; manter `false` em produção | Não |
 
-Ativar o kill switch exige também `REDIS_ENABLED=true`, `BULLMQ_ENABLED=true`, credenciais oficiais e migration aplicada. `MARKETPLACE_IFOOD_WEBHOOK_TOKEN` é legado e não substitui `X-IFood-Signature`.
+Ativar polling exige os dois kill switches, `REDIS_ENABLED=true`, `BULLMQ_ENABLED=true`, opt-in `settingsJson.pollingFallbackEnabled=true` por conexão, credenciais oficiais e migration aplicada. `MARKETPLACE_IFOOD_WEBHOOK_TOKEN` é legado e não substitui `X-IFood-Signature`.
 
 ---
 

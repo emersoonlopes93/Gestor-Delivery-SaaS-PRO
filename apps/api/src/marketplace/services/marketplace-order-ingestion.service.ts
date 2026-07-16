@@ -91,13 +91,13 @@ export class MarketplaceOrderIngestionService {
 
       const existingOrder = await this.prisma.marketplaceOrder.findFirst({
         where: { tenantId: connection.tenantId, provider: inbox.provider, externalOrderId },
-        select: { lastExternalEventAt: true },
+        select: {
+          lastExternalEventAt: true,
+          lastExternalEventSequence: true,
+          lastExternalEventTopic: true,
+        },
       });
-      if (
-        inbox.eventCreatedAt
-        && existingOrder?.lastExternalEventAt
-        && inbox.eventCreatedAt.getTime() < existingOrder.lastExternalEventAt.getTime()
-      ) {
+      if (existingOrder && this.isOlderEvent(inbox, existingOrder)) {
         await this.prisma.marketplaceEventInbox.update({
           where: { id: inbox.id },
           data: {
@@ -132,7 +132,12 @@ export class MarketplaceOrderIngestionService {
         connection.tenantId,
         connection.id,
         normalizedOrder,
-        { id: inbox.eventId, createdAt: inbox.eventCreatedAt },
+        {
+          id: inbox.eventId,
+          createdAt: inbox.eventCreatedAt,
+          sequence: inbox.eventSequence,
+          topic: inbox.topic,
+        },
       );
       if (marketplaceOrder.confirmationDeadlineAt) {
         const remainingMs = marketplaceOrder.confirmationDeadlineAt.getTime() - Date.now();
@@ -260,7 +265,7 @@ export class MarketplaceOrderIngestionService {
     tenantId: string,
     connectionId: string,
     normalized: NormalizedMarketplaceOrder,
-    event: { id?: string | null; createdAt?: Date | null },
+    event: { id?: string | null; createdAt?: Date | null; sequence?: bigint | null; topic?: string | null },
   ) {
     const existing = await this.prisma.marketplaceOrder.findFirst({
       where: {
@@ -281,6 +286,8 @@ export class MarketplaceOrderIngestionService {
           confirmationDeadlineAt: normalized.confirmationDeadlineAt ?? existing.confirmationDeadlineAt,
           lastExternalEventAt: event.createdAt ?? existing.lastExternalEventAt,
           lastExternalEventId: event.id ?? existing.lastExternalEventId,
+          lastExternalEventSequence: event.sequence ?? existing.lastExternalEventSequence,
+          lastExternalEventTopic: event.topic ?? existing.lastExternalEventTopic,
           rawPayload: this.toInputJsonValue(normalized.rawPayload),
           normalizedPayload: this.toInputJsonValue(normalized),
           lastSyncedAt: new Date(),
@@ -302,10 +309,45 @@ export class MarketplaceOrderIngestionService {
         confirmationDeadlineAt: normalized.confirmationDeadlineAt ?? null,
         lastExternalEventAt: event.createdAt ?? null,
         lastExternalEventId: event.id ?? null,
+        lastExternalEventSequence: event.sequence ?? null,
+        lastExternalEventTopic: event.topic ?? null,
         rawPayload: this.toInputJsonValue(normalized.rawPayload),
         normalizedPayload: this.toInputJsonValue(normalized),
       },
     });
+  }
+
+  private isOlderEvent(
+    incoming: { eventCreatedAt: Date | null; eventSequence: bigint | null; topic: string | null },
+    current: { lastExternalEventAt: Date | null; lastExternalEventSequence: bigint | null; lastExternalEventTopic: string | null },
+  ): boolean {
+    if (!incoming.eventCreatedAt || !current.lastExternalEventAt) return false;
+    const timeDifference = incoming.eventCreatedAt.getTime() - current.lastExternalEventAt.getTime();
+    if (timeDifference !== 0) return timeDifference < 0;
+    if (incoming.eventSequence !== null && current.lastExternalEventSequence !== null
+      && incoming.eventSequence !== current.lastExternalEventSequence) {
+      return incoming.eventSequence < current.lastExternalEventSequence;
+    }
+    return this.eventPrecedence(incoming.topic) < this.eventPrecedence(current.lastExternalEventTopic);
+  }
+
+  private eventPrecedence(topic: string | null): number {
+    const normalized = topic?.toUpperCase() ?? '';
+    if (normalized === 'CAN') return 70;
+    if (normalized === 'CON') return 60;
+    if (normalized === 'DSP') return 50;
+    if (normalized === 'RTP') return 40;
+    if (normalized === 'SPS' || normalized === 'SPE') return 30;
+    if (normalized === 'CFM') return 20;
+    if (normalized === 'PLC') return 10;
+    if (normalized.includes('CANCEL')) return 70;
+    if (normalized.includes('CONCLUD') || normalized.includes('COMPLET')) return 60;
+    if (normalized.includes('DISPATCH')) return 50;
+    if (normalized.includes('READY')) return 40;
+    if (normalized.includes('PREPAR')) return 30;
+    if (normalized.includes('CONFIRM')) return 20;
+    if (normalized.includes('PLACED')) return 10;
+    return 0;
   }
 
   private async createInternalOrderFromNormalized(normalized: NormalizedMarketplaceOrder): Promise<string> {

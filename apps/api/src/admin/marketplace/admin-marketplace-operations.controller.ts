@@ -10,6 +10,7 @@ import {
 import { CurrentUser, RequireAdminPermissions } from '../../common/decorators';
 import { MarketplaceAdminOperationsService } from '../../marketplace/services/marketplace-admin-operations.service';
 import { MarketplaceReconciliationService } from '../../marketplace/services/marketplace-reconciliation.service';
+import { MarketplacePollingService } from '../../marketplace/services/marketplace-polling.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
 
@@ -19,6 +20,7 @@ export class AdminMarketplaceOperationsController {
   constructor(
     private readonly operations: MarketplaceAdminOperationsService,
     private readonly reconciliation: MarketplaceReconciliationService,
+    private readonly polling: MarketplacePollingService,
   ) {}
 
   @Get('operations')
@@ -79,6 +81,29 @@ export class AdminMarketplaceOperationsController {
   @RequireAdminPermissions('saas.marketplace.read')
   getMetrics(@Query('tenantId') tenantId: string) {
     return this.operations.getMetrics(this.requiredTenantId(tenantId));
+  }
+
+  @Get('connections/polling')
+  @RequireAdminPermissions('saas.marketplace.read')
+  listPollingConnections(@Query('tenantId') tenantId: string) {
+    return this.operations.listPollingConnections(this.requiredTenantId(tenantId));
+  }
+
+  @Post('connections/:connectionId/poll-now')
+  @RequireAdminPermissions('saas.marketplace.manage')
+  @Throttle({ default: { limit: 3, ttl: 60 } })
+  pollNow(
+    @Query('tenantId') tenantId: string,
+    @Param('connectionId') connectionId: string,
+    @CurrentUser('sub') adminId: string,
+    @Req() req: Request,
+  ) {
+    return this.polling.runNow({
+      tenantId: this.requiredTenantId(tenantId),
+      connectionId,
+      adminId,
+      ip: req.ip,
+    });
   }
 
   @Post('operations/:operationId/retry')

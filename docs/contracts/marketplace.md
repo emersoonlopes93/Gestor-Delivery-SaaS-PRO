@@ -126,7 +126,7 @@ Erros permanentes terminam em `INTERVENTION_REQUIRED`. Erros temporários ficam 
 
 ## 9. Filas e payload
 
-Fila canônica: `marketplace-event-ingest`; jobs: `event-inbox-process`, `order-status-sync` e `operation-reconciliation-scan`.
+Fila canônica: `marketplace-event-ingest`; jobs: `event-inbox-process`, `order-status-sync`, `operation-reconciliation-scan`, `ifood-polling-scan` e `ifood-poll-connection`.
 
 O payload contém somente `tenantId`, ID interno, ID externo, tipo, correlation ID, versão e ID da operação. Não contém credenciais ou payload de cliente. O fluxo bidirecional falha com `503` quando Redis/BullMQ não está disponível; não há fallback síncrono.
 
@@ -134,7 +134,7 @@ O payload contém somente `tenantId`, ID interno, ID externo, tipo, correlation 
 
 `MarketplaceOperation` registra tenant, conexão, pedidos interno/externo, operação, status, tentativas, timestamps, HTTP normalizado, código do provider, erro sanitizado e correlation ID. `GET /marketplaces/operations` expõe somente linhas do tenant autenticado.
 
-Migrations: `20260716050000_marketplace_bidirectional_operations` e `20260716150000_marketplace_reconciliation_operations`. Ambas são aditivas. A segunda adiciona metadados de evento/SLA/linhagem, índices operacionais, enums de divergência e `MarketplaceDivergence`. Rollback seguro de aplicação deve primeiro desativar `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED` e voltar o código, preservando as tabelas de auditoria. Remover colunas, tabela ou enums é destrutivo e exige mudança separada, backup e aprovação.
+Migrations: `20260716050000_marketplace_bidirectional_operations`, `20260716150000_marketplace_reconciliation_operations` e `20260716190000_ifood_polling_fallback`. Todas são aditivas. A terceira adiciona canal inicial/final, contador/último recebimento, estado e contadores de polling e metadados de ordenação. Rollback seguro primeiro desativa `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED`, depois o bidirecional se necessário, e volta o código preservando auditoria. Remover colunas, constraints ou enums exige mudança separada, backup e aprovação.
 
 Logs estruturados incluem IDs operacionais, duração, tentativa/resultado e classificação, mas nunca token, secret, Authorization ou payload integral.
 
@@ -203,12 +203,20 @@ Endpoints SaaS Admin exigem `AdminAuthGuard`, `AdminPermissionsGuard`, tenant ex
 | `POST /admin/marketplace/operations/:id/retry` | `saas.marketplace.manage` | retry após reconciliação, rate limit 5/min |
 | `POST /admin/marketplace/divergences/:id/acknowledge` | `saas.marketplace.manage` | reconhecer com auditoria |
 | `POST /admin/marketplace/connections/:id/rotate-credentials` | `saas.marketplace.manage` | recifrar credenciais, rate limit 3/min |
+| `GET /admin/marketplace/connections/polling` | `saas.marketplace.read` | estado, timestamps e contadores sanitizados |
+| `POST /admin/marketplace/connections/:id/poll-now` | `saas.marketplace.manage` | ciclo manual auditado, rate limit 3/min |
 
 Retry administrativo nunca reutiliza silenciosamente o job: reconcilia primeiro, recusa operações concluídas/aceitas/ativas, cria correlation ID e operação filha, registra admin/IP, preserva a original e limita três tentativas por operação.
 
 ## 17. Polling e recuperação
 
-O projeto permanece webhook-first e não implementa polling. A indisponibilidade do webhook é recuperada por repetição do remetente, inbox persistente e consulta pontual de estado durante reconciliação. Não foi adicionado polling porque a adoção exige validar credenciais, presença do merchant, ACK, filtros e rate limits oficiais. Se for adotado, deverá rodar a cada 30 segundos, ordenar por `createdAt` e enviar ACK somente após persistência segura.
+O fallback iFood é opt-in e permanece desligado por padrão. Exige `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED=true`, `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED=true`, Redis/BullMQ, feature/entitlement do tenant, tenant ativo, conexão `CONNECTED`, merchant mapeado e `settingsJson.pollingFallbackEnabled=true`.
+
+O scheduler executa a cada 30 segundos, cria jobs determinísticos por conexão/janela, aplica jitter e usa o header `x-polling-merchants` com um merchant. Eventos são ordenados por `createdAt`, depois sequência, precedência de estado e ID apenas como desempate estável. Webhook e polling compartilham `(provider,dedupeKey)`; a inbox registra primeiro/último canal, entregas e timestamps.
+
+ACK usa lotes conservadores de até 2.000 IDs e só ocorre após commit da nova linha ou confirmação de duplicata existente. Falha de persistência, ID ausente ou merchant inconsistente não recebe ACK. Evento sem tópico/pedido é persistido como `IGNORED`; desconhecidos não interrompem o lote. Falha permanente bloqueia polling da conexão; 429/5xx respeitam `Retry-After`/backoff.
+
+Polling bem-sucedido é o heartbeat oficial. Presença webhook por merchant exclui conexões com polling opt-in; a homologação deve configurar presença por merchant e nunca manter os dois métodos de presença ativos para o mesmo merchant. Detalhes operacionais: `docs/operations/runbooks/ifood-homologation.md`.
 
 ## 18. Criptografia e rotação
 

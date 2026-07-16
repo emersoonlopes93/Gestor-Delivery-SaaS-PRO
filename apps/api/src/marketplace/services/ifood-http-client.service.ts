@@ -15,6 +15,12 @@ type CancellationReasonResponse = {
   reasons?: Array<{ code?: unknown; description?: unknown }>;
 };
 
+export type IfoodPollingFilters = {
+  categories?: string;
+  types?: string;
+  groups?: string;
+};
+
 @Injectable()
 export class IfoodHttpClientService {
   private readonly logger = new Logger(IfoodHttpClientService.name);
@@ -30,6 +36,58 @@ export class IfoodHttpClientService {
       path: `/order/v1.0/orders/${encodeURIComponent(externalOrderId)}`,
       correlationId,
     });
+  }
+
+  async pollEvents(
+    connection: MarketplaceConnection,
+    merchantId: string,
+    correlationId: string,
+    filters: IfoodPollingFilters = {},
+  ): Promise<Record<string, unknown>[]> {
+    const query = new URLSearchParams();
+    if (filters.categories) query.set('categories', filters.categories);
+    if (filters.types) query.set('types', filters.types);
+    if (filters.groups) query.set('groups', filters.groups);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    const response = await this.request(connection, {
+      method: 'GET',
+      path: `/events/v1.0/events:polling${suffix}`,
+      correlationId,
+      headers: { 'x-polling-merchants': merchantId },
+    });
+    if (response.status === 204) return [];
+    if (!response.ok) throw await this.toError(response);
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new IfoodApiError('iFood returned an invalid polling response.', false, response.status, 'INVALID_RESPONSE');
+    }
+    if (!Array.isArray(payload)) {
+      throw new IfoodApiError('iFood polling response is not an event array.', false, response.status, 'INVALID_RESPONSE');
+    }
+    return payload.filter((event): event is Record<string, unknown> => (
+      typeof event === 'object' && event !== null && !Array.isArray(event)
+    ));
+  }
+
+  async acknowledgeEvents(
+    connection: MarketplaceConnection,
+    eventIds: string[],
+    correlationId: string,
+  ): Promise<{ accepted: true; httpStatus: number }> {
+    const uniqueIds = [...new Set(eventIds.map((id) => id.trim()).filter(Boolean))];
+    if (uniqueIds.length === 0 || uniqueIds.length > 2000) {
+      throw new IfoodApiError('iFood acknowledgment batch must contain between 1 and 2000 unique IDs.', false, 400, 'INVALID_ACK_BATCH');
+    }
+    const response = await this.request(connection, {
+      method: 'POST',
+      path: '/events/v1.0/events/acknowledgment',
+      correlationId,
+      body: uniqueIds.map((id) => ({ id })),
+    });
+    if (!response.ok) throw await this.toError(response);
+    return { accepted: true, httpStatus: response.status };
   }
 
   async confirmOrder(connection: MarketplaceConnection, externalOrderId: string, correlationId: string) {
@@ -74,7 +132,7 @@ export class IfoodHttpClientService {
 
   private async requestAccepted(
     connection: MarketplaceConnection,
-    input: { path: string; correlationId: string; body?: Record<string, unknown> },
+    input: { path: string; correlationId: string; body?: unknown },
   ) {
     const response = await this.request(connection, {
       method: 'POST',
@@ -95,7 +153,7 @@ export class IfoodHttpClientService {
 
   private async requestJson<T>(
     connection: MarketplaceConnection,
-    input: { method: 'GET' | 'POST'; path: string; correlationId: string; body?: Record<string, unknown> },
+    input: { method: 'GET' | 'POST'; path: string; correlationId: string; body?: unknown; headers?: Record<string, string> },
   ): Promise<T> {
     const response = await this.request(connection, input);
     if (!response.ok) throw await this.toError(response);
@@ -108,7 +166,7 @@ export class IfoodHttpClientService {
 
   private async request(
     connection: MarketplaceConnection,
-    input: { method: 'GET' | 'POST'; path: string; correlationId: string; body?: Record<string, unknown> },
+    input: { method: 'GET' | 'POST'; path: string; correlationId: string; body?: unknown; headers?: Record<string, string> },
   ): Promise<Response> {
     let token = await this.tokens.getAccessToken(connection);
     let response = await this.execute(connection, token, input);
@@ -125,7 +183,7 @@ export class IfoodHttpClientService {
   private async execute(
     connection: MarketplaceConnection,
     token: string,
-    input: { method: 'GET' | 'POST'; path: string; correlationId: string; body?: Record<string, unknown> },
+    input: { method: 'GET' | 'POST'; path: string; correlationId: string; body?: unknown; headers?: Record<string, string> },
   ): Promise<Response> {
     const startedAt = Date.now();
     const baseUrl = this.config.get<string>('MARKETPLACE_IFOOD_API_BASE_URL')?.trim()
@@ -138,6 +196,7 @@ export class IfoodHttpClientService {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
           'x-correlation-id': input.correlationId,
+          ...input.headers,
         },
         body: input.body ? JSON.stringify(input.body) : undefined,
         signal: AbortSignal.timeout(Number(this.config.get<string>('MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS') || 10000)),

@@ -138,6 +138,7 @@ export class MarketplaceConnectionService {
     const importAsStatus = record.importAsStatus;
     return {
       autoConfirmOrders: record.autoConfirmOrders === true,
+      pollingFallbackEnabled: record.pollingFallbackEnabled === true,
       importAsStatus: importAsStatus === 'confirmed' || importAsStatus === 'preparing'
         ? importAsStatus
         : 'pending',

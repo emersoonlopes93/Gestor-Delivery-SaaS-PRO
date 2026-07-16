@@ -51,4 +51,21 @@ describe('IfoodHttpClientService', () => {
     expect(error).toBeInstanceOf(IfoodApiError);
     expect(error).toMatchObject({ retryable: true, httpStatus: 429, retryAfterMs: 7000 });
   });
+
+  it('polls a single merchant and accepts a 204 empty cycle', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(service.pollEvents(connection, 'merchant-1', 'corr-poll')).resolves.toEqual([]);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://ifood.test/events/v1.0/events:polling');
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('x-polling-merchants')).toBe('merchant-1');
+  });
+
+  it('sends unique acknowledgment IDs using the official endpoint', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(null, { status: 202 }));
+    await expect(service.acknowledgeEvents(connection, ['evt-1', 'evt-1', 'evt-2'], 'corr-ack')).resolves.toEqual({
+      accepted: true,
+      httpStatus: 202,
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe('https://ifood.test/events/v1.0/events/acknowledgment');
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual([{ id: 'evt-1' }, { id: 'evt-2' }]);
+  });
 });

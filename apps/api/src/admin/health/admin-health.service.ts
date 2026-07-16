@@ -15,12 +15,44 @@ export class AdminHealthService {
     const redisConfigured = Boolean(redisHost && redisHost !== 'localhost' && redisHost !== '127.0.0.1');
     const bullmqEnabled = process.env.BULLMQ_ENABLED === 'true';
     const campaignsDispatchEnabled = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+    const marketplacePollingEnabled = process.env.MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED === 'true';
+    const marketplaceTenantIds = databaseOk
+      ? await this.prisma.tenant.findMany({ select: { id: true }, orderBy: { id: 'asc' }, take: 10_000 })
+      : [];
+    const marketplaceConnections = marketplaceTenantIds.length
+      ? await this.prisma.marketplaceConnection.findMany({
+        where: { tenantId: { in: marketplaceTenantIds.map((tenant) => tenant.id) }, provider: 'IFOOD' },
+        select: {
+          pollingStatus: true,
+          pollingLastSuccessAt: true,
+          pollingBlockedReason: true,
+          settingsJson: true,
+        },
+      })
+      : [];
+    const pollingConnections = marketplaceConnections.filter((connection) => (
+      typeof connection.settingsJson === 'object'
+      && connection.settingsJson !== null
+      && !Array.isArray(connection.settingsJson)
+      && 'pollingFallbackEnabled' in connection.settingsJson
+      && connection.settingsJson.pollingFallbackEnabled === true
+    ));
+    const pollingStaleThreshold = Date.now() - 90_000;
+    const stalePollingConnections = pollingConnections.filter((connection) => (
+      !connection.pollingLastSuccessAt || connection.pollingLastSuccessAt.getTime() < pollingStaleThreshold
+    ));
     const readinessReasons = [
       !databaseOk ? 'Database health check failed' : null,
       !redisEnabled ? 'REDIS_ENABLED=false' : null,
       redisEnabled && !redisHost ? 'REDIS_HOST missing' : null,
       redisEnabled && redisHost && !redisConfigured ? 'REDIS_HOST points to localhost' : null,
       !bullmqEnabled ? 'BULLMQ_ENABLED=false' : null,
+      marketplacePollingEnabled && (!redisEnabled || !bullmqEnabled)
+        ? 'iFood polling requires Redis and BullMQ'
+        : null,
+      marketplacePollingEnabled && pollingConnections.some((connection) => connection.pollingStatus === 'BLOCKED')
+        ? 'One or more iFood polling connections are blocked'
+        : null,
       process.env.NODE_ENV === 'production' && !redisEnabled ? 'Production requires REDIS_ENABLED=true' : null,
       process.env.NODE_ENV === 'production' && !bullmqEnabled ? 'Production requires BULLMQ_ENABLED=true' : null,
     ].filter((reason): reason is string => Boolean(reason));
@@ -48,6 +80,14 @@ export class AdminHealthService {
         },
         campaignsDispatch: {
           enabled: campaignsDispatchEnabled,
+        },
+        marketplacePolling: {
+          enabled: marketplacePollingEnabled,
+          configuredConnections: pollingConnections.length,
+          healthyConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'HEALTHY').length,
+          degradedConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'DEGRADED').length,
+          blockedConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'BLOCKED').length,
+          staleConnections: stalePollingConnections.length,
         },
       },
       productionReadiness: {
@@ -77,6 +117,18 @@ export class AdminHealthService {
             failed: null,
             delayed: null,
             lastError: campaignsDispatchEnabled && (!bullmqEnabled || !redisConfigured) ? 'Queue cannot run without BullMQ and production Redis' : null,
+          },
+          {
+            name: 'marketplace-event-ingest',
+            critical: marketplacePollingEnabled,
+            status: marketplacePollingEnabled ? (bullmqEnabled && redisConfigured ? 'configured' : 'blocked') : 'disabled',
+            waiting: null,
+            active: null,
+            failed: null,
+            delayed: null,
+            lastError: marketplacePollingEnabled && (!bullmqEnabled || !redisConfigured)
+              ? 'iFood polling cannot run without BullMQ and production Redis'
+              : null,
           },
         ],
       },

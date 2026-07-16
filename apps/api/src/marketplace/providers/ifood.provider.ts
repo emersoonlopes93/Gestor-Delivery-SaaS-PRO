@@ -63,6 +63,27 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     };
   }
 
+  async parsePollingEvent(body: Record<string, unknown>): Promise<ParsedMarketplaceEvent> {
+    return this.parseWebhookEvent({ headers: {}, body });
+  }
+
+  async pollEvents(input: {
+    connection: MarketplaceConnection;
+    merchantId: string;
+    correlationId: string;
+    filters?: { categories?: string; types?: string; groups?: string };
+  }): Promise<Record<string, unknown>[]> {
+    return this.client.pollEvents(input.connection, input.merchantId, input.correlationId, input.filters);
+  }
+
+  async acknowledgeEvents(input: {
+    connection: MarketplaceConnection;
+    eventIds: string[];
+    correlationId: string;
+  }): Promise<{ accepted: true; httpStatus: number }> {
+    return this.client.acknowledgeEvents(input.connection, input.eventIds, input.correlationId);
+  }
+
   async fetchOrderDetails(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;

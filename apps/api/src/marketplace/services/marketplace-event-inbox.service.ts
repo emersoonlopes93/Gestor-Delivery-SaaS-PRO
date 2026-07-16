@@ -1,5 +1,12 @@
 import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
-import { MarketplaceEventInbox, MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
+import {
+  MarketplaceConnection,
+  MarketplaceEventChannel,
+  MarketplaceEventInbox,
+  MarketplaceEventStatus,
+  MarketplaceProvider,
+  Prisma,
+} from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
@@ -8,6 +15,7 @@ import { MarketplaceConnectionService } from './marketplace-connection.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { MarketplaceOrderIngestionService } from './marketplace-order-ingestion.service';
+import type { ParsedMarketplaceEvent } from '../marketplace.types';
 
 @Injectable()
 export class MarketplaceEventInboxService {
@@ -42,23 +50,57 @@ export class MarketplaceEventInboxService {
       body: input.body,
     });
 
+    if (parsed.topic?.toUpperCase() === 'KEEPALIVE') {
+      return {
+        accepted: true as const,
+        heartbeat: true as const,
+        merchantIds: await this.resolveWebhookPresenceMerchants(parsed.rawPayload),
+      };
+    }
+
     const payloadHash = createHash('sha256')
       .update(typeof input.rawBody === 'string' ? input.rawBody : input.rawBody.toString('utf8'))
       .digest('hex');
-    const dedupeKey = parsed.eventId?.trim() || payloadHash;
     const connection = await this.connectionService.resolveConnection({
       provider: parsed.provider,
       externalMerchantId: parsed.externalMerchantId,
       externalStoreId: parsed.externalStoreId,
     });
 
+    return this.persistParsedEvent({
+      parsed,
+      payloadHash,
+      headers: input.headers,
+      channel: MarketplaceEventChannel.WEBHOOK,
+      connection,
+      process: true,
+    });
+  }
+
+  async persistParsedEvent(input: {
+    parsed: ParsedMarketplaceEvent;
+    payloadHash?: string;
+    headers?: Record<string, string | string[] | undefined>;
+    channel: MarketplaceEventChannel;
+    connection?: MarketplaceConnection | null;
+    process?: boolean;
+  }): Promise<{ accepted: true; duplicate: boolean; inboxId: string }> {
+    const payloadHash = input.payloadHash ?? createHash('sha256')
+      .update(JSON.stringify(input.parsed.rawPayload))
+      .digest('hex');
+    const dedupeKey = input.parsed.eventId?.trim() || payloadHash;
     const existing = await this.prisma.marketplaceEventInbox.findFirst({
-      where: { provider: parsed.provider, dedupeKey },
+      where: { provider: input.parsed.provider, dedupeKey },
     });
     if (existing) {
       await this.prisma.marketplaceEventInbox.update({
         where: { id: existing.id },
-        data: { duplicateCount: { increment: 1 } },
+        data: {
+          duplicateCount: { increment: 1 },
+          deliveryCount: { increment: 1 },
+          lastDeliveryChannel: input.channel,
+          lastReceivedAt: new Date(),
+        },
       });
       this.logger.log({
         message: 'marketplace_event_duplicate',
@@ -67,6 +109,12 @@ export class MarketplaceEventInboxService {
         eventId: existing.eventId,
         correlationId: existing.correlationId,
       });
+      if (input.process !== false && (
+        existing.status === MarketplaceEventStatus.RECEIVED
+        || existing.status === MarketplaceEventStatus.FAILED
+      )) {
+        await this.dispatchInbox(existing);
+      }
       return { accepted: true, duplicate: true, inboxId: existing.id };
     }
 
@@ -74,48 +122,58 @@ export class MarketplaceEventInboxService {
     try {
       inbox = await this.prisma.marketplaceEventInbox.create({
         data: {
-          provider: parsed.provider,
-          eventId: parsed.eventId?.trim() || null,
-          tenantId: connection?.tenantId ?? null,
-          connectionId: connection?.id ?? null,
-          externalMerchantId: parsed.externalMerchantId ?? null,
-          externalStoreId: parsed.externalStoreId ?? null,
-          externalOrderId: parsed.externalOrderId ?? null,
-          topic: parsed.topic ?? null,
-          eventCreatedAt: parsed.eventCreatedAt ?? null,
-          eventSequence: parsed.eventSequence ?? null,
+          provider: input.parsed.provider,
+          eventId: input.parsed.eventId?.trim() || null,
+          tenantId: input.connection?.tenantId ?? null,
+          connectionId: input.connection?.id ?? null,
+          externalMerchantId: input.parsed.externalMerchantId ?? null,
+          externalStoreId: input.parsed.externalStoreId ?? null,
+          externalOrderId: input.parsed.externalOrderId ?? null,
+          topic: input.parsed.topic ?? null,
+          eventCreatedAt: input.parsed.eventCreatedAt ?? null,
+          eventSequence: input.parsed.eventSequence ?? null,
           correlationId: randomUUID(),
           payloadHash,
           dedupeKey,
-          rawPayload: parsed.rawPayload as Prisma.InputJsonValue,
-          headersJson: this.sanitizeHeaders(input.headers) as Prisma.InputJsonValue,
-          status: MarketplaceEventStatus.RECEIVED,
+          rawPayload: input.parsed.rawPayload as Prisma.InputJsonValue,
+          headersJson: input.headers
+            ? this.sanitizeHeaders(input.headers) as Prisma.InputJsonValue
+            : undefined,
+          status: input.process === false ? MarketplaceEventStatus.IGNORED : MarketplaceEventStatus.RECEIVED,
+          firstDeliveryChannel: input.channel,
+          lastDeliveryChannel: input.channel,
         },
       });
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
       inbox = await this.prisma.marketplaceEventInbox.findFirstOrThrow({
-        where: { provider: parsed.provider, dedupeKey },
+        where: { provider: input.parsed.provider, dedupeKey },
       });
       await this.prisma.marketplaceEventInbox.update({
         where: { id: inbox.id },
-        data: { duplicateCount: { increment: 1 } },
+        data: {
+          duplicateCount: { increment: 1 },
+          deliveryCount: { increment: 1 },
+          lastDeliveryChannel: input.channel,
+          lastReceivedAt: new Date(),
+        },
       });
+      if (input.process !== false && (
+        inbox.status === MarketplaceEventStatus.RECEIVED
+        || inbox.status === MarketplaceEventStatus.FAILED
+      )) {
+        await this.dispatchInbox(inbox);
+      }
       return { accepted: true, duplicate: true, inboxId: inbox.id };
     }
 
-    if (this.queue) {
+    if (input.process === false) {
       await this.prisma.marketplaceEventInbox.update({
         where: { id: inbox.id },
-        data: { status: MarketplaceEventStatus.QUEUED },
-      });
-      await this.queue.add('event-inbox-process', { eventInboxId: inbox.id, tenantId: inbox.tenantId }, {
-        jobId: `marketplace-event-${inbox.id}`,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
+        data: { processedAt: new Date(), lastError: 'non_actionable_event' },
       });
     } else {
-      await this.ingestionService.processInboxEvent(inbox.id);
+      await this.dispatchInbox(inbox);
     }
 
     return { accepted: true, duplicate: false, inboxId: inbox.id };
@@ -162,5 +220,53 @@ export class MarketplaceEventInboxService {
         masked.has(key.toLowerCase()) ? '***' : value,
       ]),
     );
+  }
+
+  private async dispatchInbox(inbox: MarketplaceEventInbox): Promise<void> {
+    if (!this.queue) {
+      await this.ingestionService.processInboxEvent(inbox.id);
+      return;
+    }
+    await this.prisma.marketplaceEventInbox.update({
+      where: { id: inbox.id },
+      data: { status: MarketplaceEventStatus.QUEUED },
+    });
+    try {
+      await this.queue.add('event-inbox-process', { eventInboxId: inbox.id, tenantId: inbox.tenantId }, {
+        jobId: `marketplace-event-${inbox.id}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
+    } catch (error) {
+      await this.prisma.marketplaceEventInbox.updateMany({
+        where: { id: inbox.id, status: MarketplaceEventStatus.QUEUED },
+        data: { status: MarketplaceEventStatus.RECEIVED, lastError: 'queue_dispatch_failed' },
+      });
+      throw error;
+    }
+  }
+
+  private async resolveWebhookPresenceMerchants(payload: Record<string, unknown>): Promise<string[] | undefined> {
+    if (!Array.isArray(payload.merchantIds)) return undefined;
+    const requested = payload.merchantIds.filter((value): value is string => typeof value === 'string' && Boolean(value.trim()));
+    if (requested.length === 0) return [];
+    const connections = await this.prisma.marketplaceConnection.findMany({
+      where: {
+        provider: MarketplaceProvider.IFOOD,
+        status: 'CONNECTED',
+        externalMerchantId: { in: requested },
+        tenant: { status: 'active' },
+      },
+      select: { externalMerchantId: true, settingsJson: true },
+    });
+    return connections.flatMap((connection) => {
+      const settings = connection.settingsJson;
+      const pollingPresenceActive = typeof settings === 'object'
+        && settings !== null
+        && !Array.isArray(settings)
+        && 'pollingFallbackEnabled' in settings
+        && settings.pollingFallbackEnabled === true;
+      return connection.externalMerchantId && !pollingPresenceActive ? [connection.externalMerchantId] : [];
+    });
   }
 }

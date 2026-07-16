@@ -6,6 +6,8 @@ import { MarketplaceStatusSyncService } from '../services/marketplace-status-syn
 import type { MarketplaceStatusJob } from '../services/marketplace-status-sync.service';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceReconciliationService } from '../services/marketplace-reconciliation.service';
+import { MarketplacePollingService } from '../services/marketplace-polling.service';
+import type { MarketplacePollingJob } from '../services/marketplace-polling.service';
 
 export function marketplaceBackoffStrategy(attemptsMade: number, type?: string, error?: Error): number {
   const exponentialDelay = 5000 * (2 ** Math.max(0, attemptsMade - 1));
@@ -24,6 +26,7 @@ export class MarketplaceEventProcessor extends WorkerHost {
     private readonly ingestionService: MarketplaceOrderIngestionService,
     private readonly statusSyncService: MarketplaceStatusSyncService,
     private readonly reconciliationService: MarketplaceReconciliationService,
+    private readonly pollingService: MarketplacePollingService,
   ) {
     super();
   }
@@ -35,6 +38,14 @@ export class MarketplaceEventProcessor extends WorkerHost {
 
     if (job.name === 'operation-reconciliation-scan') {
       return this.reconciliationService.reconcileBatch(100);
+    }
+
+    if (job.name === 'ifood-polling-scan') {
+      return this.pollingService.scheduleEligibleConnections();
+    }
+
+    if (job.name === 'ifood-poll-connection') {
+      return this.pollingService.runConnection(job.data as MarketplacePollingJob, job.attemptsMade > 0);
     }
 
     const data = job.data as { eventInboxId: string; tenantId?: string | null };

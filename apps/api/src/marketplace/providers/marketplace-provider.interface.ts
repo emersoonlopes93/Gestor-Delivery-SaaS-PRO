@@ -18,6 +18,18 @@ export interface MarketplaceProviderAdapter {
     headers: Record<string, string | string[] | undefined>;
     body: unknown;
   }): Promise<ParsedMarketplaceEvent>;
+  parsePollingEvent?(body: Record<string, unknown>): Promise<ParsedMarketplaceEvent>;
+  pollEvents?(input: {
+    connection: MarketplaceConnection;
+    merchantId: string;
+    correlationId: string;
+    filters?: { categories?: string; types?: string; groups?: string };
+  }): Promise<Record<string, unknown>[]>;
+  acknowledgeEvents?(input: {
+    connection: MarketplaceConnection;
+    eventIds: string[];
+    correlationId: string;
+  }): Promise<{ accepted: true; httpStatus: number }>;
   fetchOrderDetails(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;

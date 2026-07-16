@@ -9,7 +9,7 @@ Atualmente operamos com as seguintes filas canônicas:
 | Fila | Finalidade | Principais Jobs | Consumer | Idempotência Esperada |
 |------|------------|-----------------|----------|-----------------------|
 | `campaign-dispatch` | Disparo e automação de campanhas via WhatsApp | `system-feed-queue`, `system-automation-scan`, (default/dispatch) | `CampaignProcessor` | Sim (verificar status prévio e cooldown/opt-out) |
-| `marketplace-event-ingest` | Ingestão e sincronização de eventos externos | `order-status-sync`, `event-inbox-process` | `MarketplaceEventProcessor` | Sim (`MarketplaceOperation`, inbox e constraints) |
+| `marketplace-event-ingest` | Ingestão, polling e sincronização de eventos externos | `order-status-sync`, `event-inbox-process`, `operation-reconciliation-scan`, `ifood-polling-scan`, `ifood-poll-connection` | `MarketplaceEventProcessor` | Sim (`MarketplaceOperation`, inbox, telemetria e constraints) |
 | `orders` | (Reservada) Confirmações automáticas, KDS, Spooler | (Reservada) | (A ser implementado) | Sim |
 
 ## 2. Configurações Globais (Defaults)
@@ -64,6 +64,8 @@ Quando um job esgota as tentativas de retry, ele permanece na fila com status `f
 ## 7. Reconciliação iFood
 
 `operation-reconciliation-scan` compartilha a fila `marketplace-event-ingest` e é registrado a cada 60 segundos somente quando BullMQ está disponível e a integração bidirecional está habilitada. O job possui ID estável, três tentativas e backoff exponencial. Cada rodada processa no máximo 100 operações, em páginas por tenant, e o worker tem concorrência 5.
+
+`ifood-polling-scan` só é registrado quando os dois kill switches iFood estão ativos. A cada 30 segundos ele seleciona conexões elegíveis e cria `ifood-poll-connection` por conexão/janela, com job ID determinístico e jitter. O job sempre propaga `tenantId`; 429/5xx usam retry/backoff, falhas permanentes marcam o polling da conexão como `BLOCKED` e impedem novas agendas.
 
 O scheduler pode enumerar conexões globais, mas toda consulta e mutação operacional subsequente contém `tenantId`. Cada operação é recarregada e reivindicada por comparação otimista de `updatedAt`; duas execuções simultâneas não consultam o provider para a mesma versão. A consulta externa usa o timeout `MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS`.
 

@@ -162,3 +162,73 @@ Nenhum teste automatizado chamou o iFood real.
 ## Próximo passo recomendado
 
 Revisar o diff, criar commit(s) da Sprint 5B, aplicar a migration em staging, sincronizar novas permissões administrativas, configurar versões de chave, manter o kill switch desligado e executar o roteiro de homologação oficial. Não iniciar catálogo ou outra sprint automaticamente.
+
+---
+
+# Sprint 5C — Polling de fallback e preparação para homologação iFood
+
+Data: 2026-07-16
+
+Branch: `feat/ifood-polling-fallback`
+Base confirmada: `cbbfbf5334c1de33f64e6f68694c004c2b427773` (Sprint 5B commitada)
+
+## Objetivo e decisões
+
+Foi implementado polling iFood opt-in, desligado por padrão e protegido por dois kill switches. A documentação oficial foi validada antes do código. A cadência é 30 segundos; cada job consulta um merchant via `x-polling-merchants`; ACK usa lotes conservadores de 2.000 IDs e ocorre apenas após persistência/duplicata durável.
+
+Webhook e polling reutilizam a mesma inbox e a mesma unique `(provider,dedupeKey)`. A inbox registra primeiro/último canal, contador e último recebimento. Ordenação usa `createdAt`, sequência e precedência; ID é apenas desempate estável. Presença webhook por merchant exclui conexões opt-in no polling para impedir presença dupla.
+
+## Implementação
+
+- `MarketplacePollingService`: scan periódico, jobs determinísticos por conexão/janela, jitter, claim contra simultaneidade, retry compatível, tenant/feature/merchant governance, persist-before-ACK e bloqueio permanente.
+- Cliente/provider iFood: `GET /events/v1.0/events:polling`, 200/204, filtros configuráveis, `POST /events/v1.0/events/acknowledgment`, lotes únicos e `Retry-After` existente.
+- Inbox: telemetria WEBHOOK/POLLING, deduplicação multicanal, redispatch seguro quando a fila falha, heartbeat `KEEPALIVE` 202.
+- Lifecycle: sequência/tópico do último evento e precedência determinística para timestamps iguais.
+- Administração: listagem sanitizada de polling e `poll-now` auditado/rate-limited.
+- Readiness: fila e contagens healthy/degraded/blocked/stale no health administrativo.
+- Runbook: `docs/operations/runbooks/ifood-homologation.md`.
+
+## Migration
+
+`20260716190000_ifood_polling_fallback` é exclusivamente aditiva:
+
+- enums `MarketplaceEventChannel` e `MarketplacePollingStatus`;
+- telemetria de canal/entrega na inbox;
+- estado, timestamps e contadores de polling na conexão;
+- sequência/tópico do último evento no pedido marketplace;
+- três índices e duas CHECK constraints não destrutivas.
+
+Validação PostgreSQL 16 local/descartável:
+
+- banco vazio: PASS, 46 migrations aplicadas;
+- estado Sprint 5B com conexão, inbox, pedido marketplace, operação e divergência: PASS;
+- contagens antes/depois: `1|1|1|1|1`;
+- defaults existentes: `DISABLED`, `WEBHOOK`, `WEBHOOK`, `deliveryCount=1`;
+- nenhum banco remoto acessado e nenhum `db push` executado.
+
+O diff Prisma pós-migration não apontou drift da Sprint 5C. Permanecem diferenças anteriores em `system_configs.platform_logo_media_id` e tipos de `tenant_settings.handoff_sound/ready_sound`; não foram alteradas por estarem fora do escopo.
+
+## Testes e gates
+
+| Comando | Resultado |
+|---|---|
+| baseline `pnpm lint`, `pnpm typecheck`, `pnpm build` | PASS; 16 warnings React preexistentes |
+| `pnpm lint` pós-implementação | PASS; mesmos 16 warnings |
+| `pnpm typecheck` | PASS |
+| `pnpm check:no-any` | PASS |
+| `pnpm check:features` | PASS com alertas Beta esperados |
+| `pnpm prisma:validate` | PASS |
+| build API | PASS |
+| Jest marketplace | PASS: 12 suítes, 50 testes |
+| `git diff --check` | PASS |
+| `pnpm test` | FAIL por suites preexistentes fora do marketplace |
+
+Falhas integrais fora do escopo observadas novamente: dois testes de `ConversationService`, compilação da fixture `location-provider.service.spec.ts`, HMAC em `webhook-security.service.spec.ts` e dois testes de `BaseMenusPage` no web-admin. Web-tenant passou 12/12 e storefront 1/1. Nenhuma falha toca arquivos da Sprint 5C.
+
+## Riscos e próximo passo
+
+- Homologação real ainda pendente; não chamar a integração de homologada.
+- Presença deve ser configurada por merchant no portal; não usar presença webhook e polling simultaneamente para o mesmo merchant.
+- Filtros `types/groups` geram auto-ACK dos eventos excluídos; ambos ficam vazios por padrão e não podem ser combinados.
+- O container de validação é removido ao encerrar a sessão.
+- Próximo passo: revisar o diff/SQL, aplicar migration somente em staging, configurar um tenant piloto e executar integralmente o runbook com evidências. Não iniciar catálogo ou outra sprint automaticamente.
