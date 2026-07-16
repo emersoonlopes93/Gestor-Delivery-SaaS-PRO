@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BellRing, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, BellRing, WifiOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getNotificationPermission, showWebNotification } from '../lib/notification-support';
 import {
@@ -165,12 +165,7 @@ export function NotificationCenter() {
         </div>
       ) : null}
 
-      {!connectionBanner && typeof navigator !== 'undefined' && navigator.onLine ? (
-        <div className="pointer-events-none fixed right-4 top-4 z-[68] hidden rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-black text-emerald-700 lg:flex lg:items-center lg:gap-2">
-          <Wifi className="h-3.5 w-3.5" />
-          <span>Tempo real ativo</span>
-        </div>
-      ) : null}
+
 
       {soundManager.lastPlaybackBlocked && !soundManager.isUnlocked ? (
         <div className="fixed bottom-4 left-1/2 z-[68] w-[min(92vw,560px)] -translate-x-1/2">

@@ -14,7 +14,6 @@ import {
   MapPin,
   Menu,
   Package,
-  Search,
   Settings,
   ShoppingCart,
   SlidersHorizontal,
@@ -25,7 +24,6 @@ import {
   Bell,
   UserCircle,
   ChevronRight,
-  CornerDownRight,
   Moon,
   Sun,
   Building2,
@@ -368,7 +366,6 @@ export function AppLayout() {
   }, [initializeTheme]);
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [desktopSearch, setDesktopSearch] = useState('');
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
 
@@ -662,6 +659,38 @@ export function AppLayout() {
 
 
 
+  const getBreadcrumb = () => {
+    const segments = location.pathname.split('/').filter(Boolean);
+    if (segments.length === 0) return { label: 'Dashboard' };
+
+    // Procurar nos SIDEBAR_GROUPS o item correspondente
+    for (const group of SIDEBAR_GROUPS) {
+      for (const item of group.items) {
+        if (isItemActive(item, location.pathname)) {
+          // Se o grupo é Dashboard ou Sistema, apenas mostre o label do item para manter limpo
+          if (group.id === 'dashboard' || group.id === 'system') {
+            return { label: item.label };
+          }
+          return {
+            parentLabel: group.label,
+            label: item.label
+          };
+        }
+      }
+    }
+
+    // Fallback amigável
+    const firstSegment = segments[0];
+    const formattedSegment = firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1);
+    if (segments.length > 1) {
+      const formattedChild = segments[1].charAt(0).toUpperCase() + segments[1].slice(1);
+      return { parentLabel: formattedSegment, label: formattedChild };
+    }
+    return { label: formattedSegment };
+  };
+
+  const breadcrumb = getBreadcrumb();
+
   return (
     <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
       <NotificationCenter />
@@ -696,70 +725,68 @@ export function AppLayout() {
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
       >
-        <div className={`p-4 flex flex-col gap-4 ${collapsed ? 'items-center' : ''}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
-          <div className="flex items-center justify-between gap-3">
-            {!collapsed ? (
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
-                  P
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight flex items-center gap-1.5">
-                    PedeHub
-                  </h1>
-                  <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
-                  {tenantData?.businessGroup ? (
-                    <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
-                      <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="truncate">{tenantData.businessGroup.name}</span>
-                      <span className="text-muted-foreground font-bold normal-case tracking-normal">
-                        {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
-                      </span>
-                    </div>
-                  ) : null}
-                  {accessibleStores.length > 1 ? (
-                    <div className="mt-3 flex items-center gap-2">
-                      <select
-                        value={selectedTenantId}
-                        onChange={(e) => setSelectedTenantId(e.target.value)}
-                        disabled={switchStoreMutation.isPending}
-                        className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
-                      >
-                        {accessibleStores.map((store) => (
-                          <option key={store.tenantId} value={store.tenantId}>
-                            {store.tenant.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleSwitchStore}
-                        disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
-                        className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 border-2 border-border">
-                P
+        <div className={`p-4 flex flex-col gap-5 ${collapsed ? 'items-center' : 'items-center text-center'}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
+          <div className="flex flex-col items-center gap-3 w-full">
+            <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
+              P
+            </div>
+            {!collapsed && (
+              <div className="min-w-0 flex flex-col items-center">
+                <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight">
+                  PedeHub
+                </h1>
+                <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">
+                  {user?.tenant?.name || 'Carregando...'}
+                </p>
+                {tenantData?.businessGroup ? (
+                  <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
+                    <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="truncate">{tenantData.businessGroup.name}</span>
+                    <span className="text-muted-foreground font-bold normal-case tracking-normal">
+                      {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
+                    </span>
+                  </div>
+                ) : null}
+                {accessibleStores.length > 1 ? (
+                  <div className="mt-3 flex items-center gap-2 w-full max-w-[200px]">
+                    <select
+                      value={selectedTenantId}
+                      onChange={(e) => setSelectedTenantId(e.target.value)}
+                      disabled={switchStoreMutation.isPending}
+                      className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
+                    >
+                      {accessibleStores.map((store) => (
+                        <option key={store.tenantId} value={store.tenantId}>
+                          {store.tenant.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleSwitchStore}
+                      disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
+                      className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
 
           {!collapsed && (
-            <div className="space-y-4">
-              <StoreStatusBadge
-                status={storeStatus}
-                compact
-                onManage={() => navigate('/settings')}
-              />
+            <div className="space-y-4 w-full flex flex-col items-center">
+              <div className="inline-flex justify-center w-full">
+                <StoreStatusBadge
+                  status={storeStatus}
+                  compact
+                  onManage={() => navigate('/settings')}
+                />
+              </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 w-full">
                 <a
                   href={publicMenuUrl}
                   target="_blank"
@@ -813,97 +840,87 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="desktop-header hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
-          <div className="h-16 px-6 flex items-center gap-4 w-full">
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-              aria-label="Alternar sidebar"
-              title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-            >
-              <Menu className="h-5 w-5" aria-hidden />
-            </button>
-
-            <div className="relative flex-1 max-w-[320px] lg:max-w-[520px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
-              <input
-                value={desktopSearch}
-                onChange={(e) => setDesktopSearch(e.target.value)}
-                placeholder="Buscar (atalhos, páginas, ações)"
-                className="input-premium pl-10"
-              />
-            </div>
-
-            <div className="hidden sm:flex items-center gap-2">
+        <header className="desktop-header hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ height: '52px', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+          <div className="px-6 flex items-center justify-between w-full h-full min-w-0 gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-foreground hover:bg-muted transition-all"
-                title="Atalhos"
+                onClick={toggleCollapsed}
+                className="inline-flex items-center justify-center rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
+                aria-label="Alternar sidebar"
+                title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
               >
-                <CornerDownRight className="h-4 w-4" aria-hidden />
-                <span className="hidden xl:inline font-bold">Atalhos</span>
+                <Menu className="h-4 w-4" aria-hidden />
+              </button>
+
+              <div className="flex items-center text-sm font-bold text-foreground min-w-0">
+                {breadcrumb.parentLabel && (
+                  <span className="hidden sm:inline text-muted-foreground shrink-0 select-none">
+                    {breadcrumb.parentLabel}
+                    <span className="mx-2 font-normal text-muted-foreground/65">/</span>
+                  </span>
+                )}
+                <span className="truncate select-none font-black text-foreground">
+                  {breadcrumb.label}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all border-none"
+                title="Tema"
+                aria-label="Alternar Tema"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
+              </button>
+
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-card p-1 sm:pr-3 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm select-none"
+                title="Perfil"
+              >
+                <div className="w-6 h-6 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
+                  <UserCircle className="h-4 w-4" aria-hidden />
+                </div>
+                <span className="hidden min-[1150px]:inline truncate max-w-[120px]">{user?.name || 'Conta'}</span>
+                <ChevronRight className="hidden min-[1150px]:inline h-3 w-3 text-muted-foreground rotate-90" aria-hidden />
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all border-none"
-              title="Tema"
-              aria-label="Alternar Tema"
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted/50 text-foreground hover:bg-muted transition-all"
-              title="Notificações"
-              aria-label="Notificações"
-            >
-              <Bell className="h-4 w-4" aria-hidden />
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 sm:pr-3 text-sm font-bold text-foreground hover:bg-muted transition-all shadow-sm"
-              title="Perfil"
-            >
-              <div className="w-8 h-8 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center">
-                <UserCircle className="h-5 w-5" aria-hidden />
-              </div>
-              <span className="hidden lg:inline truncate max-w-[120px] xl:max-w-[180px]">{user?.name || 'Conta'}</span>
-            </button>
           </div>
         </header>
 
-        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
-          <div className="h-14 px-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-10 h-10 text-foreground hover:bg-muted transition-all active:scale-95"
-              aria-label="Abrir menu"
-            >
-              <Menu className="h-5 w-5" aria-hidden />
-            </button>
-            <div className="min-w-0 text-center">
-              <div className="text-sm font-black text-foreground truncate flex items-center justify-center gap-1.5">
-                PedeHub
+        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ height: '52px', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+          <div className="px-4 flex items-center justify-between w-full h-full gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={openMobile}
+                className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-8 h-8 text-foreground hover:bg-muted transition-all shrink-0"
+                aria-label="Abrir menu"
+              >
+                <Menu className="h-4.5 w-4.5" aria-hidden />
+              </button>
+              <div className="truncate text-xs font-black text-foreground select-none">
+                {breadcrumb.label}
               </div>
-              <div className="text-[10px] font-bold text-muted-foreground truncate uppercase tracking-widest leading-none mt-0.5">{user?.tenant?.name || 'Carregando...'}</div>
             </div>
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all active:scale-95"
-            >
-               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all"
+              >
+                 {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+              </button>
+              <div className="w-7 h-7 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
+                <UserCircle className="h-4.5 w-4.5" aria-hidden />
+              </div>
+            </div>
           </div>
         </header>
-
 
         <main className="app-main flex-1 overflow-auto bg-background safe-bottom">
           <div key={location.pathname} className="h-full">
