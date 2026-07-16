@@ -56,6 +56,8 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       externalMerchantId: this.readString(payload, ['merchantId', 'merchant_id']),
       externalStoreId: this.readString(payload, ['storeId', 'store_id']),
       externalOrderId: this.readString(orderPayload, ['id', 'orderId', 'order_id', 'displayId']),
+      eventCreatedAt: this.readDate(payload, ['createdAt', 'created_at']),
+      eventSequence: this.readBigInt(payload, ['sequence', 'sequenceNumber', 'sequence_number']),
       orderPayload,
       rawPayload: payload,
     };
@@ -73,6 +75,14 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     };
   }
 
+  async fetchCurrentOrder(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<ExternalMarketplaceOrder> {
+    return this.client.fetchOrderDetails(input.connection, input.externalOrderId, input.correlationId);
+  }
+
   async normalizeOrder(input: {
     connection: MarketplaceConnection;
     externalOrder: ExternalMarketplaceOrder;
@@ -81,6 +91,12 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     const customer = this.asRecord(order.customer);
     const delivery = this.asRecord(order.deliveryAddress) ?? this.asRecord(order.delivery_address) ?? this.asRecord(order.address);
     const items = Array.isArray(order.items) ? order.items : [];
+    const orderTiming = this.readString(order, ['orderTiming', 'order_timing']);
+    const externalCreatedAt = this.readDate(order, ['createdAt', 'created_at']);
+    const preparationStartAt = this.readDate(order, ['preparationStartDateTime', 'preparation_start_date_time']);
+    const deadlineBase = orderTiming?.toUpperCase() === 'SCHEDULED'
+      ? preparationStartAt
+      : externalCreatedAt;
     const normalizedItems = items.map((item, index) => {
       const record = this.asRecord(item) ?? {};
       const quantity = Math.max(1, this.toNumber(record.quantity) || 1);
@@ -103,6 +119,9 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       externalOrderId: this.readString(order, ['id', 'orderId', 'order_id']) ?? 'unknown-order',
       externalDisplayId: this.readString(order, ['displayId', 'display_id']),
       externalStatus: this.readString(order, ['status']),
+      externalCreatedAt,
+      preparationStartAt,
+      confirmationDeadlineAt: deadlineBase ? new Date(deadlineBase.getTime() + 8 * 60 * 1000) : null,
       fulfillmentType: this.normalizeFulfillmentType(
         this.readString(order, ['fulfillmentType', 'fulfillment_type', 'serviceType', 'service_type']),
       ),
@@ -175,6 +194,23 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     if (typeof value === 'string' && value.trim()) {
       const parsed = Number(value.replace(',', '.'));
       return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
+  private readDate(record: Record<string, unknown> | null, keys: string[]): Date | null {
+    const value = this.readString(record, keys);
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private readBigInt(record: Record<string, unknown> | null, keys: string[]): bigint | null {
+    if (!record) return null;
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'number' && Number.isSafeInteger(value)) return BigInt(value);
+      if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
     }
     return null;
   }

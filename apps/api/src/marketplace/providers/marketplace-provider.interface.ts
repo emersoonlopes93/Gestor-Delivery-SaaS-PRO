@@ -23,6 +23,11 @@ export interface MarketplaceProviderAdapter {
     externalOrderId: string;
     eventPayload: Record<string, unknown>;
   }): Promise<ExternalMarketplaceOrder>;
+  fetchCurrentOrder?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<ExternalMarketplaceOrder>;
   normalizeOrder(input: {
     connection: MarketplaceConnection;
     externalOrder: ExternalMarketplaceOrder;

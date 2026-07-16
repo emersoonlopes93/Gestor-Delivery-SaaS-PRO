@@ -1,6 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { MarketplaceEventStatus, MarketplaceProvider, OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
+import {
+  MarketplaceDivergenceType,
+  MarketplaceEventStatus,
+  MarketplaceOperationStatus,
+  MarketplaceOperationType,
+  MarketplaceProvider,
+  OrderStatus,
+  PaymentMethod,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
 import { MarketplaceConnectionService } from './marketplace-connection.service';
@@ -11,6 +20,7 @@ import { generatePublicTrackingToken } from '../../common/utils/tracking-token.u
 import { NormalizedMarketplaceOrder } from '../marketplace.types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { MarketplaceStatusSyncService } from './marketplace-status-sync.service';
+import { MarketplaceDivergenceService } from './marketplace-divergence.service';
 
 @Injectable()
 export class MarketplaceOrderIngestionService {
@@ -24,6 +34,7 @@ export class MarketplaceOrderIngestionService {
     private readonly ordersGateway: OrdersGateway,
     private readonly ordersService: OrdersService,
     private readonly statusSyncService: MarketplaceStatusSyncService,
+    private readonly divergenceService: MarketplaceDivergenceService,
   ) {}
 
   async processInboxEvent(eventInboxId: string) {
@@ -32,6 +43,9 @@ export class MarketplaceOrderIngestionService {
       include: { connection: true },
     });
     if (!inbox) throw new BadRequestException('Marketplace event inbox not found.');
+    if (inbox.status === MarketplaceEventStatus.PROCESSED || inbox.status === MarketplaceEventStatus.IGNORED) {
+      return { processed: true, duplicate: true };
+    }
 
     const connection = inbox.connection ?? await this.connectionService.resolveConnection({
       provider: inbox.provider,
@@ -41,24 +55,66 @@ export class MarketplaceOrderIngestionService {
 
     if (!connection) {
       await this.failInbox(inbox.id, 'Marketplace connection not found for event.');
-      return;
+      this.logger.error({
+        message: 'marketplace_merchant_mapping_failure',
+        merchantId: inbox.externalMerchantId,
+        externalOrderId: inbox.externalOrderId,
+        eventId: inbox.eventId,
+        correlationId: inbox.correlationId,
+      });
+      throw new BadRequestException('Marketplace connection not found for event.');
     }
 
-    await this.prisma.marketplaceEventInbox.update({
-      where: { id: inbox.id },
+    const claimed = await this.prisma.marketplaceEventInbox.updateMany({
+      where: {
+        id: inbox.id,
+        status: {
+          in: [MarketplaceEventStatus.RECEIVED, MarketplaceEventStatus.QUEUED, MarketplaceEventStatus.FAILED],
+        },
+      },
       data: {
         status: MarketplaceEventStatus.PROCESSING,
         attempts: { increment: 1 },
         tenantId: connection.tenantId,
         connectionId: connection.id,
+        processingStartedAt: new Date(),
       },
     });
+    if (claimed.count === 0) return { processed: false, duplicate: true };
 
     try {
       const provider = this.providerRegistry.get(inbox.provider);
       const externalOrderId = inbox.externalOrderId?.trim() || this.readString(inbox.rawPayload, ['orderId', 'id']);
       if (!externalOrderId) {
         throw new Error('externalOrderId missing in marketplace payload.');
+      }
+
+      const existingOrder = await this.prisma.marketplaceOrder.findFirst({
+        where: { tenantId: connection.tenantId, provider: inbox.provider, externalOrderId },
+        select: { lastExternalEventAt: true },
+      });
+      if (
+        inbox.eventCreatedAt
+        && existingOrder?.lastExternalEventAt
+        && inbox.eventCreatedAt.getTime() < existingOrder.lastExternalEventAt.getTime()
+      ) {
+        await this.prisma.marketplaceEventInbox.update({
+          where: { id: inbox.id },
+          data: {
+            status: MarketplaceEventStatus.IGNORED,
+            processedAt: new Date(),
+            lastError: 'out_of_order_event_suppressed',
+          },
+        });
+        this.logger.warn({
+          message: 'marketplace_event_out_of_order',
+          tenantId: connection.tenantId,
+          merchantId: connection.externalMerchantId,
+          externalOrderId,
+          eventId: inbox.eventId,
+          correlationId: inbox.correlationId,
+        });
+        return { processed: true, ignored: true, reason: 'out_of_order' };
       }
 
       const externalOrder = await provider.fetchOrderDetails({
@@ -72,7 +128,45 @@ export class MarketplaceOrderIngestionService {
         externalOrder,
       });
 
-      const marketplaceOrder = await this.upsertMarketplaceOrder(connection.tenantId, connection.id, normalizedOrder);
+      const marketplaceOrder = await this.upsertMarketplaceOrder(
+        connection.tenantId,
+        connection.id,
+        normalizedOrder,
+        { id: inbox.eventId, createdAt: inbox.eventCreatedAt },
+      );
+      if (marketplaceOrder.confirmationDeadlineAt) {
+        const remainingMs = marketplaceOrder.confirmationDeadlineAt.getTime() - Date.now();
+        if (remainingMs <= 2 * 60 * 1000) {
+          this.logger.warn({
+            message: remainingMs <= 0
+              ? 'marketplace_confirmation_deadline_expired'
+              : 'marketplace_confirmation_deadline_near',
+            tenantId: connection.tenantId,
+            merchantId: connection.externalMerchantId,
+            orderId: marketplaceOrder.internalOrderId,
+            externalOrderId,
+            eventId: inbox.eventId,
+            correlationId: inbox.correlationId,
+            deadlineAt: marketplaceOrder.confirmationDeadlineAt,
+            remainingMs,
+          });
+        }
+        if (remainingMs <= 0) {
+          await this.divergenceService.record({
+            tenantId: connection.tenantId,
+            marketplaceOrderId: marketplaceOrder.id,
+            internalOrderId: marketplaceOrder.internalOrderId,
+            provider: marketplaceOrder.provider,
+            externalOrderId,
+            type: MarketplaceDivergenceType.OPERATION_TIMEOUT,
+            localState: marketplaceOrder.statusInternal,
+            remoteState: marketplaceOrder.statusExternal,
+            reason: 'Order was ingested after the official confirmation deadline.',
+            recommendedAction: 'Inspect the remote order before attempting confirmation.',
+            correlationId: inbox.correlationId,
+          });
+        }
+      }
       if (!marketplaceOrder.internalOrderId) {
         const internalOrderId = await this.createInternalOrderFromNormalized(normalizedOrder);
         await this.prisma.marketplaceOrder.update({
@@ -121,6 +215,7 @@ export class MarketplaceOrderIngestionService {
         data: {
           status: MarketplaceEventStatus.PROCESSED,
           processedAt: new Date(),
+          processingStartedAt: null,
           lastError: null,
         },
       });
@@ -165,6 +260,7 @@ export class MarketplaceOrderIngestionService {
     tenantId: string,
     connectionId: string,
     normalized: NormalizedMarketplaceOrder,
+    event: { id?: string | null; createdAt?: Date | null },
   ) {
     const existing = await this.prisma.marketplaceOrder.findFirst({
       where: {
@@ -180,6 +276,11 @@ export class MarketplaceOrderIngestionService {
         data: {
           externalDisplayId: normalized.externalDisplayId ?? null,
           statusExternal: normalized.externalStatus ?? null,
+          externalCreatedAt: normalized.externalCreatedAt ?? existing.externalCreatedAt,
+          preparationStartAt: normalized.preparationStartAt ?? existing.preparationStartAt,
+          confirmationDeadlineAt: normalized.confirmationDeadlineAt ?? existing.confirmationDeadlineAt,
+          lastExternalEventAt: event.createdAt ?? existing.lastExternalEventAt,
+          lastExternalEventId: event.id ?? existing.lastExternalEventId,
           rawPayload: this.toInputJsonValue(normalized.rawPayload),
           normalizedPayload: this.toInputJsonValue(normalized),
           lastSyncedAt: new Date(),
@@ -196,6 +297,11 @@ export class MarketplaceOrderIngestionService {
         externalDisplayId: normalized.externalDisplayId ?? null,
         statusExternal: normalized.externalStatus ?? null,
         statusInternal: this.resolveInitialStatusValue(connectionId, normalized),
+        externalCreatedAt: normalized.externalCreatedAt ?? null,
+        preparationStartAt: normalized.preparationStartAt ?? null,
+        confirmationDeadlineAt: normalized.confirmationDeadlineAt ?? null,
+        lastExternalEventAt: event.createdAt ?? null,
+        lastExternalEventId: event.id ?? null,
         rawPayload: this.toInputJsonValue(normalized.rawPayload),
         normalizedPayload: this.toInputJsonValue(normalized),
       },
@@ -332,6 +438,7 @@ export class MarketplaceOrderIngestionService {
       where: { id: inboxId },
       data: {
         status: MarketplaceEventStatus.FAILED,
+        processingStartedAt: null,
         lastError: message,
       },
     });
@@ -347,12 +454,14 @@ export class MarketplaceOrderIngestionService {
       ? OrderStatus.confirmed
       : normalizedTopic === 'CANCELLED' || normalizedTopic === 'ORDER_CANCELLED'
         ? OrderStatus.cancelled
-        : null;
+        : normalizedTopic === 'COMPLETED' || normalizedTopic === 'ORDER_COMPLETED' || normalizedTopic === 'CONCLUDED'
+          ? OrderStatus.completed
+          : null;
     if (!targetStatus) return;
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
       where: { tenantId, provider: MarketplaceProvider.IFOOD, externalOrderId },
-      select: { id: true, internalOrderId: true },
+      select: { id: true, internalOrderId: true, provider: true },
     });
     if (!marketplaceOrder?.internalOrderId) return;
     const order = await this.prisma.order.findFirst({
@@ -360,6 +469,40 @@ export class MarketplaceOrderIngestionService {
       select: { status: true },
     });
     if (!order) return;
+    const pendingCancel = targetStatus === OrderStatus.confirmed
+      ? await this.prisma.marketplaceOperation.findFirst({
+          where: {
+            tenantId,
+            marketplaceOrderId: marketplaceOrder.id,
+            operation: MarketplaceOperationType.CANCEL,
+            status: {
+              in: [
+                MarketplaceOperationStatus.PENDING,
+                MarketplaceOperationStatus.QUEUED,
+                MarketplaceOperationStatus.PROCESSING,
+                MarketplaceOperationStatus.ACCEPTED,
+              ],
+            },
+          },
+        })
+      : null;
+    if (pendingCancel) {
+      await this.divergenceService.record({
+        tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        operationId: pendingCancel.id,
+        provider: marketplaceOrder.provider,
+        externalOrderId,
+        type: MarketplaceDivergenceType.REMOTE_AHEAD,
+        localState: order.status,
+        remoteState: normalizedTopic,
+        reason: 'Remote confirmation arrived while a local cancellation operation is pending.',
+        recommendedAction: 'Reconcile the cancellation with the current remote order before retrying.',
+        correlationId: pendingCancel.correlationId,
+        lastAttemptAt: pendingCancel.lastAttemptAt,
+      });
+    }
     if (order.status === targetStatus) {
       await this.prisma.marketplaceOrder.updateMany({
         where: { id: marketplaceOrder.id, tenantId },
@@ -368,6 +511,19 @@ export class MarketplaceOrderIngestionService {
       return;
     }
     if (!ORDER_STATUS_TRANSITIONS[order.status]?.includes(targetStatus)) {
+      await this.divergenceService.record({
+        tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        provider: marketplaceOrder.provider,
+        externalOrderId,
+        type: MarketplaceDivergenceType.INVALID_TRANSITION,
+        localState: order.status,
+        remoteState: normalizedTopic,
+        reason: `External event cannot apply transition ${order.status} -> ${targetStatus}.`,
+        recommendedAction: 'Inspect order history and remote state; do not force a local transition.',
+        correlationId: `event:${externalOrderId}:${normalizedTopic ?? 'unknown'}`,
+      });
       this.logger.warn({
         message: 'marketplace_event_transition_blocked',
         tenantId,

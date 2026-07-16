@@ -2,8 +2,8 @@
 title: Limitações e Gaps Conhecidos
 status: current
 owner: engineering
-last_verified: 2026-07-15
-verified_against: main-copy / c63d394
+last_verified: 2026-07-16
+verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
 ---
 
 # Gaps Conhecidos e Limitações (Known Gaps)
@@ -28,9 +28,10 @@ verified_against: main-copy / c63d394
 |---|---|---|
 | Homologação oficial pendente | Alta | Confirmação, cancelamento, OAuth e HMAC estão cobertos por mocks contratuais, mas exigem tenant/merchant oficial e evidências do portal iFood antes de produção. |
 | Credenciais legadas em texto puro não são migradas automaticamente | Alta | O runtime falha fechado; reconectar cada integração para gravar tokens com AES-256-GCM. |
-| UI ainda não apresenta reconciliação completa | Média | Operações são consultáveis pela API; criar painel operacional em sprint futura. |
+| UI visual de reconciliação ausente | Baixa | Endpoints SaaS Admin protegidos cobrem listagem, detalhe, histórico, retry, reconhecimento e métricas; dashboard visual permanece opcional. |
 | Ingestão usa o payload do evento como detalhe quando disponível | Média | Avaliar busca oficial completa por tipo de evento na homologação sem ampliar a Sprint 5A. |
-| Sem métricas Prometheus dedicadas | Baixa | Logs estruturados e persistência existem; integrar contadores ao stack de métricas futuro. |
+| Sem exportador Prometheus e plataforma externa de alertas | Média | Métricas por tenant, logs estruturados, divergências e readiness existem; integrar alert manager externo antes de produção em escala. |
+| Polling de fallback não implementado | Média | Arquitetura segue webhook-first com reconciliação pontual. Só adicionar polling após validar presença, ACK, filtros, credenciais e rate limits oficiais. |
 
 ---
 

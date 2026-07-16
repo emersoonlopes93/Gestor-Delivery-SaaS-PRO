@@ -51,6 +51,9 @@ const baseEnvSchema = z.object({
   MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
   MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: z.enum(['true', 'false']).default('false'),
   MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: z.string().default(''),
+  MARKETPLACE_CREDENTIALS_KEY_VERSION: z.string().min(1).default('current'),
+  MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY: z.string().default(''),
+  MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION: z.string().default(''),
 
   // Upload
   MEDIA_MAX_SIZE_BYTES: z.string().optional(),

@@ -34,6 +34,8 @@ import { AdminBaseMenuController } from './base-menu/admin-base-menu.controller'
 import { AdminBaseMenuService } from './base-menu/admin-base-menu.service';
 import { FeatureControlModule } from '../feature-control/feature-control.module';
 import { AdminFeaturesController } from './features/admin-features.controller';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
+import { AdminMarketplaceOperationsController } from './marketplace/admin-marketplace-operations.controller';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { AdminFeaturesController } from './features/admin-features.controller';
     UploadModule,
     AdminModulesModule,
     FeatureControlModule,
+    MarketplaceModule,
     forwardRef(() => AiAgentModule),
   ],
   controllers: [
@@ -61,6 +64,7 @@ import { AdminFeaturesController } from './features/admin-features.controller';
     AdminBaseMenuController,
     AdminBaseMediaController,
     AdminFeaturesController,
+    AdminMarketplaceOperationsController,
   ],
   providers: [
     AdminAuthService, 

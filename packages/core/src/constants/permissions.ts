@@ -163,6 +163,8 @@ export const ADMIN_PERMISSIONS = {
   'saas.settings.manage': 'Manage system settings',
   'saas.franchise.read': 'View franchise dashboard and groups',
   'saas.franchise.manage': 'Manage franchise operations',
+  'saas.marketplace.read': 'View marketplace operations and reconciliation',
+  'saas.marketplace.manage': 'Retry and acknowledge marketplace operations',
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
@@ -262,6 +264,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_menu.read',
     'saas.base_media.read',
     'saas.franchise.read',
+    'saas.marketplace.read',
   ],
   financial: [
     'saas.tenants.read',
@@ -291,6 +294,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_media.manage',
     'saas.franchise.read',
     'saas.franchise.manage',
+    'saas.marketplace.read',
+    'saas.marketplace.manage',
   ],
   auditor: [
     'saas.tenants.read',
@@ -301,5 +306,6 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_menu.read',
     'saas.base_media.read',
     'saas.franchise.read',
+    'saas.marketplace.read',
   ],
 };

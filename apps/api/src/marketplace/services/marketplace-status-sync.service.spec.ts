@@ -46,9 +46,17 @@ describe('MarketplaceStatusSyncService', () => {
     const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
     const config = { get: jest.fn().mockReturnValue('true') };
     const queue = withQueue ? { add: jest.fn().mockResolvedValue({}) } : undefined;
+    const divergenceService = { record: jest.fn().mockResolvedValue({}), resolveForOperation: jest.fn().mockResolvedValue(undefined) };
     return {
       prisma, provider, queue,
-      service: new MarketplaceStatusSyncService(prisma as never, registry as never, featureControl as never, config as never, queue as never),
+      service: new MarketplaceStatusSyncService(
+        prisma as never,
+        registry as never,
+        featureControl as never,
+        config as never,
+        divergenceService as never,
+        queue as never,
+      ),
     };
   };
 

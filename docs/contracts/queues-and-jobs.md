@@ -60,3 +60,13 @@ Todo Consumer (`@Processor`) para eventos com efeitos colaterais críticos (webh
 Quando um job esgota as tentativas de retry, ele permanece na fila com status `failed`. O job iFood bidirecional usa 3 tentativas, backoff exponencial mínimo de 5s e respeita `Retry-After`; erros permanentes não são repetidos.
 - Estes jobs estarão disponíveis para leitura via endpoints de auditoria administrativa (`/admin/queues` ou similar).
 - Não há processamento automático de dead-letters nativo; a re-execução (`retry()`) de um job retido dependerá de intervenção manual da equipe ou de ferramentas de console de Admin SaaS baseados na visibilidade exposta na API.
+
+## 7. Reconciliação iFood
+
+`operation-reconciliation-scan` compartilha a fila `marketplace-event-ingest` e é registrado a cada 60 segundos somente quando BullMQ está disponível e a integração bidirecional está habilitada. O job possui ID estável, três tentativas e backoff exponencial. Cada rodada processa no máximo 100 operações, em páginas por tenant, e o worker tem concorrência 5.
+
+O scheduler pode enumerar conexões globais, mas toda consulta e mutação operacional subsequente contém `tenantId`. Cada operação é recarregada e reivindicada por comparação otimista de `updatedAt`; duas execuções simultâneas não consultam o provider para a mesma versão. A consulta externa usa o timeout `MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS`.
+
+Retry administrativo não chama `job.retry()` indiscriminadamente. O fluxo reconcilia primeiro, rejeita operação concluída, aceita somente `FAILED`/`INTERVENTION_REQUIRED`, cria operação filha e correlation ID novos, preserva a original, audita solicitante/IP e limita três tentativas.
+
+Se o worker estiver indisponível, operações permanecem visíveis como pendentes, a idade máxima cresce em `GET /admin/marketplace/metrics` e o readiness existente sinaliza BullMQ/Redis desabilitados. Ainda não há plataforma externa de alertas conectada; regras de alerta estão no runbook iFood.

@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger, Optional, ServiceUnavailableEx
 import type { Queue } from 'bullmq';
 import {
   MarketplaceConnectionStatus,
+  MarketplaceDivergenceType,
   MarketplaceOperation,
   MarketplaceOperationStatus,
   MarketplaceOperationType,
@@ -16,6 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
+import { MarketplaceDivergenceService } from './marketplace-divergence.service';
 
 export type MarketplaceStatusJob = {
   tenantId: string;
@@ -36,6 +38,7 @@ export class MarketplaceStatusSyncService {
     private readonly providerRegistry: MarketplaceProviderRegistryService,
     private readonly featureControl: FeatureControlService,
     private readonly config: ConfigService,
+    private readonly divergenceService: MarketplaceDivergenceService,
     @Optional() @InjectQueue(MARKETPLACE_EVENT_QUEUE) private readonly queue?: Queue,
   ) {}
 
@@ -67,6 +70,19 @@ export class MarketplaceStatusSyncService {
       throw new ServiceUnavailableException('iFood connection is not operational.');
     }
     if (!this.queue) {
+      await this.divergenceService.record({
+        tenantId: input.tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        provider: marketplaceOrder.provider,
+        externalOrderId: marketplaceOrder.externalOrderId,
+        type: MarketplaceDivergenceType.EVENT_MISSING,
+        localState: marketplaceOrder.statusInternal,
+        remoteState: marketplaceOrder.statusExternal,
+        reason: 'BullMQ is unavailable during a marketplace status operation.',
+        recommendedAction: 'Restore the worker and reconcile the remote order before retrying.',
+        correlationId: randomUUID(),
+      });
       throw new ServiceUnavailableException('BullMQ is required for bidirectional iFood operations.');
     }
 
@@ -116,6 +132,9 @@ export class MarketplaceStatusSyncService {
           idempotencyKey,
           cancellationReason: reason,
           correlationId,
+          deadlineAt: operation === MarketplaceOperationType.CONFIRM
+            ? marketplaceOrder.confirmationDeadlineAt
+            : null,
         },
       });
     } catch (error) {
@@ -139,6 +158,7 @@ export class MarketplaceStatusSyncService {
       operationId: record.id,
     };
     const jobId = `ifood-${operation.toLowerCase()}-${input.tenantId}-${marketplaceOrder.id}-${reasonFingerprint}`;
+    const enqueuedAt = new Date();
     await this.queue.add('order-status-sync', job, {
       jobId,
       attempts: 3,
@@ -146,7 +166,7 @@ export class MarketplaceStatusSyncService {
     });
     await this.prisma.marketplaceOperation.update({
       where: { id: record.id, tenantId: input.tenantId },
-      data: { status: MarketplaceOperationStatus.QUEUED, lastError: null },
+      data: { status: MarketplaceOperationStatus.QUEUED, lastError: null, enqueuedAt },
     });
     return { deferred: true, operationId: record.id };
   }
@@ -192,12 +212,17 @@ export class MarketplaceStatusSyncService {
       return { accepted: true, duplicate: true };
     }
 
+    const attemptAt = new Date();
     await this.prisma.marketplaceOperation.update({
       where: { id: record.id, tenantId: input.tenantId },
       data: {
         status: MarketplaceOperationStatus.PROCESSING,
         attempts: { increment: 1 },
-        lastAttemptAt: new Date(),
+        firstAttemptAt: record.firstAttemptAt ?? attemptAt,
+        lastAttemptAt: attemptAt,
+        queueDelayMs: record.enqueuedAt
+          ? Math.max(0, attemptAt.getTime() - record.enqueuedAt.getTime())
+          : null,
         lastError: null,
       },
     });
@@ -238,6 +263,7 @@ export class MarketplaceStatusSyncService {
         attempt: record.attempts + 1,
         durationMs: Date.now() - startedAt,
       });
+      await this.divergenceService.resolveForOperation(record.tenantId, record.id, 'Provider accepted the operation.');
       return { accepted: true, duplicate: false };
     } catch (error) {
       const apiError = error instanceof IfoodApiError ? error : new IfoodApiError('Unknown iFood operation error.', false);
@@ -250,6 +276,27 @@ export class MarketplaceStatusSyncService {
           lastError: apiError.message.slice(0, 500),
         },
       });
+      if (!apiError.retryable) {
+        await this.divergenceService.record({
+          tenantId: record.tenantId,
+          marketplaceOrderId: record.marketplaceOrderId,
+          internalOrderId: record.marketplaceOrder.internalOrderId,
+          operationId: record.id,
+          provider: record.provider,
+          externalOrderId: record.externalOrderId,
+          type: apiError.httpStatus === 401 || apiError.httpStatus === 403
+            ? MarketplaceDivergenceType.AUTHENTICATION_FAILURE
+            : MarketplaceDivergenceType.PERMANENT_PROVIDER_REJECTION,
+          localState: record.marketplaceOrder.statusInternal,
+          remoteState: record.marketplaceOrder.statusExternal,
+          reason: apiError.message,
+          recommendedAction: apiError.httpStatus === 401 || apiError.httpStatus === 403
+            ? 'Reconnect the merchant credentials before retrying.'
+            : 'Review the provider code and order eligibility before an administrative retry.',
+          correlationId: record.correlationId,
+          lastAttemptAt: attemptAt,
+        });
+      }
       this.logger.warn({
         message: 'marketplace_operation_failed',
         tenantId: record.tenantId,

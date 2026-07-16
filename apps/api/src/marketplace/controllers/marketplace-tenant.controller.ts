@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import type { TenantJwtPayload } from '@gestor/types';
-import { Prisma } from '@prisma/client';
+import { MarketplaceEventStatus, Prisma } from '@prisma/client';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators';
@@ -82,6 +82,22 @@ export class MarketplaceTenantController {
       where: { tenantId: req.user.tenantId },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
+      select: {
+        id: true,
+        provider: true,
+        externalOrderId: true,
+        externalDisplayId: true,
+        internalOrderId: true,
+        statusExternal: true,
+        statusInternal: true,
+        externalCreatedAt: true,
+        preparationStartAt: true,
+        confirmationDeadlineAt: true,
+        lastExternalEventAt: true,
+        lastSyncedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 
@@ -93,15 +109,36 @@ export class MarketplaceTenantController {
     @Query('externalOrderId') externalOrderId?: string,
     @Query('status') status?: string,
   ) {
+    const normalizedStatus = status?.trim();
+    if (normalizedStatus && !Object.values(MarketplaceEventStatus).includes(normalizedStatus as MarketplaceEventStatus)) {
+      throw new BadRequestException('Invalid marketplace event status.');
+    }
     return this.prisma.marketplaceEventInbox.findMany({
       where: {
         tenantId: req.user.tenantId,
         ...(eventId?.trim() ? { eventId: eventId.trim() } : {}),
         ...(externalOrderId?.trim() ? { externalOrderId: externalOrderId.trim() } : {}),
-        ...(status?.trim() ? { status: status.trim() as never } : {}),
+        ...(normalizedStatus ? { status: normalizedStatus as MarketplaceEventStatus } : {}),
       },
       orderBy: [{ receivedAt: 'desc' }],
       take: 100,
+      select: {
+        id: true,
+        provider: true,
+        eventId: true,
+        externalMerchantId: true,
+        externalStoreId: true,
+        externalOrderId: true,
+        topic: true,
+        eventCreatedAt: true,
+        correlationId: true,
+        status: true,
+        attempts: true,
+        duplicateCount: true,
+        lastError: true,
+        receivedAt: true,
+        processedAt: true,
+      },
     });
   }
 
@@ -112,6 +149,27 @@ export class MarketplaceTenantController {
       where: { tenantId: req.user.tenantId },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
+      select: {
+        id: true,
+        marketplaceOrderId: true,
+        externalOrderId: true,
+        operation: true,
+        status: true,
+        correlationId: true,
+        attempts: true,
+        enqueuedAt: true,
+        firstAttemptAt: true,
+        lastAttemptAt: true,
+        acceptedAt: true,
+        completedAt: true,
+        deadlineAt: true,
+        queueDelayMs: true,
+        httpStatus: true,
+        providerCode: true,
+        lastError: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 

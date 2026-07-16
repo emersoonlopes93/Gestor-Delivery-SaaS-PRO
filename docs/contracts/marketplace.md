@@ -3,7 +3,7 @@ title: Contrato de Marketplace — iFood
 status: current
 owner: engineering
 last_verified: 2026-07-16
-verified_against: feat/ifood-bidirectional-core / 99064d7 (commit inicial)
+verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
 ---
 
 # Contrato de Marketplace — iFood
@@ -16,6 +16,7 @@ verified_against: feat/ifood-bidirectional-core / 99064d7 (commit inicial)
 | Confirmação e cancelamento via Order API | Implementados; testes contratuais com HTTP mockado |
 | OAuth, renovação e coalescência de token | Implementados; testes automatizados |
 | Assinatura HMAC-SHA256 do webhook | Implementada; testes automatizados |
+| Reconciliação, divergências, SLA e operação administrativa | Implementados; testes automatizados e migration aditiva |
 | Homologação no ambiente oficial iFood | Pendente por ausência de credenciais/merchant de homologação |
 | Production-ready | Não declarado até homologação, migration no ambiente-alvo e smoke oficial |
 | Catálogo, preços, estoque e promoções | Fora do escopo |
@@ -33,6 +34,9 @@ Consulta realizada em 2026-07-16:
 - [Eventos de pedido](https://developer.ifood.com.br/pt-BR/docs/guides/modules/order/events/)
 - [Boas práticas](https://developer.ifood.com.br/en-US/docs/getting-started/documentation/best-practices)
 - [Assinatura de webhook](https://developer.ifood.com.br/pt-BR/docs/guides/modules/events/webhook-signature)
+- [Polling, duplicidade e ordenação](https://developer.ifood.com.br/pt-BR/docs/guides/modules/events/polling-overview)
+- [Pedidos agendados](https://developer.ifood.com.br/en-US/docs/guides/modules/order/scheduled-orders)
+- [Fundamentos e deadline de confirmação](https://developer.ifood.com.br/en-US/docs/guides/modules/order/fundamentals)
 
 O código não fixa o tempo de validade de token: usa `expiresIn`, pois o valor pode mudar. O `202 Accepted` de confirmação/cancelamento significa somente aceite assíncrono; o resultado final vem por evento.
 
@@ -122,7 +126,7 @@ Erros permanentes terminam em `INTERVENTION_REQUIRED`. Erros temporários ficam 
 
 ## 9. Filas e payload
 
-Fila canônica: `marketplace-event-ingest`; job: `order-status-sync`.
+Fila canônica: `marketplace-event-ingest`; jobs: `event-inbox-process`, `order-status-sync` e `operation-reconciliation-scan`.
 
 O payload contém somente `tenantId`, ID interno, ID externo, tipo, correlation ID, versão e ID da operação. Não contém credenciais ou payload de cliente. O fluxo bidirecional falha com `503` quando Redis/BullMQ não está disponível; não há fallback síncrono.
 
@@ -130,7 +134,7 @@ O payload contém somente `tenantId`, ID interno, ID externo, tipo, correlation 
 
 `MarketplaceOperation` registra tenant, conexão, pedidos interno/externo, operação, status, tentativas, timestamps, HTTP normalizado, código do provider, erro sanitizado e correlation ID. `GET /marketplaces/operations` expõe somente linhas do tenant autenticado.
 
-Migration: `20260716050000_marketplace_bidirectional_operations`. É aditiva: cria dois enums, a tabela, índices e FKs; não altera nem reescreve pedidos existentes. Rollback seguro de aplicação deve primeiro desativar `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED` e voltar o código, preservando a tabela. Remover tabela/enums é destrutivo e só pode ocorrer em mudança separada, com backup e confirmação de que não há auditoria a preservar.
+Migrations: `20260716050000_marketplace_bidirectional_operations` e `20260716150000_marketplace_reconciliation_operations`. Ambas são aditivas. A segunda adiciona metadados de evento/SLA/linhagem, índices operacionais, enums de divergência e `MarketplaceDivergence`. Rollback seguro de aplicação deve primeiro desativar `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED` e voltar o código, preservando as tabelas de auditoria. Remover colunas, tabela ou enums é destrutivo e exige mudança separada, backup e aprovação.
 
 Logs estruturados incluem IDs operacionais, duração, tentativa/resultado e classificação, mas nunca token, secret, Authorization ou payload integral.
 
@@ -151,4 +155,61 @@ O fluxo exige simultaneamente:
 
 Pendente: obtenção/refresh real, pedido de teste, confirmação, cancelamento elegível, repetição de evento, timeout e inspeção de logs no ambiente oficial. Sem essas evidências a feature permanece Beta.
 
-Fora do escopo: catálogo, publicação, preços, estoque, promoções, segundo marketplace, scheduling iFood, fiscal e painel completo de reconciliação.
+Fora do escopo: catálogo, publicação, preços, estoque, promoções, segundo marketplace, scheduling iFood, fiscal e dashboard analítico completo.
+
+## 13. Matriz de eventos e ordenação
+
+| Evento | Entidade | Estado local esperado | Operação relacionada | Pode repetir? |
+|---|---|---|---|---|
+| `PLACED`/evento de criação | Pedido | `pending` após importação | nenhuma | Sim |
+| `CONFIRMED`/`ORDER_CONFIRMED` | Pedido | `confirmed`, somente por transição válida | `CONFIRM` → `SUCCEEDED` | Sim |
+| falha permanente de confirmação HTTP | Operação | sem mudança local | `CONFIRM` → `INTERVENTION_REQUIRED` | Sim por retry controlado |
+| `CANCELLED`/`ORDER_CANCELLED` | Pedido | `cancelled`, somente por transição válida | `CANCEL` → `SUCCEEDED` | Sim |
+| `CANCELLATION_REQUEST_FAILED` | Operação | estado local preservado | `CANCEL` → `INTERVENTION_REQUIRED` | Sim |
+| cancelamento remoto sem operação local | Pedido | `cancelled` se a máquina permitir | nenhuma; pode gerar divergência | Sim |
+| `COMPLETED`/`ORDER_COMPLETED`/`CONCLUDED` | Pedido | `completed` apenas se a transição direta for permitida | nenhuma | Sim |
+| evento desconhecido | Inbox | nenhum efeito de lifecycle | nenhuma | Sim; persiste para auditoria |
+| evento mais antigo que `lastExternalEventAt` | Inbox | nenhum; regressão bloqueada | nenhuma | Sim; termina `IGNORED` |
+
+Todo evento persiste `eventId`, `createdAt`, sequência quando disponível, correlation ID, hash e chave de deduplicação. A unique constraint `(provider, dedupeKey)` é a autoridade. O código faz uma leitura rápida para duplicatas e também captura `P2002`, fechando a corrida entre workers. Eventos `PROCESSED` ou `IGNORED` retornam sucesso sem repetir efeitos; `FAILED` pode ser reprocessado com claim condicional.
+
+## 14. Reconciliação e divergências
+
+O scheduler BullMQ executa a cada 60 segundos, com job ID estável, até 100 operações por rodada, ordenação por idade, três tentativas, backoff exponencial, timeout do cliente HTTP e worker com concorrência 5. A varredura enumera conexões iFood e depois consulta operações sempre com `tenantId`. Cada operação usa claim otimista por `updatedAt`, impedindo duas varreduras simultâneas de consultarem o provider para a mesma versão.
+
+Tipos canônicos: `LOCAL_AHEAD`, `REMOTE_AHEAD`, `OPERATION_TIMEOUT`, `EVENT_MISSING`, `INVALID_TRANSITION`, `AUTHENTICATION_FAILURE`, `MERCHANT_MAPPING_FAILURE`, `PERMANENT_PROVIDER_REJECTION` e `UNKNOWN_EXTERNAL_STATE`. Divergências guardam tenant, IDs interno/externo, estados, operação, motivo, última tentativa, correlation ID, ação recomendada e resolução. Nunca autorizam transição fora de `ORDER_STATUS_TRANSITIONS`.
+
+## 15. SLA de confirmação
+
+O prazo oficial é calculado como:
+
+- pedido `IMMEDIATE`: `createdAt + 8 minutos`;
+- pedido `SCHEDULED`: `preparationStartDateTime + 8 minutos`.
+
+São persistidos recebimento do evento, `externalCreatedAt`, `preparationStartAt`, deadline, enqueue, primeira tentativa, aceite e atraso de fila. Restando até dois minutos, é emitido alerta estruturado; prazo vencido gera alerta e divergência `OPERATION_TIMEOUT`. A métrica administrativa inclui pendências, idade máxima, deadlines, duplicatas, fora de ordem, divergências, retries, autenticação, `429`, `5xx` e tempo médio até conclusão.
+
+## 16. Administração e retry
+
+Endpoints SaaS Admin exigem `AdminAuthGuard`, `AdminPermissionsGuard`, tenant explícito, paginação e payload sanitizado:
+
+| Endpoint | Permissão | Finalidade |
+|---|---|---|
+| `GET /admin/marketplace/operations` | `saas.marketplace.read` | listar operações e filtrar status/tipo |
+| `GET /admin/marketplace/failures` | `saas.marketplace.read` | listar `FAILED`/`INTERVENTION_REQUIRED` |
+| `GET /admin/marketplace/divergences` | `saas.marketplace.read` | listar divergências e resolução |
+| `GET /admin/marketplace/operations/:id` | `saas.marketplace.read` | detalhe sanitizado |
+| `GET /admin/marketplace/operations/:id/history` | `saas.marketplace.read` | operação original e retries filhos |
+| `GET /admin/marketplace/metrics` | `saas.marketplace.read` | métricas operacionais por tenant |
+| `POST /admin/marketplace/operations/:id/retry` | `saas.marketplace.manage` | retry após reconciliação, rate limit 5/min |
+| `POST /admin/marketplace/divergences/:id/acknowledge` | `saas.marketplace.manage` | reconhecer com auditoria |
+| `POST /admin/marketplace/connections/:id/rotate-credentials` | `saas.marketplace.manage` | recifrar credenciais, rate limit 3/min |
+
+Retry administrativo nunca reutiliza silenciosamente o job: reconcilia primeiro, recusa operações concluídas/aceitas/ativas, cria correlation ID e operação filha, registra admin/IP, preserva a original e limita três tentativas por operação.
+
+## 17. Polling e recuperação
+
+O projeto permanece webhook-first e não implementa polling. A indisponibilidade do webhook é recuperada por repetição do remetente, inbox persistente e consulta pontual de estado durante reconciliação. Não foi adicionado polling porque a adoção exige validar credenciais, presença do merchant, ACK, filtros e rate limits oficiais. Se for adotado, deverá rodar a cada 30 segundos, ordenar por `createdAt` e enviar ACK somente após persistência segura.
+
+## 18. Criptografia e rotação
+
+Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 bytes e auth tag obrigatória. `enc:v1` continua legível apenas com a chave atual para migração; plaintext falha fechado. A leitura aceita somente a versão atual e uma versão anterior explicitamente configurada. O endpoint administrativo recifra tokens sem retornar plaintext, token ou ciphertext.

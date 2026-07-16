@@ -19,6 +19,9 @@ import { MarketplaceEventProcessor } from './processors/marketplace-event.proces
 import { MarketplaceCredentialService } from './services/marketplace-credential.service';
 import { IfoodTokenService } from './services/ifood-token.service';
 import { IfoodHttpClientService } from './services/ifood-http-client.service';
+import { MarketplaceDivergenceService } from './services/marketplace-divergence.service';
+import { MarketplaceReconciliationService } from './services/marketplace-reconciliation.service';
+import { MarketplaceAdminOperationsService } from './services/marketplace-admin-operations.service';
 
 const enableMarketplaceQueue =
   process.env.REDIS_ENABLED !== 'false' &&
@@ -60,6 +63,9 @@ const enableMarketplaceQueue =
     MarketplaceEventInboxService,
     MarketplaceOrderIngestionService,
     MarketplaceStatusSyncService,
+    MarketplaceDivergenceService,
+    MarketplaceReconciliationService,
+    MarketplaceAdminOperationsService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),
   ],
   exports: [
@@ -67,6 +73,9 @@ const enableMarketplaceQueue =
     MarketplaceEventInboxService,
     MarketplaceOrderIngestionService,
     MarketplaceStatusSyncService,
+    MarketplaceCredentialService,
+    MarketplaceReconciliationService,
+    MarketplaceAdminOperationsService,
   ],
 })
 export class MarketplaceModule {}

@@ -7,6 +7,8 @@ export type ParsedMarketplaceEvent = {
   externalMerchantId?: string | null;
   externalStoreId?: string | null;
   externalOrderId?: string | null;
+  eventCreatedAt?: Date | null;
+  eventSequence?: bigint | null;
   orderPayload?: Record<string, unknown> | null;
   rawPayload: Record<string, unknown>;
 };
@@ -40,6 +42,9 @@ export type NormalizedMarketplaceOrder = {
   externalOrderId: string;
   externalDisplayId?: string | null;
   externalStatus?: string | null;
+  externalCreatedAt?: Date | null;
+  preparationStartAt?: Date | null;
+  confirmationDeadlineAt?: Date | null;
   fulfillmentType: 'delivery' | 'pickup';
   customerName: string;
   customerPhone: string;

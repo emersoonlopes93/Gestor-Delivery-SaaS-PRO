@@ -40,6 +40,7 @@ describe('MarketplaceEventInboxService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    provider.validateWebhook.mockResolvedValue(true);
   });
 
   it('stores and immediately processes an inbox event when no queue is available', async () => {
@@ -108,5 +109,43 @@ describe('MarketplaceEventInboxService', () => {
     await expect(service.reprocessEventInbox('inbox-1', 'tenant-other')).rejects.toThrow(
       'Marketplace event inbox not found.',
     );
+  });
+
+  it('rejects an invalid signature before persisting the event', async () => {
+    provider.validateWebhook.mockResolvedValueOnce(false);
+    const service = new MarketplaceEventInboxService(
+      prisma as never,
+      registry as never,
+      connectionService as never,
+      ingestionService as never,
+      undefined,
+    );
+    await expect(service.receiveWebhook({
+      provider: MarketplaceProvider.IFOOD,
+      headers: {},
+      rawBody: Buffer.from('{}'),
+      body: {},
+    })).rejects.toThrow('Invalid marketplace webhook signature.');
+    expect(prisma.marketplaceEventInbox.create).not.toHaveBeenCalled();
+  });
+
+  it('does not re-run effects for an already processed inbox row', async () => {
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce({
+      id: 'inbox-1',
+      status: MarketplaceEventStatus.PROCESSED,
+    });
+    const service = new MarketplaceEventInboxService(
+      prisma as never,
+      registry as never,
+      connectionService as never,
+      ingestionService as never,
+      undefined,
+    );
+    await expect(service.reprocessEventInbox('inbox-1', 'tenant-1')).resolves.toEqual({
+      success: true,
+      skipped: true,
+      reason: 'already_processed',
+    });
+    expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
   });
 });

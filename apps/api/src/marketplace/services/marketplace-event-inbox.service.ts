@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
-import { MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
-import { createHash } from 'crypto';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
+import { MarketplaceEventInbox, MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
+import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
@@ -11,6 +11,8 @@ import { MarketplaceOrderIngestionService } from './marketplace-order-ingestion.
 
 @Injectable()
 export class MarketplaceEventInboxService {
+  private readonly logger = new Logger(MarketplaceEventInboxService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerRegistry: MarketplaceProviderRegistryService,
@@ -28,6 +30,10 @@ export class MarketplaceEventInboxService {
     const provider = this.providerRegistry.get(input.provider);
     const isValid = await provider.validateWebhook(input);
     if (!isValid) {
+      this.logger.warn({
+        message: 'marketplace_webhook_signature_invalid',
+        provider: input.provider,
+      });
       throw new BadRequestException('Invalid marketplace webhook signature.');
     }
 
@@ -46,11 +52,26 @@ export class MarketplaceEventInboxService {
       externalStoreId: parsed.externalStoreId,
     });
 
-    let inbox = await this.prisma.marketplaceEventInbox.findFirst({
+    const existing = await this.prisma.marketplaceEventInbox.findFirst({
       where: { provider: parsed.provider, dedupeKey },
     });
+    if (existing) {
+      await this.prisma.marketplaceEventInbox.update({
+        where: { id: existing.id },
+        data: { duplicateCount: { increment: 1 } },
+      });
+      this.logger.log({
+        message: 'marketplace_event_duplicate',
+        tenantId: existing.tenantId,
+        externalOrderId: existing.externalOrderId,
+        eventId: existing.eventId,
+        correlationId: existing.correlationId,
+      });
+      return { accepted: true, duplicate: true, inboxId: existing.id };
+    }
 
-    if (!inbox) {
+    let inbox: MarketplaceEventInbox;
+    try {
       inbox = await this.prisma.marketplaceEventInbox.create({
         data: {
           provider: parsed.provider,
@@ -61,6 +82,9 @@ export class MarketplaceEventInboxService {
           externalStoreId: parsed.externalStoreId ?? null,
           externalOrderId: parsed.externalOrderId ?? null,
           topic: parsed.topic ?? null,
+          eventCreatedAt: parsed.eventCreatedAt ?? null,
+          eventSequence: parsed.eventSequence ?? null,
+          correlationId: randomUUID(),
           payloadHash,
           dedupeKey,
           rawPayload: parsed.rawPayload as Prisma.InputJsonValue,
@@ -68,7 +92,15 @@ export class MarketplaceEventInboxService {
           status: MarketplaceEventStatus.RECEIVED,
         },
       });
-    } else {
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      inbox = await this.prisma.marketplaceEventInbox.findFirstOrThrow({
+        where: { provider: parsed.provider, dedupeKey },
+      });
+      await this.prisma.marketplaceEventInbox.update({
+        where: { id: inbox.id },
+        data: { duplicateCount: { increment: 1 } },
+      });
       return { accepted: true, duplicate: true, inboxId: inbox.id };
     }
 
@@ -77,7 +109,11 @@ export class MarketplaceEventInboxService {
         where: { id: inbox.id },
         data: { status: MarketplaceEventStatus.QUEUED },
       });
-      await this.queue.add('event-inbox-process', { eventInboxId: inbox.id });
+      await this.queue.add('event-inbox-process', { eventInboxId: inbox.id, tenantId: inbox.tenantId }, {
+        jobId: `marketplace-event-${inbox.id}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
     } else {
       await this.ingestionService.processInboxEvent(inbox.id);
     }
@@ -93,6 +129,9 @@ export class MarketplaceEventInboxService {
       },
     });
     if (!inbox) throw new BadRequestException('Marketplace event inbox not found.');
+    if (inbox.status === MarketplaceEventStatus.PROCESSED) {
+      return { success: true, skipped: true, reason: 'already_processed' };
+    }
 
     await this.prisma.marketplaceEventInbox.update({
       where: { id: inbox.id },
@@ -103,7 +142,11 @@ export class MarketplaceEventInboxService {
     });
 
     if (this.queue) {
-      await this.queue.add('event-inbox-process', { eventInboxId: inbox.id });
+      await this.queue.add('event-inbox-process', { eventInboxId: inbox.id, tenantId: inbox.tenantId }, {
+        jobId: `marketplace-event-retry-${inbox.id}-${inbox.attempts + 1}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
     } else {
       await this.ingestionService.processInboxEvent(inbox.id);
     }

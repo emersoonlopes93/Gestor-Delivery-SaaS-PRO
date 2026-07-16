@@ -80,6 +80,7 @@ model Tenant {
   marketplaceEventInboxes        MarketplaceEventInbox[]
   marketplaceOrders              MarketplaceOrder[]
   marketplaceOperations          MarketplaceOperation[]
+  marketplaceDivergences         MarketplaceDivergence[]
   mediaAssets                    MediaAsset[]
   mediaCategories                MediaCategory[]
   optionGroups                   OptionGroup[]
@@ -940,61 +941,62 @@ model ProductUpsell {
 }
 
 model Order {
-  id                  String                       @id @default(uuid())
-  tenantId            String                       @map("tenant_id")
-  orderNumber         String                       @map("order_number") @db.VarChar(20)
-  status              OrderStatus                  @default(pending)
-  fulfillmentType     FulfillmentType              @map("fulfillment_type")
-  customerName        String                       @map("customer_name") @db.VarChar(150)
-  customerPhone       String                       @map("customer_phone") @db.VarChar(30)
-  customerEmail       String?                      @map("customer_email") @db.VarChar(255)
-  itemsSubtotal       Decimal                      @map("items_subtotal") @db.Decimal(10, 2)
-  discountTotal       Decimal                      @default(0) @map("discount_total") @db.Decimal(10, 2)
-  deliveryFee         Decimal                      @default(0) @map("delivery_fee") @db.Decimal(10, 2)
-  serviceFee          Decimal                      @default(0) @map("service_fee") @db.Decimal(10, 2)
-  total               Decimal                      @db.Decimal(10, 2)
-  sourceChannel       String                       @default("direct_online") @map("source_channel") @db.VarChar(40)
-  idempotencyKey      String                       @map("idempotency_key") @db.VarChar(100)
-  notes               String?
-  createdAt           DateTime                     @default(now()) @map("created_at")
-  updatedAt           DateTime                     @updatedAt @map("updated_at")
-  deliveryDriverId    String?                      @map("delivery_driver_id")
-  cashSessionId       String?                      @map("cash_session_id")
-  paymentMethod       PaymentMethod?               @map("payment_method")
-  cashbackUsed        Decimal?                     @map("cashback_used") @db.Decimal(10, 2)
-  couponId            String?                      @map("coupon_id")
-  customerId          String?                      @map("customer_id")
-  deliveryLat         Float?                       @map("delivery_lat")
-  deliveryLng         Float?                       @map("delivery_lng")
-  publicTrackingToken String                       @unique @map("public_tracking_token")
-  changeFor           Decimal?                     @map("change_for") @db.Decimal(10, 2)
-  tableNumber         String?                      @map("table_number") @db.VarChar(20)
-  waiterId            String?                      @map("waiter_id")
-  scheduledFor        DateTime?                    @map("scheduled_for")
-  isScheduled         Boolean                      @default(false) @map("is_scheduled")
-  orderCoupons        OrderCoupon[]
-  paymentTransactions PaymentTransaction[]
-  cashMovements       CashMovement[]
-  cashbackHistory     CashbackTransaction[]
-  loyaltyTransactions CustomerLoyaltyTransaction[]
-  walletTransactions  CustomerWalletTransaction[]
-  activeTable         DineInTable?                 @relation("ActiveTableOrder")
-  marketplaceOrders   MarketplaceOrder[]
-  deliveryAddress     OrderDeliveryAddress?
-  OrderFeedback       OrderFeedback?
-  items               OrderItem[]
-  orderSplits         OrderSplit[]
-  timeline            OrderTimeline[]
-  cashSession         CashSession?                 @relation(fields: [cashSessionId], references: [id])
-  coupon              Coupon?                      @relation(fields: [couponId], references: [id])
-  customer            Customer?                    @relation(fields: [customerId], references: [id])
-  deliveryDriver      DeliveryDriver?              @relation(fields: [deliveryDriverId], references: [id])
-  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  waiter              TenantUser?                  @relation("WaiterOrders", fields: [waiterId], references: [id])
-  printJobs           PrintJob[]
-  revenueEvents       RevenueEvent[]
-  scheduledOrders     ScheduledOrder[]
-  stockMovements      StockMovement[]
+  id                     String                       @id @default(uuid())
+  tenantId               String                       @map("tenant_id")
+  orderNumber            String                       @map("order_number") @db.VarChar(20)
+  status                 OrderStatus                  @default(pending)
+  fulfillmentType        FulfillmentType              @map("fulfillment_type")
+  customerName           String                       @map("customer_name") @db.VarChar(150)
+  customerPhone          String                       @map("customer_phone") @db.VarChar(30)
+  customerEmail          String?                      @map("customer_email") @db.VarChar(255)
+  itemsSubtotal          Decimal                      @map("items_subtotal") @db.Decimal(10, 2)
+  discountTotal          Decimal                      @default(0) @map("discount_total") @db.Decimal(10, 2)
+  deliveryFee            Decimal                      @default(0) @map("delivery_fee") @db.Decimal(10, 2)
+  serviceFee             Decimal                      @default(0) @map("service_fee") @db.Decimal(10, 2)
+  total                  Decimal                      @db.Decimal(10, 2)
+  sourceChannel          String                       @default("direct_online") @map("source_channel") @db.VarChar(40)
+  idempotencyKey         String                       @map("idempotency_key") @db.VarChar(100)
+  notes                  String?
+  createdAt              DateTime                     @default(now()) @map("created_at")
+  updatedAt              DateTime                     @updatedAt @map("updated_at")
+  deliveryDriverId       String?                      @map("delivery_driver_id")
+  cashSessionId          String?                      @map("cash_session_id")
+  paymentMethod          PaymentMethod?               @map("payment_method")
+  cashbackUsed           Decimal?                     @map("cashback_used") @db.Decimal(10, 2)
+  couponId               String?                      @map("coupon_id")
+  customerId             String?                      @map("customer_id")
+  deliveryLat            Float?                       @map("delivery_lat")
+  deliveryLng            Float?                       @map("delivery_lng")
+  publicTrackingToken    String                       @unique @map("public_tracking_token")
+  changeFor              Decimal?                     @map("change_for") @db.Decimal(10, 2)
+  tableNumber            String?                      @map("table_number") @db.VarChar(20)
+  waiterId               String?                      @map("waiter_id")
+  scheduledFor           DateTime?                    @map("scheduled_for")
+  isScheduled            Boolean                      @default(false) @map("is_scheduled")
+  orderCoupons           OrderCoupon[]
+  paymentTransactions    PaymentTransaction[]
+  cashMovements          CashMovement[]
+  cashbackHistory        CashbackTransaction[]
+  loyaltyTransactions    CustomerLoyaltyTransaction[]
+  walletTransactions     CustomerWalletTransaction[]
+  activeTable            DineInTable?                 @relation("ActiveTableOrder")
+  marketplaceOrders      MarketplaceOrder[]
+  marketplaceDivergences MarketplaceDivergence[]
+  deliveryAddress        OrderDeliveryAddress?
+  OrderFeedback          OrderFeedback?
+  items                  OrderItem[]
+  orderSplits            OrderSplit[]
+  timeline               OrderTimeline[]
+  cashSession            CashSession?                 @relation(fields: [cashSessionId], references: [id])
+  coupon                 Coupon?                      @relation(fields: [couponId], references: [id])
+  customer               Customer?                    @relation(fields: [customerId], references: [id])
+  deliveryDriver         DeliveryDriver?              @relation(fields: [deliveryDriverId], references: [id])
+  tenant                 Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  waiter                 TenantUser?                  @relation("WaiterOrders", fields: [waiterId], references: [id])
+  printJobs              PrintJob[]
+  revenueEvents          RevenueEvent[]
+  scheduledOrders        ScheduledOrder[]
+  stockMovements         StockMovement[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -1564,54 +1566,66 @@ model MarketplaceConnection {
 }
 
 model MarketplaceEventInbox {
-  id                 String                 @id @default(uuid())
-  provider           MarketplaceProvider
-  eventId            String?                @map("event_id") @db.VarChar(180)
-  tenantId           String?                @map("tenant_id")
-  connectionId       String?                @map("connection_id")
-  externalMerchantId String?                @map("external_merchant_id") @db.VarChar(120)
-  externalStoreId    String?                @map("external_store_id") @db.VarChar(120)
-  externalOrderId    String?                @map("external_order_id") @db.VarChar(120)
-  topic              String?                @db.VarChar(120)
-  status             MarketplaceEventStatus @default(RECEIVED)
-  payloadHash        String                 @map("payload_hash") @db.VarChar(128)
-  dedupeKey          String                 @map("dedupe_key") @db.VarChar(220)
-  rawPayload         Json                   @map("raw_payload")
-  headersJson        Json?                  @map("headers_json")
-  attempts           Int                    @default(0)
-  lastError          String?                @map("last_error")
-  receivedAt         DateTime               @default(now()) @map("received_at")
-  processedAt        DateTime?              @map("processed_at")
-  connection         MarketplaceConnection? @relation(fields: [connectionId], references: [id])
-  tenant             Tenant?                @relation(fields: [tenantId], references: [id])
+  id                  String                 @id @default(uuid())
+  provider            MarketplaceProvider
+  eventId             String?                @map("event_id") @db.VarChar(180)
+  tenantId            String?                @map("tenant_id")
+  connectionId        String?                @map("connection_id")
+  externalMerchantId  String?                @map("external_merchant_id") @db.VarChar(120)
+  externalStoreId     String?                @map("external_store_id") @db.VarChar(120)
+  externalOrderId     String?                @map("external_order_id") @db.VarChar(120)
+  topic               String?                @db.VarChar(120)
+  eventCreatedAt      DateTime?              @map("event_created_at")
+  eventSequence       BigInt?                @map("event_sequence")
+  correlationId       String                 @map("correlation_id") @db.VarChar(120)
+  status              MarketplaceEventStatus @default(RECEIVED)
+  payloadHash         String                 @map("payload_hash") @db.VarChar(128)
+  dedupeKey           String                 @map("dedupe_key") @db.VarChar(220)
+  rawPayload          Json                   @map("raw_payload")
+  headersJson         Json?                  @map("headers_json")
+  attempts            Int                    @default(0)
+  duplicateCount      Int                    @default(0) @map("duplicate_count")
+  lastError           String?                @map("last_error")
+  receivedAt          DateTime               @default(now()) @map("received_at")
+  processedAt         DateTime?              @map("processed_at")
+  processingStartedAt DateTime?              @map("processing_started_at")
+  connection          MarketplaceConnection? @relation(fields: [connectionId], references: [id])
+  tenant              Tenant?                @relation(fields: [tenantId], references: [id])
 
   @@unique([provider, dedupeKey])
   @@index([provider, externalOrderId])
   @@index([tenantId, status])
   @@index([status, receivedAt])
+  @@index([tenantId, externalOrderId, eventCreatedAt])
   @@map("marketplace_event_inbox")
 }
 
 model MarketplaceOrder {
-  id                String                 @id @default(uuid())
-  tenantId          String                 @map("tenant_id")
-  connectionId      String                 @map("connection_id")
-  provider          MarketplaceProvider
-  externalOrderId   String                 @map("external_order_id") @db.VarChar(120)
-  externalDisplayId String?                @map("external_display_id") @db.VarChar(120)
-  internalOrderId   String?                @map("internal_order_id")
-  statusExternal    String?                @map("status_external") @db.VarChar(60)
-  statusInternal    String?                @map("status_internal") @db.VarChar(60)
-  rawPayload        Json                   @map("raw_payload")
-  normalizedPayload Json?                  @map("normalized_payload")
-  importedAt        DateTime?              @map("imported_at")
-  lastSyncedAt      DateTime?              @map("last_synced_at")
-  createdAt         DateTime               @default(now()) @map("created_at")
-  updatedAt         DateTime               @updatedAt @map("updated_at")
-  connection        MarketplaceConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  internalOrder     Order?                 @relation(fields: [internalOrderId], references: [id])
-  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  operations        MarketplaceOperation[]
+  id                     String                  @id @default(uuid())
+  tenantId               String                  @map("tenant_id")
+  connectionId           String                  @map("connection_id")
+  provider               MarketplaceProvider
+  externalOrderId        String                  @map("external_order_id") @db.VarChar(120)
+  externalDisplayId      String?                 @map("external_display_id") @db.VarChar(120)
+  internalOrderId        String?                 @map("internal_order_id")
+  statusExternal         String?                 @map("status_external") @db.VarChar(60)
+  statusInternal         String?                 @map("status_internal") @db.VarChar(60)
+  externalCreatedAt      DateTime?               @map("external_created_at")
+  preparationStartAt     DateTime?               @map("preparation_start_at")
+  confirmationDeadlineAt DateTime?               @map("confirmation_deadline_at")
+  lastExternalEventAt    DateTime?               @map("last_external_event_at")
+  lastExternalEventId    String?                 @map("last_external_event_id") @db.VarChar(180)
+  rawPayload             Json                    @map("raw_payload")
+  normalizedPayload      Json?                   @map("normalized_payload")
+  importedAt             DateTime?               @map("imported_at")
+  lastSyncedAt           DateTime?               @map("last_synced_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  connection             MarketplaceConnection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  internalOrder          Order?                  @relation(fields: [internalOrderId], references: [id])
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operations             MarketplaceOperation[]
+  divergences            MarketplaceDivergence[]
 
   @@unique([tenantId, provider, externalOrderId])
   @@index([internalOrderId])
@@ -1633,22 +1647,68 @@ model MarketplaceOperation {
   cancellationReason String?                    @map("cancellation_reason") @db.VarChar(40)
   correlationId      String                     @map("correlation_id") @db.VarChar(120)
   attempts           Int                        @default(0)
+  enqueuedAt         DateTime?                  @map("enqueued_at")
+  firstAttemptAt     DateTime?                  @map("first_attempt_at")
+  deadlineAt         DateTime?                  @map("deadline_at")
+  queueDelayMs       Int?                       @map("queue_delay_ms")
   lastAttemptAt      DateTime?                  @map("last_attempt_at")
   acceptedAt         DateTime?                  @map("accepted_at")
   completedAt        DateTime?                  @map("completed_at")
   httpStatus         Int?                       @map("http_status")
   providerCode       String?                    @map("provider_code") @db.VarChar(120)
   lastError          String?                    @map("last_error") @db.VarChar(500)
+  parentOperationId  String?                    @map("parent_operation_id")
+  requestedByAdminId String?                    @map("requested_by_admin_id")
+  adminRetryNumber   Int                        @default(0) @map("admin_retry_number")
   createdAt          DateTime                   @default(now()) @map("created_at")
   updatedAt          DateTime                   @updatedAt @map("updated_at")
   tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   connection         MarketplaceConnection      @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   marketplaceOrder   MarketplaceOrder           @relation(fields: [marketplaceOrderId], references: [id], onDelete: Cascade)
+  parentOperation    MarketplaceOperation?      @relation("MarketplaceOperationRetries", fields: [parentOperationId], references: [id])
+  retryOperations    MarketplaceOperation[]     @relation("MarketplaceOperationRetries")
+  divergences        MarketplaceDivergence[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status, createdAt])
   @@index([marketplaceOrderId, operation, status], map: "marketplace_ops_order_operation_status_idx")
+  @@index([tenantId, deadlineAt, status])
+  @@index([parentOperationId])
   @@map("marketplace_operations")
+}
+
+model MarketplaceDivergence {
+  id                 String                      @id @default(uuid())
+  tenantId           String                      @map("tenant_id")
+  marketplaceOrderId String                      @map("marketplace_order_id")
+  internalOrderId    String?                     @map("internal_order_id")
+  operationId        String?                     @map("operation_id")
+  provider           MarketplaceProvider
+  externalOrderId    String                      @map("external_order_id") @db.VarChar(120)
+  type               MarketplaceDivergenceType
+  status             MarketplaceDivergenceStatus @default(OPEN)
+  localState         String?                     @map("local_state") @db.VarChar(60)
+  remoteState        String?                     @map("remote_state") @db.VarChar(120)
+  reason             String                      @db.VarChar(500)
+  recommendedAction  String                      @map("recommended_action") @db.VarChar(500)
+  correlationId      String                      @map("correlation_id") @db.VarChar(120)
+  lastAttemptAt      DateTime?                   @map("last_attempt_at")
+  acknowledgedAt     DateTime?                   @map("acknowledged_at")
+  acknowledgedBy     String?                     @map("acknowledged_by")
+  resolvedAt         DateTime?                   @map("resolved_at")
+  resolutionNote     String?                     @map("resolution_note") @db.VarChar(500)
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @updatedAt @map("updated_at")
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  marketplaceOrder   MarketplaceOrder            @relation(fields: [marketplaceOrderId], references: [id], onDelete: Cascade)
+  internalOrder      Order?                      @relation(fields: [internalOrderId], references: [id])
+  operation          MarketplaceOperation?       @relation(fields: [operationId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, type, status])
+  @@index([marketplaceOrderId, status])
+  @@index([operationId])
+  @@map("marketplace_divergences")
 }
 
 model PaymentTransaction {
@@ -3339,6 +3399,24 @@ enum MarketplaceOperationStatus {
   SUCCEEDED
   FAILED
   INTERVENTION_REQUIRED
+}
+
+enum MarketplaceDivergenceType {
+  LOCAL_AHEAD
+  REMOTE_AHEAD
+  OPERATION_TIMEOUT
+  EVENT_MISSING
+  INVALID_TRANSITION
+  AUTHENTICATION_FAILURE
+  MERCHANT_MAPPING_FAILURE
+  PERMANENT_PROVIDER_REJECTION
+  UNKNOWN_EXTERNAL_STATE
+}
+
+enum MarketplaceDivergenceStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
 }
 
 enum PaymentAttemptStatus {
