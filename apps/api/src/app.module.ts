@@ -177,6 +177,16 @@ if (process.env.REDIS_ENABLED === 'false') {
   logRedisState('warn', 'redis_localhost', '[REDIS] localhost_configured - not_production_ready');
 }
 
+const enableBullmq =
+  process.env.REDIS_ENABLED !== 'false' &&
+  process.env.BULLMQ_ENABLED === 'true';
+
+if (enableBullmq) {
+  logRedisState('log', 'bullmq_enabled', '[BULLMQ] global_connection_enabled');
+} else {
+  logRedisState('warn', 'bullmq_disabled', '[BULLMQ] disabled - workers_will_not_start');
+}
+
 @Module({
   controllers: [AppController],
   imports: [
@@ -205,6 +215,17 @@ if (process.env.REDIS_ENABLED === 'false') {
         limit: Number(process.env.RATE_LIMIT_PUBLIC_MAX_REQUESTS ?? 60),
       },
     ]),
+
+    // BullMQ — conexão global Redis para todas as filas
+    // Deve vir antes de qualquer BullModule.registerQueue()
+    ...(enableBullmq
+      ? [
+          BullModule.forRoot({
+            connection: getBullmqRedisConnectionOptions(),
+          }),
+        ]
+      : []),
+
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
