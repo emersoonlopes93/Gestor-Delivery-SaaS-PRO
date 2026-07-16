@@ -10,9 +10,7 @@ describe('LocationProviderService', () => {
   let service: LocationProviderService;
 
   const createConfigService = (overrides: Record<string, string | undefined> = {}) =>
-    ({
-      get: jest.fn((key: string) => overrides[key]),
-    } satisfies Pick<ConfigService, 'get'> as ConfigService);
+    new ConfigService(overrides);
 
   beforeEach(() => {
     service = new LocationProviderService(

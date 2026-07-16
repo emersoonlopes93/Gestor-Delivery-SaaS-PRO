@@ -372,7 +372,8 @@ describe('BaseMenusPage', () => {
     const productScope = within(productCard);
 
     expect(productScope.getByText('Açaí 300ml')).toBeInTheDocument();
-    await userEvent.click(productScope.getByRole('button', { name: 'Complementos' }));
+    const refreshedProductScope = within(await getFirstProductCard());
+    await userEvent.click(refreshedProductScope.getByRole('button', { name: 'Complementos' }));
     await userEvent.clear(screen.getAllByLabelText('Grupo')[0]);
     await userEvent.type(screen.getAllByLabelText('Grupo')[0], 'Coberturas');
     await userEvent.type(screen.getAllByLabelText('Preco adicional')[0], '2');
@@ -390,7 +391,8 @@ describe('BaseMenusPage', () => {
     vi.mocked(api.patch).mockRejectedValueOnce(Object.assign(new Error('maxSelect nao pode ser menor que minSelect.'), { status: 400 }));
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
-    await userEvent.click(productScope.getByRole('button', { name: 'Complementos' }));
+    const updatedProductScope = within(await getFirstProductCard());
+    await userEvent.click(updatedProductScope.getByRole('button', { name: 'Complementos' }));
     await userEvent.clear(screen.getAllByLabelText('Minimo')[0]);
     await userEvent.type(screen.getAllByLabelText('Minimo')[0], '2');
     await userEvent.clear(screen.getAllByLabelText('Maximo')[0]);
@@ -434,7 +436,7 @@ describe('BaseMenusPage', () => {
 
     renderPage('/base-menus/acai');
 
-    expect(await screen.findByText('Açaí')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Açaí/ })).toBeInTheDocument();
     expect(screen.queryByText('Metadados')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mais opções' }));
     expect(screen.getByText('Metadados')).toBeInTheDocument();
