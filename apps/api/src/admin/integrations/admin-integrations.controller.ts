@@ -22,6 +22,11 @@ export class UpdateIntegrationsConfigDto {
   appName?: string;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  platformLogoMediaId?: string | null;
+
+  @IsOptional()
   @IsEnum(WhatsAppProviderType)
   defaultWhatsAppProvider?: WhatsAppProviderType;
 

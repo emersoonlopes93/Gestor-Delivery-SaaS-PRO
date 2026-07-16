@@ -47,6 +47,7 @@ export * from './kds';
 export * from './notifications';
 export * from './employees';
 export * from './settings';
+export * from './branding';
 export * from './capabilities';
 export * from './feature-control';
 export * from './location';

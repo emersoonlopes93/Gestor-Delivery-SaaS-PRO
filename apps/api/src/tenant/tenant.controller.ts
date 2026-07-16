@@ -43,6 +43,12 @@ export class TenantController {
     return this.featureControlService.getTenantCapabilities(tenantId, userId);
   }
 
+  @Get('platform-branding')
+  @RequirePermissions('dashboard.view')
+  async getPlatformBranding() {
+    return this.tenantService.getPlatformBranding();
+  }
+
   /**
    * Update tenant basic info.
    */

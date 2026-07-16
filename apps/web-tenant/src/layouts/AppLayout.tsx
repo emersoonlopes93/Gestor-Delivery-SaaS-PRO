@@ -49,6 +49,7 @@ import type { BusinessGroupContext, Tenant, TenantLoginResponse, TenantSettings,
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useTenantCapabilities } from '../hooks/useTenantCapabilities';
+import { usePlatformBranding } from '../hooks/usePlatformBranding';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { StoreStatusBadge } from '../components/store/StoreStatusControl';
 import { Toaster } from 'react-hot-toast';
@@ -357,6 +358,7 @@ export function AppLayout() {
   const { user, clearUser, setUser } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore();
   const { isFeatureVisible } = useTenantCapabilities();
+  const platformBrandingQuery = usePlatformBranding();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -368,6 +370,14 @@ export function AppLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
+  const [platformLogoFailed, setPlatformLogoFailed] = useState(false);
+
+  const systemName = platformBrandingQuery.data?.systemName || 'PedeHub';
+  const platformLogoUrl = platformBrandingQuery.data?.logoUrl || null;
+
+  useEffect(() => {
+    setPlatformLogoFailed(false);
+  }, [platformLogoUrl]);
 
   const { data: tenantData } = useQuery({
     queryKey: ['tenant-settings'],
@@ -726,17 +736,39 @@ export function AppLayout() {
       >
         <div className={`p-4 flex flex-col gap-5 ${collapsed ? 'items-center' : 'items-center text-center'}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
           <div className="flex flex-col items-center gap-3 w-full">
-            <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
-              P
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 flex flex-col items-center">
-                <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight">
-                  PedeHub
-                </h1>
-                <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">
-                  {user?.tenant?.name || 'Carregando...'}
-                </p>
+            {collapsed ? (
+              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
+                {(systemName?.charAt(0) || 'P').toUpperCase()}
+              </div>
+            ) : (
+              <div className="min-w-0 flex flex-col items-center w-full">
+                {platformLogoUrl && !platformLogoFailed ? (
+                  <div className="min-w-0 flex flex-col items-center gap-2 w-full">
+                    <img
+                      src={platformLogoUrl}
+                      alt={systemName}
+                      className="block max-w-[160px] max-h-[42px] object-contain"
+                      onError={() => setPlatformLogoFailed(true)}
+                    />
+                    <p className="text-[10px] font-black text-muted-foreground truncate leading-none uppercase tracking-wider max-w-[160px]">
+                      {user?.tenant?.name || 'Carregando...'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-3 w-full">
+                    <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
+                      {(systemName?.charAt(0) || 'P').toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex flex-col items-start text-left">
+                      <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight max-w-[145px]">
+                        {systemName}
+                      </h1>
+                      <p className="text-[10px] font-black text-muted-foreground mt-0.5 truncate leading-none uppercase tracking-wider max-w-[145px]">
+                        {user?.tenant?.name || 'Carregando...'}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {tenantData?.businessGroup ? (
                   <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
                     <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />

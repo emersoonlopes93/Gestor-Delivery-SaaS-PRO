@@ -2633,6 +2633,8 @@ model SystemConfig {
   fallbackAiProvider         String?              @map("fallback_ai_provider") @db.VarChar(50)
   openaiModel                String?              @default("gpt-4o") @map("openai_model") @db.VarChar(100)
   appName                    String               @default("PedeHub") @map("app_name") @db.VarChar(120)
+  platformLogoMediaId        String?              @map("platform_logo_media_id")
+  platformLogoMedia          MediaAsset?          @relation(fields: [platformLogoMediaId], references: [id], onDelete: SetNull)
   openrouterApiKey           String?              @map("openrouter_api_key")
   openrouterModel            String?              @default("openrouter/auto") @map("openrouter_model") @db.VarChar(100)
   aiSessionTimeoutMin        Int                  @default(120) @map("ai_session_timeout_min")
@@ -2643,6 +2645,7 @@ model SystemConfig {
   aiDailyMessageLimit        Int                  @default(1000) @map("ai_daily_message_limit")
   aiCustomerCooldownMin      Int                  @default(5) @map("ai_customer_cooldown_min")
 
+  @@index([platformLogoMediaId])
   @@map("system_configs")
 }
 

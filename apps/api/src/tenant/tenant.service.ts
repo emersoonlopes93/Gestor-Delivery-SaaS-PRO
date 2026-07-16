@@ -4,7 +4,7 @@ import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
 import { TenantDefaultRole, TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
-import type { BusinessGroupRole, CreateBranchRequest, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
+import type { BusinessGroupRole, CreateBranchRequest, PlatformBrandingDTO, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
 import { 
   getStorefrontPresetById,
@@ -22,6 +22,25 @@ export class TenantService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  async getPlatformBranding(): Promise<PlatformBrandingDTO> {
+    const config = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: {
+        appName: true,
+        platformLogoMedia: {
+          select: {
+            publicUrl: true,
+          },
+        },
+      },
+    });
+
+    return {
+      systemName: config?.appName ?? 'PedeHub',
+      logoUrl: config?.platformLogoMedia?.publicUrl ?? null,
+    };
+  }
 
   private async invalidateStorefrontCacheByTenantId(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
