@@ -49,6 +49,7 @@
 | [Eventos e WebSockets](./contracts/events-and-websockets.md) | Socket.IO, namespaces, payload |
 | [Pagamentos](./contracts/payments.md) | Criação, confirmação, webhook, reconciliação |
 | [Marketplace](./contracts/marketplace.md) | iFood, ingestão, sincronização |
+| [Agendamento](./contracts/scheduling.md) | Janelas, slots, timezone, capacidade e checkout |
 | [Tratamento de erros](./contracts/error-handling.md) | Envelopes, filtros, logging |
 
 ---

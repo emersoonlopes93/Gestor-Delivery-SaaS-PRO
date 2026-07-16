@@ -362,6 +362,22 @@ export class OrdersService {
           });
         }
 
+        if (dto.scheduledFor && dto.timeSlotId) {
+          if (!customerId) {
+            throw new BadRequestException('Cliente identificado é obrigatório para agendamento.');
+          }
+          await this.schedulingService.reserveScheduledOrderInTransaction(tx, {
+            tenantId,
+            orderId: newOrder.id,
+            customerId,
+            fulfillmentType: dto.fulfillmentType,
+            scheduledFor: new Date(dto.scheduledFor),
+            timeSlotId: dto.timeSlotId,
+            estimatedDuration: dto.estimatedDuration || 30,
+            notes: `Agendado para pedido ${newOrder.orderNumber}`,
+          });
+        }
+
         return newOrder;
       },
       {
@@ -392,26 +408,6 @@ export class OrdersService {
         where: { id: couponId },
         data: { usedCount: { increment: 1 } }
       }).catch(e => this.logger.error(`Error updating coupon usage: ${e.message}`));
-    }
-
-    // Criar agendamento se especificado
-    if (dto.scheduledFor && dto.timeSlotId && customerId) {
-      try {
-        await this.schedulingService.createScheduledOrder({
-          orderId: order.id,
-          customerId,
-          fulfillmentType: dto.fulfillmentType,
-          scheduledFor: new Date(dto.scheduledFor),
-          timeSlotId: dto.timeSlotId,
-          estimatedDuration: dto.estimatedDuration || 30, // 30 min padrão
-          notes: `Agendado para pedido ${order.orderNumber}`,
-        });
-        this.logger.log(`Scheduled order ${order.id} for ${dto.scheduledFor}`);
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(`Error creating scheduled order: ${message}`);
-        // Não falhar o pedido, apenas logar erro
-      }
     }
 
     let orderDetail = await this.getOrderDetail(order.id, tenantId);
@@ -1092,6 +1088,15 @@ export class OrdersService {
             data: { status: 'available' },
           });
         }
+      }
+
+      if (nextStatus === 'cancelled' && order.isScheduled) {
+        await this.schedulingService.cancelByOrderInTransaction(
+          tx,
+          tenantId,
+          orderId,
+          dto.note,
+        );
       }
 
       await tx.orderTimeline.create({

@@ -63,8 +63,15 @@ export function CheckoutPage() {
 
   // Scheduling state
   const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledFor, setScheduledFor] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [scheduledFor, setScheduledFor] = useState<string>('');
   const [timeSlotId, setTimeSlotId] = useState<string>('');
+  const [schedulingRefreshKey, setSchedulingRefreshKey] = useState(0);
+
+  useEffect(() => {
+    setIsScheduled(false);
+    setScheduledFor('');
+    setTimeSlotId('');
+  }, [fulfillmentType]);
 
   // Address fields
   const [street, setStreet] = useState('');
@@ -284,7 +291,7 @@ export function CheckoutPage() {
           customerName: customerName || 'Simulação',
           customerPhone: customerPhone || '0000000000',
           idempotencyKey: 'validation-only',
-          scheduledFor: isScheduled ? new Date(scheduledFor) : undefined,
+          scheduledFor: isScheduled && scheduledFor && timeSlotId ? new Date(scheduledFor) : undefined,
           timeSlotId: isScheduled ? timeSlotId : undefined,
         });
 
@@ -487,7 +494,15 @@ export function CheckoutPage() {
     } catch (err: unknown) {
       const error = err as Error & { details?: { validationErrors?: string[] } };
       console.error('Card checkout error:', error);
-      setSubmitError(error.message || 'Erro ao processar pagamento com cartão.');
+      const message = error.message || 'Erro ao processar pagamento com cartão.';
+      if (isScheduled && /(horário|slot|limite|agendamento)/i.test(message)) {
+        setTimeSlotId('');
+        setScheduledFor('');
+        setSchedulingRefreshKey((value) => value + 1);
+        setSubmitError('O horário selecionado não está mais disponível. Escolha outro horário.');
+      } else {
+        setSubmitError(message);
+      }
       throw error; // Re-throw to the brick so it can show error
     } finally {
       setIsSubmitting(false);
@@ -566,7 +581,15 @@ export function CheckoutPage() {
         setSubmitError('Erro de validação. Verifique os campos abaixo:');
         setValidationErrors(error.details.validationErrors);
       } else {
-        setSubmitError(error.message || 'Erro ao processar pedido. Tente novamente.');
+        const message = error.message || 'Erro ao processar pedido. Tente novamente.';
+        if (isScheduled && /(horário|slot|limite|agendamento)/i.test(message)) {
+          setTimeSlotId('');
+          setScheduledFor('');
+          setSchedulingRefreshKey((value) => value + 1);
+          setSubmitError('O horário selecionado não está mais disponível. Escolha outro horário.');
+        } else {
+          setSubmitError(message);
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -728,6 +751,9 @@ export function CheckoutPage() {
             tenantSlug={tenantSlug!}
             selectedDate={scheduledFor}
             selectedSlotId={timeSlotId}
+            timezone={tenantInfo.scheduling.timezone}
+            maximumAdvanceDays={tenantInfo.scheduling.maximumAdvanceDays}
+            refreshKey={schedulingRefreshKey}
             onSlotSelect={(slotId, date) => {
               setTimeSlotId(slotId);
               setScheduledFor(date);

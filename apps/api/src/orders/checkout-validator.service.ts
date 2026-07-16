@@ -20,6 +20,8 @@ import { AvailabilityService } from '../catalog/publication/availability.service
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
 import { validateCashChangeFor } from './public-checkout-guards.util';
+import { DateTime } from 'luxon';
+import { FeatureControlService } from '../feature-control/feature-control.service';
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
@@ -48,6 +50,7 @@ export class CheckoutValidatorService {
     private readonly availabilityService: AvailabilityService,
     private readonly pizzaEngine: PizzaEngineService,
     private readonly upsellsService: UpsellsService,
+    private readonly featureControlService: FeatureControlService,
   ) {}
 
   async validate(
@@ -75,6 +78,16 @@ export class CheckoutValidatorService {
 
     const tenantId = tenant.id;
 
+    if (options?.scheduledFor || options?.timeSlotId) {
+      const schedulingFeature = await this.featureControlService.resolveTenantFeature({
+        tenantId,
+        featureKey: 'scheduling',
+      });
+      if (!schedulingFeature.enabled) {
+        throw new BadRequestException('Agendamento indisponível para esta loja.');
+      }
+    }
+
     // 1.5 Fetch Store Status Context once for performance and global check
     const [settings, schedulingSettings, operatingHours] = await Promise.all([
       this.prisma.tenantSettings.findUnique({
@@ -93,6 +106,9 @@ export class CheckoutValidatorService {
           enabled: true,
           acceptScheduledOrders: true,
           allowScheduleWhenClosed: true,
+          minimumAdvanceMinutes: true,
+          maximumAdvanceDays: true,
+          timezone: true,
         },
       }),
       this.prisma.tenantOperatingHours.findMany({
@@ -129,15 +145,62 @@ export class CheckoutValidatorService {
     }
 
     // 1.7 Validate Time Slot if provided
-    if (options?.timeSlotId) {
-      const slot = await this.prisma.timeSlot.findUnique({
-        where: { id: options.timeSlotId, tenantId },
+    if (options?.timeSlotId && options.scheduledFor) {
+      if (options.channel !== 'storefront_delivery' && options.channel !== 'storefront_pickup') {
+        throw new BadRequestException('Agendamento disponível apenas para entrega ou retirada.');
+      }
+      if (Number.isNaN(options.scheduledFor.getTime())) {
+        throw new BadRequestException('Data de agendamento inválida.');
+      }
+
+      const slot = await this.prisma.timeSlot.findFirst({
+        where: {
+          id: options.timeSlotId,
+          tenantId,
+          isActive: true,
+          status: 'available',
+        },
       });
-      if (!slot || !slot.isActive) {
+      if (!slot) {
         throw new BadRequestException('Horário agendado não disponível.');
       }
       if (slot.currentOccupancy >= slot.capacity) {
         throw new BadRequestException('Este horário já atingiu o limite de pedidos.');
+      }
+      if (slot.startTime.getTime() !== options.scheduledFor.getTime()) {
+        throw new BadRequestException('O horário enviado não corresponde ao slot selecionado.');
+      }
+
+      const timezone = settings?.timezone || schedulingSettings?.timezone || 'America/Sao_Paulo';
+      if (!DateTime.local().setZone(timezone).isValid) {
+        throw new BadRequestException('Timezone da loja inválido. Contate o estabelecimento.');
+      }
+      const now = DateTime.now();
+      const slotStart = DateTime.fromJSDate(slot.startTime);
+      if (slotStart.diff(now, 'minutes').minutes < (schedulingSettings?.minimumAdvanceMinutes ?? 60)) {
+        throw new BadRequestException('O horário não respeita a antecedência mínima da loja.');
+      }
+      const localSlot = slotStart.setZone(timezone);
+      const maximumAdvanceDays = schedulingSettings?.maximumAdvanceDays ?? 7;
+      if (localSlot.startOf('day') > now.setZone(timezone).startOf('day').plus({ days: maximumAdvanceDays })) {
+        throw new BadRequestException('O horário excede o horizonte máximo de agendamento.');
+      }
+
+      const localTime = localSlot.toFormat('HH:mm');
+      const localEnd = DateTime.fromJSDate(slot.endTime).setZone(timezone);
+      const windows = await this.prisma.schedulingWindow.findMany({
+        where: {
+          tenantId,
+          dayOfWeek: localSlot.weekday % 7,
+          active: true,
+        },
+        select: { startTime: true, endTime: true },
+      });
+      const activeWindow = localEnd.hasSame(localSlot, 'day')
+        && windows.some((window) =>
+          window.startTime <= localTime && window.endTime >= localEnd.toFormat('HH:mm'));
+      if (!activeWindow) {
+        throw new BadRequestException('O horário não pertence mais a uma janela ativa.');
       }
     }
 

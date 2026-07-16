@@ -47,7 +47,7 @@ source_of_truth:
 | `marketplace_orders` | **Beta** (Stub parcial) | Listagem e reprocessamento de pedidos externos. | `orders.read` |
 | `kds` | **Stub** | Kitchen Display System (Telas de produção). | `kds.use` |
 | `printing` | **Beta** | Impressão e spooler local. | `printing.read` |
-| `scheduling` | **Stub** | Agendamentos e pedidos para depois. | `scheduling.view` |
+| `scheduling` | **Beta** | Janelas tenant-safe, slots com timezone/capacidade e checkout transacional; edição de horário exige cancelar e reagendar. | `scheduling.view` |
 | `split_payment` | **Stub** | Divisão de pagamentos. | N/A |
 
 ---

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../lib/api-client';
+import { dateInTimezone } from './scheduling-date';
 
 interface TimeSlot {
   id: string;
@@ -14,16 +15,31 @@ interface SchedulingSelectorProps {
   onSlotSelect: (slotId: string, date: string) => void;
   selectedSlotId: string;
   selectedDate: string;
+  timezone: string;
+  maximumAdvanceDays: number;
+  refreshKey: number;
 }
 
-export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, selectedDate }: SchedulingSelectorProps) {
+export function SchedulingSelector({
+  tenantSlug,
+  onSlotSelect,
+  selectedSlotId,
+  selectedDate,
+  timezone,
+  maximumAdvanceDays,
+  refreshKey,
+}: SchedulingSelectorProps) {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Default to today
-  const today = new Date().toISOString().split('T')[0];
-  const [date, setDate] = useState(selectedDate || today);
+  const today = dateInTimezone(timezone);
+  const initialDate = selectedDate ? dateInTimezone(timezone, new Date(selectedDate)) : today;
+  const [date, setDate] = useState(initialDate);
+  const maximumDate = dateInTimezone(
+    timezone,
+    new Date(Date.now() + maximumAdvanceDays * 24 * 60 * 60 * 1000),
+  );
 
   useEffect(() => {
     async function loadSlots() {
@@ -46,16 +62,17 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
       }
     }
     loadSlots();
-  }, [tenantSlug, date]);
+  }, [tenantSlug, date, refreshKey]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = e.target.value;
     setDate(newDate);
-    onSlotSelect('', newDate); // Clear selected slot when date changes
+    onSlotSelect('', '');
   };
 
   const formatTime = (isoString: string) => {
     return new Date(isoString).toLocaleTimeString('pt-BR', {
+      timeZone: timezone,
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -71,6 +88,7 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
         <input
           type="date"
           min={today}
+          max={maximumDate}
           value={date}
           onChange={handleDateChange}
           className="input-premium"
@@ -104,7 +122,7 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
                   key={slot.id}
                   type="button"
                   disabled={isFull}
-                  onClick={() => onSlotSelect(slot.id, date)}
+                  onClick={() => onSlotSelect(slot.id, slot.startTime)}
                   className={`
                     p-2 text-sm border rounded-md transition-all
                     ${isSelected 

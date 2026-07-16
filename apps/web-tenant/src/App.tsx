@@ -515,9 +515,11 @@ export function App() {
         <Route
           path="/settings/scheduling"
           element={
-            <PermissionGate permission="settings.manage">
-              <SchedulingSettingsPage />
-            </PermissionGate>
+            <FeatureGate featureKey="scheduling">
+              <PermissionGate permission="settings.manage">
+                <SchedulingSettingsPage />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route

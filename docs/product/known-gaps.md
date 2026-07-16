@@ -12,6 +12,18 @@ verified_against: main-copy / c63d394
 
 ---
 
+## Agendamento (Beta)
+
+| Gap | Severidade | Impacto / recomendação |
+|-----|-----------|------------------------|
+| Slots não distinguem entrega e retirada | Média | A capacidade é compartilhada; modelar modalidade somente após validação de produto. |
+| Sem feriados ou bloqueios ad hoc | Média | Fechamentos dependem dos horários operacionais; criar modelo de exceção em sprint futura. |
+| Sem ativação operacional por proximidade do horário | Média | Pedido agendado aparece imediatamente; avaliar job idempotente antes de automatizar. |
+| Alteração de data/slot exige cancelar e recriar | Baixa | Preserva consistência de capacidade; adicionar reschedule transacional futuramente. |
+| Geração concorrente não possui constraint única de intervalo | Baixa | Operação normal é idempotente em aplicação; avaliar migration com deduplicação segura. |
+
+---
+
 ## 1. Notificações Push Não Funcionais (Stub)
 
 - **Severidade:** Alta

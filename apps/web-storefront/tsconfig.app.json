@@ -46,5 +46,6 @@
     "../../packages/theme/src",
     "../../packages/storefront-ui/src",
     "../../packages/ui/src"
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"]
 }

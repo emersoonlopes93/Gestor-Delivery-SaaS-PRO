@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { StorefrontCacheService } from './services/storefront-cache.service';
+import { FeatureControlService } from '../feature-control/feature-control.service';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { 
@@ -33,6 +34,7 @@ export class StorefrontService {
     private readonly schedulingService: SchedulingService,
     private readonly biService: BusinessIntelligenceService,
     private readonly storefrontCache: StorefrontCacheService,
+    private readonly featureControlService: FeatureControlService,
   ) {}
 
   private normalizeBrazilWhatsappNumber(raw?: string | null): string | null {
@@ -429,8 +431,14 @@ export class StorefrontService {
         Number(tenant.deliveryCoverageConfig?.maxRadiusKm ?? 0) > 0,
     );
     const pickupEnabled = Boolean(tenant.settings?.pickupEnabled);
+    const schedulingFeature = await this.featureControlService.resolveTenantFeature({
+      tenantId: tenant.id,
+      featureKey: 'scheduling',
+    });
     const scheduledOrdersEnabled = Boolean(
-      tenant.schedulingSettings?.enabled && tenant.schedulingSettings?.acceptScheduledOrders,
+      schedulingFeature.enabled &&
+        tenant.schedulingSettings?.enabled &&
+        tenant.schedulingSettings?.acceptScheduledOrders,
     );
 
     const tenantInfo = {
@@ -475,6 +483,8 @@ export class StorefrontService {
       scheduling: {
         enabled: scheduledOrdersEnabled,
         allowWhenClosed: Boolean(tenant.schedulingSettings?.allowScheduleWhenClosed),
+        timezone: tenant.settings?.timezone || tenant.schedulingSettings?.timezone || 'America/Sao_Paulo',
+        maximumAdvanceDays: tenant.schedulingSettings?.maximumAdvanceDays ?? 7,
       },
     };
 
@@ -616,11 +626,17 @@ export class StorefrontService {
   }
 
   async getAvailableSlots(slug: string, date?: Date | string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { slug },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug, status: 'active' },
       select: { id: true, settings: { select: { timezone: true } } },
     });
     if (!tenant) throw new NotFoundException('Store not found');
+
+    const schedulingFeature = await this.featureControlService.resolveTenantFeature({
+      tenantId: tenant.id,
+      featureKey: 'scheduling',
+    });
+    if (!schedulingFeature.enabled) return [];
 
     const timezone = tenant.settings?.timezone || 'America/Sao_Paulo';
     let targetDate: Date;

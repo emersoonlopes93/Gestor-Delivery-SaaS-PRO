@@ -27,6 +27,13 @@ export class SchedulingService {
     if (!tenantId) {
       throw new Error('Tenant context not found');
     }
+    this.validateTimeSlotRange(startDate, endDate, capacity);
+    if (!Number.isInteger(slotDurationMinutes) || slotDurationMinutes < 5 || slotDurationMinutes > 1440) {
+      throw new BadRequestException('slotDurationMinutes must be an integer between 5 and 1440');
+    }
+    if (endDate.getTime() - startDate.getTime() > 31 * 24 * 60 * 60 * 1000) {
+      throw new BadRequestException('Time slot generation range cannot exceed 31 days');
+    }
 
     const slots: Array<{
       startTime: Date;
@@ -36,7 +43,7 @@ export class SchedulingService {
 
     const current = new Date(startDate);
     
-    while (current < endDate) {
+    while (current.getTime() + slotDurationMinutes * 60 * 1000 <= endDate.getTime()) {
       const startTime = new Date(current);
       const endTime = new Date(current.getTime() + slotDurationMinutes * 60 * 1000);
       
@@ -49,21 +56,132 @@ export class SchedulingService {
       current.setTime(endTime.getTime());
     }
 
-    // Criar slots no banco de dados
-    const createdSlots = await this.prisma.timeSlot.createMany({
-      data: slots.map(slot => ({
-        tenantId,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        capacity: slot.capacity,
-        status: TimeSlotStatus.available,
-      })),
-      skipDuplicates: true,
+    const existing = await this.prisma.timeSlot.findMany({
+      where: { tenantId, startTime: { gte: startDate, lt: endDate } },
     });
+    const byInterval = new Map(
+      existing.map((slot) => [`${slot.startTime.getTime()}:${slot.endTime.getTime()}`, slot]),
+    );
+    let createdCount = 0;
 
-    this.logger.log(`Generated ${createdSlots.count} time slots for tenant ${tenantId}`);
-    
-    return createdSlots;
+    for (const slot of slots) {
+      const key = `${slot.startTime.getTime()}:${slot.endTime.getTime()}`;
+      const current = byInterval.get(key);
+      if (current) {
+        if (slot.capacity < current.currentOccupancy) {
+          this.logger.warn(`Preserving occupied slot capacity tenantId=${tenantId} slotId=${current.id}`);
+          continue;
+        }
+        await this.prisma.timeSlot.update({
+          where: { id: current.id },
+          data: { isActive: true, capacity: slot.capacity },
+        });
+      } else {
+        await this.prisma.timeSlot.create({
+          data: {
+            tenantId,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            capacity: slot.capacity,
+            status: TimeSlotStatus.available,
+          },
+        });
+        createdCount += 1;
+      }
+    }
+
+    this.logger.log(`Generated ${createdCount} time slots for tenant ${tenantId}`);
+    return { count: createdCount };
+  }
+
+  async createTimeSlot(data: {
+    startTime: string;
+    endTime: string;
+    capacity?: number;
+    minOrderValue?: number;
+    maxOrderValue?: number;
+    maxItems?: number;
+  }) {
+    const tenantId = this.requireTenantId();
+    const startTime = new Date(data.startTime);
+    const endTime = new Date(data.endTime);
+    this.validateTimeSlotRange(startTime, endTime, data.capacity ?? 1);
+
+    const duplicate = await this.prisma.timeSlot.findFirst({
+      where: { tenantId, startTime, endTime },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new BadRequestException('A time slot already exists for this interval');
+    }
+
+    const slot = await this.prisma.timeSlot.create({
+      data: {
+        tenantId,
+        startTime,
+        endTime,
+        capacity: data.capacity ?? 1,
+        minOrderValue: data.minOrderValue,
+        maxOrderValue: data.maxOrderValue,
+        maxItems: data.maxItems,
+      },
+    });
+    this.logger.log(`Scheduling slot created tenantId=${tenantId} slotId=${slot.id}`);
+    return slot;
+  }
+
+  async updateTimeSlot(id: string, data: {
+    startTime?: string;
+    endTime?: string;
+    capacity?: number;
+    minOrderValue?: number;
+    maxOrderValue?: number;
+    maxItems?: number;
+    status?: TimeSlotStatus;
+    isActive?: boolean;
+  }) {
+    const tenantId = this.requireTenantId();
+    const existing = await this.prisma.timeSlot.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundException('Time slot not found');
+
+    const startTime = data.startTime ? new Date(data.startTime) : existing.startTime;
+    const endTime = data.endTime ? new Date(data.endTime) : existing.endTime;
+    const capacity = data.capacity ?? existing.capacity;
+    this.validateTimeSlotRange(startTime, endTime, capacity);
+    if (capacity < existing.currentOccupancy) {
+      throw new BadRequestException('Capacity cannot be lower than current occupancy');
+    }
+
+    const duplicate = await this.prisma.timeSlot.findFirst({
+      where: { tenantId, startTime, endTime, id: { not: id } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException('A time slot already exists for this interval');
+
+    return this.prisma.timeSlot.update({
+      where: { id },
+      data: {
+        startTime,
+        endTime,
+        capacity,
+        minOrderValue: data.minOrderValue,
+        maxOrderValue: data.maxOrderValue,
+        maxItems: data.maxItems,
+        status: data.status,
+        isActive: data.isActive,
+      },
+    });
+  }
+
+  async deleteTimeSlot(id: string) {
+    const tenantId = this.requireTenantId();
+    const existing = await this.prisma.timeSlot.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundException('Time slot not found');
+    if (existing.currentOccupancy > 0) {
+      throw new BadRequestException('Cannot delete a time slot with scheduled orders');
+    }
+    await this.prisma.timeSlot.delete({ where: { id } });
+    this.logger.log(`Scheduling slot removed tenantId=${tenantId} slotId=${id}`);
   }
 
   /**
@@ -77,7 +195,12 @@ export class SchedulingService {
 
     // Load tenant scheduling settings (create defaults if missing)
     const settings = await this.getOrCreateSchedulingSettings(tenantId);
-    const timezone = settings.timezone || 'America/Sao_Paulo';
+    const tenantSettings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { timezone: true },
+    });
+    const timezone = tenantSettings?.timezone || settings.timezone || 'America/Sao_Paulo';
+    this.validateTimezone(timezone);
     const minimumAdvanceMinutes = settings.minimumAdvanceMinutes ?? 60;
     const maximumAdvanceDays = settings.maximumAdvanceDays ?? 7;
 
@@ -89,7 +212,12 @@ export class SchedulingService {
     const startUtc = startOfRequestedDay.toUTC().toJSDate();
     const endUtc = endOfRequestedDay.toUTC().toJSDate();
 
-    const maxAllowed = DateTime.now().toUTC().plus({ days: maximumAdvanceDays }).toJSDate();
+    const maxAllowed = DateTime.now()
+      .setZone(timezone)
+      .plus({ days: maximumAdvanceDays })
+      .endOf('day')
+      .toUTC()
+      .toJSDate();
 
     if (!settings.enabled || !settings.acceptScheduledOrders) {
       return [];
@@ -126,6 +254,9 @@ export class SchedulingService {
       return true;
     });
 
+    this.logger.log(
+      `Scheduling slots queried tenantId=${tenantId} date=${startOfRequestedDay.toISODate()} timezone=${timezone} resultCount=${filtered.length}`,
+    );
     return filtered.map(slot => ({
       id: slot.id,
       startTime: slot.startTime,
@@ -143,16 +274,26 @@ export class SchedulingService {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
-    return this.getOrCreateSchedulingSettings(tenantId);
+    const [settings, tenantSettings] = await Promise.all([
+      this.getOrCreateSchedulingSettings(tenantId),
+      this.prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { timezone: true },
+      }),
+    ]);
+    return { ...settings, timezone: tenantSettings?.timezone || settings.timezone };
   }
 
   async updateSchedulingSettings(data: Prisma.SchedulingSettingsUpdateInput) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
-    if (data.timezone) {
-      this.validateTimezone(data.timezone as string);
-    }
+    const tenantSettings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { timezone: true },
+    });
+    const timezone = tenantSettings?.timezone || (data.timezone as string | undefined) || 'America/Sao_Paulo';
+    this.validateTimezone(timezone);
 
     return this.prisma.schedulingSettings.upsert({
       where: { tenantId },
@@ -165,9 +306,9 @@ export class SchedulingService {
         maximumAdvanceDays: data.maximumAdvanceDays ?? 7,
         slotIntervalMinutes: data.slotIntervalMinutes ?? 30,
         maxOrdersPerSlot: data.maxOrdersPerSlot ?? 4,
-        timezone: data.timezone ?? 'America/Sao_Paulo',
+        timezone,
       } as Prisma.SchedulingSettingsUncheckedCreateInput,
-      update: data,
+      update: { ...data, timezone },
     });
   }
 
@@ -191,8 +332,9 @@ export class SchedulingService {
     if (!tenantId) throw new Error('Tenant context not found');
 
     this.validateSchedulingWindow(data);
+    await this.assertNoWindowOverlap(tenantId, data);
 
-    return this.prisma.schedulingWindow.create({
+    const created = await this.prisma.schedulingWindow.create({
       data: {
         tenantId,
         dayOfWeek: data.dayOfWeek,
@@ -201,6 +343,8 @@ export class SchedulingService {
         active: data.active ?? true,
       },
     });
+    this.logger.log(`Scheduling window created tenantId=${tenantId} windowId=${created.id}`);
+    return created;
   }
 
   async updateSchedulingWindow(id: string, data: {
@@ -228,8 +372,9 @@ export class SchedulingService {
     };
 
     this.validateSchedulingWindow(updatedData);
+    await this.assertNoWindowOverlap(tenantId, updatedData, id);
 
-    return this.prisma.schedulingWindow.update({
+    const updated = await this.prisma.schedulingWindow.update({
       where: { id },
       data: {
         dayOfWeek: data.dayOfWeek,
@@ -238,6 +383,8 @@ export class SchedulingService {
         active: data.active,
       },
     });
+    this.logger.log(`Scheduling window updated tenantId=${tenantId} windowId=${id}`);
+    return updated;
   }
 
   async deleteSchedulingWindow(id: string) {
@@ -253,6 +400,7 @@ export class SchedulingService {
     }
 
     await this.prisma.schedulingWindow.delete({ where: { id } });
+    this.logger.log(`Scheduling window removed tenantId=${tenantId} windowId=${id}`);
 
     return { success: true };
   }
@@ -281,6 +429,42 @@ export class SchedulingService {
       Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
     } catch {
       throw new BadRequestException('Invalid timezone');
+    }
+  }
+
+  private requireTenantId(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+    return tenantId;
+  }
+
+  private validateTimeSlotRange(startTime: Date, endTime: Date, capacity: number) {
+    if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+      throw new BadRequestException('Invalid time slot date');
+    }
+    if (endTime <= startTime) throw new BadRequestException('endTime must be after startTime');
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      throw new BadRequestException('capacity must be a positive integer');
+    }
+  }
+
+  private async assertNoWindowOverlap(
+    tenantId: string,
+    data: { dayOfWeek: number; startTime: string; endTime: string },
+    excludeId?: string,
+  ) {
+    const overlap = await this.prisma.schedulingWindow.findFirst({
+      where: {
+        tenantId,
+        dayOfWeek: data.dayOfWeek,
+        startTime: { lt: data.endTime },
+        endTime: { gt: data.startTime },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (overlap) {
+      throw new BadRequestException('Scheduling window overlaps an existing window');
     }
   }
 
@@ -365,61 +549,183 @@ export class SchedulingService {
     estimatedDuration: number;
     notes?: string;
   }) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
+    const tenantId = this.requireTenantId();
+    return this.prisma.$transaction((tx) =>
+      this.reserveScheduledOrderInTransaction(tx, { ...data, tenantId }),
+    );
+  }
+
+  async reserveScheduledOrderInTransaction(
+    tx: Prisma.TransactionClient,
+    data: {
+      tenantId: string;
+      orderId?: string;
+      customerId: string;
+      fulfillmentType?: FulfillmentType;
+      scheduledFor: Date;
+      timeSlotId: string;
+      estimatedDuration: number;
+      notes?: string;
+    },
+  ) {
+    if (!['delivery', 'pickup'].includes(data.fulfillmentType ?? 'pickup')) {
+      throw new BadRequestException('Scheduled orders support delivery or pickup only');
+    }
+    if (Number.isNaN(data.scheduledFor.getTime())) {
+      throw new BadRequestException('Invalid scheduled date');
     }
 
-    // Validar slot
-    const slot = await this.validateTimeSlotAvailability(data.timeSlotId);
+    await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "time_slots"
+      WHERE "id" = ${data.timeSlotId} AND "tenant_id" = ${data.tenantId}
+      FOR UPDATE
+    `);
 
-    // Buscar dados do cliente para campos legados
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: data.customerId },
+    const [slot, settings, tenantSettings, customer] = await Promise.all([
+      tx.timeSlot.findFirst({
+        where: {
+          id: data.timeSlotId,
+          tenantId: data.tenantId,
+          isActive: true,
+          status: TimeSlotStatus.available,
+        },
+      }),
+      tx.schedulingSettings.findUnique({ where: { tenantId: data.tenantId } }),
+      tx.tenantSettings.findUnique({
+        where: { tenantId: data.tenantId },
+        select: { timezone: true },
+      }),
+      tx.customer.findFirst({ where: { id: data.customerId, tenantId: data.tenantId } }),
+    ]);
+
+    if (!settings?.enabled || !settings.acceptScheduledOrders) {
+      throw new BadRequestException('Scheduling is disabled for this store');
+    }
+    if (!slot) throw new BadRequestException('The selected time slot is no longer available');
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (slot.currentOccupancy >= slot.capacity) {
+      this.logger.warn(`Scheduling capacity exceeded tenantId=${data.tenantId} slotId=${data.timeSlotId}`);
+      throw new BadRequestException('The selected time slot is no longer available');
+    }
+    if (slot.startTime.getTime() !== data.scheduledFor.getTime()) {
+      throw new BadRequestException('Scheduled date does not match the selected time slot');
+    }
+
+    const timezone = tenantSettings?.timezone || settings.timezone || 'America/Sao_Paulo';
+    this.validateTimezone(timezone);
+    const now = DateTime.now();
+    const slotStart = DateTime.fromJSDate(slot.startTime);
+    if (slotStart.diff(now, 'minutes').minutes < settings.minimumAdvanceMinutes) {
+      throw new BadRequestException('The selected time slot does not meet the minimum advance time');
+    }
+    const localNow = now.setZone(timezone).startOf('day');
+    const localSlot = slotStart.setZone(timezone);
+    if (localSlot.startOf('day') > localNow.plus({ days: settings.maximumAdvanceDays })) {
+      throw new BadRequestException('The selected time slot exceeds the scheduling horizon');
+    }
+
+    const localTime = localSlot.toFormat('HH:mm');
+    const localEnd = DateTime.fromJSDate(slot.endTime).setZone(timezone);
+    const windows = await tx.schedulingWindow.findMany({
+      where: {
+        tenantId: data.tenantId,
+        dayOfWeek: localSlot.weekday % 7,
+        active: true,
+      },
+      select: { startTime: true, endTime: true },
     });
-
-    if (!customer) {
-      throw new NotFoundException('Customer not found');
+    const activeWindow = localEnd.hasSame(localSlot, 'day')
+      && windows.some((window) =>
+        window.startTime <= localTime && window.endTime >= localEnd.toFormat('HH:mm'));
+    if (!activeWindow) {
+      throw new BadRequestException('The selected time slot is outside an active scheduling window');
     }
 
-    // Criar agendamento
-    const scheduledOrder = await this.prisma.scheduledOrder.create({
+    if (data.orderId) {
+      const order = await tx.order.findFirst({
+        where: { id: data.orderId, tenantId: data.tenantId },
+        select: { id: true },
+      });
+      if (!order) throw new NotFoundException('Order not found');
+    }
+
+    const scheduledOrder = await tx.scheduledOrder.create({
       data: {
-        tenantId,
+        tenantId: data.tenantId,
         orderId: data.orderId || null,
         customerId: data.customerId,
-        scheduledFor: data.scheduledFor,
-        timeSlotId: data.timeSlotId,
+        scheduledFor: slot.startTime,
+        timeSlotId: slot.id,
         estimatedDuration: data.estimatedDuration,
         notes: data.notes,
         status: ScheduledOrderStatus.scheduled,
-        // Campos legados para compatibilidade
         customerName: customer.name,
         customerPhone: customer.phone,
         fulfillmentType: data.fulfillmentType || 'pickup',
       },
-      include: {
-        customer: true,
-        timeSlot: true,
-      },
+      include: { customer: true, timeSlot: true },
     });
 
-    // Atualizar ocupação do slot
-    await this.prisma.timeSlot.update({
-      where: { id: data.timeSlotId },
+    const nextOccupancy = slot.currentOccupancy + 1;
+    await tx.timeSlot.update({
+      where: { id: slot.id },
       data: {
-        currentOccupancy: {
-          increment: 1,
-        },
-        status: slot.currentOccupancy + 1 >= slot.capacity 
-          ? TimeSlotStatus.occupied 
-          : TimeSlotStatus.available,
+        currentOccupancy: nextOccupancy,
+        status: nextOccupancy >= slot.capacity ? TimeSlotStatus.occupied : TimeSlotStatus.available,
       },
     });
-
-    this.logger.log(`Created scheduled order ${scheduledOrder.id} for ${data.scheduledFor}`);
-
+    this.logger.log(
+      `Scheduled order created tenantId=${data.tenantId} orderId=${data.orderId ?? 'none'} slotId=${slot.id} fulfillmentType=${data.fulfillmentType ?? 'pickup'} scheduledFor=${slot.startTime.toISOString()}`,
+    );
     return scheduledOrder;
+  }
+
+  async cancelByOrderInTransaction(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    orderId: string,
+    reason?: string,
+  ) {
+    const scheduledOrder = await tx.scheduledOrder.findFirst({
+      where: {
+        tenantId,
+        orderId,
+        status: { in: [ScheduledOrderStatus.scheduled, ScheduledOrderStatus.confirmed] },
+      },
+    });
+    if (!scheduledOrder) return;
+
+    if (scheduledOrder.timeSlotId) {
+      await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "id" FROM "time_slots"
+        WHERE "id" = ${scheduledOrder.timeSlotId} AND "tenant_id" = ${tenantId}
+        FOR UPDATE
+      `);
+    }
+
+    await tx.scheduledOrder.update({
+      where: { id: scheduledOrder.id },
+      data: {
+        status: ScheduledOrderStatus.cancelled,
+        notes: reason
+          ? `${scheduledOrder.notes || ''}\nCancelado: ${reason}`.trim()
+          : scheduledOrder.notes,
+      },
+    });
+    if (scheduledOrder.timeSlotId) {
+      await tx.timeSlot.updateMany({
+        where: {
+          id: scheduledOrder.timeSlotId,
+          tenantId,
+          currentOccupancy: { gt: 0 },
+        },
+        data: {
+          currentOccupancy: { decrement: 1 },
+          status: TimeSlotStatus.available,
+        },
+      });
+    }
+    this.logger.log(`Scheduled order cancelled tenantId=${tenantId} orderId=${orderId}`);
   }
 
   /**
@@ -463,50 +769,43 @@ export class SchedulingService {
    * Cancela um agendamento
    */
   async cancelScheduledOrder(scheduledOrderId: string, reason?: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
+    const tenantId = this.requireTenantId();
+    await this.prisma.$transaction(async (tx) => {
+      const scheduledOrder = await tx.scheduledOrder.findFirst({
+        where: { id: scheduledOrderId, tenantId },
+      });
+      if (!scheduledOrder) throw new NotFoundException('Scheduled order not found');
+      if (scheduledOrder.status === ScheduledOrderStatus.cancelled) {
+        throw new BadRequestException('Cannot cancel already cancelled scheduled order');
+      }
 
-    const scheduledOrder = await this.prisma.scheduledOrder.findFirst({
-      where: {
-        id: scheduledOrderId,
-        tenantId,
-      },
-      include: {
-        timeSlot: true,
-      },
-    });
-
-    if (!scheduledOrder) {
-      throw new NotFoundException('Scheduled order not found');
-    }
-
-    if (scheduledOrder.status === ScheduledOrderStatus.cancelled) {
-      throw new BadRequestException('Cannot cancel already cancelled scheduled order');
-    }
-
-    // Atualizar status
-    await this.prisma.scheduledOrder.update({
-      where: { id: scheduledOrderId },
-      data: {
-        status: ScheduledOrderStatus.cancelled,
-        notes: reason ? `${scheduledOrder.notes || ''}\nCancelado: ${reason}`.trim() : scheduledOrder.notes,
-      },
-    });
-
-    // Liberar capacidade do slot
-    if (scheduledOrder.timeSlotId) {
-      await this.prisma.timeSlot.update({
-        where: { id: scheduledOrder.timeSlotId },
+      if (scheduledOrder.timeSlotId) {
+        await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+          SELECT "id" FROM "time_slots"
+          WHERE "id" = ${scheduledOrder.timeSlotId} AND "tenant_id" = ${tenantId}
+          FOR UPDATE
+        `);
+      }
+      await tx.scheduledOrder.update({
+        where: { id: scheduledOrderId },
         data: {
-          currentOccupancy: {
-            decrement: 1,
-          },
-          status: TimeSlotStatus.available,
+          status: ScheduledOrderStatus.cancelled,
+          notes: reason
+            ? `${scheduledOrder.notes || ''}\nCancelado: ${reason}`.trim()
+            : scheduledOrder.notes,
         },
       });
-    }
+      if (scheduledOrder.timeSlotId) {
+        await tx.timeSlot.updateMany({
+          where: {
+            id: scheduledOrder.timeSlotId,
+            tenantId,
+            currentOccupancy: { gt: 0 },
+          },
+          data: { currentOccupancy: { decrement: 1 }, status: TimeSlotStatus.available },
+        });
+      }
+    });
 
     this.logger.log(`Cancelled scheduled order ${scheduledOrderId}`);
 
@@ -535,6 +834,43 @@ export class SchedulingService {
       orderBy: {
         scheduledFor: 'asc',
       },
+    });
+  }
+
+  async getScheduledOrder(id: string) {
+    const tenantId = this.requireTenantId();
+    const scheduledOrder = await this.prisma.scheduledOrder.findFirst({
+      where: { id, tenantId },
+      include: { customer: true, timeSlot: true, order: true },
+    });
+    if (!scheduledOrder) throw new NotFoundException('Scheduled order not found');
+    return scheduledOrder;
+  }
+
+  async updateScheduledOrder(
+    id: string,
+    data: {
+      scheduledFor?: string;
+      timeSlotId?: string;
+      estimatedDuration?: number;
+      notes?: string;
+    },
+  ) {
+    const tenantId = this.requireTenantId();
+    const existing = await this.prisma.scheduledOrder.findFirst({
+      where: { id, tenantId },
+      select: { id: true, status: true },
+    });
+    if (!existing) throw new NotFoundException('Scheduled order not found');
+    if (existing.status === ScheduledOrderStatus.cancelled) {
+      throw new BadRequestException('Cancelled scheduled orders cannot be edited');
+    }
+    if (data.scheduledFor !== undefined || data.timeSlotId !== undefined) {
+      throw new BadRequestException('To change the slot, cancel this scheduling and create a new one');
+    }
+    return this.prisma.scheduledOrder.update({
+      where: { id },
+      data: { estimatedDuration: data.estimatedDuration, notes: data.notes },
     });
   }
 
@@ -663,6 +999,17 @@ export class SchedulingService {
     if (!tenantId) {
       throw new Error('Tenant context not found');
     }
+
+    if (status === ScheduledOrderStatus.cancelled) {
+      await this.cancelScheduledOrder(scheduledOrderId);
+      return this.getScheduledOrder(scheduledOrderId);
+    }
+
+    const existing = await this.prisma.scheduledOrder.findFirst({
+      where: { id: scheduledOrderId, tenantId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Scheduled order not found');
 
     const updateData: Prisma.ScheduledOrderUpdateInput = { status };
 

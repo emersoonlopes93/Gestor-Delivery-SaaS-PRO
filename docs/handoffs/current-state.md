@@ -1,113 +1,117 @@
 # Estado Atual — Handoff
 
-> **Sessão:** Sprint 3 — Push Notifications e PWA do Entregador  
-> **Data:** 2026-07-16  
+> **Sessão:** Sprint 4 — Agendamento Production-Ready
+> **Data:** 2026-07-16
 > **Branch:** `main-copy`
+> **Commit inicial:** `b73fa2878c212d9b8b2c62f57bb255fd9ed568e1`
+> **Commits produzidos:** nenhum (alterações permanecem no working tree)
 
 ---
 
-## 1. Objetivo da Sessão
+## 1. Objetivo e estado inicial
 
-Implementar Push Notifications production-ready para o entregador e preparar a aplicação `web-delivery` como PWA, garantindo que o entregador receba notificações de atribuição e cancelamento mesmo com o app em background.
+Concluir o menor fluxo seguro de agendamento entre painel tenant, storefront, checkout, pedidos e banco, sem redesenhar o domínio.
 
----
+| Componente | Estado inicial | Gap principal |
+|------------|----------------|---------------|
+| Controller | CRUD de settings/janelas parcial | Cinco endpoints lançavam `NotImplementedException` |
+| Service | Slots e scheduled orders parciais | Sem conflito de janelas e com mutações cross-tenant inseguras em alguns caminhos |
+| Checkout | Consulta prévia de capacidade | Instante não precisava coincidir com o slot e reserva ocorria após criar o pedido |
+| Concorrência | Read-then-increment | Overbooking da última vaga e pedido parcial possíveis |
+| Storefront | Selector integrado | Enviava somente a data local, formatava no timezone do navegador e não atualizava slot vencido |
+| Feature | Catálogo `stable`, matriz `Stub` | Classificação contraditória |
+| Prisma | Migration de scheduling existente | Prisma Client não gerava por relação inversa ausente em `MediaAsset` (gap preexistente) |
 
-## 2. Alterações Realizadas
+Baseline:
 
-### Backend (apps/api)
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm lint` | Executado com falha — warning preexistente em `web-admin/IntegrationsPage.tsx` com `max-warnings=0` |
+| `pnpm typecheck` | Executado com falha — Prisma Client desatualizado/relação `platformLogoMedia` incompleta |
+| `pnpm build` | Executado com falha — mesmos erros do Prisma Client |
+| `pnpm check:features` | Executado com sucesso — scheduling ainda aparecia entre controllers com stubs |
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/notifications/push.service.ts` | Criado — VAPID setup, `sendNotification()`, `enqueueDriverNotification()` |
-| `src/notifications/push-notification.processor.ts` | Criado — Worker BullMQ para processar jobs de push |
-| `src/notifications/push-subscription.service.ts` | Criado — CRUD de subscriptions com multi-tenancy |
-| `src/notifications/push.controller.ts` | Criado — endpoints de subscribe/unsubscribe/vapid-key |
-| `src/notifications/notifications.module.ts` | Atualizado — registra fila e worker condicionalmente |
-| `src/orders/orders.service.ts` | Injetado `PushService`; `assignDriver()` agora dispara push ao entregador |
-| `src/admin/base-menu/admin-base-menu.service.ts` | `eslint-disable` para unused vars pré-existentes |
-| `src/ai-agent/services/conversation.service.ts` | `eslint-disable` para unused vars pré-existentes |
-| `src/app.module.ts` | `eslint-disable` para imports não usados pré-existentes |
-| `src/billing/billing*.ts` (múltiplos) | `eslint-disable` para unused vars pré-existentes |
-| `src/orders/order-auto-accept.policy.spec.ts` | Tipagem corrigida (`OrderAutoAcceptSettings`) |
-| `src/orders/checkout-validator.service.ts` | `let` → `const` para `snapshotCatalogV2Json` |
+## 2. Alterações e decisões
 
-### Schema Prisma
+### Backend
 
-| Arquivo | Mudança |
-|---------|---------|
-| `prisma/schema.prisma` | Adicionado model `PushSubscription` com multi-tenancy e índices |
-| `prisma/migrations/` | Migration correspondente criada |
+- Implementados os stubs de CRUD manual de slots e consulta/edição de scheduled order.
+- Settings e janelas continuam protegidos por `TenantAuthGuard`, `PermissionsGuard` e permissões de scheduling.
+- Validação de janelas agora rejeita formato inválido, duplicidade/sobreposição e horários que cruzam meia-noite.
+- `TenantSettings.timezone` tornou-se a autoridade; `SchedulingSettings.timezone` é fallback legado.
+- Gerador não cria slot parcial no fim da janela, reativa intervalos existentes e desativa slots fora das janelas atuais.
+- Checkout revalida feature efetiva, settings, modalidade, tenant, loja, slot, instante exato, janela, antecedência, horizonte e capacidade.
+- Pedido, `ScheduledOrder` e ocupação do slot são criados na mesma transação. `SELECT ... FOR UPDATE` serializa checkouts concorrentes.
+- Cancelamento do pedido ou do agendamento libera capacidade de forma transacional e tenant-safe.
+- Feature `scheduling` foi classificada como `beta`, nunca `stable`.
+- Logs estruturados/contextuais foram adicionados; request/correlation ID continua fornecido pelo interceptor HTTP global.
 
-### Frontend (apps/web-delivery)
+### Frontend tenant
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/hooks/usePushNotifications.ts` | Hook de subscrição e gerenciamento de permissão |
-| `src/pages/ActiveDeliveryPage.tsx` | Banner contextual de opt-in para push |
-| `public/sw.js` | Service Worker com `push`, `notificationclick`, `skipWaiting` |
-| `public/manifest.json` | PWA manifest com ícones e configurações |
-| `index.html` | Meta tags PWA, registro do SW |
+- Rota e item de navegação passaram a respeitar `FeatureGate('scheduling')` e permissão.
+- Formulário mostra timezone da loja, valida janela antes de enviar, confirma exclusão, mostra falha de carga e permite retry.
+- Adicionado teste de validação de janela normal/inválida/cross-midnight.
 
-### Frontend (apps/web-tenant)
+### Storefront
 
-| Arquivo | Mudança |
-|---------|---------|
-| `eslint.config.js` | Ignorar `android/`, `ios/` (diretórios de build) |
-| `src/features/onboarding/useOnboardingState.ts` | `checkValidationFromApi` e `syncProgressFromBackend` → `useCallback` |
-| `src/features/onboarding/steps/Step2Location.tsx` | `geocodeCurrentAddress` → `useCallback` |
-| `src/features/promotions/components/` (3 arquivos) | `loadData` → `useCallback` |
-| `src/features/whatsapp/components/ChatArea.tsx` | Deps do `useEffect` corrigidas |
-| `src/features/delivery/DeliveryZonesPageRefactored.tsx` | `eslint-disable` file-level para re-export |
+- Selector usa data e formatação no timezone da loja, respeita horizonte máximo e envia o ISO de `slot.startTime`.
+- Mudança de modalidade limpa o agendamento.
+- Erro de slot/capacidade preserva o checkout, limpa somente a seleção e força atualização dos slots.
+- Payload público só anuncia scheduling quando a feature efetiva e settings estão habilitados.
 
----
+### Banco e migrations
 
-## 3. Decisões Tomadas
+- **Nenhuma migration nova de scheduling.** A modelagem necessária já está coberta por:
+  - `20260604120000_add_scheduling_settings_windows_order_schedule_fields`
+  - `20260629150000_onboarding_order_modes`
+- Schema recebeu somente a relação inversa Prisma `MediaAsset.systemConfigs`, sem alteração física de banco, para permitir `prisma generate/validate` do estado já declarado em `SystemConfig`.
+- Não foi usado `prisma db push`.
 
-- **Push é fire-and-forget:** `assignDriver()` enfileira o push via `.catch()` sem bloquear a resposta HTTP.
-- **Modo degradado:** Se `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` não estão configuradas, o `PushService` loga aviso e não envia — não quebra o fluxo principal.
-- **Fila condicional:** O worker só é registrado se `REDIS_ENABLED !== 'false'` e `PUSH_NOTIFICATIONS_ENABLED === 'true'`.
-- **Limpeza automática de subscriptions expiradas:** HTTP 404/410 do gateway → subscription deletada imediatamente no processor.
-- **Tipagem pré-existente:** `PushNotificationJob` (não `PushNotificationJobData`) é o tipo correto em `@gestor/types`.
+## 3. Contratos e documentação
 
----
+- Criado `docs/contracts/scheduling.md` como contrato canônico.
+- Atualizados `docs/README.md`, `docs/scheduling-audit.md`, `docs/product/feature-matrix.md` e `docs/product/known-gaps.md`.
+- Contratos relacionados preservados: isolamento de tenant, lifecycle de pedidos, feature flags e migrations.
 
-## 4. Validações Executadas
+## 4. Testes e gates finais
 
-| Check | Resultado |
-|-------|-----------|
-| `pnpm lint` (monorepo completo) | ✅ Passou |
-| `apps/api` lint | ✅ Passou |
-| `apps/web-tenant` lint (`--max-warnings 0`) | ✅ Passou |
-| `apps/web-admin` lint (`--max-warnings 0`) | ✅ Passou |
-| `apps/web-delivery` lint (`--max-warnings 0`) | ✅ Passou |
-| `apps/web-storefront` lint | ✅ Passou (16 warnings pré-existentes, sem erros) |
-| `tsc --noEmit` (api) | ✅ Passou (1 erro pré-existente em `location-provider.service.spec.ts`) |
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm lint` | Executado com sucesso — 16 warnings preexistentes permitidos no storefront, sem erros |
+| `pnpm typecheck` | Executado com sucesso |
+| `pnpm build` | Executado com sucesso |
+| `pnpm check:features` | Executado com sucesso — nenhum `NotImplementedException` em scheduling |
+| `pnpm check:no-any` | Executado com sucesso |
+| `pnpm prisma:validate` | Executado com sucesso |
+| Testes específicos API (scheduling + storefront slots) | Executado com sucesso |
+| `pnpm --filter @gestor/web-tenant test` | Executado com sucesso — 12 testes |
+| `pnpm --filter @gestor/web-storefront test` | Executado com sucesso — 1 teste |
+| `pnpm test` | Executado com falha — 2 testes preexistentes de `web-admin/BaseMenusPage` falharam; testes tenant/storefront passaram |
+| `pnpm --filter @gestor/api test` | Executado com falha — falhas preexistentes em location, billing webhook e AI conversation; o teste de storefront afetado foi corrigido e passa |
 
----
+## 5. Validação manual
 
-## 5. Pendências e Próximos Passos
+| Cenário | Resultado |
+|---------|-----------|
+| Fluxo E2E com criação de janelas/pedidos em banco local | Bloqueado por dependência externa — `DATABASE_URL` disponível aponta para banco remoto e não foi usado para escrita sem ambiente isolado autorizado |
+| Concorrência da última vaga | Executado com sucesso em teste transacional — lock ocorre antes da leitura e pedido não é criado quando a capacidade está cheia |
+| Cross-tenant | Executado com sucesso em teste — slot de outro tenant é rejeitado sem criação parcial |
+| Timezone `America/Sao_Paulo` | Executado com sucesso em testes API/frontend — data local e UTC validados |
 
-### Crítico
-- [ ] **Testar E2E de push** — subscrever um dispositivo real, atribuir entregador e confirmar recebimento da notificação
-- [ ] **Variáveis VAPID em produção** — configurar `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` no Render
+A homologação manual de Push Notifications da Sprint 3 permanece pendente e não foi alterada.
 
-### Importante
-- [ ] **Push para tenant_user** — notificar staff quando pedido chega (evento `orderCreated`)
-- [ ] **Notificação de cancelamento** — enviar push ao entregador quando pedido é cancelado enquanto está atribuído
-- [ ] **Corrigir erro pré-existente** `location-provider.service.spec.ts` — cast inadequado do mock de `ConfigService`
+## 6. Riscos e gaps residuais
 
-### Nice-to-have
-- [ ] **Inbox de notificações** — listar notificações recentes no frontend
-- [ ] **`idempotencyKey`** nos jobs — evitar envios duplicados em retry
-- [ ] **Corrigir 16 warnings no web-storefront** — memorizar `optionGroupLinks`, `pizzaSizeItems`, etc.
+| Gap | Severidade | Recomendação |
+|-----|-----------|-------------|
+| Capacidade compartilhada entre delivery/pickup | Média | Adicionar modalidade à modelagem somente após decisão de produto e migration em etapas |
+| Sem feriados/bloqueios ad hoc | Média | Criar exceções tenant-safe em sprint futura |
+| Pedido agendado aparece imediatamente e pode ser confirmado cedo | Média | Deliberar job idempotente de ativação operacional |
+| Reschedule exige cancelar e recriar | Baixa | Implementar troca de slot com locks ordenados em sprint futura |
+| Sem unique constraint de intervalo para geração concorrente | Baixa | Deduplicar dados e adicionar constraint em migration segura |
+| Cache do payload pode demorar até o TTL para esconder toggle recém-desabilitado | Baixa | Invalidar cache na mudança; checkout já bloqueia imediatamente |
+| Suíte completa contém falhas fora de scheduling | Média | Corrigir BaseMenus, location mock, webhook HMAC e conversation mocks separadamente |
 
----
+## 7. Próximo passo recomendado
 
-## 6. Riscos Conhecidos
-
-| Risco | Severidade | Mitigação |
-|-------|-----------|-----------|
-| VAPID keys não configuradas em produção | Alta | Modo degradado (só loga aviso) |
-| Push não entregue por expiração de subscription | Média | Cleanup automático no processor |
-| Erro pré-existente em `location-provider.spec.ts` | Baixa | Não introduzido por nós; correção simples (cast para `unknown`) |
-| 16 warnings no web-storefront | Baixa | Pré-existentes; sem `--max-warnings 0` |
+Provisionar PostgreSQL local/efêmero com dados de dois tenants, aplicar `prisma migrate deploy` e executar a homologação manual de 15 passos descrita na Sprint 4. Depois, corrigir as falhas preexistentes da suíte completa. Não iniciar Sprint 5 antes dessa homologação.

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "tsc -b --noEmit && vite build",
+    "test": "pnpm dlx vitest run --environment node --globals --passWithNoTests",
     "cap:sync": "pnpm build && cap sync",
     "cap:android": "pnpm cap:sync && cap open android",
     "cap:ios": "pnpm cap:sync && cap open ios",

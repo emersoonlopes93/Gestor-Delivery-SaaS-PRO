@@ -547,7 +547,7 @@ const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
     category: 'operations',
     essential: false,
     canDisable: true,
-    status: 'stable',
+    status: 'beta',
     requiredPermission: 'scheduling.view',
   },
   {

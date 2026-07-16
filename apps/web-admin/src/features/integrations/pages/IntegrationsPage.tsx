@@ -66,6 +66,8 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     fetchConfig();
+    // Initial load only; fetchConfig has no reactive inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

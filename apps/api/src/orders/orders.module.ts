@@ -18,6 +18,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { KdsModule } from '../kds/kds.module';
 import { BillingDomainModule } from '../billing/billing-domain.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
     KdsModule,
     BillingDomainModule,
     forwardRef(() => MarketplaceModule),
+    FeatureControlModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway],

@@ -10,9 +10,10 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { UploadModule } from '../upload/upload.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { StorefrontCacheService } from './services/storefront-cache.service';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
 
 @Module({
-  imports: [DatabaseModule, CatalogModule, SchedulingModule, forwardRef(() => UploadModule), AnalyticsModule],
+  imports: [DatabaseModule, CatalogModule, SchedulingModule, forwardRef(() => UploadModule), AnalyticsModule, FeatureControlModule],
   controllers: [StorefrontController],
   providers: [StorefrontService, StorefrontCacheService],
   exports: [StorefrontService, StorefrontCacheService],

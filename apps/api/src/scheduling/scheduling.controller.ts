@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
-  NotImplementedException,
   Logger,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators';
@@ -22,6 +21,9 @@ import { SchedulingGeneratorService } from './scheduling-generator.service';
 import {
   CreateScheduledOrderDTO,
   CancelScheduledOrderDTO,
+  CreateTimeSlotDTO,
+  UpdateScheduledOrderDTO,
+  UpdateTimeSlotDTO,
 } from './dto/create-scheduled-order.dto';
 import { UpdateSchedulingSettingsDto } from './dto/scheduling-settings.dto';
 import {
@@ -72,7 +74,10 @@ export class SchedulingController {
   @HttpCode(HttpStatus.OK)
   async autoGenerateTimeSlots() {
     const result = await this.schedulingGenerator.generateSlotsForNextDays();
-    return { success: true, resultCount: result.length };
+    return {
+      success: true,
+      resultCount: result.reduce((total, item) => total + item.created.count, 0),
+    };
   }
 
   @Get('time-slots/available')
@@ -134,21 +139,21 @@ export class SchedulingController {
   @Post('time-slots')
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.CREATED)
-  async createTimeSlot() {
-    throw new NotImplementedException('Use /time-slots/generate for bulk creation');
+  async createTimeSlot(@Body() dto: CreateTimeSlotDTO) {
+    return this.schedulingService.createTimeSlot(dto);
   }
 
   @Put('time-slots/:id')
   @RequirePermissions('scheduling.manage')
-  async updateTimeSlot() {
-    throw new NotImplementedException('Not implemented yet');
+  async updateTimeSlot(@Param('id') id: string, @Body() dto: UpdateTimeSlotDTO) {
+    return this.schedulingService.updateTimeSlot(id, dto);
   }
 
   @Delete('time-slots/:id')
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteTimeSlot() {
-    throw new NotImplementedException('Not implemented yet');
+  async deleteTimeSlot(@Param('id') id: string) {
+    await this.schedulingService.deleteTimeSlot(id);
   }
 
   @Post('scheduled-orders')
@@ -182,14 +187,17 @@ export class SchedulingController {
 
   @Get('scheduled-orders/:id')
   @RequirePermissions('scheduling.view')
-  async getScheduledOrder() {
-    throw new NotImplementedException('Not implemented yet');
+  async getScheduledOrder(@Param('id') id: string) {
+    return this.schedulingService.getScheduledOrder(id);
   }
 
   @Put('scheduled-orders/:id')
   @RequirePermissions('scheduling.update')
-  async updateScheduledOrder() {
-    throw new NotImplementedException('Not implemented yet');
+  async updateScheduledOrder(
+    @Param('id') id: string,
+    @Body() dto: UpdateScheduledOrderDTO,
+  ) {
+    return this.schedulingService.updateScheduledOrder(id, dto);
   }
 
   @Post('scheduled-orders/:id/confirm')

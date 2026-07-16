@@ -43,6 +43,8 @@ export interface StorefrontTenantInfo {
   scheduling?: {
     enabled: boolean;
     allowWhenClosed?: boolean;
+    timezone: string;
+    maximumAdvanceDays: number;
   };
 }
 
