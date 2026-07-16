@@ -2,8 +2,8 @@
 title: Matriz de Funcionalidades
 status: current
 owner: product
-last_verified: 2026-07-15
-verified_against: main-copy / c63d394
+last_verified: 2026-07-16
+verified_against: release/ifood-staging-rc
 source_of_truth:
   - packages/core/src/constants/features.ts
 ---
@@ -115,7 +115,7 @@ source_of_truth:
 | Feature Key | Status | Descrição | Entitlement requerido |
 |-------------|--------|-----------|-----------------------|
 | `storefront_core` | **Stable** | Cardápio público PWA com link próprio. | N/A |
-| `ifood_marketplace` | **Beta** | Pedidos bidirecionais, reconciliação operacional e endpoints SaaS Admin implementados e testados por contrato; homologação iFood pendente. Catálogo fora do escopo. | `ifood_integration` |
+| `ifood_marketplace` | **Beta** | RC de staging com pedidos bidirecionais, reconciliação, polling/ACK por token-device e operação SaaS Admin; homologação iFood pendente e kill switches desligados. Catálogo fora do escopo. | `ifood_integration` |
 | `franchise` | **Beta** | Agrupamento de lojas para franqueadoras. | N/A |
 | `admin_integrations` | **Beta** | Integrações globais para todo o SaaS. | N/A |
 

@@ -210,13 +210,13 @@ Retry administrativo nunca reutiliza silenciosamente o job: reconcilia primeiro,
 
 ## 17. Polling e recuperação
 
-O fallback iFood é opt-in e permanece desligado por padrão. Exige `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED=true`, `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED=true`, Redis/BullMQ, feature/entitlement do tenant, tenant ativo, conexão `CONNECTED`, merchant mapeado e `settingsJson.pollingFallbackEnabled=true`.
+O fallback iFood é opt-in e permanece desligado por padrão. Exige `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED=true`, `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED=true`, Redis/BullMQ, feature/entitlement do tenant, tenant ativo, conexão `CONNECTED`, merchant mapeado, `settingsJson.pollingFallbackEnabled=true` e `settingsJson.presenceMode=POLLING`.
 
-O scheduler executa a cada 30 segundos, cria jobs determinísticos por conexão/janela, aplica jitter e usa o header `x-polling-merchants` com um merchant. Eventos são ordenados por `createdAt`, depois sequência, precedência de estado e ID apenas como desempate estável. Webhook e polling compartilham `(provider,dedupeKey)`; a inbox registra primeiro/último canal, entregas e timestamps.
+O scheduler executa a cada 30 segundos por token/device. Conexões sem refresh token usam o OAuth client centralizado e compartilham um job; seus merchants são agrupados em headers de até 100 IDs. Conexões com refresh token têm token independente e job próprio. Job ID e claim persistente impedem dois schedulers/workers de executar a mesma janela. Eventos são ordenados por `createdAt`, depois sequência, precedência de estado e ID apenas como desempate estável. Webhook e polling compartilham `(provider,dedupeKey)`; a inbox registra primeiro/último canal, entregas e timestamps.
 
 ACK usa lotes conservadores de até 2.000 IDs e só ocorre após commit da nova linha ou confirmação de duplicata existente. Falha de persistência, ID ausente ou merchant inconsistente não recebe ACK. Evento sem tópico/pedido é persistido como `IGNORED`; desconhecidos não interrompem o lote. Falha permanente bloqueia polling da conexão; 429/5xx respeitam `Retry-After`/backoff.
 
-Polling bem-sucedido é o heartbeat oficial. Presença webhook por merchant exclui conexões com polling opt-in; a homologação deve configurar presença por merchant e nunca manter os dois métodos de presença ativos para o mesmo merchant. Detalhes operacionais: `docs/operations/runbooks/ifood-homologation.md`.
+Polling bem-sucedido é o heartbeat oficial. `presenceMode` aceita `WEBHOOK`, `POLLING` ou `DISABLED`; a API rejeita combinação contraditória entre polling e presença. Polling sem heartbeat não se aplica ao contrato iFood vigente. O modo nunca é alterado automaticamente em produção. Detalhes operacionais: [runbook de homologação](../operations/runbooks/ifood-homologation.md).
 
 ## 18. Criptografia e rotação
 

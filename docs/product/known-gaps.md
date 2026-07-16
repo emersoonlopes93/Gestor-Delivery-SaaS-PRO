@@ -31,7 +31,9 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 | UI visual de reconciliação ausente | Baixa | Endpoints SaaS Admin protegidos cobrem listagem, detalhe, histórico, retry, reconhecimento e métricas; dashboard visual permanece opcional. |
 | Ingestão usa o payload do evento como detalhe quando disponível | Média | Avaliar busca oficial completa por tipo de evento na homologação sem ampliar a Sprint 5A. |
 | Sem exportador Prometheus e plataforma externa de alertas | Média | Métricas por tenant, logs estruturados, divergências e readiness existem; integrar alert manager externo antes de produção em escala. |
-| Polling de fallback não implementado | Média | Arquitetura segue webhook-first com reconciliação pontual. Só adicionar polling após validar presença, ACK, filtros, credenciais e rate limits oficiais. |
+| Polling ainda não homologado no ambiente oficial | Alta | Implementação agrupa merchants por token/device, persiste antes do ACK e limita headers/lotes; manter desligado até evidência com merchant oficial. |
+| Migration ausente para `system_configs.platform_logo_media_id` | Alta | O schema de branding foi commitado sem migration; criar migration aditiva específica e validar antes de declarar schema sem drift. |
+| Alerta externo e dashboard visual ausentes | Média | Readiness e métricas sanitizadas existem, mas o canal on-call ainda depende do provedor de logs. |
 
 ---
 

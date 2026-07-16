@@ -119,3 +119,5 @@ O projeto ainda não possui Alertmanager/PagerDuty/Slack integrado. O canal disp
 - `marketplace_merchant_mapping_failure`;
 - readiness de Redis/BullMQ não saudável;
 - `oldestOperationAgeMs` e `deadlinesExpired` acima do limite operacional.
+
+Para rollout e rollback de staging, use o [runbook de staging](./ifood-staging-rollout.md). Conexão iFood bloqueada ou stale degrada a seção marketplace do health, mas não derruba isoladamente a readiness global da API.

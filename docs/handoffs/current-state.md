@@ -232,3 +232,59 @@ Falhas integrais fora do escopo observadas novamente: dois testes de `Conversati
 - Filtros `types/groups` geram auto-ACK dos eventos excluídos; ambos ficam vazios por padrão e não podem ser combinados.
 - O container de validação é removido ao encerrar a sessão.
 - Próximo passo: revisar o diff/SQL, aplicar migration somente em staging, configurar um tenant piloto e executar integralmente o runbook com evidências. Não iniciar catálogo ou outra sprint automaticamente.
+
+---
+
+# Sprint 6A — baseline global e RC de staging
+
+Data: 2026-07-16
+
+Branch: `release/ifood-staging-rc`
+Base inicial: `cbbfbf5334c1de33f64e6f68694c004c2b427773`
+
+## Resultado
+
+Release candidate preparado parcialmente para staging. Integração ainda não homologada pelo iFood. Kill switches permanecem desabilitados.
+
+Commits criados:
+
+- `2b04dbd` — checkpoint da Sprint 5C, polling/ACK e telemetria;
+- `1a48016` — cadência por token/device, agrupamento de merchants, presença coerente e concorrência;
+- `7f7a20a` — restauração da confiabilidade da suíte global.
+
+Conexões sem refresh token compartilham o OAuth client/token centralizado e agora geram um job por janela, com merchants em lotes de até 100. Conexões com refresh token usam token/device independente. Dois schedulers/workers concorrentes são protegidos por job ID determinístico e claim persistente. `presenceMode` é explícito (`WEBHOOK`, `POLLING`, `DISABLED`) e a API rejeita polling com presença contraditória.
+
+## Baseline e gates
+
+| Gate | Antes | Depois |
+|---|---|---|
+| `pnpm test` | FAIL: Conversation, Location, WebhookSecurity e BaseMenusPage | PASS: API 43 suítes/178 testes; web-admin 10; web-tenant 12; storefront 1 |
+| `pnpm lint` | PASS com 16 warnings React | PASS com os mesmos 16 warnings |
+| `pnpm typecheck` | PASS | PASS |
+| `pnpm build` | não reexecutado no gate inicial | PASS; warnings preexistentes de chunk size |
+| `pnpm check:no-any` | PASS | PASS |
+| `pnpm check:features` | PASS com alertas Beta | PASS com alertas Beta/gaps registrados |
+| `pnpm prisma:validate` | PASS | PASS |
+
+Causas raiz do baseline: fixtures de Conversation desatualizadas para `findMany`/gateway estático; cast estrutural inválido no teste Location; teste HMAC sujeito à precedência de variável real do processo; teste React reutilizando nó desmontado e buscando título dividido por ícone.
+
+## Migrations e drift
+
+Em PostgreSQL 16 local/efêmero, passaram: banco vazio, upgrade desde pré-5A, upgrade desde 5B e redeploy de 5C. `handoff_sound` e `ready_sound` terminam como `VARCHAR(255)` e coincidem com o schema. O único diff remanescente é aditivo: coluna/index/FK `system_configs.platform_logo_media_id`, introduzidos no commit de branding sem migration. A criação da migration aguarda aprovação específica da Sprint 6A.
+
+O smoke de startup com ambos kill switches desligados alcança inicialização dos módulos, mas termina em `P2022` no `SystemConfigService` devido ao drift de `platform_logo_media_id`. Portanto o RC ainda é **no-go** até a migration aditiva ser aprovada, criada e validada.
+
+## Incidente de validação
+
+Na primeira tentativa de validação, apenas `DATABASE_URL` foi sobrescrita; como o schema usa `DIRECT_URL` para migrations, o Prisma carregou o valor remoto de `apps/api/.env`. As migrations aditivas 5A, 5B e 5C foram aplicadas nesse banco remoto antes da detecção; comandos seguintes apenas retornaram “sem pendências”. Nenhuma credencial foi lida/exibida e não houve operação destrutiva, mas a ação violou a restrição de não executar migration remota.
+
+Ações tomadas: nenhuma outra chamada Prisma foi feita até identificar a causa; todas as validações posteriores sobrescreveram `DATABASE_URL` e `DIRECT_URL` e confirmaram destino `127.0.0.1`; o incidente foi registrado. Próxima ação operacional: identificar formalmente o ambiente remoto, auditar `_prisma_migrations`/backup com o responsável do banco e manter os kill switches desligados. Como as três migrations são aditivas, o rollback imediato recomendado é funcional por flags/código; não executar `DROP` nem apagar eventos, operações ou divergências.
+
+## Documentação e próximo passo
+
+- contrato e matriz de feature atualizados;
+- gaps e limites de readiness registrados;
+- homologação/reconciliação atualizadas;
+- novo [runbook de staging](../operations/runbooks/ifood-staging-rollout.md) com piloto, go/no-go e rollback.
+
+Próximo passo: obter aprovação para a migration aditiva de branding, validar novamente as quatro trajetórias e o smoke de startup, concluir gates, criar commits de migration/documentação e somente então classificar o RC como go para staging. Não ativar tenant real nem iniciar nova sprint.

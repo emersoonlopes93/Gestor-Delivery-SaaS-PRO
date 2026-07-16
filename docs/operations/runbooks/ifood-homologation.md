@@ -10,7 +10,7 @@ Validar polling, ACK, presença, deduplicação e operação sem expor credencia
 - [Autenticação centralizada](https://developer.ifood.com.br/pt-BR/docs/guides/modules/authentication/centralized/)
 - [Erros de autenticação](https://developer.ifood.com.br/pt-BR/docs/guides/modules/authentication/errors-and-troubleshooting/)
 
-Contrato adotado: `GET /events/v1.0/events:polling` a cada 30 segundos, Bearer JWT, `x-polling-merchants` obrigatório e no máximo 100 merchants por chamada. Esta implementação usa um merchant por job. Respostas 200 contêm array; 204 significa vazio; limite absoluto 6.000 RPM/token. O ACK é `POST /events/v1.0/events/acknowledgment`, IDs únicos e lotes de até 2.000 (limite conservador; a referência técnica também cita payload máximo de 10.000).
+Contrato adotado: `GET /events/v1.0/events:polling` a cada 30 segundos por token/device, Bearer JWT, `x-polling-merchants` obrigatório e no máximo 100 merchants por chamada. Merchants do OAuth centralizado compartilham o mesmo job e são divididos em lotes de 100; refresh tokens por conexão permanecem isolados. Respostas 200 contêm array; 204 significa vazio; limite absoluto 6.000 RPM/token. O ACK é `POST /events/v1.0/events/acknowledgment`, IDs únicos e lotes de até 2.000.
 
 ## Pré-requisitos
 
@@ -19,7 +19,7 @@ Contrato adotado: `GET /events/v1.0/events:polling` a cada 30 segundos, Bearer J
 - Redis e BullMQ saudáveis;
 - secrets configurados no secret manager, nunca em ticket/log;
 - `ifood_marketplace` habilitada apenas para o tenant piloto;
-- conexão `CONNECTED`, merchant ID correto e `pollingFallbackEnabled=true`;
+- conexão `CONNECTED`, merchant ID correto, `pollingFallbackEnabled=true` e `presenceMode=POLLING`;
 - presença do Developer Portal configurada por merchant; não combinar webhook e polling para o mesmo merchant;
 - ambos kill switches ainda `false` durante a preparação.
 
@@ -46,6 +46,9 @@ Contrato adotado: `GET /events/v1.0/events:polling` a cada 30 segundos, Bearer J
 | 429 | `Retry-After` respeitado, conexão `DEGRADED`, sem loop agressivo |
 | 401/403/merchant divergente | refresh único no 401; falha permanente `BLOCKED`, sem novo polling |
 | kill switch | nenhum scan/job novo; webhook continua independente |
+| dois schedulers/workers | um único claim/job por token-device e janela |
+| mais de 100 merchants | chamadas em lotes de 100 sem exceder uma cadência por token-device |
+| conexão removida | job encerra sem chamada ao provider |
 
 Registre apenas correlation ID, tenant, connection, merchant, contagens, status e duração. Não capture Authorization, token, secret, ciphertext, payload integral ou dados pessoais.
 
