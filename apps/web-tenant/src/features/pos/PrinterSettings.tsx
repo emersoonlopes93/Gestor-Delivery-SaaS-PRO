@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Printer, Monitor, Plus } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
@@ -164,6 +164,7 @@ export function PrinterSettings() {
       const nextDevice = savedDevice || devices[0].id;
       if (nextDevice !== selectedDevice) setSelectedDevice(nextDevice);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stations.length, devices.length, selectedStation, selectedDevice]);
 
   useEffect(() => {
@@ -182,6 +183,7 @@ export function PrinterSettings() {
     if (!selectedPrinterDevice) return;
     const nextAutoPrint = selectedPrinterDevice.autoPrintEnabled === true;
     setAutoPrintEnabled((current) => (current === nextAutoPrint ? current : nextAutoPrint));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPrinterDevice?.id, selectedPrinterDevice?.autoPrintEnabled]);
 
   useEffect(() => {

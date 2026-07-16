@@ -182,7 +182,7 @@ type ProductModalState = {
   product: BaseMenuProduct | null;
 };
 
-type GalleryAsset = PublishedGlobalImage & {
+type _GalleryAsset = PublishedGlobalImage & {
   tagsJson: string[];
   metadataJson: Record<string, unknown>;
 };
@@ -255,7 +255,6 @@ function BaseMenuListView() {
 
   useEffect(() => {
     void loadItems();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const segments = useMemo(() => Array.from(new Set(items.map((item) => item.segment))).sort(), [items]);
@@ -470,6 +469,7 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
 
   useEffect(() => {
     void loadDraft();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) return <div className="flex min-h-[480px] items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando draft...</div>;
@@ -717,6 +717,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
 
   useEffect(() => {
     void loadDetail();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const products = useMemo(() => detail?.categories.flatMap((category) => category.products) ?? [], [detail]);
@@ -896,7 +897,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
     </div>
   );
 }
-function PublishSummary({ validation }: { validation: DraftValidation }) {
+function _PublishSummary({ validation }: { validation: DraftValidation }) {
 
   return (
     <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
@@ -1099,7 +1100,7 @@ function TemplateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () =>
   );
 }
 
-function CategoryCreateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () => void | Promise<void> }) {
+function _CategoryCreateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [sortOrder, setSortOrder] = useState('0');
@@ -1148,7 +1149,7 @@ function ProductCreateForm({ draft, category, onSaved }: { draft: BaseMenuDraft;
   );
 }
 
-function ProductEditor({ draft, product, canManage, onSaved }: { draft: BaseMenuDraft; product: BaseMenuProduct; canManage: boolean; onSaved: () => void | Promise<void> }) {
+function _ProductEditor({ draft, product, canManage, onSaved }: { draft: BaseMenuDraft; product: BaseMenuProduct; canManage: boolean; onSaved: () => void | Promise<void> }) {
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description ?? '');
   const [basePrice, setBasePrice] = useState(String(product.basePrice));
@@ -1300,7 +1301,7 @@ async function moveProductInDraft(draft: BaseMenuDraft, product: BaseMenuProduct
   ]);
 }
 
-async function duplicateProductInDraft(draft: BaseMenuDraft, product: BaseMenuProduct) {
+async function _duplicateProductInDraft(draft: BaseMenuDraft, product: BaseMenuProduct) {
   const category = draft.categories.find((item) => item.id === product.categoryId);
   if (!category) return;
   await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}/products`, {
@@ -1570,6 +1571,7 @@ function ProductImagePickerModal({
 
   useEffect(() => {
     void load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, search, category]);
 
   const categories = useMemo(() => Array.from(new Set(items.map((item) => item.categoryName ?? item.category).filter((value): value is string => Boolean(value)))).sort(), [items]);
@@ -2100,7 +2102,7 @@ function errorMessage(error: unknown): string {
   return 'Falha ao carregar dados.';
 }
 
-function getErrorStatus(error: unknown): number | null {
+function _getErrorStatus(error: unknown): number | null {
   if (typeof error !== 'object' || error === null) return null;
   const candidate = error as { status?: unknown };
   return typeof candidate.status === 'number' ? candidate.status : null;

@@ -148,7 +148,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [form, showDetails, coordinatesDirty]);
+  }, [form, showDetails, coordinatesDirty, geocodeCurrentAddress]);
 
   const loadData = async () => {
     setLoading(true);
@@ -187,7 +187,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     }
   };
 
-  const geocodeCurrentAddress = async () => {
+  const geocodeCurrentAddress = useCallback(async () => {
     const currentRequest = geocodeRequestRef.current + 1;
     geocodeRequestRef.current = currentRequest;
 
@@ -232,7 +232,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         setGeocoding(false);
       }
     }
-  };
+  }, [form]);
 
   const handleAddressSelected = (
     address: {

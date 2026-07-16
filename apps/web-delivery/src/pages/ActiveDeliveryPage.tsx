@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { Package, Power, Navigation, MapPin, CheckCircle2, Clock, Truck } from 'lucide-react';
+import { Package, Power, Navigation, MapPin, CheckCircle2, Clock, Truck, Bell, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDriverTracking } from '../hooks/useDriverTracking';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { api } from '../lib/api';
 
 interface DeliveryRun {
@@ -97,6 +98,9 @@ export function ActiveDeliveryPage() {
   const pendingRuns = runs.filter((r) => r.status === 'ready_for_delivery');
   const activeRuns = runs.filter((r) => r.status === 'out_for_delivery');
 
+  const { permissionState, isSubscribed, isLoading: pushLoading, requestPermissionAndSubscribe, unsubscribe: unsubscribePush } = usePushNotifications();
+  const showPushBanner = permissionState !== 'unsupported' && permissionState !== 'denied' && !isSubscribed;
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto relative overflow-hidden font-sans">
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm relative z-10">
@@ -118,6 +122,34 @@ export function ActiveDeliveryPage() {
         </button>
       </header>
 
+      {/* Banner de push notifications */}
+      {showPushBanner && (
+        <div className="mx-3 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3">
+          <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-800 leading-tight">Ativar alertas</p>
+            <p className="text-xs text-slate-500">Receba novas corridas mesmo com o app em segundo plano</p>
+          </div>
+          <button
+            onClick={requestPermissionAndSubscribe}
+            disabled={pushLoading}
+            className="flex-shrink-0 px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg disabled:opacity-50 hover:bg-orange-600 transition-colors"
+          >
+            {pushLoading ? '...' : 'Ativar'}
+          </button>
+        </div>
+      )}
+      {isSubscribed && (
+        <div className="mx-3 mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
+          <Bell className="w-4 h-4 text-emerald-600" />
+          <p className="text-xs font-medium text-emerald-700 flex-1">Alertas de entrega ativos</p>
+          <button onClick={unsubscribePush} className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+            <BellOff className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <main className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6">
 
         {/* GPS Status Card */}

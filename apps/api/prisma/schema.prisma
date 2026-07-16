@@ -133,6 +133,7 @@ model Tenant {
   upsellItems                    UpsellItem[]
   upsells                        Upsell[]
   whatsappInstance               WhatsAppInstance?
+  pushSubscriptions              PushSubscription[]
 
   @@map("tenants")
 }
@@ -2969,6 +2970,27 @@ model product_complement_items {
 
   @@index([group_id])
   @@index([tenant_id])
+}
+
+model PushSubscription {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  recipientType String   @map("recipient_type")
+  recipientId   String   @map("recipient_id")
+  endpoint      String   @db.Text
+  p256dhKey     String   @map("p256dh_key") @db.Text
+  authKey       String   @map("auth_key") @db.Text
+  userAgent     String?  @map("user_agent") @db.VarChar(500)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  lastUsedAt    DateTime? @map("last_used_at")
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, recipientId, recipientType, endpoint])
+  @@index([tenantId, recipientId, recipientType, isActive])
+  @@map("push_subscriptions")
 }
 
 enum CampaignType {

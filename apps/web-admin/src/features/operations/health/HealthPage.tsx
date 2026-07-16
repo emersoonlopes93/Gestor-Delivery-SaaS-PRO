@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../../../lib/api-client';
 import { Activity, AlertTriangle, Building2, CheckCircle2, Clock, RefreshCw, Search } from 'lucide-react';
 
@@ -56,7 +56,7 @@ export function HealthPage() {
   const [billingFilter, setBillingFilter] = useState('');
   const [whatsappFilter, setWhatsappFilter] = useState('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -80,11 +80,11 @@ export function HealthPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, searchTerm, statusFilter, billingFilter, whatsappFilter]);
 
   useEffect(() => {
     loadData();
-  }, [page, searchTerm, statusFilter, billingFilter, whatsappFilter]);
+  }, [loadData, page, searchTerm, statusFilter, billingFilter, whatsappFilter]);
 
   if (loading) {
     return (

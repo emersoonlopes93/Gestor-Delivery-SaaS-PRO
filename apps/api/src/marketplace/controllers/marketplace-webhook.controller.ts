@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Body, Controller, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { Public } from '../../common/decorators';

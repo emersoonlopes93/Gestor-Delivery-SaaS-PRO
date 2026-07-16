@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import type {
@@ -80,7 +80,7 @@ export function TenantAccessPage() {
   const [overrideModal, setOverrideModal] = useState<OverrideModalState | null>(null);
   const [presetModal, setPresetModal] = useState<PresetModalState | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!tenantId) {
       return;
     }
@@ -103,11 +103,11 @@ export function TenantAccessPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenantId]);
 
   useEffect(() => {
     void loadData();
-  }, [tenantId]);
+  }, [loadData, tenantId]);
 
   const categories = useMemo(() => {
     return Array.from(new Set(features.map((item) => item.category))).sort((a, b) => a.localeCompare(b));

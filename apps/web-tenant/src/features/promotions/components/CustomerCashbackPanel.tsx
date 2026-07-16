@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api-client';
 import { ArrowDown, ArrowUp, Plus, Minus, DollarSign } from 'lucide-react';
 import { BalanceAdjustmentModal } from './BalanceAdjustmentModal';
@@ -23,7 +23,7 @@ export function CustomerCashbackPanel({ customerId, customerName }: CustomerCash
   
   const [modalType, setModalType] = useState<'add' | 'remove' | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await api.get<{ balance: number; transactions: CashbackTransaction[] }>(`/promotions/cashback/customer/${customerId}`);
@@ -37,11 +37,11 @@ export function CustomerCashbackPanel({ customerId, customerName }: CustomerCash
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerId]);
 
   useEffect(() => {
     if (customerId) loadData();
-  }, [customerId]);
+  }, [customerId, loadData]);
 
   const handleAdjustment = async (amount: number, description: string) => {
     const type = modalType === 'add' ? 'earned' : 'redeemed';

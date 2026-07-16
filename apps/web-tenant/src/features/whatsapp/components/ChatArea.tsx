@@ -167,7 +167,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     console.log(`[CHAT_HISTORY_UI] sessionId=${session?.id} count=${sessionMessages.length} containsMarker=${!!marker} markerMessageId=${marker?.id || ''} directionsSummary=${directionsSummary} senderTypesSummary=${senderTypesSummary}`);
     
     setMessages(sessionMessages);
-  }, [sessionMessages]);
+  }, [sessionMessages, session?.id]);
 
   useEffect(() => {
     if (session?.id) {

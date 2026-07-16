@@ -79,6 +79,7 @@ const baseEnvSchema = z.object({
   // Feature Flags
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
   CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
+  PUSH_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false'),
   BILLING_DB_PREFLIGHT: z.enum(['strict', 'warn', 'off']).optional(),
 });
 
@@ -100,6 +101,16 @@ export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
           path: ['BULLMQ_ENABLED'],
           message: `BULLMQ_ENABLED deve ser 'true' se CAMPAIGNS_DISPATCH_ENABLED estiver ativo.`,
         });
+    }
+
+    if (data.PUSH_NOTIFICATIONS_ENABLED === 'true') {
+      if (!data.VAPID_PUBLIC_KEY || !data.VAPID_PRIVATE_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['VAPID_PUBLIC_KEY'],
+          message: `VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY são obrigatórios se PUSH_NOTIFICATIONS_ENABLED for 'true'.`,
+        });
+      }
     }
   }
 });

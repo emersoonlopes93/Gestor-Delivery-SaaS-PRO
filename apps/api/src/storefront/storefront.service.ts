@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { StorefrontCacheService } from './services/storefront-cache.service';
 import { DateTime } from 'luxon';

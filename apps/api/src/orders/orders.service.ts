@@ -17,6 +17,7 @@ import { TheoreticalStockService } from '../inventory/theoretical-stock.service'
 import { PaymentGatewayService } from '../payment-gateway/payment-gateway.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { WhatsappService } from '../notifications/whatsapp.service';
+import { PushService } from '../notifications/push.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
@@ -170,6 +171,7 @@ export class OrdersService {
     private readonly revenueLedgerService: RevenueLedgerService,
     @Inject(forwardRef(() => MarketplaceStatusSyncService))
     private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
+    private readonly pushService: PushService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -1633,6 +1635,18 @@ export class OrdersService {
       orderId,
       orderNumber: refreshed.orderNumber,
     });
+
+    if (driverId) {
+      this.pushService.enqueueDriverNotification(tenantId, driverId, {
+        title: 'Nova Entrega Atribuída!',
+        body: `Você foi designado para o pedido #${refreshed.orderNumber}.`,
+      }).catch(err => this.logger.error('Error enqueueing push', err));
+    } else if (previousDriverId) {
+      this.pushService.enqueueDriverNotification(tenantId, previousDriverId, {
+        title: 'Entrega Removida',
+        body: `Você foi removido do pedido #${refreshed.orderNumber}.`,
+      }).catch(err => this.logger.error('Error enqueueing push', err));
+    }
 
     return this.mapOrderToDispatchItem(refreshed);
   }

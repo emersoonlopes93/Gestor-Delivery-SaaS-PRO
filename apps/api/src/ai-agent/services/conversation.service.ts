@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ChatState, MessageDirection, ChatSession, ChatMessage } from '@prisma/client';

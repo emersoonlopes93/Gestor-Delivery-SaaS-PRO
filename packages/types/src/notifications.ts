@@ -112,3 +112,28 @@ export function normalizeNotificationEvent(value: NotificationCanonicalEvent | N
   }
   return value;
 }
+
+// ============================================================
+// Push Notification Queue
+// ============================================================
+
+export const NOTIFICATIONS_PUSH_QUEUE = 'notifications-push';
+
+export type PushNotificationJobType =
+  | 'send-to-recipient'
+  | 'send-to-tenant-broadcast';
+
+export interface PushNotificationJob {
+  type: PushNotificationJobType;
+  tenantId: string;
+  recipientType: 'driver' | 'tenant_user';
+  recipientId: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  icon?: string;
+  tag?: string;
+  url?: string;
+  /** ID de idempotência para evitar envios duplicados */
+  idempotencyKey?: string;
+}

@@ -1,8 +1,9 @@
 import { canAutoAcceptOrder } from './order-auto-accept.policy';
+import type { OrderAutoAcceptSettings } from '@gestor/types';
 
-const baseSettings = {
+const baseSettings: OrderAutoAcceptSettings = {
   autoAcceptOrdersEnabled: true,
-  autoAcceptDelaySeconds: 0 as 0,
+  autoAcceptDelaySeconds: 0,
   autoAcceptDeliveryOrders: true,
   autoAcceptPickupOrders: true,
 };

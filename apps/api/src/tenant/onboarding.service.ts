@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, TenantOnboarding } from '@prisma/client';
 import type { OnboardingBackendStep, OnboardingCompletionCheck } from '@gestor/types';

@@ -157,9 +157,9 @@ export function useOnboardingState() {
         syncProgressFromBackend(),
       ]);
     }
-  }, []);
+  }, [checkValidationFromApi, syncProgressFromBackend]);
 
-  const syncProgressFromBackend = async () => {
+  const syncProgressFromBackend = useCallback(async () => {
     try {
       const res = await api.get<BackendOnboardingStatus>('/tenant/onboarding');
       if (!res.success || !res.data) return;
@@ -169,9 +169,9 @@ export function useOnboardingState() {
     } catch {
       // silent
     }
-  };
+  }, []);
 
-  const checkValidationFromApi = async () => {
+  const checkValidationFromApi = useCallback(async () => {
     try {
       const [tenantRes, hoursRes, productsRes, coverageRes] = await Promise.all([
         api.get<{
@@ -232,7 +232,7 @@ export function useOnboardingState() {
     } catch {
       // silent - keep existing validation state
     }
-  };
+  }, []);
 
   const syncCurrentStepToBackend = useCallback(async (stepIndex: number) => {
     const backendSteps = STEP_BACKEND_MAPPING[stepIndex] ?? [];

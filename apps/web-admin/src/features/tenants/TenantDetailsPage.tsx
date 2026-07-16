@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
 import { Bot, Calendar, CreditCard, ExternalLink, Shield, Store, Package, Activity, AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -29,7 +29,7 @@ export function TenantDetailsPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
 
-  const loadTenant = async () => {
+  const loadTenant = useCallback(async () => {
     try {
       setLoading(true);
       // Supondo que existe um endpoint individual ou pegando da lista
@@ -51,9 +51,9 @@ export function TenantDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenantId]);
 
-  const loadActivity = async () => {
+  const loadActivity = useCallback(async () => {
     try {
       setLoadingActivity(true);
       const res = await api.get<{ success: boolean; data: { items: ActivityItem[] } }>(`/admin/dashboard/recent-activity`);
@@ -66,14 +66,14 @@ export function TenantDetailsPage() {
     } finally {
       setLoadingActivity(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (tenantId) {
       loadTenant();
       loadActivity();
     }
-  }, [tenantId]);
+  }, [tenantId, loadTenant, loadActivity]);
 
   const handleImpersonate = async () => {
     if (!tenant) return;

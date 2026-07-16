@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Logger } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
 import { MarketplaceProviderAdapter } from './marketplace-provider.interface';

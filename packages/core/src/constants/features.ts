@@ -58,10 +58,11 @@ export type CatalogFeatureKey =
   | 'loyalty'
   | 'coupons'
   | 'scheduling'
-  | 'dine_in'
   | 'ai_agent'
   | 'franchise'
-  | 'admin_integrations';
+  | 'admin_integrations'
+  | 'dine_in'
+  | 'push_notifications';
 
 export type BillingEntitlementKey =
   | 'ai_agent'
@@ -449,6 +450,17 @@ const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
     envFallbackKey: 'VITE_FEATURE_BI_ADVANCED',
     billingEntitlementKey: 'advanced_reports',
     billingEntitlementFlagKey: 'canUseAdvancedReports',
+  },
+  {
+    key: 'push_notifications',
+    name: 'Notificações Push',
+    description: 'Envio de push notifications via web-push.',
+    category: 'notifications',
+    essential: false,
+    canDisable: true,
+    status: 'beta',
+    moduleKey: 'notifications',
+    envFallbackKey: 'VITE_FEATURE_PUSH_NOTIFICATIONS',
   },
   {
     key: 'goals',

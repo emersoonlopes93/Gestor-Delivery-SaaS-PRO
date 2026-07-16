@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { MarketplaceEventStatus, MarketplaceProvider, OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';

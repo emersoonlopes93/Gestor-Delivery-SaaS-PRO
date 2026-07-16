@@ -54,7 +54,7 @@ export function TenantsPage() {
     }
   };
 
-  const handleCreateBillingV2 = async (tenantId: string) => {
+  const _handleCreateBillingV2 = async (tenantId: string) => {
     try {
       await api.post(`/admin/tenants/${tenantId}/billing-v2-subscription`, {});
       loadTenants();

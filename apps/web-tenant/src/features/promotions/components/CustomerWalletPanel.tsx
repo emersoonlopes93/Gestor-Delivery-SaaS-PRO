@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api-client';
 import { ArrowDown, ArrowUp, Plus, Minus, Wallet } from 'lucide-react';
 import { BalanceAdjustmentModal } from './BalanceAdjustmentModal';
@@ -24,7 +24,7 @@ export function CustomerWalletPanel({ customerId, customerName }: CustomerWallet
   
   const [modalType, setModalType] = useState<'add' | 'remove' | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await api.get<{ balance: number; transactions: WalletTransaction[] }>(`/wallet/customer/${customerId}`);
@@ -38,11 +38,11 @@ export function CustomerWalletPanel({ customerId, customerName }: CustomerWallet
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerId]);
 
   useEffect(() => {
     if (customerId) loadData();
-  }, [customerId]);
+  }, [customerId, loadData]);
 
   const handleAdjustment = async (amount: number, description: string) => {
     const action = modalType === 'add' ? 'credit' : 'debit';

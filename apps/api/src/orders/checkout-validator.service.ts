@@ -466,7 +466,6 @@ export class CheckoutValidatorService {
     let extrasTotal = 0;
     let unitPrice = basePrice;
     let composition = '';
-    let snapshotCatalogV2Json: unknown | undefined;
     let selectionsSnapshot: Array<{
       groupId: string;
       groupName: string;
@@ -515,7 +514,7 @@ export class CheckoutValidatorService {
         .join(', ')}`;
     }
 
-    snapshotCatalogV2Json = {
+    const snapshotCatalogV2Json = {
       version: 'catalog_v2_snapshot_v1',
       channel,
       lineType: 'product',
