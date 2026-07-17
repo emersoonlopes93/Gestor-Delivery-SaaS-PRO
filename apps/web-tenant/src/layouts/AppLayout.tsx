@@ -270,23 +270,23 @@ function SidebarGroupView(props: {
         <button
           type="button"
           onClick={() => onToggle(group.id)}
-          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${isAnyItemActive
-            ? 'bg-sidebar-active text-sidebar-active-foreground'
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 group ${isAnyItemActive
+            ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
             }`}
         >
-          <span className="text-[10px] font-black uppercase tracking-[0.25em] transition-colors">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 transition-colors">
             {group.label}
           </span>
           <span
             className={`transition-transform duration-300 ${isOpen ? 'rotate-90' : 'rotate-0'}`}
             aria-hidden
           >
-            <ChevronRight className="h-3.5 w-3.5 opacity-50" aria-hidden />
+            <ChevronRight className="h-3.5 w-3.5 opacity-40" aria-hidden />
           </span>
         </button>
       ) : (
-        <div className="mx-auto w-8 h-px bg-muted/60 my-4" />
+        <div className="mx-auto w-5 h-px bg-border/50 my-3" />
       )}
 
       <div
@@ -321,14 +321,20 @@ function SidebarGroupView(props: {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
-                    ? 'bg-primary text-primary-foreground shadow-lg dark:bg-sidebar-active dark:text-sidebar-active-foreground'
+                    ? 'bg-muted/80 text-foreground'
                     : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-primary-foreground dark:text-sidebar-active-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
+                    {isActive && !collapsed && (
+                      <span className="absolute -left-3 top-[18%] bottom-[18%] w-[3px] bg-primary rounded-r-full" aria-hidden />
+                    )}
+                    <span
+                      className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
+                      aria-hidden
+                    >
                       <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
@@ -337,9 +343,6 @@ function SidebarGroupView(props: {
                         {item.label}
                       </span>
                     ) : null}
-                    {isActive && !collapsed && (
-                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-primary-foreground dark:bg-sidebar-active-foreground animate-pulse" />
-                    )}
                   </>
                 )}
               </NavLink>
@@ -734,80 +737,90 @@ export function AppLayout() {
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
       >
-        <div className={`p-4 flex flex-col gap-5 ${collapsed ? 'items-center' : 'items-center text-center'}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
-          <div className="flex flex-col items-center gap-3 w-full">
+        <div className={`p-3 flex flex-col gap-3 ${collapsed ? 'items-center' : ''}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
+          {/* Brand + toggle button row */}
+          <div className="flex items-center justify-between w-full gap-2">
             {collapsed ? (
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
+              <div className="w-9 h-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-black text-lg shadow-md shrink-0 mx-auto">
                 {(systemName?.charAt(0) || 'P').toUpperCase()}
               </div>
             ) : (
-              <div className="min-w-0 flex flex-col items-center w-full">
+              <div className="min-w-0 flex flex-col items-start flex-1">
                 {platformLogoUrl && !platformLogoFailed ? (
-                  <div className="min-w-0 flex flex-col items-center gap-2 w-full">
+                  <div className="min-w-0 flex flex-col items-start gap-1">
                     <img
                       src={platformLogoUrl}
                       alt={systemName}
-                      className="block max-w-[160px] max-h-[42px] object-contain"
+                      className="block max-w-[120px] max-h-[32px] object-contain"
                       onError={() => setPlatformLogoFailed(true)}
                     />
-                    <p className="text-[10px] font-black text-muted-foreground truncate leading-none uppercase tracking-wider max-w-[160px]">
+                    <p className="text-[9px] font-black text-muted-foreground truncate leading-none uppercase tracking-wider max-w-[130px]">
                       {user?.tenant?.name || 'Carregando...'}
                     </p>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-3 w-full">
-                    <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-black text-base shadow-md shrink-0">
                       {(systemName?.charAt(0) || 'P').toUpperCase()}
                     </div>
                     <div className="min-w-0 flex flex-col items-start text-left">
-                      <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight max-w-[145px]">
+                      <h1 className="text-[12px] font-black text-foreground tracking-tight truncate leading-tight max-w-[110px]">
                         {systemName}
                       </h1>
-                      <p className="text-[10px] font-black text-muted-foreground mt-0.5 truncate leading-none uppercase tracking-wider max-w-[145px]">
+                      <p className="text-[9px] font-black text-muted-foreground truncate leading-none uppercase tracking-wider max-w-[110px]">
                         {user?.tenant?.name || 'Carregando...'}
                       </p>
                     </div>
                   </div>
                 )}
-                {tenantData?.businessGroup ? (
-                  <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
-                    <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <span className="truncate">{tenantData.businessGroup.name}</span>
-                    <span className="text-muted-foreground font-bold normal-case tracking-normal">
-                      {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
-                    </span>
-                  </div>
-                ) : null}
-                {accessibleStores.length > 1 ? (
-                  <div className="mt-3 flex items-center gap-2 w-full max-w-[200px]">
-                    <select
-                      value={selectedTenantId}
-                      onChange={(e) => setSelectedTenantId(e.target.value)}
-                      disabled={switchStoreMutation.isPending}
-                      className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
-                    >
-                      {accessibleStores.map((store) => (
-                        <option key={store.tenantId} value={store.tenantId}>
-                          {store.tenant.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={handleSwitchStore}
-                      disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
-                      className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
-                    </button>
-                  </div>
-                ) : null}
               </div>
             )}
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="hidden md:flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
+              title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+            >
+              <Menu className="h-4 w-4" />
+            </button>
           </div>
 
           {!collapsed && (
-            <div className="space-y-4 w-full flex flex-col items-center">
+            <>
+              {tenantData?.businessGroup ? (
+                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
+                  <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="truncate">{tenantData.businessGroup.name}</span>
+                  <span className="text-muted-foreground font-bold normal-case tracking-normal">
+                    {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
+                  </span>
+                </div>
+              ) : null}
+              {accessibleStores.length > 1 ? (
+                <div className="flex items-center gap-2 w-full">
+                  <select
+                    value={selectedTenantId}
+                    onChange={(e) => setSelectedTenantId(e.target.value)}
+                    disabled={switchStoreMutation.isPending}
+                    className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
+                  >
+                    {accessibleStores.map((store) => (
+                      <option key={store.tenantId} value={store.tenantId}>
+                        {store.tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleSwitchStore}
+                    disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
+                    className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
+                  </button>
+                </div>
+              ) : null}
+
               <div className="inline-flex justify-center w-full">
                 <StoreStatusBadge
                   status={storeStatus}
@@ -817,26 +830,26 @@ export function AppLayout() {
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 w-full">
+              <div className="grid grid-cols-2 gap-1.5 w-full">
                 <a
                   href={publicMenuUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-row items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all group shadow-sm h-[34px]"
                 >
-                  <Globe className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Cardápio</span>
+                  <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">Cardápio</span>
                 </a>
                 <button
                   type="button"
                   onClick={() => navigate('/settings/qr-codes')}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-row items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all group shadow-sm h-[34px]"
                 >
-                  <QrCode className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">QR Code</span>
+                  <QrCode className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">QR Code</span>
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -874,15 +887,6 @@ export function AppLayout() {
         <header className="desktop-header hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ height: '52px', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="px-6 flex items-center justify-between w-full h-full min-w-0 gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={toggleCollapsed}
-                className="inline-flex items-center justify-center rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
-                aria-label="Alternar sidebar"
-                title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-              >
-                <Menu className="h-4 w-4" aria-hidden />
-              </button>
 
               <div className="flex items-center text-sm font-bold text-foreground min-w-0">
                 {breadcrumb.parentLabel && (
