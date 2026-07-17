@@ -342,3 +342,45 @@ Checksum SHA-256 do arquivo e checksum registrado pelo Prisma: `510ce2bc60f3467c
 O RC passa a **go para staging somente como artefato validado localmente**; não autoriza aplicar migrations ou ativar polling em staging/produção. Polling continua desabilitado por padrão e protegido pelos kill switches.
 
 O incidente histórico de `DIRECT_URL` permanece separado e aberto: antes de qualquer staging ou produção, o responsável pelo banco deve identificar formalmente o banco remoto afetado, conferir `_prisma_migrations`, confirmar backup recuperável e demonstrar que apenas as migrations aditivas 5A–5C foram aplicadas. Esta sessão não realizou nova consulta nem qualquer alteração remota.
+
+---
+
+## Segurança do startup e migration operacional no Dokploy
+
+Data: 2026-07-16
+Branch: `fix/production-entrypoint-safety`
+Base: `main-copy` / `6cdd98a3`
+
+### Objetivo e decisões
+
+O startup normal da API foi separado da gestão de schema. `docker-entrypoint.sh` agora valida somente a presença de `DATABASE_URL` e `DIRECT_URL`, não imprime valores, não executa limpeza ou migration e delega ao `CMD` da imagem com `exec`. O `CMD` inicia diretamente o artefato Node compilado.
+
+O Compose de produção ganhou o serviço manual `api-migrate`, isolado pelo profile `operations`, com `restart: "no"` e comando exclusivo `npx prisma@5.22.0 migrate deploy`. O serviço não possui dependência da API, seed ou limpeza e não participa do `docker compose up` padrão.
+
+`clean_db.js` deixou de ser copiado para a imagem, foi desacoplado de `prisma:migrate:deploy`, exige `CLEAN_DB=true` em comando local explícito e falha fechado em `NODE_ENV=production`.
+
+### Arquivos e contratos afetados
+
+- startup/infra: `apps/api/docker-entrypoint.sh`, `apps/api/Dockerfile`, `docker-compose.prod.yml`, `apps/api/package.json`, `apps/api/clean_db.js`;
+- operação: novo `docs/operations/runbooks/dokploy-deployment.md` e atualizações no rollout iFood, índice documental, ambiente, pacote Dokploy histórico e `AGENTS.md`;
+- nenhum schema, migration, contrato REST, feature flag ou comportamento de domínio foi alterado.
+
+### Validações
+
+| Comando | Resultado |
+|---|---|
+| baseline e final `pnpm lint` | PASS; 16 warnings React preexistentes |
+| baseline e final `pnpm typecheck` | PASS |
+| `pnpm build` | PASS; warnings preexistentes de chunk size |
+| `pnpm test` | PASS: API 43 suítes/178 testes; web-admin 10; web-tenant 12; storefront 1 |
+| `pnpm prisma:validate` com ambas URLs sobrescritas para host local | PASS |
+| `pnpm check:no-any` | PASS |
+| `docker compose -f docker-compose.prod.yml config --quiet` com URLs fictícias | PASS |
+| runtime direto de `docker-entrypoint.sh` com placeholders | PASS; somente startup e comando delegado, sem secret ou migration |
+| prova PostgreSQL 16 efêmera | NÃO CONCLUÍDA: Docker Desktop perdeu o daemon durante o build, antes de qualquer migration |
+
+Nenhum deploy, banco remoto, migration, seed, limpeza, push ou merge foi executado. Os kill switches do iFood permaneceram inalterados e desligados.
+
+### Pendência e próximo passo
+
+Repetir a prova efêmera quando o daemon Docker estiver saudável: comprovar startup sem `_prisma_migrations`, duas execuções idempotentes de `api-migrate`, isolamento de falha e startup da API após schema aplicado. Depois revisar o diff e obter aprovação explícita antes de integrar em `main-copy`; não fazer deploy automaticamente.

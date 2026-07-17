@@ -31,6 +31,24 @@ services:
     networks:
       - cpnet-attach
 
+  api-migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    profiles:
+      - operations
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      DIRECT_URL: ${DIRECT_URL:?DIRECT_URL is required}
+      NODE_ENV: production
+    entrypoint: ["npx", "prisma@5.22.0"]
+    command: ["migrate", "deploy"]
+    networks:
+      - cpnet-attach
+
 networks:
   cpnet-attach:
     external: true
