@@ -704,6 +704,10 @@ export function AppLayout() {
 
   const breadcrumb = getBreadcrumb();
 
+  useEffect(() => {
+    document.title = breadcrumb.label ? `${systemName} - ${breadcrumb.label}` : systemName;
+  }, [breadcrumb.label, systemName]);
+
   return (
     <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
       <NotificationCenter />
