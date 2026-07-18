@@ -359,9 +359,11 @@ O Compose de produção ganhou o serviço manual `api-migrate`, isolado pelo pro
 
 `clean_db.js` deixou de ser copiado para a imagem, foi desacoplado de `prisma:migrate:deploy`, exige `CLEAN_DB=true` em comando local explícito e falha fechado em `NODE_ENV=production`.
 
+Durante a validação efêmera foi identificado que `.dockerignore` não excluía arquivos `.env`. Como o Dockerfile usa `COPY . .` no estágio de build, isso poderia incluir um `.env` local no contexto. A correção passa a excluir `.env` em qualquer diretório, preservando apenas arquivos `.env.example`; o build posterior confirmou que `prisma generate` carregou somente o schema, sem carregar `.env`.
+
 ### Arquivos e contratos afetados
 
-- startup/infra: `apps/api/docker-entrypoint.sh`, `apps/api/Dockerfile`, `docker-compose.prod.yml`, `apps/api/package.json`, `apps/api/clean_db.js`;
+- startup/infra: `.dockerignore`, `apps/api/docker-entrypoint.sh`, `apps/api/Dockerfile`, `docker-compose.prod.yml`, `apps/api/package.json`, `apps/api/clean_db.js`;
 - operação: novo `docs/operations/runbooks/dokploy-deployment.md` e atualizações no rollout iFood, índice documental, ambiente, pacote Dokploy histórico e `AGENTS.md`;
 - nenhum schema, migration, contrato REST, feature flag ou comportamento de domínio foi alterado.
 
@@ -380,6 +382,8 @@ O Compose de produção ganhou o serviço manual `api-migrate`, isolado pelo pro
 | prova PostgreSQL 16 efêmera | NÃO CONCLUÍDA: Docker Desktop perdeu o daemon durante o build, antes de qualquer migration |
 
 Nenhum deploy, banco remoto, migration, seed, limpeza, push ou merge foi executado. Os kill switches do iFood permaneceram inalterados e desligados.
+
+Tentativa posterior de prova efêmera: o build passou por `prisma generate` e pela compilação da API sem carregar `.env`, mas o Docker Desktop ficou bloqueado ao transferir a imagem final. Nenhum container de teste, migration, seed ou limpeza foi iniciado; os arquivos temporários de Compose e variáveis fictícias foram removidos.
 
 ### Pendência e próximo passo
 
