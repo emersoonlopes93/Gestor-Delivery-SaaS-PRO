@@ -2,6 +2,15 @@ name: Validate production entrypoint
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main-copy
+    paths:
+      - ".github/workflows/validate-production-entrypoint.yml"
+      - "apps/api/**"
+      - "docker-compose.prod.yml"
+      - "docker-compose.entrypoint-test.yml"
+      - ".dockerignore"
 
 permissions:
   contents: read
@@ -27,6 +36,8 @@ jobs:
     steps:
       - name: Checkout requested revision
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -45,7 +56,7 @@ jobs:
       - name: Create isolated Compose override
         shell: bash
         run: |
-          cat > docker-compose.entrypoint-ci.yml <<'EOF'
+          cat > "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" <<'EOF'
           services:
             api:
               image: gestor-entrypoint-ci-api:local
@@ -109,13 +120,27 @@ jobs:
           echo "Database host: ephemeral-postgres"
           echo "Database name: gestor_test"
           docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
-            -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml config --quiet
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" config --quiet
+          rendered_config="$RUNNER_TEMP/docker-compose.entrypoint-ci.rendered.yml"
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" config > "$rendered_config"
+          if grep -Eq '^[[:space:]]*env_file:' "$rendered_config" || \
+            grep -Fq '.env' "$rendered_config" || \
+            grep -Fq 'CLEAN_DB: "true"' "$rendered_config"; then
+            echo "Rendered Compose configuration is not isolated."
+            exit 1
+          fi
+          if ! grep -Fq 'DATABASE_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public' "$rendered_config" || \
+            ! grep -Fq 'DIRECT_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public' "$rendered_config"; then
+            echo "Rendered Compose configuration does not use the expected ephemeral database."
+            exit 1
+          fi
 
       - name: Build and inspect the API image
         shell: bash
         run: |
           set -euo pipefail
-          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml)
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
           "${compose[@]}" build api > "$RUNNER_TEMP/api-image-build.log" 2>&1
 
           if grep -Fq "Environment variables loaded from .env" "$RUNNER_TEMP/api-image-build.log"; then
@@ -124,11 +149,11 @@ jobs:
           fi
 
           docker run --rm --entrypoint sh gestor-entrypoint-ci-api:local -ec '
-            test -x ./apps/api/docker-entrypoint.sh
-            test -f ./apps/api/dist/apps/api/src/main.js
-            test -f ./apps/api/prisma/schema.prisma
-            test -n "$(find ./apps/api/prisma/migrations -name migration.sql -print -quit)"
-            test ! -e ./apps/api/clean_db.js
+            test -x ./docker-entrypoint.sh
+            test -f ./dist/apps/api/src/main.js
+            test -f ./prisma/schema.prisma
+            test -n "$(find ./prisma/migrations -name migration.sql -print -quit)"
+            test ! -e ./clean_db.js
             test -z "$(find /app -name .env -print -quit)"
           '
           echo "API image structure verified."
@@ -138,13 +163,13 @@ jobs:
         run: |
           set -euo pipefail
           docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
-            -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml up -d --wait ephemeral-postgres
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" up -d --wait ephemeral-postgres
 
       - name: Verify normal startup does not migrate
         shell: bash
         run: |
           set -euo pipefail
-          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml)
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
           "${compose[@]}" up -d api
           sleep 10
           "${compose[@]}" logs --no-color api > "$RUNNER_TEMP/api-before-migration.log" 2>&1 || true
@@ -159,6 +184,18 @@ jobs:
             assert_absent "$pattern" "$RUNNER_TEMP/api-before-migration.log"
           done
 
+          api_id=$("${compose[@]}" ps -aq api)
+          test -n "$api_id"
+          api_running=$(docker inspect -f '{{.State.Running}}' "$api_id")
+          if [ "$api_running" != "true" ]; then
+            api_exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$api_id")
+            test "$api_exit_code" -ne 0
+            if ! grep -Eiq 'P2021|does not exist|relation.*does not exist' "$RUNNER_TEMP/api-before-migration.log"; then
+              echo "API exited before migrations without an expected empty-schema error."
+              exit 1
+            fi
+          fi
+
           before_count=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = '_prisma_migrations';")
           test "$before_count" = "0"
           "${compose[@]}" stop api || true
@@ -168,7 +205,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml)
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
           "${compose[@]}" --profile operations run --rm api-migrate > "$RUNNER_TEMP/api-migrate-first.log" 2>&1
 
           assert_absent() {
@@ -188,7 +225,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml)
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
           "${compose[@]}" --profile operations run --rm api-migrate > "$RUNNER_TEMP/api-migrate-second.log" 2>&1
 
           assert_absent() {
@@ -218,7 +255,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml)
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
           "${compose[@]}" up -d api
 
           for attempt in $(seq 1 30); do
@@ -250,9 +287,6 @@ jobs:
           echo "API process, health and readiness verified after migration."
 
       - name: Quality gates
-        env:
-          DATABASE_URL: postgresql://gestor:gestor@127.0.0.1:5432/gestor_test?schema=public
-          DIRECT_URL: postgresql://gestor:gestor@127.0.0.1:5432/gestor_test?schema=public
         run: |
           pnpm lint
           pnpm typecheck
@@ -267,5 +301,7 @@ jobs:
         shell: bash
         run: |
           docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
-            -f docker-compose.prod.yml -f docker-compose.entrypoint-ci.yml down --volumes --remove-orphans --rmi local || true
-          rm -f docker-compose.entrypoint-ci.yml
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" down --volumes --remove-orphans --rmi local || true
+          docker image rm -f gestor-entrypoint-ci-api:local || true
+          rm -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml"
+          rm -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.rendered.yml"
