@@ -30,8 +30,6 @@ jobs:
       MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: "false"
       REDIS_ENABLED: "false"
       BULLMQ_ENABLED: "false"
-      JWT_SECRET: ci-ephemeral-jwt-secret
-      JWT_REFRESH_SECRET: ci-ephemeral-refresh-secret
 
     steps:
       - name: Checkout requested revision
@@ -43,7 +41,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -71,8 +68,8 @@ jobs:
                 MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: ${MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED}
                 REDIS_ENABLED: ${REDIS_ENABLED}
                 BULLMQ_ENABLED: ${BULLMQ_ENABLED}
-                JWT_SECRET: ${JWT_SECRET}
-                JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+                JWT_SECRET: ci-ephemeral-not-a-production-secret
+                JWT_REFRESH_SECRET: ci-ephemeral-not-a-production-refresh-secret
               ports:
                 - "127.0.0.1:3333:3333"
               depends_on:
@@ -91,8 +88,8 @@ jobs:
                 MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: ${MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED}
                 REDIS_ENABLED: ${REDIS_ENABLED}
                 BULLMQ_ENABLED: ${BULLMQ_ENABLED}
-                JWT_SECRET: ${JWT_SECRET}
-                JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+                JWT_SECRET: ci-ephemeral-not-a-production-secret
+                JWT_REFRESH_SECRET: ci-ephemeral-not-a-production-refresh-secret
 
             ephemeral-postgres:
               image: postgres:16-alpine
