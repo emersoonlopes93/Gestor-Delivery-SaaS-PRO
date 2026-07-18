@@ -177,9 +177,16 @@ jobs:
               exit 1
             fi
           }
-          for pattern in "migrate deploy" "Applying migration" "DROP SCHEMA" "clean_db" "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "password"; do
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in API logs."
+              exit 1
+            fi
+          }
+          for pattern in "migrate deploy" "Applying migration" "DROP SCHEMA" "clean_db" "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
             assert_absent "$pattern" "$RUNNER_TEMP/api-before-migration.log"
           done
+          assert_no_password_value "$RUNNER_TEMP/api-before-migration.log"
 
           api_id=$("${compose[@]}" ps -aq api)
           test -n "$api_id"
@@ -211,9 +218,16 @@ jobs:
               exit 1
             fi
           }
-          for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "password"; do
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in migration logs."
+              exit 1
+            fi
+          }
+          for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
             assert_absent "$pattern" "$RUNNER_TEMP/api-migrate-first.log"
           done
+          assert_no_password_value "$RUNNER_TEMP/api-migrate-first.log"
 
           "${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -v ON_ERROR_STOP=1 -c "CREATE TABLE entrypoint_ci_sentinel (id integer PRIMARY KEY); INSERT INTO entrypoint_ci_sentinel VALUES (1);" >/dev/null
           echo "Manual migration completed."
@@ -231,9 +245,16 @@ jobs:
               exit 1
             fi
           }
-          for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "password"; do
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in migration logs."
+              exit 1
+            fi
+          }
+          for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
             assert_absent "$pattern" "$RUNNER_TEMP/api-migrate-second.log"
           done
+          assert_no_password_value "$RUNNER_TEMP/api-migrate-second.log"
 
           migration_total=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM _prisma_migrations;")
           migration_failed=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL;")
@@ -274,9 +295,16 @@ jobs:
               exit 1
             fi
           }
-          for pattern in "migrate deploy" "Applying migration" "DROP SCHEMA" "clean_db" "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "password"; do
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in API logs."
+              exit 1
+            fi
+          }
+          for pattern in "migrate deploy" "Applying migration" "DROP SCHEMA" "clean_db" "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
             assert_absent "$pattern" "$RUNNER_TEMP/api-after-migration.log"
           done
+          assert_no_password_value "$RUNNER_TEMP/api-after-migration.log"
 
           api_id=$("${compose[@]}" ps -q api)
           test -n "$api_id"
