@@ -9,7 +9,6 @@ on:
       - ".github/workflows/validate-production-entrypoint.yml"
       - "apps/api/**"
       - "docker-compose.prod.yml"
-      - "docker-compose.entrypoint-test.yml"
       - ".dockerignore"
 
 permissions:
