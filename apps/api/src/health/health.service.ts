@@ -21,6 +21,12 @@ export type QueueMetrics = {
 
 export type HealthStatus = 'ok' | 'degraded' | 'down';
 
+type WebSocketGatewayStatus = {
+  active: boolean;
+  clientsCount: number | null;
+  reason: 'gateway_not_initialized' | 'server_not_initialized' | 'engine_not_initialized' | null;
+};
+
 export type ReadyPayload = {
   status: HealthStatus;
   timestamp: string;
@@ -36,9 +42,9 @@ export type ReadyPayload = {
     redis: { enabled: boolean; connected: boolean; latencyMs: number | null; reason: string | null };
     bullmq: { enabled: boolean; connected: boolean; queues: QueueMetrics[] };
     websocket: {
-      ordersGateway: { active: boolean; clientsCount: number };
-      deliveryGateway: { active: boolean; clientsCount: number };
-      chatGateway: { active: boolean; clientsCount: number };
+      ordersGateway: WebSocketGatewayStatus;
+      deliveryGateway: WebSocketGatewayStatus;
+      chatGateway: WebSocketGatewayStatus;
     };
   };
 };
@@ -228,6 +234,29 @@ export class HealthService {
     }
   }
 
+  private getWebSocketGatewayStatus(instance: {
+    server?: {
+      engine?: { clientsCount?: number };
+      server?: { engine?: { clientsCount?: number } };
+    };
+  } | null): WebSocketGatewayStatus {
+    if (!instance) {
+      return { active: false, clientsCount: null, reason: 'gateway_not_initialized' };
+    }
+
+    const server = instance.server;
+    if (!server) {
+      return { active: false, clientsCount: null, reason: 'server_not_initialized' };
+    }
+
+    const clientsCount = server.engine?.clientsCount ?? server.server?.engine?.clientsCount;
+    if (typeof clientsCount !== 'number') {
+      return { active: false, clientsCount: null, reason: 'engine_not_initialized' };
+    }
+
+    return { active: true, clientsCount, reason: null };
+  }
+
   async getReadiness(): Promise<ReadyPayload> {
     const startedAt = Date.now();
 
@@ -289,15 +318,10 @@ export class HealthService {
     const bullmqConnected = bullmqEnabled && redisConnected && queues.every((q) => q.status === 'ok');
 
     // 4. WebSocket Check (Instâncias estáticas)
-    const ordersGatewayActive = !!(OrdersGateway.instance && OrdersGateway.instance.server);
-    const deliveryGatewayActive = !!(DeliveryTrackingGateway.instance && DeliveryTrackingGateway.instance.server);
-    const chatGatewayActive = !!(ChatGateway.instance && ChatGateway.instance.server);
-
-    const ordersClientsCount = ordersGatewayActive ? OrdersGateway.instance!.server.engine.clientsCount : 0;
-    const deliveryClientsCount = deliveryGatewayActive ? DeliveryTrackingGateway.instance!.server.engine.clientsCount : 0;
-    const chatClientsCount = chatGatewayActive ? ChatGateway.instance!.server.engine.clientsCount : 0;
-
-    const websocketHealthy = ordersGatewayActive && deliveryGatewayActive && chatGatewayActive;
+    const ordersGateway = this.getWebSocketGatewayStatus(OrdersGateway.instance);
+    const deliveryGateway = this.getWebSocketGatewayStatus(DeliveryTrackingGateway.instance);
+    const chatGateway = this.getWebSocketGatewayStatus(ChatGateway.instance);
+    const websocketHealthy = ordersGateway.active && deliveryGateway.active && chatGateway.active;
 
     // Status logic
     let status: HealthStatus = 'ok';
@@ -334,18 +358,9 @@ export class HealthService {
           queues,
         },
         websocket: {
-          ordersGateway: {
-            active: ordersGatewayActive,
-            clientsCount: ordersClientsCount,
-          },
-          deliveryGateway: {
-            active: deliveryGatewayActive,
-            clientsCount: deliveryClientsCount,
-          },
-          chatGateway: {
-            active: chatGatewayActive,
-            clientsCount: chatClientsCount,
-          },
+          ordersGateway,
+          deliveryGateway,
+          chatGateway,
         },
       },
     };
