@@ -25,10 +25,10 @@ describe('HealthService readiness WebSocket diagnostics', () => {
     $queryRawUnsafe: jest.fn(),
   };
   const service = new HealthService(prisma as never);
-  const healthInternals = service as unknown as {
+  const healthInternals: {
     pingRedis: () => Promise<{ connected: boolean; latencyMs: number | null; reason: string | null }>;
     checkQueueHealth: (name: string, enabled: boolean) => Promise<QueueMetrics>;
-  };
+  } = Object.getPrototypeOf(service);
 
   const setGatewayInstances = (
     orders: GatewayWithEngine | null,
