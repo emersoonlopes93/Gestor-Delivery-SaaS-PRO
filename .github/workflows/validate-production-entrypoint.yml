@@ -94,6 +94,8 @@ jobs:
             ephemeral-postgres:
               image: postgres:16-alpine
               hostname: ephemeral-postgres
+              networks:
+                - cpnet-attach
               environment:
                 POSTGRES_USER: gestor
                 POSTGRES_PASSWORD: gestor
@@ -202,6 +204,15 @@ jobs:
           test "$before_count" = "0"
           "${compose[@]}" stop api || true
           echo "Normal API startup did not apply migrations."
+
+      - name: Verify ephemeral PostgreSQL DNS
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" \
+            --profile operations run --rm --entrypoint sh api-migrate \
+            -c 'getent hosts ephemeral-postgres'
 
       - name: Run api-migrate manually
         shell: bash
