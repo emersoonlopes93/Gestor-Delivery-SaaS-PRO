@@ -139,6 +139,17 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm db:generate
 
+      - name: Build API smoke artifact
+        run: pnpm --filter @gestor/api build
+
+      - name: Verify API smoke artifact
+        run: |
+          if ! test -f apps/api/dist/apps/api/src/main.js; then
+            echo "Expected API smoke artifact is missing."
+            find apps/api/dist -type f -name main.js -print 2>/dev/null || true
+            exit 1
+          fi
+
       - name: Migrate ephemeral DB
         run: pnpm --filter @gestor/api prisma:migrate:deploy
 
@@ -147,7 +158,10 @@ jobs:
 
       - name: Start API
         run: |
-          pnpm --filter @gestor/api start:prod >"$RUNNER_TEMP/api-smoke.log" 2>&1 &
+          (
+            cd apps/api
+            exec node --max-old-space-size=512 dist/apps/api/src/main.js
+          ) >"$RUNNER_TEMP/api-smoke.log" 2>&1 &
           echo "$!" >"$RUNNER_TEMP/api-smoke.pid"
 
       - name: Wait for health
