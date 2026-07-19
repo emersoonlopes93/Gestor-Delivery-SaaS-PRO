@@ -48,6 +48,21 @@ export class StorefrontService {
     return null;
   }
 
+  async getPublicBranding(): Promise<{ systemName: string; logoUrl: string | null }> {
+    const config = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: {
+        appName: true,
+        platformLogoMedia: { select: { publicUrl: true } },
+      },
+    });
+
+    return {
+      systemName: config?.appName ?? 'PedeHub',
+      logoUrl: config?.platformLogoMedia?.publicUrl ?? null,
+    };
+  }
+
   async getStorefrontPayload(
     slug: string,
     fulfillmentType: 'delivery' | 'pickup' = 'delivery',

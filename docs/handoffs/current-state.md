@@ -388,3 +388,40 @@ Tentativa posterior de prova efêmera: o build passou por `prisma generate` e pe
 ### Pendência e próximo passo
 
 Repetir a prova efêmera quando o daemon Docker estiver saudável: comprovar startup sem `_prisma_migrations`, duas execuções idempotentes de `api-migrate`, isolamento de falha e startup da API após schema aplicado. Depois revisar o diff e obter aprovação explícita antes de integrar em `main-copy`; não fazer deploy automaticamente.
+
+---
+
+## Metadados dinâmicos do storefront e títulos de abas
+
+Data: 2026-07-17
+Branch: `feat/dynamic-meta-and-page-titles`
+
+### Objetivo e auditoria
+
+O storefront é uma SPA Vite, mas a imagem de produção já inicia `apps/web-storefront/server.js`, um servidor Express que entrega o `index.html` inicial. A implementação anterior de SEO estava incompleta: buscava a rota inexistente `/storefront/:slug`, não escapava HTML, não emitia canonical/`og:url` e não normalizava imagens para URL absoluta. Alterações de título, favicon e descrição no React ocorrem somente após a API responder no navegador e, isoladamente, não atendem crawlers de compartilhamento.
+
+O tenant é resolvido pelo primeiro segmento da rota pública e pelo endpoint `GET /public/storefront/:slug`; a identidade disponível sem alteração de schema é nome do tenant, `TenantSettings.logoUrl` e hero/banner em `storefrontThemeJson`. A biblioteca de mídia existente continua sendo a responsável por URLs públicas. Não existem campos específicos persistidos para descrição social, imagem social ou favicon; não foram criados campos nem uma segunda infraestrutura de upload. O fallback de descrição é o texto público padrão e a ordem de imagem é banner, logo e logo global.
+
+O nome global canônico vem de `SystemConfig.appName`; a logo global vem de `SystemConfig.platformLogoMedia`. Foi exposto somente esse payload público e não sensível em `GET /public/storefront/branding` para permitir o fallback do renderizador. O painel tenant já concentrava labels de menu e breadcrumb em `SIDEBAR_GROUPS`; o painel SaaS Admin faz o mesmo. Os títulos da aba agora reutilizam essas configurações, com exceções amigáveis para páginas de detalhe.
+
+### Alterações feitas
+
+- `apps/web-storefront/server.js`: corrigida a chamada da API pública, HTML inicial com title, description, canonical, Open Graph, Twitter Card, manifest e favicon por tenant; sanitização de conteúdo HTML, URLs absolutas e cache local de cinco minutos.
+- `apps/api/src/storefront/storefront.controller.ts` e `storefront.service.ts`: endpoint público mínimo de branding global, sem dados internos ou segredos.
+- `apps/web-tenant/src/layouts/AppLayout.tsx`: título `{systemName} - {label atual}` sincronizado com breadcrumb/menu.
+- `apps/web-admin/src/layouts/AppLayout.tsx`: título dinâmico baseado no menu, incluindo detalhes conhecidos de tenant e cardápio base.
+
+### Validações
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @gestor/web-storefront build` | PASS |
+| TypeScript API, web-tenant e web-admin | PASS |
+| `node --check apps/web-storefront/server.js` | PASS |
+| `pnpm --filter @gestor/api test -- storefront.service.spec.ts` | PASS, 1 suíte/1 teste |
+| `pnpm --filter @gestor/web-storefront test` | PASS, 1 arquivo/1 teste |
+| `git diff --check` | PASS |
+
+### Limitações e próximo passo
+
+O servidor atualiza o cache interno em até cinco minutos; previews já guardados por WhatsApp/Facebook/LinkedIn/Telegram dependem do cache de cada plataforma e não são invalidáveis pela aplicação. Antes de publicação, confirmar que o deploy do storefront utiliza `Dockerfile.storefront`/`server.js`, pois um host que sirva apenas o build estático continuará sem metatags por tenant no HTML inicial. Não houve migration, acesso a ambiente remoto, deploy, push ou merge.
