@@ -18,7 +18,7 @@ MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED=false
 
 ## Deploy com capacidades desligadas
 
-1. Aplicar `prisma migrate deploy` somente após backup e aprovação operacional de staging.
+1. Aplicar migrations pelo serviço manual `api-migrate` somente após backup e aprovação operacional de staging, seguindo o [runbook do Dokploy](./dokploy-deployment.md).
 2. Validar schema, iniciar API e workers, executar smoke de startup e inspecionar health.
 3. Confirmar que nenhum job de polling foi criado e nenhum tenant foi ativado automaticamente.
 4. Inspecionar métricas de fila, erros de autenticação, assinaturas inválidas e logs sanitizados.

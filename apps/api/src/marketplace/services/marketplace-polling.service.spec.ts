@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import {
   MarketplaceConnectionStatus,
   MarketplacePollingStatus,
@@ -8,6 +7,11 @@ import {
 import { MarketplacePollingService } from './marketplace-polling.service';
 
 describe('MarketplacePollingService', () => {
+  const enabledPollingConfig = {
+    MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: 'true',
+    MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: 'true',
+    MARKETPLACE_IFOOD_POLLING_INTERVAL_MS: '30000',
+  };
   const connection = {
     id: 'conn-1',
     tenantId: 'tenant-1',
@@ -35,13 +39,12 @@ describe('MarketplacePollingService', () => {
   const inbox = { persistParsedEvent: jest.fn() };
   const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
 
-  const createService = (queue?: { add: jest.Mock }) => new MarketplacePollingService(
+  const createService = (
+    queue?: { add: jest.Mock },
+    configValues: Record<string, string> = enabledPollingConfig,
+  ) => new MarketplacePollingService(
     prisma as never,
-    new ConfigService({
-      MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: 'true',
-      MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: 'true',
-      MARKETPLACE_IFOOD_POLLING_INTERVAL_MS: '30000',
-    }),
+    { get: jest.fn((key: string) => configValues[key]) } as never,
     { get: jest.fn().mockReturnValue(provider) } as never,
     inbox as never,
     featureControl as never,
@@ -103,6 +106,39 @@ describe('MarketplacePollingService', () => {
       scheduledAt: new Date().toISOString(),
     })).rejects.toThrow('database unavailable');
     expect(provider.acknowledgeEvents).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule or poll when the kill switch is explicitly disabled', async () => {
+    const queue = { add: jest.fn() };
+    const service = createService(queue, {
+      ...enabledPollingConfig,
+      MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: 'false',
+    });
+    const job = {
+      schemaVersion: 2 as const,
+      tokenDeviceKey: 'centralized-application',
+      connections: [{ tenantId: 'tenant-1', connectionId: 'conn-1' }],
+      scheduledAt: new Date().toISOString(),
+    };
+
+    await expect(service.scheduleEligibleConnections()).resolves.toEqual({ inspected: 0, scheduled: 0 });
+    await expect(service.runConnection(job)).rejects.toThrow('iFood polling fallback is disabled.');
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(provider.pollEvents).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule a connection without polling opt-in', async () => {
+    const queue = { add: jest.fn() };
+    prisma.marketplaceConnection.findMany.mockResolvedValue([
+      {
+        ...connection,
+        settingsJson: { pollingFallbackEnabled: false, presenceMode: 'WEBHOOK' },
+      },
+    ]);
+
+    await expect(createService(queue).scheduleEligibleConnections()).resolves.toEqual({ inspected: 1, scheduled: 0 });
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(provider.pollEvents).not.toHaveBeenCalled();
   });
 
   it('blocks polling and withholds ACK on merchant integrity mismatch', async () => {

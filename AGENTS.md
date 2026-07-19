@@ -34,7 +34,7 @@
 - **Backend:** NestJS 10, Prisma 5, PostgreSQL, Redis, BullMQ, Socket.IO
 - **Frontend:** Vite, React, Tailwind CSS
 - **CI:** GitHub Actions
-- **Deploy:** Render + Docker
+- **Deploy atual:** Dokploy + Docker Compose (`render.yaml` permanece apenas como configuração legada)
 
 ---
 
