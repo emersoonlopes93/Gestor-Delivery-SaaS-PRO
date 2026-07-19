@@ -24,7 +24,6 @@ jobs:
       COMPOSE_PROJECT_NAME: gestor-entrypoint-ci
       DATABASE_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public
       DIRECT_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public
-      NODE_ENV: production
       CLEAN_DB: "false"
       MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: "false"
       MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: "false"
@@ -62,7 +61,7 @@ jobs:
               environment:
                 DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
                 DIRECT_URL: ${DIRECT_URL:?DIRECT_URL is required}
-                NODE_ENV: ${NODE_ENV}
+                NODE_ENV: production
                 CLEAN_DB: ${CLEAN_DB}
                 MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: ${MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED}
                 MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: ${MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED}
@@ -70,8 +69,6 @@ jobs:
                 BULLMQ_ENABLED: ${BULLMQ_ENABLED}
                 JWT_SECRET: ci-ephemeral-not-a-production-secret
                 JWT_REFRESH_SECRET: ci-ephemeral-not-a-production-refresh-secret
-              ports:
-                - "127.0.0.1:3333:3333"
               depends_on:
                 ephemeral-postgres:
                   condition: service_healthy
@@ -82,7 +79,7 @@ jobs:
               environment:
                 DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
                 DIRECT_URL: ${DIRECT_URL:?DIRECT_URL is required}
-                NODE_ENV: ${NODE_ENV}
+                NODE_ENV: production
                 CLEAN_DB: ${CLEAN_DB}
                 MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: ${MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED}
                 MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: ${MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED}
@@ -310,34 +307,25 @@ jobs:
         run: |
           set -euo pipefail
           compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
-          health_url="http://127.0.0.1:3333/api/v1/health"
-          readiness_url="http://127.0.0.1:3333/api/v1/health/ready"
           api_log_raw="$RUNNER_TEMP/api-after-migration.log"
           api_log_sanitized="$api_log_raw.sanitized"
           "${compose[@]}" up -d api
-
-          health_ok=0
-          health_status="000"
-          readiness_status="000"
           set +e
+          health_status="000"
           for attempt in $(seq 1 60); do
-            health_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 1 "$health_url")
-            readiness_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 1 "$readiness_url")
-            if [ "$health_status" = "200" ] && [ "$readiness_status" = "200" ]; then
-              health_ok=1
-              break
-            fi
+            health_status=$("${compose[@]}" --profile operations run --rm --entrypoint node api-migrate -e 'fetch("http://api:3333/api/v1/health").then((r) => console.log(r.status)).catch(() => console.log("000"))' 2>/dev/null | tail -n 1)
+            [ "$health_status" = "200" ] && break
             sleep 1
           done
-          set -e
-
           api_id=$("${compose[@]}" ps -q api)
+          readiness_body="$RUNNER_TEMP/api-readiness.body"
+          readiness_status=$("${compose[@]}" --profile operations run --rm --entrypoint node api-migrate -e 'fetch("http://api:3333/api/v1/health/ready").then(async (r) => { console.log(r.status); console.log(await r.text()) }).catch(() => console.log("000"))' 2>/dev/null > "$readiness_body"; head -n 1 "$readiness_body")
+          set -e
           test -n "$api_id"
-
-          if [ "$health_ok" -ne 1 ]; then
+          if [ "$health_status" != "200" ] || [ "$readiness_status" != "200" ]; then
             echo "::group::Sanitized API startup diagnostic"
-            echo "Runner health HTTP status: $health_status"
-            echo "Runner readiness HTTP status: $readiness_status"
+            echo "Internal health HTTP status: $health_status"
+            echo "Internal readiness HTTP status: $readiness_status"
             "${compose[@]}" ps -a
             docker inspect --format='status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} error={{json .State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} image={{.Config.Image}} cmd={{json .Config.Cmd}}' "$api_id"
 
@@ -354,22 +342,7 @@ jobs:
             else
               cat "$api_log_sanitized"
             fi
-
-            api_running=$(docker inspect -f '{{.State.Running}}' "$api_id")
-            if [ "$api_running" = "true" ]; then
-              "${compose[@]}" exec -T api sh -c '
-                printf "pid1_cmd="
-                tr "\\000" " " </proc/1/cmdline
-                printf "\\nnode_process="
-                if [ -d /proc/1 ] && grep -aq "node" /proc/1/cmdline; then echo "present"; else echo "absent"; fi
-                printf "listening_tcp_3333="
-                if grep -Eq "^[[:space:]]*[0-9]+:.*:0D05[[:space:]].* 0A " /proc/net/tcp /proc/net/tcp6 2>/dev/null; then echo "present"; else echo "absent"; fi
-              ' || true
-              internal_health_status=$("${compose[@]}" --profile operations run --rm --entrypoint node api-migrate -e 'fetch("http://api:3333/api/v1/health").then((response) => console.log(response.status)).catch(() => console.log("connection_error"))' 2>/dev/null | tail -n 1 || true)
-              internal_readiness_status=$("${compose[@]}" --profile operations run --rm --entrypoint node api-migrate -e 'fetch("http://api:3333/api/v1/health/ready").then((response) => console.log(response.status)).catch(() => console.log("connection_error"))' 2>/dev/null | tail -n 1 || true)
-              echo "Internal health result: ${internal_health_status:-unavailable}"
-              echo "Internal readiness result: ${internal_readiness_status:-unavailable}"
-            fi
+            tail -n +2 "$readiness_body" | sed -E -e 's#postgres(ql)?://[^[:space:]]+#[REDACTED_DATABASE_URL]#gI' -e 's#(DATABASE_URL|DIRECT_URL|password|token|secret)[^,[:space:]]*#[REDACTED]#gI' -e 's#([0-9]{1,3}\.){3}[0-9]{1,3}#[REDACTED_IP]#g'
             echo "::endgroup::"
             exit 1
           fi
@@ -397,14 +370,19 @@ jobs:
 
       - name: Quality gates
         if: always()
+        shell: bash
         run: |
-          pnpm lint
-          pnpm typecheck
-          pnpm build
-          pnpm test
-          pnpm prisma:validate
-          pnpm check:no-any
-          git diff --check
+          set +e
+          failed=0
+          pnpm exec eslint --version || failed=1
+          pnpm lint || failed=1
+          pnpm typecheck || failed=1
+          pnpm build || failed=1
+          pnpm test || failed=1
+          DATABASE_URL="$DATABASE_URL" DIRECT_URL="$DIRECT_URL" pnpm prisma:validate || failed=1
+          pnpm check:no-any || failed=1
+          git diff --check || failed=1
+          exit "$failed"
 
       - name: Cleanup ephemeral resources
         if: always()
@@ -422,3 +400,4 @@ jobs:
           rm -f "$RUNNER_TEMP/api-migrate-second.log"
           rm -f "$RUNNER_TEMP/api-after-migration.log"
           rm -f "$RUNNER_TEMP/api-after-migration.log.sanitized"
+          rm -f "$RUNNER_TEMP/api-readiness.body"
