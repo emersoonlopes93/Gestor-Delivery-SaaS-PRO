@@ -2,7 +2,7 @@ import { ChatGateway } from '../chat/chat.gateway';
 import { DeliveryTrackingGateway } from '../delivery/delivery-tracking.gateway';
 import { OrdersGateway } from '../orders/orders.gateway';
 import { HealthController } from './health.controller';
-import { HealthService } from './health.service';
+import { HealthService, type QueueMetrics } from './health.service';
 
 type GatewayWithEngine = {
   server?: {
@@ -11,19 +11,24 @@ type GatewayWithEngine = {
   };
 };
 
+const environmentKeys = ['REDIS_ENABLED', 'BULLMQ_ENABLED'] as const;
+
 describe('HealthService readiness WebSocket diagnostics', () => {
   const originalGateways = {
     orders: OrdersGateway.instance,
     delivery: DeliveryTrackingGateway.instance,
     chat: ChatGateway.instance,
   };
-  const originalRedisEnabled = process.env.REDIS_ENABLED;
-  const originalBullmqEnabled = process.env.BULLMQ_ENABLED;
+  const originalEnvironment = new Map(environmentKeys.map((key) => [key, process.env[key]]));
   const prisma = {
     isHealthy: jest.fn<Promise<boolean>, []>(),
     $queryRawUnsafe: jest.fn(),
   };
   const service = new HealthService(prisma as never);
+  const healthInternals = service as unknown as {
+    pingRedis: () => Promise<{ connected: boolean; latencyMs: number | null; reason: string | null }>;
+    checkQueueHealth: (name: string, enabled: boolean) => Promise<QueueMetrics>;
+  };
 
   const setGatewayInstances = (
     orders: GatewayWithEngine | null,
@@ -35,26 +40,53 @@ describe('HealthService readiness WebSocket diagnostics', () => {
     ChatGateway.instance = chat as ChatGateway | null;
   };
 
+  const setActiveGateways = () => setGatewayInstances(
+    { server: { server: { engine: { clientsCount: 2 } } } },
+    { server: { server: { engine: { clientsCount: 3 } } } },
+    { server: { server: { engine: { clientsCount: 5 } } } },
+  );
+
+  const setEnvironment = (redisEnabled: boolean, bullmqEnabled: boolean) => {
+    process.env.REDIS_ENABLED = String(redisEnabled);
+    process.env.BULLMQ_ENABLED = String(bullmqEnabled);
+  };
+
+  const restoreEnvironment = () => {
+    for (const key of environmentKeys) {
+      const value = originalEnvironment.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+
   beforeEach(() => {
-    process.env.REDIS_ENABLED = 'false';
-    process.env.BULLMQ_ENABLED = 'false';
+    jest.restoreAllMocks();
+    prisma.isHealthy.mockReset();
+    prisma.$queryRawUnsafe.mockReset();
     prisma.isHealthy.mockResolvedValue(true);
-    setGatewayInstances(
-      { server: { server: { engine: { clientsCount: 2 } } } },
-      { server: { server: { engine: { clientsCount: 3 } } } },
-      { server: { server: { engine: { clientsCount: 5 } } } },
-    );
+    setEnvironment(false, false);
+    setActiveGateways();
   });
 
-  afterAll(() => {
-    OrdersGateway.instance = originalGateways.orders;
-    DeliveryTrackingGateway.instance = originalGateways.delivery;
-    ChatGateway.instance = originalGateways.chat;
-    process.env.REDIS_ENABLED = originalRedisEnabled;
-    process.env.BULLMQ_ENABLED = originalBullmqEnabled;
+  afterEach(() => {
+    jest.restoreAllMocks();
+    setGatewayInstances(originalGateways.orders, originalGateways.delivery, originalGateways.chat);
+    restoreEnvironment();
   });
 
-  it('reports active gateways with their connection counts', async () => {
+  it('reports ok when all configured dependencies are healthy', async () => {
+    setEnvironment(true, true);
+    jest.spyOn(healthInternals, 'pingRedis').mockResolvedValue({ connected: true, latencyMs: 1, reason: null });
+    jest.spyOn(healthInternals, 'checkQueueHealth').mockImplementation(async (name): Promise<QueueMetrics> => ({
+      name,
+      status: 'ok',
+      waiting: 0,
+      active: 0,
+      failed: 0,
+      delayed: 0,
+      error: null,
+    }));
+
     const readiness = await service.getReadiness();
 
     expect(readiness.status).toBe('ok');
@@ -63,6 +95,33 @@ describe('HealthService readiness WebSocket diagnostics', () => {
       deliveryGateway: { active: true, clientsCount: 3, reason: null },
       chatGateway: { active: true, clientsCount: 5, reason: null },
     });
+  });
+
+  it('reports disabled Redis and BullMQ as degraded without probing them', async () => {
+    const redisProbe = jest.spyOn(healthInternals, 'pingRedis');
+    const queueProbe = jest.spyOn(healthInternals, 'checkQueueHealth');
+
+    const readiness = await service.getReadiness();
+
+    expect(readiness.status).toBe('degraded');
+    expect(readiness.services).toMatchObject({ redis: 'disabled', bullmq: 'disabled', websocket: 'ok' });
+    expect(redisProbe).not.toHaveBeenCalled();
+    expect(queueProbe).not.toHaveBeenCalled();
+  });
+
+  it('reports enabled but unavailable Redis and BullMQ as degraded', async () => {
+    setEnvironment(true, true);
+    jest.spyOn(healthInternals, 'pingRedis').mockResolvedValue({
+      connected: false,
+      latencyMs: null,
+      reason: 'redis_health_connect_timeout',
+    });
+
+    const readiness = await service.getReadiness();
+
+    expect(readiness.status).toBe('degraded');
+    expect(readiness.services).toMatchObject({ redis: 'degraded', bullmq: 'degraded', websocket: 'ok' });
+    expect(readiness.details.redis.reason).toBe('redis_health_connect_timeout');
   });
 
   it('reports a mandatory gateway that has not been instantiated without throwing', async () => {
@@ -83,21 +142,7 @@ describe('HealthService readiness WebSocket diagnostics', () => {
     });
   });
 
-  it('keeps disabled Redis and BullMQ independent from WebSocket readiness', async () => {
-    setGatewayInstances(null, null, null);
-
-    const readiness = await service.getReadiness();
-
-    expect(readiness.status).toBe('degraded');
-    expect(readiness.services).toMatchObject({ redis: 'disabled', bullmq: 'disabled', websocket: 'degraded' });
-    expect(readiness.details.websocket.chatGateway).toEqual({
-      active: false,
-      clientsCount: null,
-      reason: 'gateway_not_initialized',
-    });
-  });
-
-  it('reports every uninitialized gateway when more than one is not ready', async () => {
+  it('reports every uninitialized mandatory gateway with a structured reason', async () => {
     setGatewayInstances({ server: {} }, null, { server: { engine: { clientsCount: 5 } } });
 
     const readiness = await service.getReadiness();
