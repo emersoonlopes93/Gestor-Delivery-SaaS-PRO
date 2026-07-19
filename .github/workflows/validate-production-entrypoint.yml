@@ -49,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma Client for quality gates
+        run: pnpm --filter @gestor/api prisma:generate
+
       - name: Create isolated Compose override
         shell: bash
         run: |
