@@ -208,7 +208,34 @@ jobs:
         run: |
           set -euo pipefail
           compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
-          "${compose[@]}" --profile operations run --rm api-migrate > "$RUNNER_TEMP/api-migrate-first.log" 2>&1
+          migration_log="$RUNNER_TEMP/api-migrate-first.log"
+          sanitized_log="$migration_log.sanitized"
+
+          set +e
+          "${compose[@]}" --profile operations run --rm api-migrate > "$migration_log" 2>&1
+          migration_exit_code=$?
+          set -e
+
+          if [ "$migration_exit_code" -ne 0 ]; then
+            sed -E \
+              -e 's#postgres(ql)?://[^[:space:]]+#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(DATABASE_URL|DIRECT_URL)[[:space:]]*[:=][^[:space:]]*#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(password|token|secret)[[:space:]]*[:=][^[:space:]]+#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#ci-ephemeral-not-a-production-secret#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#ci-ephemeral-not-a-production-refresh-secret#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#://[^:@[:space:]]*:[^@[:space:]]*@#://[REDACTED]@#g' \
+              "$migration_log" > "$sanitized_log"
+
+            if grep -Eqi 'postgres(ql)?://|DATABASE_URL[[:space:]]*[:=]|DIRECT_URL[[:space:]]*[:=]|(password|token|secret)[[:space:]]*[:=]|ci-ephemeral-not-a-production' "$sanitized_log"; then
+              echo "Sanitization check failed; diagnostic will not be printed."
+              exit "$migration_exit_code"
+            fi
+
+            echo "::group::Sanitized api-migrate diagnostic"
+            cat "$sanitized_log"
+            echo "::endgroup::"
+            exit "$migration_exit_code"
+          fi
 
           assert_absent() {
             if grep -Fqi "$1" "$2"; then
@@ -223,9 +250,9 @@ jobs:
             fi
           }
           for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
-            assert_absent "$pattern" "$RUNNER_TEMP/api-migrate-first.log"
+            assert_absent "$pattern" "$migration_log"
           done
-          assert_no_password_value "$RUNNER_TEMP/api-migrate-first.log"
+          assert_no_password_value "$migration_log"
 
           "${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -v ON_ERROR_STOP=1 -c "CREATE TABLE entrypoint_ci_sentinel (id integer PRIMARY KEY); INSERT INTO entrypoint_ci_sentinel VALUES (1);" >/dev/null
           echo "Manual migration completed."
@@ -328,3 +355,9 @@ jobs:
           docker image rm -f gestor-entrypoint-ci-api:local || true
           rm -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml"
           rm -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.rendered.yml"
+          rm -f "$RUNNER_TEMP/api-image-build.log"
+          rm -f "$RUNNER_TEMP/api-before-migration.log"
+          rm -f "$RUNNER_TEMP/api-migrate-first.log"
+          rm -f "$RUNNER_TEMP/api-migrate-first.log.sanitized"
+          rm -f "$RUNNER_TEMP/api-migrate-second.log"
+          rm -f "$RUNNER_TEMP/api-after-migration.log"
