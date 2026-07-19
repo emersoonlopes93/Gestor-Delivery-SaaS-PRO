@@ -138,7 +138,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'orders-list', label: 'Lista de Pedidos', to: '/orders', icon: ClipboardList, permission: 'orders.read', match: (p) => p === '/orders' },
       { id: 'orders-board', label: 'Kanban Operacional', to: '/orders/board', icon: BarChart3, permission: 'orders.use_kanban' },
-      { id: 'orders-kds', label: 'KDS (Cozinha)', to: '/orders/kds', icon: ChefHat, permission: 'kds.use' },
+      { id: 'orders-kds', label: 'KDS (Cozinha)', to: '/orders/kds', icon: ChefHat, permission: 'kds.use', featureKey: 'kds' },
       { id: 'orders-automation', label: 'Automacao de Pedidos', to: '/orders/settings/automation', icon: Bot, permission: 'orders.settings.manage' },
     ],
   },
@@ -157,8 +157,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'PDV e Caixa',
     items: [
       { id: 'pos', label: 'Ponto de Venda', to: '/pos', icon: ShoppingCart, permission: 'pos.read' },
-      { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read' },
-      { id: 'pos-printers', label: 'Impressoras', to: '/pos/printers', icon: Printer, permission: 'settings.manage' },
+      { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read', featureKey: 'dine_in' },
+      { id: 'pos-printers', label: 'Impressoras', to: '/pos/printers', icon: Printer, permission: 'settings.manage', featureKey: 'printing' },
       { id: 'cash', label: 'Caixa', to: '/cash', icon: Wallet, permission: 'cash.read' },
     ],
   },

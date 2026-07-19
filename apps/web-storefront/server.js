@@ -115,7 +115,10 @@ ${imageTags}
 <meta name="twitter:description" content="${escapeHtml(description)}" />
 <link rel="manifest" href="/manifest/${encodeURIComponent(slug)}.webmanifest" />`;
 
-    html = html.replace('<title>PedeHub</title>', metaTags);
+    html = html
+      .replace(/<meta name="description"[^>]*>\s*/i, '')
+      .replace(/<link rel="icon"[^>]*>\s*/i, '')
+      .replace('<title>PedeHub</title>', metaTags);
   } catch (error) {
     console.error('Erro ao gerar metadados públicos do storefront:', error);
   }
