@@ -16,8 +16,12 @@ function CurrencyInputHarness({ initialValue }: { initialValue: number }) {
   );
 }
 
+function getCurrencyInput(): HTMLInputElement {
+  return screen.getByLabelText<HTMLInputElement>('currency-input');
+}
+
 function expectCurrencyDisplay(value: string) {
-  const normalized = (screen.getByLabelText('currency-input') as HTMLInputElement).value.replace(/\u00a0/g, ' ');
+  const normalized = getCurrencyInput().value.replace(/\u00a0/g, ' ');
   expect(normalized).toBe(value);
 }
 
@@ -39,7 +43,7 @@ describe('CurrencyInput', () => {
   it('builds cents progressively while typing', () => {
     render(<CurrencyInputHarness initialValue={0} />);
 
-    const input = screen.getByLabelText('currency-input');
+    const input = getCurrencyInput();
 
     replaceAllCurrency(input, '1');
     expectCurrencyDisplay('R$ 0,01');
@@ -61,7 +65,7 @@ describe('CurrencyInput', () => {
   it('supports select-all replacement and backspace without locking', () => {
     render(<CurrencyInputHarness initialValue={0.05} />);
 
-    const input = screen.getByLabelText('currency-input');
+    const input = getCurrencyInput();
 
     replaceAllCurrency(input, '50');
     expectCurrencyDisplay('R$ 0,50');
@@ -80,7 +84,7 @@ describe('CurrencyInput', () => {
     const user = userEvent.setup();
     render(<CurrencyInputHarness initialValue={12.34} />);
 
-    const input = screen.getByLabelText('currency-input');
+    const input = getCurrencyInput();
 
     await user.clear(input);
     expectCurrencyDisplay('R$ 0,00');
@@ -99,7 +103,7 @@ describe('CurrencyInput', () => {
   it('replaces a selected suffix without retaining the old digits', () => {
     render(<CurrencyInputHarness initialValue={12.34} />);
 
-    const input = screen.getByLabelText('currency-input');
+    const input = getCurrencyInput();
     input.focus();
     input.setSelectionRange(input.value.length - 2, input.value.length);
     fireEvent.change(input, { target: { value: 'R$ 12,00' } });
