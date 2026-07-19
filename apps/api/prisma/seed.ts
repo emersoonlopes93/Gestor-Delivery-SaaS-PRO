@@ -14,6 +14,7 @@ import {
   ensureDefaultTenantRoles,
   ensureTenantPermissionCatalog,
 } from '../src/tenant/default-tenant-roles';
+import { SMOKE_TENANT_FIXTURE } from './smoke-tenant-fixture';
 
 const prisma = new PrismaClient();
 
@@ -394,7 +395,7 @@ async function seedBaseMenus() {
 }
 
 async function seedDemoTenant() {
-  const TENANT_SLUG = 'pizzaria-demo';
+  const TENANT_SLUG = SMOKE_TENANT_FIXTURE.slug;
   console.log('🏪 Seeding demo tenant...');
 
   try {
@@ -474,9 +475,15 @@ async function seedDemoTenant() {
 
     await ensureDefaultTenantRoles(prisma, tenant.id);
 
-    // Create tenant owner user
-    const ownerEmail = 'demo@demo.com';
-    const ownerPassword = await bcrypt.hash('demo123', 12);
+    // CI owns a deterministic, disposable tenant fixture. Persistent environments
+    // retain the existing demo owner password hash on repeated seeds.
+    const isEphemeralSmokeSeed = process.env.NODE_ENV === 'test';
+    const ownerEmail = isEphemeralSmokeSeed
+      ? SMOKE_TENANT_FIXTURE.ownerEmail
+      : 'demo@demo.com';
+    const ownerPassword = isEphemeralSmokeSeed
+      ? await bcrypt.hash(SMOKE_TENANT_FIXTURE.ownerPassword, 12)
+      : undefined;
 
     const owner = await prisma.tenantUser.upsert({
       where: {
@@ -484,12 +491,13 @@ async function seedDemoTenant() {
       },
       update: {
         isActive: true,
+        ...(ownerPassword ? { passwordHash: ownerPassword } : {}),
       },
       create: {
         tenantId: tenant.id,
         email: ownerEmail,
         name: 'Dono da Pizzaria',
-        passwordHash: ownerPassword,
+        passwordHash: ownerPassword ?? await bcrypt.hash('demo123', 12),
         isActive: true,
       },
     });
