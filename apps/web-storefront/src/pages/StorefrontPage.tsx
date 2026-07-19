@@ -174,7 +174,7 @@ export function StorefrontPage() {
       document.title = `${tenant.name}${suffix}`.substring(0, 80); // Limita o tamanho para exibição otimizada na aba
 
       // Atualizar o favicon (ícone da aba) dinamicamente com a logo do Tenant
-      let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+      let link: HTMLLinkElement | null = document.querySelector("link[rel='icon']");
       if (!link) {
         link = document.createElement('link');
         link.rel = 'icon';
