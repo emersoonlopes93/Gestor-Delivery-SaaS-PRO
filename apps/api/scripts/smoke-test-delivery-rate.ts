@@ -218,8 +218,6 @@ async function main() {
       city: 'São Paulo',
       state: 'SP',
       zipCode: '01001000',
-      lat: -23.53,
-      lng: -46.61,
       lat: -23.55,
       lng: -46.63,
     },
@@ -245,6 +243,8 @@ async function main() {
       city: 'São Paulo',
       state: 'SP',
       zipCode: '01001000',
+      lat: -23.53,
+      lng: -46.61,
     },
     distanceKm: 5,
   });
