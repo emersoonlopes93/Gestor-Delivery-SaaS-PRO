@@ -567,7 +567,6 @@ async function seedDemoTenant() {
     });
 
     // Create tenant operating hours
-    const isEphemeralSmokeSeed = process.env.NODE_ENV === 'test';
     const openTime = isEphemeralSmokeSeed ? '00:00' : '08:00';
     const closeTime = isEphemeralSmokeSeed ? '23:59' : '22:00';
     for (let day = 0; day <= 6; day++) {
