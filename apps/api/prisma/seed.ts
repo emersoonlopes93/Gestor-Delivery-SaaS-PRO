@@ -566,7 +566,10 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create default tenant operating hours (08:00 to 22:00 for Sun-Sat)
+    // Create tenant operating hours
+    const isEphemeralSmokeSeed = process.env.NODE_ENV === 'test';
+    const openTime = isEphemeralSmokeSeed ? '00:00' : '08:00';
+    const closeTime = isEphemeralSmokeSeed ? '23:59' : '22:00';
     for (let day = 0; day <= 6; day++) {
       const existingHours = await prisma.tenantOperatingHours.findFirst({
         where: { tenantId: tenant.id, dayOfWeek: day }
@@ -577,8 +580,18 @@ async function seedDemoTenant() {
             tenantId: tenant.id,
             dayOfWeek: day,
             isOpen: true,
-            openTime: '08:00',
-            closeTime: '22:00',
+            openTime,
+            closeTime,
+          }
+        });
+      } else if (isEphemeralSmokeSeed) {
+        // For ephemeral test, ensure it's 24h
+        await prisma.tenantOperatingHours.update({
+          where: { id: existingHours.id },
+          data: {
+            isOpen: true,
+            openTime,
+            closeTime,
           }
         });
       }
