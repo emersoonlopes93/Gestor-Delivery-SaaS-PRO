@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcryptjs';
+import { TENANT_ROLE_PERMISSIONS } from '@gestor/core';
 import { SMOKE_TENANT_FIXTURE } from './smoke-tenant-fixture';
 
 describe('smoke tenant fixture', () => {
@@ -9,7 +10,11 @@ describe('smoke tenant fixture', () => {
       slug: 'pizzaria-demo',
       ownerEmail: 'owner@pizzariademo.com',
       ownerRole: 'tenant_owner',
+      billingPlanSlug: 'revenue-growth',
     });
+    expect(TENANT_ROLE_PERMISSIONS[SMOKE_TENANT_FIXTURE.ownerRole]).toEqual(
+      expect.arrayContaining(['inventory.create']),
+    );
     await expect(bcrypt.compare(SMOKE_TENANT_FIXTURE.ownerPassword, passwordHash)).resolves.toBe(true);
     await expect(bcrypt.compare('incorrect-smoke-password', passwordHash)).resolves.toBe(false);
   });

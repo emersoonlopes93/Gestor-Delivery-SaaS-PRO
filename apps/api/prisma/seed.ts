@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { PrismaClient, TenantStatus } from '@prisma/client';
+import { PrismaClient, TenantStatus, TenantSubscriptionStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   TENANT_PERMISSIONS,
@@ -478,6 +478,38 @@ async function seedDemoTenant() {
     // CI owns a deterministic, disposable tenant fixture. Persistent environments
     // retain the existing demo owner password hash on repeated seeds.
     const isEphemeralSmokeSeed = process.env.NODE_ENV === 'test';
+    if (isEphemeralSmokeSeed) {
+      const smokePlan = await prisma.billingPlan.findUniqueOrThrow({
+        where: { slug: SMOKE_TENANT_FIXTURE.billingPlanSlug },
+        select: { id: true, requiresPaymentMethod: true },
+      });
+      const existingSubscription = await prisma.tenantBillingSubscription.findFirst({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      const subscriptionData = {
+        billingPlanId: smokePlan.id,
+        status: TenantSubscriptionStatus.active,
+        requiresPaymentMethod: smokePlan.requiresPaymentMethod,
+      };
+
+      if (existingSubscription) {
+        await prisma.tenantBillingSubscription.update({
+          where: { id: existingSubscription.id },
+          data: subscriptionData,
+        });
+      } else {
+        await prisma.tenantBillingSubscription.create({
+          data: {
+            tenantId: tenant.id,
+            startedAt: new Date(),
+            ...subscriptionData,
+          },
+        });
+      }
+    }
+
     const ownerEmail = isEphemeralSmokeSeed
       ? SMOKE_TENANT_FIXTURE.ownerEmail
       : 'demo@demo.com';

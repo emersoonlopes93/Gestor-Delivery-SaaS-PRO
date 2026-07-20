@@ -5,4 +5,5 @@ export const SMOKE_TENANT_FIXTURE = {
   ownerEmail: 'owner@pizzariademo.com',
   ownerPassword: 'Owner@123',
   ownerRole: TenantDefaultRole.TENANT_OWNER,
+  billingPlanSlug: 'revenue-growth',
 } as const;
