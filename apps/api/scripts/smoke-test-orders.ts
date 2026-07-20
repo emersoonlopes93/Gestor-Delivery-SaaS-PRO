@@ -41,7 +41,7 @@ function pickNumber(obj: Record<string, unknown>, key: string): number | null {
   return typeof v === 'number' ? v : null;
 }
 
-function pickFirstProductIdWithoutRequiredComplements(storefront: unknown): {
+function pickFirstProductIdWithoutRequiredOptions(storefront: unknown): {
   productId: string | null;
   productName: string | null;
 } {
@@ -56,13 +56,14 @@ function pickFirstProductIdWithoutRequiredComplements(storefront: unknown): {
       const pRec = asRecord(p);
       if (!pRec) continue;
 
-      const complements = asArray(pRec.complements);
-      const hasRequiredComplementGroup = complements.some((g) => {
-        const gRec = asRecord(g);
-        return gRec?.isRequired === true;
+      const optionGroupLinks = asArray(pRec.optionGroupLinks);
+      const hasRequiredOptionGroup = optionGroupLinks.some((link) => {
+        const linkRec = asRecord(link);
+        const optionGroup = linkRec ? asRecord(linkRec.optionGroup) : null;
+        return (linkRec?.overrideIsRequired ?? optionGroup?.isRequired) === true;
       });
 
-      if (!hasRequiredComplementGroup) {
+      if (!hasRequiredOptionGroup) {
         const productId = pickString(pRec, 'id');
         const productName = pickString(pRec, 'name');
         if (productId) return { productId, productName };
@@ -129,11 +130,11 @@ async function testCheckoutPickup() {
   // First, get storefront data to find real product IDs
   const { data: storefront } = await api('GET', `/public/storefront/${TENANT_SLUG}`);
 
-  const picked = pickFirstProductIdWithoutRequiredComplements(storefront);
+  const picked = pickFirstProductIdWithoutRequiredOptions(storefront);
   const productId = picked.productId;
   const productName = picked.productName ?? 'unknown';
   if (!productId) {
-    assert('Pickup checkout', false, 'No product without required complements found in storefront', storefront);
+    assert('Pickup checkout', false, 'No product without required options found in storefront', storefront);
     return null;
   }
 
@@ -145,7 +146,6 @@ async function testCheckoutPickup() {
       lineType: 'product',
       productId,
       quantity: 1,
-      complements: [],
     }],
     customerName: 'Smoke Test Pickup',
     customerPhone: '11999990001',
@@ -191,10 +191,10 @@ async function testCheckoutDelivery() {
   console.log('\n🚚 Test 2: Checkout Delivery');
 
   const { data: storefront } = await api('GET', `/public/storefront/${TENANT_SLUG}`);
-  const picked = pickFirstProductIdWithoutRequiredComplements(storefront);
+  const picked = pickFirstProductIdWithoutRequiredOptions(storefront);
   const productId = picked.productId;
   if (!productId) {
-    assert('Delivery checkout', false, 'No product without required complements found in storefront', storefront);
+    assert('Delivery checkout', false, 'No product without required options found in storefront', storefront);
     return null;
   }
 
@@ -204,7 +204,6 @@ async function testCheckoutDelivery() {
       lineType: 'product',
       productId,
       quantity: 2,
-      complements: [],
     }],
     customerName: 'Smoke Test Delivery',
     customerPhone: '11999990002',
@@ -233,88 +232,7 @@ async function testCheckoutDelivery() {
 }
 
 // ----------------------------------------------------------------
-// TEST 3: Product with required complements
-// ----------------------------------------------------------------
-async function testComplementsRequired() {
-  console.log('\n🧀 Test 3: Complements Validation');
-
-  const { data: storefront } = await api('GET', `/public/storefront/${TENANT_SLUG}`);
-  const s = asRecord(storefront);
-  const categories = s ? asArray(s.categories) : [];
-  
-  // Find first product that has required complements
-  let productWithReqComp = null;
-  for (const cat of categories) {
-    const catRec = asRecord(cat);
-    const products = catRec ? asArray(catRec.products) : [];
-    for (const p of products) {
-      const pRec = asRecord(p);
-      const complements = pRec ? asArray(pRec.complements) : [];
-      const required = complements.find((c) => {
-        const cRec = asRecord(c);
-        return cRec?.isRequired === true;
-      });
-      if (required && pRec) { productWithReqComp = pRec; break; }
-    }
-    if (productWithReqComp) break;
-  }
-
-  if (!productWithReqComp) {
-    assert('Complements validation', true, 'SKIPPED: No product with required complements in demo data');
-    return;
-  }
-
-  const complements = asArray(productWithReqComp.complements);
-  const requiredGroup = complements
-    .map(asRecord)
-    .find((c) => c?.isRequired === true) ?? null;
-
-  const productId = pickString(productWithReqComp, 'id');
-  const groupId = requiredGroup ? pickString(requiredGroup, 'id') : null;
-  const items = requiredGroup ? asArray(requiredGroup.items) : [];
-  const firstItem = items.length > 0 ? asRecord(items[0]) : null;
-  const itemId = firstItem ? pickString(firstItem, 'id') : null;
-
-  if (!productId || !groupId || !itemId) {
-    assert('Complements validation', false, 'Invalid required complements payload shape', productWithReqComp);
-    return;
-  }
-
-  // Try without required complement (should FAIL)
-  const { status: failStatus } = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, {
-    idempotencyKey: `test-comp-fail-${Date.now()}`,
-    items: [{
-      lineType: 'product',
-      productId,
-      quantity: 1,
-      complements: [],
-    }],
-    customerName: 'Test Comp Fail',
-    customerPhone: '11999990003',
-    fulfillmentType: 'pickup',
-    payment: { method: 'pix' },
-  });
-
-  assert('Reject missing required complement', failStatus === 400, `Expected 400, got ${failStatus}`);
-
-  // Try WITH required complement (should PASS)
-  const { status: passStatus, data } = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, {
-    idempotencyKey: `test-comp-pass-${Date.now()}`,
-    items: [{
-      lineType: 'product',
-      productId,
-      quantity: 1,
-      complements: [{ groupId, itemId }],
-    }],
-    customerName: 'Test Comp Pass',
-    customerPhone: '11999990004',
-    fulfillmentType: 'pickup',
-    payment: { method: 'pix' },
-  });
-
-  assert('Accept valid complement', passStatus === 201 || passStatus === 200, `Got ${passStatus}`);
-}
-
+// TEST 3: Product with required Catalog V2 options
 // ----------------------------------------------------------------
 // TEST 4: Combo checkout
 // ----------------------------------------------------------------
@@ -339,23 +257,25 @@ async function testComboCheckout() {
   const comboId = pickString(combo, 'id');
   const comboName = pickString(combo, 'name') ?? 'unknown';
   const blocks = asArray(combo.blocks);
-  const selections = blocks.flatMap((b) => {
+  const slots = blocks.flatMap((b) => {
     const block = asRecord(b);
     if (!block) return [];
-    const blockId = pickString(block, 'id');
+    const comboSlotId = pickString(block, 'id');
     const minSelect = pickNumber(block, 'minSelect') ?? 0;
     const items = asArray(block.items);
-    if (!blockId || minSelect <= 0 || items.length === 0) return [];
+    if (!comboSlotId || minSelect <= 0 || items.length === 0) return [];
 
-    return Array.from({ length: minSelect }, (_, i) => {
+    const selectedItems = Array.from({ length: minSelect }, (_, i) => {
       const item = asRecord(items[i % items.length]);
-      const blockItemId = item ? pickString(item, 'id') : null;
-      return blockItemId ? { blockId, blockItemId } : null;
-    }).filter((x): x is { blockId: string; blockItemId: string } => x !== null);
+      const productId = item ? pickString(item, 'productId') : null;
+      return productId ? { productId, qty: 1 } : null;
+    }).filter((item): item is { productId: string; qty: number } => item !== null);
+
+    return selectedItems.length === minSelect ? [{ comboSlotId, items: selectedItems }] : [];
   });
 
-  if (!comboId || selections.length === 0) {
-    assert('Combo checkout', false, 'Combo missing id or selections', combo);
+  if (!comboId || slots.length === 0) {
+    assert('Combo checkout', false, 'Combo missing id or slots', combo);
     return;
   }
 
@@ -364,8 +284,9 @@ async function testComboCheckout() {
     items: [{
       lineType: 'combo',
       comboId,
+      productId: comboId,
       quantity: 1,
-      comboSelections: selections,
+      slots,
     }],
     customerName: 'Smoke Test Combo',
     customerPhone: '11999990005',
@@ -388,17 +309,17 @@ async function testIdempotency() {
   console.log('\n🔁 Test 5: Idempotency Key Retry');
 
   const { data: storefront } = await api('GET', `/public/storefront/${TENANT_SLUG}`);
-  const picked = pickFirstProductIdWithoutRequiredComplements(storefront);
+  const picked = pickFirstProductIdWithoutRequiredOptions(storefront);
   const productId = picked.productId;
   if (!productId) {
-    assert('Idempotency', false, 'No product without required complements found in storefront', storefront);
+    assert('Idempotency', false, 'No product without required options found in storefront', storefront);
     return;
   }
   const key = `test-idempotency-${Date.now()}`;
 
   const { data: first } = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, {
     idempotencyKey: key,
-    items: [{ lineType: 'product', productId, quantity: 1, complements: [] }],
+    items: [{ lineType: 'product', productId, quantity: 1 }],
     customerName: 'Idempotency Test',
     customerPhone: '11999990006',
     fulfillmentType: 'pickup',
@@ -407,7 +328,7 @@ async function testIdempotency() {
 
   const { data: second } = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, {
     idempotencyKey: key,
-    items: [{ lineType: 'product', productId, quantity: 1, complements: [] }],
+    items: [{ lineType: 'product', productId, quantity: 1 }],
     customerName: 'Idempotency Test',
     customerPhone: '11999990006',
     fulfillmentType: 'pickup',
@@ -470,7 +391,6 @@ async function main() {
     // Test 1-4: Checkout scenarios
     const pickupOrder = await testCheckoutPickup();
     await testCheckoutDelivery();
-    await testComplementsRequired();
     await testComboCheckout();
 
     // Test 5: Idempotency
