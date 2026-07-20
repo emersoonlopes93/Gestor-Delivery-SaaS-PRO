@@ -178,6 +178,7 @@ async function main() {
       items: [{ lineType: 'product', productId, quantity: 1 }],
       customerName: 'Smoke Inventory',
       customerPhone: '11999990111',
+      customerEmail: 'smoke-checkout@example.test',
       fulfillmentType: 'pickup',
       payment: { method: 'pix' },
     },
