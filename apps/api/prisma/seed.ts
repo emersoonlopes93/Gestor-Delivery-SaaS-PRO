@@ -433,6 +433,7 @@ async function seedDemoTenant() {
         state: 'SP',
         zipCode: '01310-100',
         pixKey: 'contato@pizzariademo.com',
+        pickupEnabled: true,
         paymentMethods: ['pix', 'credit_card', 'cash'],
         audioNotificationEnabled: true,
         newOrderSound: 'notification.mp3',
@@ -454,8 +455,7 @@ async function seedDemoTenant() {
         street: 'Av. Paulista',
         number: '1000',
         neighborhood: 'Bela Vista',
-
-
+        pickupEnabled: true,
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
