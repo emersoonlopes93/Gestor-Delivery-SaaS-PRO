@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { PrismaClient, TenantStatus } from '@prisma/client';
+import { PrismaClient, TenantStatus, TenantSubscriptionStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   TENANT_PERMISSIONS,
@@ -14,6 +14,7 @@ import {
   ensureDefaultTenantRoles,
   ensureTenantPermissionCatalog,
 } from '../src/tenant/default-tenant-roles';
+import { SMOKE_TENANT_FIXTURE } from './smoke-tenant-fixture';
 
 const prisma = new PrismaClient();
 
@@ -394,7 +395,7 @@ async function seedBaseMenus() {
 }
 
 async function seedDemoTenant() {
-  const TENANT_SLUG = 'pizzaria-demo';
+  const TENANT_SLUG = SMOKE_TENANT_FIXTURE.slug;
   console.log('🏪 Seeding demo tenant...');
 
   try {
@@ -432,6 +433,7 @@ async function seedDemoTenant() {
         state: 'SP',
         zipCode: '01310-100',
         pixKey: 'contato@pizzariademo.com',
+        pickupEnabled: true,
         paymentMethods: ['pix', 'credit_card', 'cash'],
         audioNotificationEnabled: true,
         newOrderSound: 'notification.mp3',
@@ -453,8 +455,7 @@ async function seedDemoTenant() {
         street: 'Av. Paulista',
         number: '1000',
         neighborhood: 'Bela Vista',
-
-
+        pickupEnabled: true,
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
@@ -474,9 +475,47 @@ async function seedDemoTenant() {
 
     await ensureDefaultTenantRoles(prisma, tenant.id);
 
-    // Create tenant owner user
-    const ownerEmail = 'demo@demo.com';
-    const ownerPassword = await bcrypt.hash('demo123', 12);
+    // CI owns a deterministic, disposable tenant fixture. Persistent environments
+    // retain the existing demo owner password hash on repeated seeds.
+    const isEphemeralSmokeSeed = process.env.NODE_ENV === 'test';
+    if (isEphemeralSmokeSeed) {
+      const smokePlan = await prisma.billingPlan.findUniqueOrThrow({
+        where: { slug: SMOKE_TENANT_FIXTURE.billingPlanSlug },
+        select: { id: true, requiresPaymentMethod: true },
+      });
+      const existingSubscription = await prisma.tenantBillingSubscription.findFirst({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      const subscriptionData = {
+        billingPlanId: smokePlan.id,
+        status: TenantSubscriptionStatus.active,
+        requiresPaymentMethod: smokePlan.requiresPaymentMethod,
+      };
+
+      if (existingSubscription) {
+        await prisma.tenantBillingSubscription.update({
+          where: { id: existingSubscription.id },
+          data: subscriptionData,
+        });
+      } else {
+        await prisma.tenantBillingSubscription.create({
+          data: {
+            tenantId: tenant.id,
+            startedAt: new Date(),
+            ...subscriptionData,
+          },
+        });
+      }
+    }
+
+    const ownerEmail = isEphemeralSmokeSeed
+      ? SMOKE_TENANT_FIXTURE.ownerEmail
+      : 'demo@demo.com';
+    const ownerPassword = isEphemeralSmokeSeed
+      ? await bcrypt.hash(SMOKE_TENANT_FIXTURE.ownerPassword, 12)
+      : undefined;
 
     const owner = await prisma.tenantUser.upsert({
       where: {
@@ -484,12 +523,13 @@ async function seedDemoTenant() {
       },
       update: {
         isActive: true,
+        ...(ownerPassword ? { passwordHash: ownerPassword } : {}),
       },
       create: {
         tenantId: tenant.id,
         email: ownerEmail,
         name: 'Dono da Pizzaria',
-        passwordHash: ownerPassword,
+        passwordHash: ownerPassword ?? await bcrypt.hash('demo123', 12),
         isActive: true,
       },
     });
@@ -526,7 +566,9 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create default tenant operating hours (08:00 to 22:00 for Sun-Sat)
+    // Create tenant operating hours
+    const openTime = isEphemeralSmokeSeed ? '00:00' : '08:00';
+    const closeTime = isEphemeralSmokeSeed ? '23:59' : '22:00';
     for (let day = 0; day <= 6; day++) {
       const existingHours = await prisma.tenantOperatingHours.findFirst({
         where: { tenantId: tenant.id, dayOfWeek: day }
@@ -537,8 +579,18 @@ async function seedDemoTenant() {
             tenantId: tenant.id,
             dayOfWeek: day,
             isOpen: true,
-            openTime: '08:00',
-            closeTime: '22:00',
+            openTime,
+            closeTime,
+          }
+        });
+      } else if (isEphemeralSmokeSeed) {
+        // For ephemeral test, ensure it's 24h
+        await prisma.tenantOperatingHours.update({
+          where: { id: existingHours.id },
+          data: {
+            isOpen: true,
+            openTime,
+            closeTime,
           }
         });
       }

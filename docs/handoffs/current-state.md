@@ -342,3 +342,86 @@ Checksum SHA-256 do arquivo e checksum registrado pelo Prisma: `510ce2bc60f3467c
 O RC passa a **go para staging somente como artefato validado localmente**; não autoriza aplicar migrations ou ativar polling em staging/produção. Polling continua desabilitado por padrão e protegido pelos kill switches.
 
 O incidente histórico de `DIRECT_URL` permanece separado e aberto: antes de qualquer staging ou produção, o responsável pelo banco deve identificar formalmente o banco remoto afetado, conferir `_prisma_migrations`, confirmar backup recuperável e demonstrar que apenas as migrations aditivas 5A–5C foram aplicadas. Esta sessão não realizou nova consulta nem qualquer alteração remota.
+
+---
+
+## Segurança do startup e migration operacional no Dokploy
+
+Data: 2026-07-16
+Branch: `fix/production-entrypoint-safety`
+Base: `main-copy` / `6cdd98a3`
+
+### Objetivo e decisões
+
+O startup normal da API foi separado da gestão de schema. `docker-entrypoint.sh` agora valida somente a presença de `DATABASE_URL` e `DIRECT_URL`, não imprime valores, não executa limpeza ou migration e delega ao `CMD` da imagem com `exec`. O `CMD` inicia diretamente o artefato Node compilado.
+
+O Compose de produção ganhou o serviço manual `api-migrate`, isolado pelo profile `operations`, com `restart: "no"` e comando exclusivo `npx prisma@5.22.0 migrate deploy`. O serviço não possui dependência da API, seed ou limpeza e não participa do `docker compose up` padrão.
+
+`clean_db.js` deixou de ser copiado para a imagem, foi desacoplado de `prisma:migrate:deploy`, exige `CLEAN_DB=true` em comando local explícito e falha fechado em `NODE_ENV=production`.
+
+Durante a validação efêmera foi identificado que `.dockerignore` não excluía arquivos `.env`. Como o Dockerfile usa `COPY . .` no estágio de build, isso poderia incluir um `.env` local no contexto. A correção passa a excluir `.env` em qualquer diretório, preservando apenas arquivos `.env.example`; o build posterior confirmou que `prisma generate` carregou somente o schema, sem carregar `.env`.
+
+### Arquivos e contratos afetados
+
+- startup/infra: `.dockerignore`, `apps/api/docker-entrypoint.sh`, `apps/api/Dockerfile`, `docker-compose.prod.yml`, `apps/api/package.json`, `apps/api/clean_db.js`;
+- operação: novo `docs/operations/runbooks/dokploy-deployment.md` e atualizações no rollout iFood, índice documental, ambiente, pacote Dokploy histórico e `AGENTS.md`;
+- nenhum schema, migration, contrato REST, feature flag ou comportamento de domínio foi alterado.
+
+### Validações
+
+| Comando | Resultado |
+|---|---|
+| baseline e final `pnpm lint` | PASS; 16 warnings React preexistentes |
+| baseline e final `pnpm typecheck` | PASS |
+| `pnpm build` | PASS; warnings preexistentes de chunk size |
+| `pnpm test` | PASS: API 43 suítes/178 testes; web-admin 10; web-tenant 12; storefront 1 |
+| `pnpm prisma:validate` com ambas URLs sobrescritas para host local | PASS |
+| `pnpm check:no-any` | PASS |
+| `docker compose -f docker-compose.prod.yml config --quiet` com URLs fictícias | PASS |
+| runtime direto de `docker-entrypoint.sh` com placeholders | PASS; somente startup e comando delegado, sem secret ou migration |
+| prova PostgreSQL 16 efêmera | NÃO CONCLUÍDA: Docker Desktop perdeu o daemon durante o build, antes de qualquer migration |
+
+Nenhum deploy, banco remoto, migration, seed, limpeza, push ou merge foi executado. Os kill switches do iFood permaneceram inalterados e desligados.
+
+Tentativa posterior de prova efêmera: o build passou por `prisma generate` e pela compilação da API sem carregar `.env`, mas o Docker Desktop ficou bloqueado ao transferir a imagem final. Nenhum container de teste, migration, seed ou limpeza foi iniciado; os arquivos temporários de Compose e variáveis fictícias foram removidos.
+
+### Pendência e próximo passo
+
+Repetir a prova efêmera quando o daemon Docker estiver saudável: comprovar startup sem `_prisma_migrations`, duas execuções idempotentes de `api-migrate`, isolamento de falha e startup da API após schema aplicado. Depois revisar o diff e obter aprovação explícita antes de integrar em `main-copy`; não fazer deploy automaticamente.
+
+---
+
+## Metadados dinâmicos do storefront e títulos de abas
+
+Data: 2026-07-17
+Branch: `feat/dynamic-meta-and-page-titles`
+
+### Objetivo e auditoria
+
+O storefront é uma SPA Vite, mas a imagem de produção já inicia `apps/web-storefront/server.js`, um servidor Express que entrega o `index.html` inicial. A implementação anterior de SEO estava incompleta: buscava a rota inexistente `/storefront/:slug`, não escapava HTML, não emitia canonical/`og:url` e não normalizava imagens para URL absoluta. Alterações de título, favicon e descrição no React ocorrem somente após a API responder no navegador e, isoladamente, não atendem crawlers de compartilhamento.
+
+O tenant é resolvido pelo primeiro segmento da rota pública e pelo endpoint `GET /public/storefront/:slug`; a identidade disponível sem alteração de schema é nome do tenant, `TenantSettings.logoUrl` e hero/banner em `storefrontThemeJson`. A biblioteca de mídia existente continua sendo a responsável por URLs públicas. Não existem campos específicos persistidos para descrição social, imagem social ou favicon; não foram criados campos nem uma segunda infraestrutura de upload. O fallback de descrição é o texto público padrão e a ordem de imagem é banner, logo e logo global.
+
+O nome global canônico vem de `SystemConfig.appName`; a logo global vem de `SystemConfig.platformLogoMedia`. Foi exposto somente esse payload público e não sensível em `GET /public/storefront/branding` para permitir o fallback do renderizador. O painel tenant já concentrava labels de menu e breadcrumb em `SIDEBAR_GROUPS`; o painel SaaS Admin faz o mesmo. Os títulos da aba agora reutilizam essas configurações, com exceções amigáveis para páginas de detalhe.
+
+### Alterações feitas
+
+- `apps/web-storefront/server.js`: corrigida a chamada da API pública, HTML inicial com title, description, canonical, Open Graph, Twitter Card, manifest e favicon por tenant; sanitização de conteúdo HTML, URLs absolutas e cache local de cinco minutos.
+- `apps/api/src/storefront/storefront.controller.ts` e `storefront.service.ts`: endpoint público mínimo de branding global, sem dados internos ou segredos.
+- `apps/web-tenant/src/layouts/AppLayout.tsx`: título `{systemName} - {label atual}` sincronizado com breadcrumb/menu.
+- `apps/web-admin/src/layouts/AppLayout.tsx`: título dinâmico baseado no menu, incluindo detalhes conhecidos de tenant e cardápio base.
+
+### Validações
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @gestor/web-storefront build` | PASS |
+| TypeScript API, web-tenant e web-admin | PASS |
+| `node --check apps/web-storefront/server.js` | PASS |
+| `pnpm --filter @gestor/api test -- storefront.service.spec.ts` | PASS, 1 suíte/1 teste |
+| `pnpm --filter @gestor/web-storefront test` | PASS, 1 arquivo/1 teste |
+| `git diff --check` | PASS |
+
+### Limitações e próximo passo
+
+O servidor atualiza o cache interno em até cinco minutos; previews já guardados por WhatsApp/Facebook/LinkedIn/Telegram dependem do cache de cada plataforma e não são invalidáveis pela aplicação. Antes de publicação, confirmar que o deploy do storefront utiliza `Dockerfile.storefront`/`server.js`, pois um host que sirva apenas o build estático continuará sem metatags por tenant no HTML inicial. Não houve migration, acesso a ambiente remoto, deploy, push ou merge.

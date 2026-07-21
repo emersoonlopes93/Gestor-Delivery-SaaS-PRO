@@ -204,9 +204,11 @@ export function App() {
         <Route
           path="/orders/kds"
           element={
-            <PermissionGate permission="kds.use">
-              <KdsPage />
-            </PermissionGate>
+            <FeatureGate featureKey="kds">
+              <PermissionGate permission="kds.use">
+                <KdsPage />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route
@@ -277,17 +279,21 @@ export function App() {
         <Route
           path="/pos/tables"
           element={
-            <PermissionGate permission="pos.read">
-              <TablesPage />
-            </PermissionGate>
+            <FeatureGate featureKey="dine_in">
+              <PermissionGate permission="pos.read">
+                <TablesPage />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route
           path="/pos/printers"
           element={
-            <PermissionGate permission="settings.manage">
-              <PrinterSettings />
-            </PermissionGate>
+            <FeatureGate featureKey="printing">
+              <PermissionGate permission="settings.manage">
+                <PrinterSettings />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route

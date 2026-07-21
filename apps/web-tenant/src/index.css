@@ -64,6 +64,18 @@
     --surface-inset: #ffffff;         /* fundo de superfícies embutidas */
     --border-subtle: #e2e8f0;         /* borda sutil */
 
+    /* === SIDEBAR ICON COLORS === */
+    --sidebar-icon-dashboard: #60a5fa;
+    --sidebar-icon-menu: #fb7185;
+    --sidebar-icon-orders: #818cf8;
+    --sidebar-icon-logistics: #fb923c;
+    --sidebar-icon-pos: #22d3ee;
+    --sidebar-icon-management: #34d399;
+    --sidebar-icon-marketing: #c084fc;
+    --sidebar-icon-performance: #facc15;
+    --sidebar-icon-whatsapp: #4ade80;
+    --sidebar-icon-system: #94a3b8;
+
     /* === CHAT BUBBLE TOKENS (LIGHT MODE) === */
     --chat-bubble-user: #0c93e9;     /* cor do usuário - primary-500 */
     --chat-bubble-user-foreground: #ffffff; /* texto do usuário - branco */
@@ -159,6 +171,17 @@
     --surface-subtle: #f8fafc;
     --surface-inset: #ffffff;
     --border-subtle: #e2e8f0;
+
+    --sidebar-icon-dashboard: #60a5fa;
+    --sidebar-icon-menu: #fb7185;
+    --sidebar-icon-orders: #818cf8;
+    --sidebar-icon-logistics: #fb923c;
+    --sidebar-icon-pos: #22d3ee;
+    --sidebar-icon-management: #34d399;
+    --sidebar-icon-marketing: #c084fc;
+    --sidebar-icon-performance: #facc15;
+    --sidebar-icon-whatsapp: #4ade80;
+    --sidebar-icon-system: #94a3b8;
   }
 
   /* === DARK MODE TOKENS === */
@@ -212,6 +235,18 @@
     --surface-subtle: #111827;      /* fundo sutil de superfícies dark */
     --surface-inset: #1f2937;       /* fundo de superfícies embutidas dark */
     --border-subtle: #334155;       /* borda sutil dark */
+
+    /* === SIDEBAR ICON COLORS === */
+    --sidebar-icon-dashboard: #60a5fa;
+    --sidebar-icon-menu: #fb7185;
+    --sidebar-icon-orders: #818cf8;
+    --sidebar-icon-logistics: #fb923c;
+    --sidebar-icon-pos: #22d3ee;
+    --sidebar-icon-management: #34d399;
+    --sidebar-icon-marketing: #c084fc;
+    --sidebar-icon-performance: #facc15;
+    --sidebar-icon-whatsapp: #4ade80;
+    --sidebar-icon-system: #94a3b8;
 
     /* === CHAT BUBBLE TOKENS (DARK MODE) === */
     --chat-bubble-user: #0c93e9;     /* cor do usuário - primary-500 (mantida) */

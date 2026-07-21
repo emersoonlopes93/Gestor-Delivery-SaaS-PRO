@@ -79,4 +79,36 @@ describe('PlanGatingGuard financial enforcement', () => {
       .resolves
       .toBe(true);
   });
+
+  it('allows inventory only when the Billing V2 plan includes the module', async () => {
+    reflector.getAllAndOverride.mockReturnValue('inventory');
+    tenantBillingResolver.reconcileTenantBillingStatus.mockResolvedValue({
+      subscriptionStatus: 'active',
+      trialEndsAt: null,
+      subscription: { gracePeriodEndsAt: null },
+      source: 'billing_v2',
+      allowAllModules: false,
+      includedModules: ['inventory'],
+    });
+
+    await expect(makeGuard().canActivate(makeContext('/api/v1/inventory/ingredients') as never))
+      .resolves
+      .toBe(true);
+  });
+
+  it('keeps inventory blocked when the Billing V2 plan omits the module', async () => {
+    reflector.getAllAndOverride.mockReturnValue('inventory');
+    tenantBillingResolver.reconcileTenantBillingStatus.mockResolvedValue({
+      subscriptionStatus: 'active',
+      trialEndsAt: null,
+      subscription: { gracePeriodEndsAt: null },
+      source: 'billing_v2',
+      allowAllModules: false,
+      includedModules: [],
+    });
+
+    await expect(makeGuard().canActivate(makeContext('/api/v1/inventory/ingredients') as never))
+      .rejects
+      .toBeInstanceOf(ForbiddenException);
+  });
 });

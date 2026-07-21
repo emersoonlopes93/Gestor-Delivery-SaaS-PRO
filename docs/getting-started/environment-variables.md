@@ -37,6 +37,10 @@ source_of_truth:
 | `DIRECT_URL` | **Sim** | Todos | API | URL direta (sem pooling) — para migrations | `postgresql://user:pass@host:5432/db` | **Sim** |
 
 > `DIRECT_URL` é necessário para Neon/Supabase onde o pooler não suporta migrations.
+>
+> No Dokploy, o startup normal da API não executa migrations. `DATABASE_URL` e `DIRECT_URL`
+> são consumidas pelo serviço operacional manual `api-migrate`, e seus valores completos nunca
+> devem ser impressos em logs. `CLEAN_DB` é proibido em produção.
 
 ---
 

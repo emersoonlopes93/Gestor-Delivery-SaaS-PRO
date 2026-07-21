@@ -82,7 +82,7 @@
 
 | Documento | Descrição |
 |-----------|-----------|
-| [Deploy](./operations/deployment.md) | Render, Docker, variáveis de produção |
+| [Deploy no Dokploy](./operations/runbooks/dokploy-deployment.md) | Compose, migration operacional e validação de produção |
 | [Prontidão para produção](./operations/production-readiness.md) | Checklist de lançamento |
 | [Observabilidade](./operations/observability.md) | Logs, métricas, health checks |
 | [Backup e restore](./operations/backups-and-restore.md) | Estratégia de backup do banco |

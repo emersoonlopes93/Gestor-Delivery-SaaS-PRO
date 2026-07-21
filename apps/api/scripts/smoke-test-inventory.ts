@@ -108,14 +108,15 @@ async function main() {
       if (typeof p !== 'object' || p === null) continue;
       const pRec = p as Record<string, unknown>;
 
-      const complements = Array.isArray(pRec.complements) ? pRec.complements : [];
-      const hasRequiredComplementGroup = complements.some((g) => {
-        if (typeof g !== 'object' || g === null) return false;
-        const gRec = g as Record<string, unknown>;
-        return gRec.isRequired === true;
+      const optionGroupLinks = Array.isArray(pRec.optionGroupLinks) ? pRec.optionGroupLinks : [];
+      const hasRequiredOptionGroup = optionGroupLinks.some((link) => {
+        if (typeof link !== 'object' || link === null) return false;
+        const linkRec = link as Record<string, unknown>;
+        const optionGroup = asRecord(linkRec.optionGroup);
+        return (linkRec.overrideIsRequired ?? optionGroup?.isRequired) === true;
       });
 
-      if (!hasRequiredComplementGroup) {
+      if (!hasRequiredOptionGroup) {
         const id = pickString(pRec, 'id');
         if (id) {
           productId = id;
@@ -154,15 +155,30 @@ async function main() {
   });
   assert('recipe includes created ingredient', hasIngredient, 'ingredient not found in recipe', getRecipe.data);
 
-  // Runtime check: create order -> confirm -> cancel (exercise depletion/reversal paths; verify no exception)
+  const legacyPayload = await api(
+    'POST',
+    `/orders/public-checkout/${TENANT_SLUG}`,
+    {
+      idempotencyKey: `smoke-inv-legacy-${Date.now()}`,
+      items: [{ lineType: 'product', productId, quantity: 1, complements: [] }],
+      customerName: 'Smoke Inventory Legacy Payload',
+      customerPhone: '11999990110',
+      fulfillmentType: 'pickup',
+      payment: { method: 'pix' },
+    },
+  );
+  assert('reject legacy complements payload', legacyPayload.status === 400, `Status=${legacyPayload.status}`, legacyPayload.raw);
+
+  // Runtime check: create order -> verify depletion -> confirm -> cancel -> verify reversal.
   const orderCreate = await api(
     'POST',
     `/orders/public-checkout/${TENANT_SLUG}`,
     {
       idempotencyKey: `smoke-inv-${Date.now()}`,
-      items: [{ lineType: 'product', productId, quantity: 1, complements: [] }],
+      items: [{ lineType: 'product', productId, quantity: 1 }],
       customerName: 'Smoke Inventory',
       customerPhone: '11999990111',
+      customerEmail: 'smoke-checkout@example.test',
       fulfillmentType: 'pickup',
       payment: { method: 'pix' },
     },
@@ -175,11 +191,25 @@ async function main() {
   assert('order has id', typeof orderId === 'string' && orderId.length > 0, 'missing orderId', orderCreate.data);
 
   if (orderId) {
+    const movementsAfterCreate = await api('GET', `/inventory/movements?ingredientId=${ingredientId}`, undefined, token);
+    const depletionExists = Array.isArray(movementsAfterCreate.data) && movementsAfterCreate.data.some((movement) => {
+      const record = asRecord(movement);
+      return record?.type === 'theoretical_depletion' && record.orderId === orderId && record.quantity === 50;
+    });
+    assert('order creates theoretical inventory depletion', depletionExists, 'missing theoretical depletion movement', movementsAfterCreate.data);
+
     const confirm = await api('PATCH', `/orders/${orderId}/status`, { status: 'confirmed' }, token);
     assert('confirm order status 200', confirm.status === 200, `Status=${confirm.status}`, confirm.raw);
 
     const cancel = await api('PATCH', `/orders/${orderId}/status`, { status: 'cancelled' }, token);
     assert('cancel order status 200', cancel.status === 200, `Status=${cancel.status}`, cancel.raw);
+
+    const movementsAfterCancel = await api('GET', `/inventory/movements?ingredientId=${ingredientId}`, undefined, token);
+    const depletionWasReversed = Array.isArray(movementsAfterCancel.data) && !movementsAfterCancel.data.some((movement) => {
+      const record = asRecord(movement);
+      return record?.type === 'theoretical_depletion' && record.orderId === orderId;
+    });
+    assert('cancel order reverses theoretical inventory depletion', depletionWasReversed, 'theoretical depletion movement still exists', movementsAfterCancel.data);
   }
 
   const failed = results.filter((r) => !r.passed);

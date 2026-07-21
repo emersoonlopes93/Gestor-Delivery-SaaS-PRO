@@ -174,26 +174,22 @@ export function StorefrontPage() {
       document.title = `${tenant.name}${suffix}`.substring(0, 80); // Limita o tamanho para exibição otimizada na aba
 
       // Atualizar o favicon (ícone da aba) dinamicamente com a logo do Tenant
-      if (tenant.logo) {
-        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-        if (!link) {
-          link = document.createElement('link');
-          link.rel = 'icon';
-          document.getElementsByTagName('head')[0].appendChild(link);
-        }
-        link.href = tenant.logo;
+      let link: HTMLLinkElement | null = document.querySelector("link[rel='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
       }
+      link.href = tenant.logo || '/favicon.svg';
 
       // Atualizar a meta description para SEO dinamicamente
-      if (tenant.description) {
-        let meta: HTMLMetaElement | null = document.querySelector("meta[name='description']");
-        if (!meta) {
-          meta = document.createElement('meta');
-          meta.name = 'description';
-          document.getElementsByTagName('head')[0].appendChild(meta);
-        }
-        meta.content = tenant.description;
+      let meta: HTMLMetaElement | null = document.querySelector("meta[name='description']");
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        document.getElementsByTagName('head')[0].appendChild(meta);
       }
+      meta.content = tenant.description || 'Confira nosso cardápio online e faça seu pedido.';
     }
   }, [data, setTenantId, tableIdParam, setTableId]);
 
