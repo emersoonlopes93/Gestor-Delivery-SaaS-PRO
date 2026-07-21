@@ -64,6 +64,17 @@ export class KdsService {
     });
   }
 
+  private async assertOrderBelongsToTenant(orderId: string, tenantId: string): Promise<void> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+  }
+
   /**
    * Obtém as estações ativas de forma dinâmica (categorias e jobs pendentes)
    */
@@ -352,6 +363,8 @@ export class KdsService {
       throw new Error('Tenant context not found');
     }
 
+    await this.assertOrderBelongsToTenant(data.orderId, tenantId);
+
     const printJob = await this.prisma.printJob.create({
       data: {
         tenantId,
@@ -436,12 +449,13 @@ export class KdsService {
   /**
    * Limpa jobs antigos (manutenção)
    */
-  async cleanupOldJobs(days = 7) {
+  async cleanupOldJobs(tenantId: string, days = 7) {
     const date = new Date();
     date.setDate(date.getDate() - days);
 
     return this.prisma.printJob.deleteMany({
       where: {
+        tenantId,
         createdAt: { lt: date },
         status: {
           in: [PrismaPrintJobStatus.completed, PrismaPrintJobStatus.failed],
@@ -682,6 +696,8 @@ export class KdsService {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return;
 
+    await this.assertOrderBelongsToTenant(data.orderId, tenantId);
+
     return this.createOrReusePrintJob({
       tenantId,
       orderId: data.orderId,
@@ -699,6 +715,8 @@ export class KdsService {
   async createIncrementalPrintJobsForOrder(data: { orderId: string; station: string; items: { content: string }[] }) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return;
+
+    await this.assertOrderBelongsToTenant(data.orderId, tenantId);
 
     const jobs = data.items.map((item) => this.createOrReusePrintJob({
       tenantId,

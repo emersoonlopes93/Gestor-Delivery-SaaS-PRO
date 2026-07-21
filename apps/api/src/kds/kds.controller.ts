@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
@@ -24,6 +25,8 @@ import {
   PrintJobQueryDTO,
 } from './dto/kds.dto';
 import { PrintJobStatus } from '@gestor/types';
+
+type TenantRequest = { user: { tenantId: string } };
 
 @Controller('kds')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -141,7 +144,7 @@ export class KdsController {
   @Post('print-jobs/cleanup')
   @RequirePermissions('kds.manage')
   @HttpCode(HttpStatus.OK)
-  async cleanup(@Body() data: CleanupPrintJobsDTO) {
-    return this.kdsService.cleanupOldJobs(data.daysOld);
+  async cleanup(@Request() req: TenantRequest, @Body() data: CleanupPrintJobsDTO) {
+    return this.kdsService.cleanupOldJobs(req.user.tenantId, data.daysOld);
   }
 }
