@@ -1,18 +1,43 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StockMovementType } from '@gestor/types';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class TheoreticalStockService {
   private readonly logger = new Logger(TheoreticalStockService.name);
+  private readonly maxSerializableAttempts = 3;
 
   constructor(private prisma: PrismaService) {}
 
-  async processOrderDepletion(tenantId: string, orderId: string) {
+  async processOrderDepletion(tenantId: string, orderId: string): Promise<void> {
     this.logger.log(`Processing theoretical stock depletion for order ${orderId}`);
 
-    const existingMovements = await this.prisma.stockMovement.count({
+    for (let attempt = 1; attempt <= this.maxSerializableAttempts; attempt += 1) {
+      try {
+        await this.prisma.$transaction(
+          (tx) => this.processOrderDepletionInTransaction(tx, tenantId, orderId),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+        return;
+      } catch (error) {
+        if (!this.isSerializableConflict(error) || attempt === this.maxSerializableAttempts) {
+          throw error;
+        }
+        this.logger.warn(`Retrying theoretical stock depletion for order ${orderId} after P2034 (${attempt}/${this.maxSerializableAttempts})`);
+      }
+    }
+  }
+
+  async processOrderDepletionInTransaction(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    orderId: string,
+  ): Promise<void> {
+    const lockKey = `${tenantId}:${orderId}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+
+    const existingMovements = await tx.stockMovement.count({
       where: {
         tenantId,
         orderId,
@@ -25,7 +50,7 @@ export class TheoreticalStockService {
       return;
     }
 
-    const order = await this.prisma.order.findFirst({
+    const order = await tx.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
         items: true,
@@ -40,6 +65,7 @@ export class TheoreticalStockService {
       // 1. Resolve Product Recipe
       if (item.productId) {
         await this.addRecipeConsumption(
+          tx,
           tenantId,
           item.productId,
           Number(item.quantity),
@@ -57,6 +83,7 @@ export class TheoreticalStockService {
                 if (slotItem.productId) {
                   // Os slots abatem como 'product' baseado na quantidade escolhida * a quantidade do item principal
                   await this.addRecipeConsumption(
+                    tx,
                     tenantId,
                     slotItem.productId,
                     Number(item.quantity) * Number(slotItem.qty || 1),
@@ -72,56 +99,44 @@ export class TheoreticalStockService {
 
     if (consumptionByIngredient.size === 0) return;
 
-    await this.prisma.$transaction(async (tx) => {
-      const alreadyDepleted = await tx.stockMovement.count({
+    const ingredientIds = Array.from(consumptionByIngredient.keys());
+    const ingredients = await tx.ingredient.findMany({
+      where: { tenantId, id: { in: ingredientIds } },
+      select: { id: true, currentCost: true },
+    });
+    const costByIngredient = new Map(
+      ingredients.map((ingredient) => [ingredient.id, Number(ingredient.currentCost)]),
+    );
+
+    if (costByIngredient.size !== ingredientIds.length) {
+      throw new BadRequestException('Ingrediente da receita não encontrado para este tenant.');
+    }
+
+    for (const [ingredientId, quantity] of consumptionByIngredient) {
+      const updated = await tx.ingredient.updateMany({
         where: {
+          id: ingredientId,
           tenantId,
-          orderId,
-          type: StockMovementType.THEORETICAL_DEPLETION,
+          currentStock: { gte: quantity },
         },
+        data: { currentStock: { decrement: quantity } },
       });
 
-      if (alreadyDepleted > 0) return;
-
-      const ingredientIds = Array.from(consumptionByIngredient.keys());
-      const ingredients = await tx.ingredient.findMany({
-        where: { tenantId, id: { in: ingredientIds } },
-        select: { id: true, currentCost: true },
-      });
-      const costByIngredient = new Map(
-        ingredients.map((ingredient) => [ingredient.id, Number(ingredient.currentCost)]),
-      );
-
-      if (costByIngredient.size !== ingredientIds.length) {
-        throw new BadRequestException('Ingrediente da receita não encontrado para este tenant.');
+      if (updated.count !== 1) {
+        throw new BadRequestException('Estoque insuficiente para confirmar este pedido.');
       }
+    }
 
-      for (const [ingredientId, quantity] of consumptionByIngredient) {
-        const updated = await tx.ingredient.updateMany({
-          where: {
-            id: ingredientId,
-            tenantId,
-            currentStock: { gte: quantity },
-          },
-          data: { currentStock: { decrement: quantity } },
-        });
-
-        if (updated.count !== 1) {
-          throw new BadRequestException('Estoque insuficiente para confirmar este pedido.');
-        }
-      }
-
-      await tx.stockMovement.createMany({
-        data: Array.from(consumptionByIngredient, ([ingredientId, quantity]) => ({
-          tenantId,
-          ingredientId,
-          type: StockMovementType.THEORETICAL_DEPLETION,
-          quantity,
-          unitCost: costByIngredient.get(ingredientId) || 0,
-          orderId,
-          notes: `Baixa teórica via pedido ${orderId}`,
-        })),
-      });
+    await tx.stockMovement.createMany({
+      data: Array.from(consumptionByIngredient, ([ingredientId, quantity]) => ({
+        tenantId,
+        ingredientId,
+        type: StockMovementType.THEORETICAL_DEPLETION,
+        quantity,
+        unitCost: costByIngredient.get(ingredientId) || 0,
+        orderId,
+        notes: `Baixa teórica via pedido ${orderId}`,
+      })),
     });
   }
 
@@ -160,13 +175,14 @@ export class TheoreticalStockService {
   }
 
   private async addRecipeConsumption(
+    tx: Prisma.TransactionClient,
     tenantId: string,
     productId: string,
     quantityMultiplier: number,
     consumptionByIngredient: Map<string, number>,
   ): Promise<void> {
     const recipeItems: Array<{ ingredientId: string; quantity: Prisma.Decimal }> =
-      await this.prisma.productRecipeIngredient.findMany({
+      await tx.productRecipeIngredient.findMany({
         where: { productId, tenantId },
       });
 
@@ -177,5 +193,9 @@ export class TheoreticalStockService {
         (consumptionByIngredient.get(recipeItem.ingredientId) || 0) + quantity,
       );
     }
+  }
+
+  private isSerializableConflict(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
   }
 }

@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod, Prisma } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod, OrderStatus as SharedOrderStatus } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
@@ -381,26 +381,39 @@ export class PosService {
         }
       }
 
-      return currentOrder;
+      await this.cashService.registerSaleMovement(
+        tenantId,
+        activeSession.id,
+        currentOrder.id,
+        Number(currentOrder.total),
+        dto.paymentMethod,
+        tx,
+      );
+      if (cashbackUsed && customerId) {
+        await this.cashbackService.createTransaction({
+          tenantId,
+          customerId,
+          type: 'used',
+          amount: cashbackUsed,
+          orderId: currentOrder.id,
+          description: `Usado no PDV, pedido ${currentOrder.orderNumber}`,
+        }, tx);
+      }
+      if (couponId) {
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+      await this.theoreticalStockService.processOrderDepletionInTransaction(tx, tenantId, currentOrder.id);
+      return this.ordersService.confirmPosOrderInTransaction(tx, currentOrder.id, tenantId, operatorId);
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5_000,
+      timeout: 20_000,
     });
 
-    await this.cashService.registerSaleMovement(tenantId, activeSession.id, order.id, Number(order.total), dto.paymentMethod);
-    if (cashbackUsed && customerId) {
-      await this.cashbackService.createTransaction({
-        tenantId, customerId, type: 'used', amount: cashbackUsed, orderId: order.id, 
-        description: `Usado no PDV, pedido ${order.orderNumber}`
-      });
-    }
-    if (couponId) {
-      await this.prisma.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
-    }
-    await this.theoreticalStockService.processOrderDepletion(tenantId, order.id);
-
-    // Transition order to confirmed via centralized OrdersService to ensure timeline, KDS, and WebSocket are properly triggered
-    await this.ordersService.updateOrderStatus(order.id, tenantId, {
-      status: 'confirmed' as SharedOrderStatus,
-      note: 'Venda finalizada via PDV.',
-    }, operatorId);
+    await this.ordersService.runConfirmedOrderSideEffects(order.id, tenantId);
 
     return this.getOrderDetail(order.id, tenantId);
   }

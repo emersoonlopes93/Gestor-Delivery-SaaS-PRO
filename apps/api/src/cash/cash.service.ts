@@ -316,9 +316,11 @@ export class CashService {
     orderId: string,
     amount: number,
     paymentMethod: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const parsedPaymentMethod = this.parsePaymentMethod(paymentMethod);
-    await this.prisma.cashMovement.create({
+    const client = tx || this.prisma;
+    await client.cashMovement.create({
       data: {
         tenantId,
         cashSessionId,
