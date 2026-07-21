@@ -88,3 +88,10 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 - **Componente:** `drop_models.js`, `clean_schema.js`
 - **Problema:** Scripts de manutenção avulsos que podem apagar o banco se rodados sem cuidado em ambientes produtivos conectados por URL direta.
 - **Ação:** Arquivá-los em `/scripts/maintenance/` e forçar barreira de confirmação (ex: `--force` ou variável `NODE_ENV!=production`).
+
+## 8. Operação de loja
+
+| Gap | Severidade | Impacto / recomendação |
+|---|---|---|
+| Pedido de mesa persiste o número visual, não o identificador da mesa | Média | O contrato atual de `Order`/PDV não possui `tableId`; não alterar sem migration aditiva, migração de dados e revisão do ciclo de mesa. |
+| KDS depende de polling quando WebSocket/Redis não estão disponíveis | Baixa | A UI atualiza a cada 10 segundos; manter o polling como fallback até existir observabilidade operacional de tempo real. |

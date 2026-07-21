@@ -45,8 +45,8 @@ source_of_truth:
 | `orders_core` | **Stable** | Gestão de pedidos e checkout base. | N/A (Core) |
 | `checkout_core` | **Stable** | Finalização de pedidos. | N/A (Core) |
 | `marketplace_orders` | **Beta** | Inbox idempotente, ordenação, reconciliação, divergências, SLA e reprocessamento controlado de pedidos externos. | `orders.read` |
-| `kds` | **Stub** | Kitchen Display System (Telas de produção). | `kds.use` |
-| `printing` | **Beta** | Impressão e spooler local. | `printing.read` |
+| `kds` | **Beta** | Painel de produção com estações, consulta tenant-safe de jobs, atualização de status e polling de fallback. | `kds.use` |
+| `printing` | **Beta** | Jobs de impressão, retry, spooler local e fallback de impressão pelo navegador. | `printing.read` |
 | `scheduling` | **Beta** | Janelas tenant-safe, slots com timezone/capacidade e checkout transacional; edição de horário exige cancelar e reagendar. | `scheduling.view` |
 | `split_payment` | **Stub** | Divisão de pagamentos. | N/A |
 
@@ -79,7 +79,7 @@ source_of_truth:
 
 | Feature Key | Status | Descrição | Permissão requerida |
 |-------------|--------|-----------|--------------------|
-| `pos` | **Stable** | Ponto de venda de balcão (frente de caixa). | `pos.read` |
+| `pos` | **Stable** | Ponto de venda com sessão de caixa obrigatória, pagamento, idempotência por chave e impressão de cupom. | `pos.read` |
 | `dine_in` | **Beta** | Gestão de mesas e comandas de consumo local. | `pos.read` |
 
 ---
@@ -92,6 +92,7 @@ source_of_truth:
 | `cashback` | **Beta** | Carteira virtual com % de retorno. | `crm.manage_loyalty_cashback`|
 | `loyalty` | **Beta** | Programa de selos e fidelização. | `crm.manage_loyalty_cashback`|
 | `crm_enterprise` | **Beta** | Pipeline e segmentação avançada de clientes. | `crm.read` |
+| `crm_operational_profile` | **Stable** | Perfil operacional do cliente com contatos, totais, ticket médio, últimos pedidos, endereços e observações internas. | `crm.read` |
 | `campaigns` | **Beta** | Disparos automáticos e campanhas (requer Redis). | `crm.read` |
 | `whatsapp_connect` | **Beta** | Conexão com API Oficial do WhatsApp. | `settings.manage` |
 | `whatsapp_advanced` | **Beta** | Inbox de atendimento humano. | `orders.read` |
@@ -103,7 +104,7 @@ source_of_truth:
 
 | Feature Key | Status | Descrição | Permissão requerida |
 |-------------|--------|-----------|--------------------|
-| `inventory_advanced` | **Stable** | Fichas técnicas, insumos e dedução automática. | `inventory.read` |
+| `inventory_advanced` | **Stable** | Fichas técnicas, insumos e baixa teórica atômica, idempotente e sem saldo negativo. | `inventory.read` |
 | `finance_advanced` | **Stable** | DRE simplificado, fluxo de caixa e lançamentos. | `finance.read` |
 | `bi_advanced` | **Beta** | Dashboards e cubos de dados customizados. | `reports.read` |
 | `goals` | **Beta** | Cadastro e acompanhamento de metas da loja. | `goals.read` |
