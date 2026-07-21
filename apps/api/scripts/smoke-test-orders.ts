@@ -149,6 +149,7 @@ async function testCheckoutPickup() {
     }],
     customerName: 'Smoke Test Pickup',
     customerPhone: '11999990001',
+      customerEmail: 'smoke-orders@example.test',
     fulfillmentType: 'pickup',
     payment: { method: 'pix' },
   });
@@ -207,6 +208,7 @@ async function testCheckoutDelivery() {
     }],
     customerName: 'Smoke Test Delivery',
     customerPhone: '11999990002',
+    customerEmail: 'smoke-orders@example.test',
     fulfillmentType: 'delivery',
     deliveryAddress: {
       street: 'Rua Teste',
@@ -290,6 +292,7 @@ async function testComboCheckout() {
     }],
     customerName: 'Smoke Test Combo',
     customerPhone: '11999990005',
+    customerEmail: 'smoke-orders@example.test',
     fulfillmentType: 'pickup',
     payment: { method: 'pix' },
   });
@@ -322,6 +325,7 @@ async function testIdempotency() {
     items: [{ lineType: 'product', productId, quantity: 1 }],
     customerName: 'Idempotency Test',
     customerPhone: '11999990006',
+    customerEmail: 'smoke-orders@example.test',
     fulfillmentType: 'pickup',
     payment: { method: 'pix' },
   });
@@ -331,6 +335,7 @@ async function testIdempotency() {
     items: [{ lineType: 'product', productId, quantity: 1 }],
     customerName: 'Idempotency Test',
     customerPhone: '11999990006',
+    customerEmail: 'smoke-orders@example.test',
     fulfillmentType: 'pickup',
     payment: { method: 'pix' },
   });
