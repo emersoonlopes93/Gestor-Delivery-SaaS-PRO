@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StockMovementType } from '@gestor/types';
 import type { Prisma } from '@prisma/client';
@@ -12,6 +12,19 @@ export class TheoreticalStockService {
   async processOrderDepletion(tenantId: string, orderId: string) {
     this.logger.log(`Processing theoretical stock depletion for order ${orderId}`);
 
+    const existingMovements = await this.prisma.stockMovement.count({
+      where: {
+        tenantId,
+        orderId,
+        type: StockMovementType.THEORETICAL_DEPLETION,
+      },
+    });
+
+    if (existingMovements > 0) {
+      this.logger.debug(`Theoretical stock was already depleted for order ${orderId}`);
+      return;
+    }
+
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -21,10 +34,17 @@ export class TheoreticalStockService {
 
     if (!order) return;
 
+    const consumptionByIngredient = new Map<string, number>();
+
     for (const item of order.items) {
       // 1. Resolve Product Recipe
       if (item.productId) {
-        await this.applyRecipeDepletion(tenantId, orderId, 'product', item.productId, Number(item.quantity));
+        await this.addRecipeConsumption(
+          tenantId,
+          item.productId,
+          Number(item.quantity),
+          consumptionByIngredient,
+        );
       }
 
       // 2. Resolve Combo V3 Slots (from snapshot)
@@ -36,7 +56,12 @@ export class TheoreticalStockService {
               for (const slotItem of slot.items) {
                 if (slotItem.productId) {
                   // Os slots abatem como 'product' baseado na quantidade escolhida * a quantidade do item principal
-                  await this.applyRecipeDepletion(tenantId, orderId, 'product', slotItem.productId, Number(item.quantity) * Number(slotItem.qty || 1));
+                  await this.addRecipeConsumption(
+                    tenantId,
+                    slotItem.productId,
+                    Number(item.quantity) * Number(slotItem.qty || 1),
+                    consumptionByIngredient,
+                  );
                 }
               }
             }
@@ -44,6 +69,60 @@ export class TheoreticalStockService {
         }
       }
     }
+
+    if (consumptionByIngredient.size === 0) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      const alreadyDepleted = await tx.stockMovement.count({
+        where: {
+          tenantId,
+          orderId,
+          type: StockMovementType.THEORETICAL_DEPLETION,
+        },
+      });
+
+      if (alreadyDepleted > 0) return;
+
+      const ingredientIds = Array.from(consumptionByIngredient.keys());
+      const ingredients = await tx.ingredient.findMany({
+        where: { tenantId, id: { in: ingredientIds } },
+        select: { id: true, currentCost: true },
+      });
+      const costByIngredient = new Map(
+        ingredients.map((ingredient) => [ingredient.id, Number(ingredient.currentCost)]),
+      );
+
+      if (costByIngredient.size !== ingredientIds.length) {
+        throw new BadRequestException('Ingrediente da receita não encontrado para este tenant.');
+      }
+
+      for (const [ingredientId, quantity] of consumptionByIngredient) {
+        const updated = await tx.ingredient.updateMany({
+          where: {
+            id: ingredientId,
+            tenantId,
+            currentStock: { gte: quantity },
+          },
+          data: { currentStock: { decrement: quantity } },
+        });
+
+        if (updated.count !== 1) {
+          throw new BadRequestException('Estoque insuficiente para confirmar este pedido.');
+        }
+      }
+
+      await tx.stockMovement.createMany({
+        data: Array.from(consumptionByIngredient, ([ingredientId, quantity]) => ({
+          tenantId,
+          ingredientId,
+          type: StockMovementType.THEORETICAL_DEPLETION,
+          quantity,
+          unitCost: costByIngredient.get(ingredientId) || 0,
+          orderId,
+          notes: `Baixa teórica via pedido ${orderId}`,
+        })),
+      });
+    });
   }
 
   async reverseOrderDepletion(tenantId: string, orderId: string) {
@@ -80,53 +159,23 @@ export class TheoreticalStockService {
     }
   }
 
-  private async applyRecipeDepletion(
-    tenantId: string, 
-    orderId: string, 
-    type: 'product', 
-    id: string,
-    quantityMultiplier: number
-  ) {
-    let recipeItems: Array<{ ingredientId: string; quantity: Prisma.Decimal }> = [];
-
-    if (type === 'product') {
-      recipeItems = await this.prisma.productRecipeIngredient.findMany({ where: { productId: id, tenantId } });
-    }
+  private async addRecipeConsumption(
+    tenantId: string,
+    productId: string,
+    quantityMultiplier: number,
+    consumptionByIngredient: Map<string, number>,
+  ): Promise<void> {
+    const recipeItems: Array<{ ingredientId: string; quantity: Prisma.Decimal }> =
+      await this.prisma.productRecipeIngredient.findMany({
+        where: { productId, tenantId },
+      });
 
     for (const recipeItem of recipeItems) {
-      const consumptionQty = Number(recipeItem.quantity) * quantityMultiplier;
-
-      await this.prisma.$transaction(async (tx) => {
-        // 0. Get current cost from ingredient
-        const ingredient = await tx.ingredient.findUnique({
-          where: { id: recipeItem.ingredientId },
-          select: { currentCost: true }
-        });
-        const unitCost = ingredient?.currentCost ? Number(ingredient.currentCost) : 0;
-
-        // 1. Create movement
-        await tx.stockMovement.create({
-          data: {
-            tenantId,
-            ingredientId: recipeItem.ingredientId,
-            type: StockMovementType.THEORETICAL_DEPLETION,
-            quantity: consumptionQty,
-            unitCost: unitCost,
-            orderId,
-            notes: `Baixa teórica via pedido ${orderId}`,
-          },
-        });
-
-        // 2. Decrement physical materialized stock
-        await tx.ingredient.update({
-          where: { id: recipeItem.ingredientId },
-          data: {
-            currentStock: {
-              decrement: consumptionQty,
-            },
-          },
-        });
-      });
+      const quantity = Number(recipeItem.quantity) * quantityMultiplier;
+      consumptionByIngredient.set(
+        recipeItem.ingredientId,
+        (consumptionByIngredient.get(recipeItem.ingredientId) || 0) + quantity,
+      );
     }
   }
 }

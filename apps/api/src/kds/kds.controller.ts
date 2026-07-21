@@ -10,7 +10,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  NotImplementedException,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
@@ -64,8 +63,8 @@ export class KdsController {
 
   @Get('print-jobs/:id')
   @RequirePermissions('kds.use')
-  async getPrintJob() {
-    throw new NotImplementedException('Not implemented yet');
+  async getPrintJob(@Param('id') id: string) {
+    return this.kdsService.getPrintJob(id);
   }
 
   @Get('print-jobs/order/:orderId')

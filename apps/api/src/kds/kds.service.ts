@@ -232,6 +232,34 @@ export class KdsService {
   }
 
   /**
+   * Retrieves a single print job while preserving tenant isolation.
+   */
+  async getPrintJob(printJobId: string): Promise<PrintJobWithOrder> {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new Error('Tenant context not found');
+    }
+
+    const printJob = await this.prisma.printJob.findFirst({
+      where: { id: printJobId, tenantId },
+      include: {
+        order: {
+          include: {
+            items: true,
+            customer: true,
+          },
+        },
+      },
+    });
+
+    if (!printJob) {
+      throw new NotFoundException('Print job not found');
+    }
+
+    return printJob;
+  }
+
+  /**
    * Marca um job de impressão como em processo
    */
   async markAsPrinting(printJobId: string) {
