@@ -48,6 +48,11 @@ function pickString(obj: Record<string, unknown>, key: string): string | null {
   return typeof v === 'string' ? v : null;
 }
 
+function pickNumber(obj: Record<string, unknown>, key: string): number | null {
+  const v = obj[key];
+  return typeof v === 'number' ? v : null;
+}
+
 async function getTenantToken(): Promise<string | null> {
   const login = await api('POST', '/auth/tenant/login', {
     email: TENANT_EMAIL,
@@ -73,11 +78,16 @@ async function main() {
   }
 
   const ingredientName = `Smoke Ingredient ${Date.now()}`;
+  // The full smoke continues with pickup (1), delivery (2), and one idempotent
+  // checkout (1): four effective product units at 50 g each.
+  const initialStock = 200;
+  const recipeQuantity = 50;
+  const orderQuantity = 1;
 
   const createdIngredient = await api(
     'POST',
     '/inventory/ingredients',
-    { name: ingredientName, unit: 'g', currentCost: 3.5, currentStock: 100, minStock: 100 },
+    { name: ingredientName, unit: 'g', minStock: 100 },
     token,
   );
 
@@ -90,7 +100,29 @@ async function main() {
 
   const ingData = asRecord(createdIngredient.data);
   const ingredientId = ingData ? pickString(ingData, 'id') : null;
+  const tenantId = ingData ? pickString(ingData, 'tenantId') : null;
   assert('ingredient has id', typeof ingredientId === 'string' && ingredientId.length > 0, 'missing id', createdIngredient.data);
+
+  if (ingredientId) {
+    const initialStockEntry = await api(
+      'POST',
+      '/inventory/movements',
+      {
+        ingredientId,
+        type: 'in',
+        quantity: initialStock,
+        unitCost: 3.5,
+        notes: 'Ephemeral smoke fixture stock',
+      },
+      token,
+    );
+    assert(
+      'seed initial ingredient stock',
+      initialStockEntry.status === 200 || initialStockEntry.status === 201,
+      `Status=${initialStockEntry.status}`,
+      initialStockEntry.raw,
+    );
+  }
 
   const storefront = await api('GET', `/public/storefront/${TENANT_SLUG}`);
   assert('storefront status 200', storefront.status === 200, `Status=${storefront.status}`, storefront.raw);
@@ -138,7 +170,7 @@ async function main() {
   const upsertRecipe = await api(
     'POST',
     `/inventory/recipes/product/${productId}`,
-    [{ ingredientId, quantity: 50 }],
+    [{ ingredientId, quantity: recipeQuantity }],
     token,
   );
 
@@ -169,13 +201,46 @@ async function main() {
   );
   assert('reject legacy complements payload', legacyPayload.status === 400, `Status=${legacyPayload.status}`, legacyPayload.raw);
 
+  const recipeBeforeOrder = await api('GET', `/inventory/recipes/product/${productId}`, undefined, token);
+  const recipeBeforeOrderItems = Array.isArray(recipeBeforeOrder.data) ? recipeBeforeOrder.data : [];
+  let observedStockBefore: number | null = null;
+  let expectedConsumption = 0;
+
+  for (const recipeItem of recipeBeforeOrderItems) {
+    const recipeRecord = asRecord(recipeItem);
+    if (!recipeRecord) continue;
+
+    const consumedIngredientId = pickString(recipeRecord, 'ingredientId');
+    const quantityPerUnit = pickNumber(recipeRecord, 'quantity');
+    if (!consumedIngredientId || quantityPerUnit === null) continue;
+
+    const requiredQuantity = quantityPerUnit * orderQuantity;
+    const ingredientBeforeOrder = await api('GET', `/inventory/ingredients/${consumedIngredientId}`, undefined, token);
+    const ingredientRecord = asRecord(ingredientBeforeOrder.data);
+    const ingredientTenantId = ingredientRecord ? pickString(ingredientRecord, 'tenantId') : null;
+    const currentStock = ingredientRecord ? pickNumber(ingredientRecord, 'currentStock') : null;
+    const movementsBeforeOrder = await api('GET', `/inventory/movements?ingredientId=${consumedIngredientId}`, undefined, token);
+    const priorMovements = Array.isArray(movementsBeforeOrder.data) ? movementsBeforeOrder.data : [];
+
+    process.stdout.write(
+      `  PRECHECK tenantId=${tenantId} productId=${productId} ingredientId=${consumedIngredientId} required=${requiredQuantity} stock=${currentStock} ingredientTenantId=${ingredientTenantId} priorMovements=${priorMovements.length}\n`,
+    );
+    assert('recipe ingredient belongs to checkout tenant', ingredientTenantId === tenantId, `tenant=${ingredientTenantId}, expected=${tenantId}`);
+    assert('recipe ingredient has sufficient stock', currentStock !== null && currentStock >= requiredQuantity, `stock=${currentStock}, required=${requiredQuantity}`);
+
+    if (consumedIngredientId === ingredientId) {
+      observedStockBefore = currentStock;
+      expectedConsumption += requiredQuantity;
+    }
+  }
+
   // Runtime check: create order -> verify depletion -> confirm -> cancel -> verify reversal.
   const orderCreate = await api(
     'POST',
     `/orders/public-checkout/${TENANT_SLUG}`,
     {
       idempotencyKey: `smoke-inv-${Date.now()}`,
-      items: [{ lineType: 'product', productId, quantity: 1 }],
+      items: [{ lineType: 'product', productId, quantity: orderQuantity }],
       customerName: 'Smoke Inventory',
       customerPhone: '11999990111',
       customerEmail: 'smoke-checkout@example.test',
@@ -194,9 +259,18 @@ async function main() {
     const movementsAfterCreate = await api('GET', `/inventory/movements?ingredientId=${ingredientId}`, undefined, token);
     const depletionExists = Array.isArray(movementsAfterCreate.data) && movementsAfterCreate.data.some((movement) => {
       const record = asRecord(movement);
-      return record?.type === 'theoretical_depletion' && record.orderId === orderId && record.quantity === 50;
+      return record?.type === 'theoretical_depletion' && record.orderId === orderId && record.quantity === expectedConsumption;
     });
     assert('order creates theoretical inventory depletion', depletionExists, 'missing theoretical depletion movement', movementsAfterCreate.data);
+
+    const ingredientAfterCreate = await api('GET', `/inventory/ingredients/${ingredientId}`, undefined, token);
+    const ingredientAfterCreateRecord = asRecord(ingredientAfterCreate.data);
+    const observedStockAfter = ingredientAfterCreateRecord ? pickNumber(ingredientAfterCreateRecord, 'currentStock') : null;
+    const expectedStockAfter = observedStockBefore === null ? null : observedStockBefore - expectedConsumption;
+    process.stdout.write(
+      `  POSTCHECK orderId=${orderId} ingredientId=${ingredientId} stockBefore=${observedStockBefore} consumed=${expectedConsumption} stockAfter=${observedStockAfter} movements=${Array.isArray(movementsAfterCreate.data) ? movementsAfterCreate.data.length : 0}\n`,
+    );
+    assert('order leaves expected stock balance', observedStockAfter === expectedStockAfter, `stock=${observedStockAfter}, expected=${expectedStockAfter}`);
 
     const confirm = await api('PATCH', `/orders/${orderId}/status`, { status: 'confirmed' }, token);
     assert('confirm order status 200', confirm.status === 200, `Status=${confirm.status}`, confirm.raw);
