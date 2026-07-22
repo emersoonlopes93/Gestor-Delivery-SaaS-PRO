@@ -970,6 +970,7 @@ model Order {
   publicTrackingToken    String                       @unique @map("public_tracking_token")
   changeFor              Decimal?                     @map("change_for") @db.Decimal(10, 2)
   tableNumber            String?                      @map("table_number") @db.VarChar(20)
+  tableId                String?                      @map("table_id")
   waiterId               String?                      @map("waiter_id")
   scheduledFor           DateTime?                    @map("scheduled_for")
   isScheduled            Boolean                      @default(false) @map("is_scheduled")
@@ -980,6 +981,7 @@ model Order {
   loyaltyTransactions    CustomerLoyaltyTransaction[]
   walletTransactions     CustomerWalletTransaction[]
   activeTable            DineInTable?                 @relation("ActiveTableOrder")
+  table                  DineInTable?                 @relation("OrderTable", fields: [tableId], references: [id], onDelete: SetNull)
   marketplaceOrders      MarketplaceOrder[]
   marketplaceDivergences MarketplaceDivergence[]
   deliveryAddress        OrderDeliveryAddress?
@@ -1005,6 +1007,7 @@ model Order {
   @@index([tenantId, status, createdAt])
   @@index([tenantId, createdAt])
   @@index([tenantId, customerId, createdAt])
+  @@index([tenantId, tableId])
   @@map("orders")
 }
 
@@ -2288,6 +2291,7 @@ model DineInTable {
   createdAt     DateTime          @default(now()) @map("created_at")
   updatedAt     DateTime          @updatedAt @map("updated_at")
   order         Order?            @relation("ActiveTableOrder", fields: [activeOrderId], references: [id])
+  orders        Order[]           @relation("OrderTable")
   tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, name])
