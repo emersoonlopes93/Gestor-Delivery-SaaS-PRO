@@ -80,7 +80,7 @@ source_of_truth:
 | Feature Key | Status | Descrição | Permissão requerida |
 |-------------|--------|-----------|--------------------|
 | `pos` | **Stable** | Ponto de venda com sessão de caixa obrigatória, pagamento, idempotência por chave e impressão de cupom. | `pos.read` |
-| `dine_in` | **Beta** | Gestão de mesas e comandas de consumo local. | `pos.read` |
+| `dine_in` | **Beta** | Gestão de mesas e comandas; pedidos novos usam relação `tableId` com snapshot `tableNumber` compatível. | `pos.read` |
 
 ---
 
