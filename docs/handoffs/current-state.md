@@ -425,3 +425,59 @@ O nome global canônico vem de `SystemConfig.appName`; a logo global vem de `Sys
 ### Limitações e próximo passo
 
 O servidor atualiza o cache interno em até cinco minutos; previews já guardados por WhatsApp/Facebook/LinkedIn/Telegram dependem do cache de cada plataforma e não são invalidáveis pela aplicação. Antes de publicação, confirmar que o deploy do storefront utiliza `Dockerfile.storefront`/`server.js`, pois um host que sirva apenas o build estático continuará sem metatags por tenant no HTML inicial. Não houve migration, acesso a ambiente remoto, deploy, push ou merge.
+
+---
+
+## Sprint 6A — núcleo operacional da loja
+
+Data: 2026-07-21
+Branch: `feat/sprint-6-operational-core`
+Base: `main-copy` em `37ae8430`
+
+### Alterações concluídas
+
+- Perfil operacional acessível pela lista de clientes, com contatos, indicadores, ticket médio, último pedido, endereços, observações internas e os dez pedidos mais recentes. As consultas permanecem filtradas por tenant e usam as permissões CRM existentes.
+- `GET /kds/print-jobs/:id` deixou de responder `NotImplementedException`; agora consulta o job e o pedido associado com filtro explícito do tenant e retorna 404 fora do escopo.
+- Baixa teórica de estoque agrega a receita por insumo e executa em transação. Reexecuções de um mesmo pedido não duplicam movimentos; decrementos exigem saldo suficiente e toda a operação é revertida se algum insumo não puder ser baixado.
+
+### Auditoria operacional
+
+| Domínio | Estado | Evidência resumida |
+|---|---|---|
+| Perfil do cliente | Completo | rota CRM, RBAC, perfil e histórico recentes |
+| PDV | Parcial | caixa obrigatório, idempotência e pedidos suportados; mesa ainda usa número visual |
+| Caixa | Completo | abertura, suprimento, sangria, venda, fechamento e resumo por meio de pagamento |
+| Impressão/reimpressão | Parcial | jobs, retry e fallback de navegador; hardware continua opcional |
+| KDS | Parcial | estações, status, endpoint de job e polling de fallback |
+| Estoque/ficha técnica | Parcial | receitas e reversão existem; baixa agora é idempotente e sem saldo negativo |
+
+### Validações focadas
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @gestor/api build` | PASS |
+| `pnpm --filter @gestor/web-tenant build` | PASS; aviso preexistente de chunk grande |
+| `pnpm --filter @gestor/api lint` | PASS |
+| `pnpm --filter @gestor/web-tenant lint` | PASS |
+| testes KDS/estoque focados | PASS, 2 suítes / 5 testes |
+| `git diff --check` | PASS |
+
+### Pendência e risco
+
+Não houve migration, deploy, acesso a banco remoto, alteração de `main` ou ativação iFood. O vínculo de pedido de mesa continua por `tableNumber`, pois não há `tableId` no contrato atual; uma correção requer migration aditiva e revisão do ciclo de mesa antes de ser proposta.
+
+---
+
+## Sprint 6A — fechamento do retry serializável
+
+Data: 2026-07-21
+Branch: `feat/sprint-6-operational-core`
+
+- POS, checkout público e baixa autônoma de estoque usam o mesmo wrapper `Serializable`, com no máximo três tentativas, retry exclusivo para Prisma `P2034` e backoff de 10ms/20ms limitado a 50ms.
+- A unidade repetida inclui todas as escritas atômicas; WebSocket, KDS, WhatsApp e pagamentos externos continuam após o commit e são disparados uma única vez.
+- Testes unitários cobrem sucesso após conflito, repetição da operação completa, limite de tentativas, preservação do último erro e ausência de retry para erros não `P2034`.
+- PostgreSQL 16 local/descartável comprovou duas baixas realmente concorrentes: 1 movimento, saldo final 8 a partir de 10, sem saldo negativo, 1 pedido, 1 movimento de caixa, 1 cashback, 1 uso de cupom e 1 evento de receita. O container foi removido ao final.
+- A CI executa essa prova no PostgreSQL efêmero do job após aplicar as migrations existentes.
+- Gates globais: lint, typecheck, build, 51 suites/210 testes da API, testes dos frontends, Prisma validate, anti-`any`, features e diff-check aprovados.
+
+Nenhuma migration ou alteração de schema foi criada; nenhum banco remoto, deploy, `main` ou `main-copy` foi alterado.

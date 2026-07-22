@@ -46,6 +46,7 @@ import { MarketplaceStatusSyncService } from '../marketplace/services/marketplac
 import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
 import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
 import { canAutoAcceptOrder } from './order-auto-accept.policy';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
 export class OrdersService {
@@ -250,7 +251,8 @@ export class OrdersService {
     // 4. Transactional order creation
     const finalTotal = total; 
 
-    const order = await this.prisma.$transaction(
+    const order = await runSerializableTransactionWithRetry(
+      this.prisma,
       async (tx) => {
         // Atomic increment of order sequence
         const updatedTenant = await tx.tenant.update({
@@ -378,37 +380,36 @@ export class OrdersService {
           });
         }
 
+        await this.inventoryService.processOrderDepletionInTransaction(tx, tenantId, newOrder.id);
+
+        if (cashbackUsed && customerId) {
+          await this.cashbackService.createTransaction({
+            tenantId,
+            customerId,
+            type: 'used',
+            amount: cashbackUsed,
+            orderId: newOrder.id,
+            description: `Usado no pedido ${newOrder.orderNumber}`,
+          }, tx);
+        }
+
+        if (couponId) {
+          await tx.coupon.update({
+            where: { id: couponId },
+            data: { usedCount: { increment: 1 } },
+          });
+        }
+
         return newOrder;
       },
       {
         timeout: 20_000,
         maxWait: 5_000,
+        onRetry: (attempt, delayMs) => this.logger.warn(
+          `Retrying public checkout transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+        ),
       },
     );
-
-    // Process Stock Depletion
-    await this.inventoryService.processOrderDepletion(tenantId, order.id).catch(e => {
-        this.logger.error(`Error processing stock depletion for order ${order.id}: ${e.message}`);
-    });
-
-    // Update Cashback Ledger & Coupon Usage
-    if (cashbackUsed && customerId) {
-      await this.cashbackService.createTransaction({
-        tenantId,
-        customerId: customerId,
-        type: 'used',
-        amount: cashbackUsed,
-        orderId: order.id,
-        description: `Usado no pedido ${order.orderNumber}`
-      }).catch(e => this.logger.error(`Error applying cashback: ${e.message}`));
-    }
-
-    if (couponId) {
-      await this.prisma.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } }
-      }).catch(e => this.logger.error(`Error updating coupon usage: ${e.message}`));
-    }
 
     let orderDetail = await this.getOrderDetail(order.id, tenantId);
 
@@ -1205,6 +1206,84 @@ export class OrdersService {
     }
 
     return updated;
+  }
+
+  async confirmPosOrderInTransaction(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+    actorId: string,
+  ) {
+    const order = await tx.order.findFirst({ where: { id: orderId, tenantId } });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    const currentStatus = order.status as OrderStatus;
+    if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(OrderStatus.confirmed)) {
+      throw new BadRequestException(`Transição inválida de ${currentStatus} para ${OrderStatus.confirmed}`);
+    }
+
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.confirmed },
+    });
+
+    await tx.orderTimeline.create({
+      data: {
+        orderId,
+        tenantId,
+        status: OrderStatus.confirmed,
+        note: 'Venda finalizada via PDV.',
+        actorId,
+      },
+    });
+
+    await this.revenueLedgerService.recordOrderStatusEvent({
+      tenantId,
+      orderId,
+      orderStatus: OrderStatus.confirmed,
+      orderTotal: order.total,
+      sourceChannel: order.sourceChannel,
+      occurredAt: new Date(),
+      actorType: 'tenant_user',
+      actorId,
+      reason: 'Venda finalizada via PDV.',
+      tx,
+    });
+
+    return updated;
+  }
+
+  async runConfirmedOrderSideEffects(orderId: string, tenantId: string): Promise<void> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId, status: OrderStatus.confirmed },
+    });
+    if (!order) throw new NotFoundException('Pedido confirmado não encontrado.');
+
+    if (order.publicTrackingToken) {
+      this.ordersGateway.emitOrderStatusUpdated(
+        order.publicTrackingToken,
+        order.orderNumber,
+        OrderStatus.confirmed,
+        'Venda finalizada via PDV.',
+      );
+    }
+
+    const jobs = await this.kdsService.createProductionJobs(orderId, tenantId);
+    if (jobs.length === 0) {
+      const existingActiveJobsCount = await this.prisma.printJob.count({
+        where: { tenantId, orderId, status: { in: ['pending', 'printing'] } },
+      });
+      if (existingActiveJobsCount === 0) {
+        this.logger.error(`No active production jobs found for order ${orderId} after status confirmed`);
+      }
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (order.customerPhone && tenant) {
+      await this.whatsappService
+        .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, OrderStatus.confirmed, tenant.name)
+        .catch((error: Error) => this.logger.warn(`WhatsApp notification failed: ${error.message}`));
+    }
   }
 
   async updateOrderNotes(orderId: string, tenantId: string, dto: UpdateOrderNotesDTO, actorId?: string) {

@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod, OrderStatus as SharedOrderStatus } from '@gestor/types';
@@ -16,6 +17,7 @@ import { KdsService } from '../kds/kds.service';
 import { PrismaService } from '../database/prisma.service';
 import { OrdersService } from '../orders/orders.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 import type {
   CreatePosOrderDTO,
@@ -29,6 +31,8 @@ import { PosFulfillmentType } from '@gestor/types';
 
 @Injectable()
 export class PosService {
+  private readonly logger = new Logger(PosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
@@ -251,7 +255,7 @@ export class PosService {
     const finalTotal = Math.round((finalItemsTotal - manualDiscountTotal) * 100) / 100;
     const combinedDiscountTotal = (commercialDiscountTotal || 0) + manualDiscountTotal;
 
-    const order = await this.prisma.$transaction(async (tx) => {
+    const order = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       let currentOrder;
       const orderTotal = Math.round((finalTotal + deliveryFee) * 100) / 100;
 
@@ -381,26 +385,41 @@ export class PosService {
         }
       }
 
-      return currentOrder;
+      await this.cashService.registerSaleMovement(
+        tenantId,
+        activeSession.id,
+        currentOrder.id,
+        Number(currentOrder.total),
+        dto.paymentMethod,
+        tx,
+      );
+      if (cashbackUsed && customerId) {
+        await this.cashbackService.createTransaction({
+          tenantId,
+          customerId,
+          type: 'used',
+          amount: cashbackUsed,
+          orderId: currentOrder.id,
+          description: `Usado no PDV, pedido ${currentOrder.orderNumber}`,
+        }, tx);
+      }
+      if (couponId) {
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+      await this.theoreticalStockService.processOrderDepletionInTransaction(tx, tenantId, currentOrder.id);
+      return this.ordersService.confirmPosOrderInTransaction(tx, currentOrder.id, tenantId, operatorId);
+    }, {
+      maxWait: 5_000,
+      timeout: 20_000,
+      onRetry: (attempt, delayMs) => this.logger.warn(
+        `Retrying POS sale transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+      ),
     });
 
-    await this.cashService.registerSaleMovement(tenantId, activeSession.id, order.id, Number(order.total), dto.paymentMethod);
-    if (cashbackUsed && customerId) {
-      await this.cashbackService.createTransaction({
-        tenantId, customerId, type: 'used', amount: cashbackUsed, orderId: order.id, 
-        description: `Usado no PDV, pedido ${order.orderNumber}`
-      });
-    }
-    if (couponId) {
-      await this.prisma.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
-    }
-    await this.theoreticalStockService.processOrderDepletion(tenantId, order.id);
-
-    // Transition order to confirmed via centralized OrdersService to ensure timeline, KDS, and WebSocket are properly triggered
-    await this.ordersService.updateOrderStatus(order.id, tenantId, {
-      status: 'confirmed' as SharedOrderStatus,
-      note: 'Venda finalizada via PDV.',
-    }, operatorId);
+    await this.ordersService.runConfirmedOrderSideEffects(order.id, tenantId);
 
     return this.getOrderDetail(order.id, tenantId);
   }
