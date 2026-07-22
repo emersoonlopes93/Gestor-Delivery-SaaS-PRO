@@ -141,6 +141,7 @@ export default function PosPage() {
   
   // Mesa Fields
   const [tableNumber, setTableNumber] = useState('');
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   
   // Delivery Fields
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -488,6 +489,7 @@ export default function PosPage() {
   const handleSelectTable = async (table: SalonTable) => {
      setFulfillmentType(PosFulfillmentType.TABLE);
      setTableNumber(table.name);
+     setSelectedTableId(table.id);
      
      if (table.activeOrderId) {
         const res = await api.get<OrderResponseDTO>(`/orders/${table.activeOrderId}`);
@@ -535,7 +537,8 @@ export default function PosPage() {
     cart.length > 0 &&
     !createSale.isPending &&
     !customerMissingRequiredData &&
-    (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated));
+    (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated)) &&
+    (fulfillmentType !== PosFulfillmentType.TABLE || !!selectedTableId);
   const isSavingCustomerAddress =
     createCustomerMutation.isPending ||
     createAddressMutation.isPending ||
@@ -582,6 +585,7 @@ export default function PosPage() {
     customerName: customerName || undefined,
     customerPhone: customerPhone || undefined,
     fulfillmentType,
+    tableId: fulfillmentType === PosFulfillmentType.TABLE ? selectedTableId || undefined : undefined,
     tableNumber: fulfillmentType === PosFulfillmentType.TABLE ? tableNumber : undefined,
     deliveryFee: isDelivery ? deliveryFee : undefined,
     selectedAddressId: isDelivery ? selectedAddressId || undefined : undefined,
@@ -634,7 +638,7 @@ export default function PosPage() {
     createSale.mutate({ ...getPayload(), paymentMethod: method }, {
       onSuccess: (data) => {
         handlePrint(data.id, 'customer'); // Auto-print customer receipt
-        setCart([]); setCurrentOrderId(null); setTableNumber(''); setViewMode('salon'); setIsPaymentModalOpen(false);
+        setCart([]); setCurrentOrderId(null); setTableNumber(''); setSelectedTableId(null); setViewMode('salon'); setIsPaymentModalOpen(false);
         clearSelectedCustomer();
         setDeliveryFee(0); setDeliveryFeeCalculated(false); setDeliveryFeeError(null);
         setSaleError(null);
@@ -821,11 +825,11 @@ export default function PosPage() {
                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400"><Hash size={14} /></span>
-                  <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-status-success" placeholder="Nº Mesa" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />
+                  <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-status-success" placeholder="Selecione uma mesa no salão" value={tableNumber} readOnly aria-label="Mesa selecionada" />
                   </div>
                   <button 
                     onClick={handleSaveDraft}
-                    disabled={!tableNumber || cart.length === 0 || upsertDraft.isPending}
+                    disabled={!selectedTableId || cart.length === 0 || upsertDraft.isPending}
                   className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                      <Save size={14} />

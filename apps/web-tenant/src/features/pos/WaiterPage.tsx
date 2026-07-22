@@ -167,6 +167,7 @@ export default function WaiterPage() {
           notes: item.notes || undefined,
         })),
         fulfillmentType: PosFulfillmentType.TABLE,
+        tableId: selectedTableId || undefined,
         tableNumber,
         paymentMethod: PaymentMethod.cash, // Placeholder for draft
         waiterId: undefined // Let server handle current operator
