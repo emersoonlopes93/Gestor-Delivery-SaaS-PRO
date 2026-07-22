@@ -93,5 +93,7 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 
 | Gap | Severidade | Impacto / recomendação |
 |---|---|---|
-| Pedido de mesa persiste o número visual, não o identificador da mesa | Média | O contrato atual de `Order`/PDV não possui `tableId`; não alterar sem migration aditiva, migração de dados e revisão do ciclo de mesa. |
+| Pedido de mesa persiste o número visual, não o identificador da mesa | Média | O contrato atual de `Order`/PDV não possui `tableId`; proposta aditiva e rollout em duas fases estão em `docs/contracts/store-operations.md`, aguardando autorização. |
+| Mesa inativa não pode ser representada | Baixa | O enum atual possui somente `free`, `occupied` e `waiting_bill`; uma flag/estado inativo exige migration e revisão de UI. |
+| Bridge USB/rede nativa ausente | Baixa | QZ Tray, Bluetooth e o fallback do navegador são opcionais; não introduzir bridge sem desenho de segurança e operação. |
 | KDS depende de polling quando WebSocket/Redis não estão disponíveis | Baixa | A UI atualiza a cada 10 segundos; manter o polling como fallback até existir observabilidade operacional de tempo real. |

@@ -10,7 +10,7 @@ describe('PosService atomic sale', () => {
       order: { create: jest.fn().mockResolvedValue({ id: 'order-1', orderNumber: '#0001', total: 20 }) },
       orderItem: { create: jest.fn() },
       orderDeliveryAddress: { upsert: jest.fn(), deleteMany: jest.fn() },
-      dineInTable: { findFirst: jest.fn(), update: jest.fn() },
+      dineInTable: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       coupon: { update: jest.fn() },
     };
     const prisma = {

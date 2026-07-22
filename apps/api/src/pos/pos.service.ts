@@ -68,6 +68,26 @@ export class PosService {
     return typeof value === 'string' && value.trim().length > 0;
   }
 
+  private normalizeTableNumber(tableNumber: string | undefined): string | null {
+    if (!this.hasText(tableNumber)) return null;
+    return tableNumber!.trim().replace(/\s+/g, ' ');
+  }
+
+  private async resolveTableForTenant(tenantId: string, tableNumber: string | undefined) {
+    const normalizedTableNumber = this.normalizeTableNumber(tableNumber);
+    if (!normalizedTableNumber) {
+      throw new BadRequestException('Uma mesa válida é obrigatória para atendimento de mesa.');
+    }
+
+    const table = await this.prisma.dineInTable.findFirst({
+      where: { tenantId, name: normalizedTableNumber },
+    });
+    if (!table) {
+      throw new BadRequestException('Mesa não encontrada neste tenant.');
+    }
+    return { table, normalizedTableNumber };
+  }
+
   private normalizeDeliveryAddress(dto: CreatePosOrderDTO, sourceAddress = dto.deliveryAddress): DeliveryAddressDTO | null {
     if (dto.fulfillmentType !== PosFulfillmentType.DELIVERY) return null;
 
@@ -224,11 +244,19 @@ export class PosService {
       throw new ForbiddenException('Você não tem permissão para aplicar descontos no PDV.');
     }
 
-    // If we're finalizing a DRAFT, we check if it already has a waiter
+    const tableAssignment = dto.fulfillmentType === PosFulfillmentType.TABLE
+      ? await this.resolveTableForTenant(tenantId, dto.tableNumber)
+      : null;
+
+    // If we're finalizing a DRAFT, ensure it belongs to this tenant before updating it.
     let draftWaiterId: string | null = null;
     if (dto.id) {
-       const draft = await this.prisma.order.findUnique({ where: { id: dto.id, tenantId }, select: { waiterId: true } });
-       if (draft) draftWaiterId = draft.waiterId;
+       const draft = await this.prisma.order.findFirst({
+         where: { id: dto.id, tenantId, sourceChannel: 'pos' },
+         select: { waiterId: true },
+       });
+       if (!draft) throw new BadRequestException('Rascunho do PDV não encontrado neste tenant.');
+       draftWaiterId = draft.waiterId;
     }
 
     // If not finalizing a DRAFT, idempotency check.
@@ -276,7 +304,7 @@ export class PosService {
             customerId,
             notes: dto.notes || null,
             waiterId: draftWaiterId || dto.waiterId || null,
-            tableNumber: dto.tableNumber || undefined,
+            tableNumber: tableAssignment?.normalizedTableNumber || null,
           }
         });
       } else {
@@ -305,7 +333,7 @@ export class PosService {
             cashSessionId: activeSession.id,
             customerId,
             waiterId: dto.waiterId || null,
-            tableNumber: dto.tableNumber || null,
+            tableNumber: tableAssignment?.normalizedTableNumber || null,
             couponId,
             cashbackUsed,
             publicTrackingToken: generatePublicTrackingToken(),
@@ -374,16 +402,11 @@ export class PosService {
         });
       }
 
-      // Free table if linked
-      if (dto.fulfillmentType === 'table' && dto.tableNumber) {
-        const table = await tx.dineInTable.findFirst({ where: { tenantId, name: dto.tableNumber } });
-        if (table) {
-          await tx.dineInTable.update({
-            where: { id: table.id },
-            data: { status: 'free', activeOrderId: null }
-          });
-        }
-      }
+      // A finalized sale releases only tables currently tied to this order.
+      await tx.dineInTable.updateMany({
+        where: { tenantId, activeOrderId: currentOrder.id },
+        data: { status: 'free', activeOrderId: null },
+      });
 
       await this.cashService.registerSaleMovement(
         tenantId,
@@ -433,6 +456,16 @@ export class PosService {
     dto: CreatePosOrderDTO & { id?: string; waiterId?: string },
   ): Promise<OrderResponseDTO> {
     const isUpdate = !!dto.id;
+    const tableAssignment = dto.fulfillmentType === PosFulfillmentType.TABLE
+      ? await this.resolveTableForTenant(tenantId, dto.tableNumber)
+      : null;
+    if (dto.id) {
+      const existingDraft = await this.prisma.order.findFirst({
+        where: { id: dto.id, tenantId, sourceChannel: 'pos' },
+        select: { id: true },
+      });
+      if (!existingDraft) throw new BadRequestException('Rascunho do PDV não encontrado neste tenant.');
+    }
     let customerId: string | null = null;
     if (dto.customerPhone) {
       const cust = await this.customerService.syncCustomerOnOrderUpsert(
@@ -459,7 +492,7 @@ export class PosService {
             customerName: dto.customerName || 'Consumidor',
             customerPhone: dto.customerPhone || '',
             notes: dto.notes || null,
-            tableNumber: dto.tableNumber || undefined,
+            tableNumber: tableAssignment?.normalizedTableNumber || null,
             fulfillmentType: this.mapPosFulfillment(dto.fulfillmentType),
           }
         });
@@ -486,6 +519,7 @@ export class PosService {
             notes: dto.notes || null,
             customerId,
             waiterId: dto.waiterId || operatorId, // Default to current operator if not specified
+            tableNumber: tableAssignment?.normalizedTableNumber || null,
             couponId,
             publicTrackingToken: generatePublicTrackingToken(),
           }
@@ -516,17 +550,31 @@ export class PosService {
         });
       }
 
-      if (dto.fulfillmentType === 'table' && dto.tableNumber) {
-        const table = await tx.dineInTable.findFirst({ where: { tenantId, name: dto.tableNumber } });
-        if (table) {
-          // Safety check: if table is occupied by ANOTHER order, don't just overwrite
-          if (table.activeOrderId && table.activeOrderId !== currentOrder.id) {
-            throw new BadRequestException(`A mesa ${dto.tableNumber} já está ocupada por outro atendimento ativo.`);
-          }
-          await tx.dineInTable.update({
-            where: { id: table.id },
-            data: { status: 'occupied', activeOrderId: currentOrder.id }
-          });
+      // Moving a draft away from a table (or to another table) must not leave
+      // a stale activeOrderId behind. The transaction rolls this back if claim fails.
+      await tx.dineInTable.updateMany({
+        where: {
+          tenantId,
+          activeOrderId: currentOrder.id,
+          ...(tableAssignment ? { id: { not: tableAssignment.table.id } } : {}),
+        },
+        data: { status: 'free', activeOrderId: null },
+      });
+
+      if (tableAssignment) {
+        const claimedTable = await tx.dineInTable.updateMany({
+          where: {
+            id: tableAssignment.table.id,
+            tenantId,
+            OR: [
+              { status: 'free', activeOrderId: null },
+              { activeOrderId: currentOrder.id },
+            ],
+          },
+          data: { status: 'occupied', activeOrderId: currentOrder.id },
+        });
+        if (claimedTable.count !== 1) {
+          throw new ConflictException(`A mesa ${tableAssignment.normalizedTableNumber} já está ocupada por outro atendimento ativo.`);
         }
       }
 
@@ -566,7 +614,7 @@ export class PosService {
   // REQUEST BILL (Pré-fechamento)
   // ----------------------------------------------------------------
   async requestBill(tenantId: string, tableId: string, actorId?: string): Promise<void> {
-    const table = await this.prisma.dineInTable.findUnique({
+    const table = await this.prisma.dineInTable.findFirst({
       where: { id: tableId, tenantId }
     });
     if (!table || table.status === 'free') {
@@ -597,8 +645,8 @@ export class PosService {
   // ----------------------------------------------------------------
   async transferTable(tenantId: string, sourceTableId: string, targetTableId: string, actorId?: string): Promise<void> {
     const [source, target] = await Promise.all([
-      this.prisma.dineInTable.findUnique({ where: { id: sourceTableId, tenantId } }),
-      this.prisma.dineInTable.findUnique({ where: { id: targetTableId, tenantId } }),
+      this.prisma.dineInTable.findFirst({ where: { id: sourceTableId, tenantId } }),
+      this.prisma.dineInTable.findFirst({ where: { id: targetTableId, tenantId } }),
     ]);
 
     if (!source || source.status === 'free' || !source.activeOrderId) {
@@ -714,8 +762,10 @@ export class PosService {
   // ----------------------------------------------------------------
   async createTable(tenantId: string, data: { name: string; capacity: number }) {
     // Check if table with same name exists for this tenant
+    const name = this.normalizeTableNumber(data.name);
+    if (!name) throw new BadRequestException('Nome da mesa é obrigatório.');
     const existing = await this.prisma.dineInTable.findFirst({
-      where: { tenantId, name: data.name },
+      where: { tenantId, name },
     });
     if (existing) {
       throw new ConflictException(`Uma mesa com o nome "${data.name}" já existe.`);
@@ -724,7 +774,7 @@ export class PosService {
     return this.prisma.dineInTable.create({
       data: {
         tenantId,
-        name: data.name,
+        name,
         capacity: data.capacity,
         status: 'free',
       },
@@ -732,7 +782,7 @@ export class PosService {
   }
 
   async deleteTable(tenantId: string, id: string) {
-    const table = await this.prisma.dineInTable.findUnique({
+    const table = await this.prisma.dineInTable.findFirst({
       where: { id, tenantId },
     });
     if (!table) throw new BadRequestException('Mesa não encontrada.');

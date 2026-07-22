@@ -46,7 +46,7 @@ source_of_truth:
 | `checkout_core` | **Stable** | Finalização de pedidos. | N/A (Core) |
 | `marketplace_orders` | **Beta** | Inbox idempotente, ordenação, reconciliação, divergências, SLA e reprocessamento controlado de pedidos externos. | `orders.read` |
 | `kds` | **Beta** | Painel de produção com estações, consulta tenant-safe de jobs, atualização de status e polling de fallback. | `kds.use` |
-| `printing` | **Beta** | Jobs de impressão, retry, spooler local e fallback de impressão pelo navegador. | `printing.read` |
+| `printing` | **Beta** | Jobs tenant-safe, reimpressão manual, retry limitado, spooler opcional e fallback pelo navegador (`window.print`). | `printing.read` |
 | `scheduling` | **Beta** | Janelas tenant-safe, slots com timezone/capacidade e checkout transacional; edição de horário exige cancelar e reagendar. | `scheduling.view` |
 | `split_payment` | **Stub** | Divisão de pagamentos. | N/A |
 
