@@ -77,7 +77,7 @@ async function main() {
   const createdIngredient = await api(
     'POST',
     '/inventory/ingredients',
-    { name: ingredientName, unit: 'g', currentCost: 3.5, minStock: 100 },
+    { name: ingredientName, unit: 'g', currentCost: 3.5, currentStock: 100, minStock: 100 },
     token,
   );
 
