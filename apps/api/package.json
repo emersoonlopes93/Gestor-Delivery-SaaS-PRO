@@ -10,6 +10,7 @@
         "start:prod": "node --max-old-space-size=512 dist/apps/api/src/main.js",
         "lint": "eslint \"{src,test}/**/*.ts\"",
         "test": "jest --config jest.config.js --runInBand",
+        "test:operations-concurrency": "jest --config jest.operations-integration.config.js --runInBand",
         "smoke:auth": "ts-node scripts/smoke-test-auth.ts",
         "smoke:p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-p1.ts",
         "smoke:media": "ts-node -r tsconfig-paths/register scripts/smoke-test-media.ts",

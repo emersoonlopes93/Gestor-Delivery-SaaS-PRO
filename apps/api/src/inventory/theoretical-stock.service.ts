@@ -2,31 +2,26 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StockMovementType } from '@gestor/types';
 import { Prisma } from '@prisma/client';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
 export class TheoreticalStockService {
   private readonly logger = new Logger(TheoreticalStockService.name);
-  private readonly maxSerializableAttempts = 3;
 
   constructor(private prisma: PrismaService) {}
 
   async processOrderDepletion(tenantId: string, orderId: string): Promise<void> {
     this.logger.log(`Processing theoretical stock depletion for order ${orderId}`);
 
-    for (let attempt = 1; attempt <= this.maxSerializableAttempts; attempt += 1) {
-      try {
-        await this.prisma.$transaction(
-          (tx) => this.processOrderDepletionInTransaction(tx, tenantId, orderId),
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        );
-        return;
-      } catch (error) {
-        if (!this.isSerializableConflict(error) || attempt === this.maxSerializableAttempts) {
-          throw error;
-        }
-        this.logger.warn(`Retrying theoretical stock depletion for order ${orderId} after P2034 (${attempt}/${this.maxSerializableAttempts})`);
-      }
-    }
+    await runSerializableTransactionWithRetry(
+      this.prisma,
+      (tx) => this.processOrderDepletionInTransaction(tx, tenantId, orderId),
+      {
+        onRetry: (attempt, delayMs) => this.logger.warn(
+          `Retrying theoretical stock depletion for order ${orderId} after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+        ),
+      },
+    );
   }
 
   async processOrderDepletionInTransaction(
@@ -193,9 +188,5 @@ export class TheoreticalStockService {
         (consumptionByIngredient.get(recipeItem.ingredientId) || 0) + quantity,
       );
     }
-  }
-
-  private isSerializableConflict(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
   }
 }

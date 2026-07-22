@@ -465,3 +465,19 @@ Base: `main-copy` em `37ae8430`
 ### Pendência e risco
 
 Não houve migration, deploy, acesso a banco remoto, alteração de `main` ou ativação iFood. O vínculo de pedido de mesa continua por `tableNumber`, pois não há `tableId` no contrato atual; uma correção requer migration aditiva e revisão do ciclo de mesa antes de ser proposta.
+
+---
+
+## Sprint 6A — fechamento do retry serializável
+
+Data: 2026-07-21
+Branch: `feat/sprint-6-operational-core`
+
+- POS, checkout público e baixa autônoma de estoque usam o mesmo wrapper `Serializable`, com no máximo três tentativas, retry exclusivo para Prisma `P2034` e backoff de 10ms/20ms limitado a 50ms.
+- A unidade repetida inclui todas as escritas atômicas; WebSocket, KDS, WhatsApp e pagamentos externos continuam após o commit e são disparados uma única vez.
+- Testes unitários cobrem sucesso após conflito, repetição da operação completa, limite de tentativas, preservação do último erro e ausência de retry para erros não `P2034`.
+- PostgreSQL 16 local/descartável comprovou duas baixas realmente concorrentes: 1 movimento, saldo final 8 a partir de 10, sem saldo negativo, 1 pedido, 1 movimento de caixa, 1 cashback, 1 uso de cupom e 1 evento de receita. O container foi removido ao final.
+- A CI executa essa prova no PostgreSQL efêmero do job após aplicar as migrations existentes.
+- Gates globais: lint, typecheck, build, 51 suites/210 testes da API, testes dos frontends, Prisma validate, anti-`any`, features e diff-check aprovados.
+
+Nenhuma migration ou alteração de schema foi criada; nenhum banco remoto, deploy, `main` ou `main-copy` foi alterado.

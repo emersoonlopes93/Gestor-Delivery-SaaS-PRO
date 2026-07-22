@@ -78,6 +78,9 @@ jobs:
       - name: Migrate DB
         run: pnpm --filter @gestor/api prisma:migrate:deploy
 
+      - name: Test concurrent operational transactions
+        run: pnpm --filter @gestor/api test:operations-concurrency
+
   smoke-with-ephemeral-seed:
     needs: build-and-migrate
     runs-on: ubuntu-latest

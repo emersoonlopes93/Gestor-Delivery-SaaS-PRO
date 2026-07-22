@@ -3,8 +3,9 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
-import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod, Prisma } from '@prisma/client';
+import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod, OrderStatus as SharedOrderStatus } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
@@ -16,6 +17,7 @@ import { KdsService } from '../kds/kds.service';
 import { PrismaService } from '../database/prisma.service';
 import { OrdersService } from '../orders/orders.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 import type {
   CreatePosOrderDTO,
@@ -29,6 +31,8 @@ import { PosFulfillmentType } from '@gestor/types';
 
 @Injectable()
 export class PosService {
+  private readonly logger = new Logger(PosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
@@ -251,7 +255,7 @@ export class PosService {
     const finalTotal = Math.round((finalItemsTotal - manualDiscountTotal) * 100) / 100;
     const combinedDiscountTotal = (commercialDiscountTotal || 0) + manualDiscountTotal;
 
-    const order = await this.prisma.$transaction(async (tx) => {
+    const order = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       let currentOrder;
       const orderTotal = Math.round((finalTotal + deliveryFee) * 100) / 100;
 
@@ -408,9 +412,11 @@ export class PosService {
       await this.theoreticalStockService.processOrderDepletionInTransaction(tx, tenantId, currentOrder.id);
       return this.ordersService.confirmPosOrderInTransaction(tx, currentOrder.id, tenantId, operatorId);
     }, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       maxWait: 5_000,
       timeout: 20_000,
+      onRetry: (attempt, delayMs) => this.logger.warn(
+        `Retrying POS sale transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+      ),
     });
 
     await this.ordersService.runConfirmedOrderSideEffects(order.id, tenantId);

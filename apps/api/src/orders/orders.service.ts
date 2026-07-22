@@ -46,6 +46,7 @@ import { MarketplaceStatusSyncService } from '../marketplace/services/marketplac
 import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
 import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
 import { canAutoAcceptOrder } from './order-auto-accept.policy';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
 export class OrdersService {
@@ -250,7 +251,8 @@ export class OrdersService {
     // 4. Transactional order creation
     const finalTotal = total; 
 
-    const order = await this.prisma.$transaction(
+    const order = await runSerializableTransactionWithRetry(
+      this.prisma,
       async (tx) => {
         // Atomic increment of order sequence
         const updatedTenant = await tx.tenant.update({
@@ -403,7 +405,9 @@ export class OrdersService {
       {
         timeout: 20_000,
         maxWait: 5_000,
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        onRetry: (attempt, delayMs) => this.logger.warn(
+          `Retrying public checkout transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+        ),
       },
     );
 
