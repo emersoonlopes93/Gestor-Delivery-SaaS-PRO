@@ -2646,7 +2646,7 @@ model WhatsAppInstance {
   phoneNumber         String?                @map("phone_number") @db.VarChar(100)
   status              WhatsAppInstanceStatus @default(disconnected)
   webhookSecret       String?                @map("webhook_secret") @db.VarChar(255)
-  evolutionInstanceId String?                @map("evolution_instance_id") @db.VarChar(100)
+  evolutionInstanceId String?                @unique @map("evolution_instance_id") @db.VarChar(100)
   createdAt           DateTime               @default(now()) @map("created_at")
   updatedAt           DateTime               @updatedAt @map("updated_at")
   qrCode              String?                @map("qr_code")
@@ -2874,6 +2874,11 @@ model CampaignDispatch {
   repliedAt        DateTime?              @map("replied_at")
   failReason       String?                @map("fail_reason")
   externalId       String?                @map("external_id") @db.VarChar(100)
+  idempotencyKey   String                 @unique @map("idempotency_key") @db.VarChar(180)
+  nextAttemptAt    DateTime?              @map("next_attempt_at")
+  providerAcceptedAt DateTime?            @map("provider_accepted_at")
+  reconciliationRequired Boolean          @default(false) @map("reconciliation_required")
+  attemptCount     Int                    @default(0) @map("attempt_count")
   createdAt        DateTime               @default(now()) @map("created_at")
   clickedAt        DateTime?              @map("clicked_at")
   convertedAt      DateTime?              @map("converted_at")
@@ -2884,6 +2889,7 @@ model CampaignDispatch {
   @@index([campaignId])
   @@index([customerId])
   @@index([campaignId, status])
+  @@index([campaignId, status, nextAttemptAt])
   @@index([customerId, status, sentAt], map: "campaign_dispatches_customer_status_sent_idx")
   @@map("campaign_dispatches")
 }
@@ -2907,11 +2913,11 @@ model MarketingAutomation {
 model CustomerOptOut {
   id         String   @id @default(uuid())
   tenantId   String   @map("tenant_id")
-  customerId String   @map("customer_id")
+  customerId String?  @map("customer_id")
   phone      String   @db.VarChar(30)
   reason     String?
   createdAt  DateTime @default(now()) @map("created_at")
-  customer   Customer @relation(fields: [customerId], references: [id])
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, phone])
@@ -3717,21 +3723,25 @@ enum MessageExternalStatus {
 enum CampaignStatus {
   draft
   scheduled
-  running
-  paused
+  queued
+  processing
   completed
+  failed
   cancelled
 }
 
 enum CampaignDispatchStatus {
   queued
   processing
+  sending
   sent
   delivered
   read
   replied
   failed
   opt_out
+  unknown
+  cancelled
 }
 
 enum FractionalPricingRule {
