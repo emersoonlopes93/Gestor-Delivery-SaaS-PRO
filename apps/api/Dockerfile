@@ -43,7 +43,7 @@ ENV NODE_ENV=production
 EXPOSE 3333
 
 RUN npm i -g prisma@5.22.0
-RUN chmod +x ./apps/api/docker-entrypoint.sh
+RUN sed -i 's/\r$//' ./apps/api/docker-entrypoint.sh && chmod +x ./apps/api/docker-entrypoint.sh
 
 WORKDIR /app/apps/api
 ENTRYPOINT ["./docker-entrypoint.sh"]
