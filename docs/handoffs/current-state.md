@@ -481,3 +481,17 @@ Branch: `feat/sprint-6-operational-core`
 - Gates globais: lint, typecheck, build, 51 suites/210 testes da API, testes dos frontends, Prisma validate, anti-`any`, features e diff-check aprovados.
 
 Nenhuma migration ou alteração de schema foi criada; nenhum banco remoto, deploy, `main` ou `main-copy` foi alterado.
+
+---
+
+## Sprint 6B.2 — relação persistida Pedido–Mesa
+
+Data: 2026-07-22
+Branch: `feat/sprint-6b2-table-relation`
+
+- Migration aditiva cria `Order.tableId` nullable, FK para `DineInTable` com `ON DELETE SET NULL` e índice `(tenantId, tableId)`; `tableNumber` não foi removido.
+- O backfill normaliza espaços e só relaciona pedidos com uma única mesa de mesmo tenant. Sem correspondência e nomes ambíguos ficam nulos; a instrução é idempotente.
+- PDV, garçom e criação pública escrevem `tableId` e o snapshot visual em conjunto. A API rejeita mesa inexistente/cross-tenant e conflito entre ID e nome; claim, transferência e liberação terminal usam `activeOrderId` de modo atômico e tenant-scoped.
+- A UI seleciona mesas do salão pelo ID. Leituras devolvem resumo da relação quando ela existe e preservam o fallback por `tableNumber`; impressão continua baseada no snapshot legível.
+
+PostgreSQL 16 local/descartável aplicou as 48 migrations, incluindo `20260722090000_add_order_table_relation`; a prova cobriu backfill unívoco, ambíguo e sem correspondência, FK/índice, `ON DELETE SET NULL` e reexecução idempotente. O container foi removido ao final. Nenhum banco remoto, deploy, merge, `main` ou `main-copy` foi alterado; o stash preexistente deve ser preservado.

@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Logger,
   Inject,
@@ -196,7 +197,7 @@ export class OrdersService {
 
     let dineInTable: DineInTable | null = null;
     if (dto.tableId) {
-      dineInTable = await this.prisma.dineInTable.findUnique({
+      dineInTable = await this.prisma.dineInTable.findFirst({
         where: { id: dto.tableId, tenantId: tenant.id },
       });
       if (!dineInTable) {
@@ -289,6 +290,7 @@ export class OrdersService {
             isScheduled: dto.scheduledFor && dto.timeSlotId ? true : false,
             publicTrackingToken: generatePublicTrackingToken(),
             tableNumber: dineInTable?.name || null,
+            tableId: dineInTable?.id || null,
           },
         });
 
@@ -355,13 +357,23 @@ export class OrdersService {
 
         // Update DineInTable
         if (dineInTable) {
-          await tx.dineInTable.update({
-            where: { id: dineInTable.id },
+          const claimedTable = await tx.dineInTable.updateMany({
+            where: {
+              id: dineInTable.id,
+              tenantId,
+              OR: [
+                { status: 'free', activeOrderId: null },
+                { activeOrderId: newOrder.id },
+              ],
+            },
             data: {
               activeOrderId: newOrder.id,
               status: 'occupied',
             },
           });
+          if (claimedTable.count !== 1) {
+            throw new ConflictException(`A mesa ${dineInTable.name} já está ocupada por outro atendimento ativo.`);
+          }
         }
 
         if (dto.scheduledFor && dto.timeSlotId) {
@@ -737,6 +749,7 @@ export class OrdersService {
       include: {
         items: true,
         deliveryDriver: true,
+        table: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -810,6 +823,7 @@ export class OrdersService {
         },
         deliveryAddress: true,
         deliveryDriver: true,
+        table: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
       },
     });
@@ -835,6 +849,7 @@ export class OrdersService {
         },
         deliveryAddress: true,
         deliveryDriver: true,
+        table: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
         paymentTransactions: {
           where: { method: 'pix' },
@@ -941,6 +956,9 @@ export class OrdersService {
     cashbackUsed?: Prisma.Decimal | number | null;
     deliveryDriverId?: string | null;
     deliveryDriver?: { name?: string | null; phone?: string | null; status?: string | null } | null;
+    tableId?: string | null;
+    tableNumber?: string | null;
+    table?: { id: string; name: string } | null;
     items: Array<{
       id: string;
       lineType: string;
@@ -1007,6 +1025,9 @@ export class OrdersService {
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
+      tableId: order.tableId ?? null,
+      tableNumber: order.tableNumber ?? null,
+      table: order.table ?? null,
       deliveryDriverId: order.deliveryDriverId,
       deliveryDriverName: order.deliveryDriver?.name,
       deliveryDriverPhone: order.deliveryDriver?.phone,
@@ -1101,6 +1122,10 @@ export class OrdersService {
 
       // Status side effects
       if (nextStatus === 'completed' || nextStatus === 'cancelled') {
+        await tx.dineInTable.updateMany({
+          where: { tenantId, activeOrderId: orderId },
+          data: { status: 'free', activeOrderId: null },
+        });
         if (order.deliveryDriverId) {
           await tx.deliveryDriver.update({
             where: { id: order.deliveryDriverId },

@@ -315,7 +315,9 @@ export interface OrderResponseDTO {
   notes?: string | null;
   items: OrderItemResponseDTO[];
   deliveryAddress?: DeliveryAddressDTO | null;
+  tableId?: string | null;
   tableNumber?: string | null;
+  table?: { id: string; name: string } | null;
   timeline: OrderTimelineEntryDTO[];
 
   paymentMethod: PaymentMethod;

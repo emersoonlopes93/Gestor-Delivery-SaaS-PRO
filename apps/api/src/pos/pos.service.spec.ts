@@ -1,21 +1,27 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { PaymentMethod, PosFulfillmentType } from '@gestor/types';
 import { PosService } from './pos.service';
 
 describe('PosService atomic sale', () => {
-  const makeHarness = (stockError?: Error) => {
+  const makeHarness = (stockError?: Error, table: { id: string; tenantId: string; name: string } | null = null) => {
     let committed = false;
     const tx = {
       tenant: { update: jest.fn().mockResolvedValue({ orderSequence: 1 }) },
-      order: { create: jest.fn().mockResolvedValue({ id: 'order-1', orderNumber: '#0001', total: 20 }) },
+      order: {
+        create: jest.fn().mockResolvedValue({ id: 'order-1', orderNumber: '#0001', total: 20 }),
+        update: jest.fn().mockResolvedValue({ id: 'order-1', orderNumber: '#0001', total: 20 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       orderItem: { create: jest.fn() },
       orderDeliveryAddress: { upsert: jest.fn(), deleteMany: jest.fn() },
-      dineInTable: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      dineInTable: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       coupon: { update: jest.fn() },
+      orderTimeline: { create: jest.fn() },
     };
     const prisma = {
       cashSession: { findFirst: jest.fn().mockResolvedValue({ id: 'cash-1' }) },
       order: { findFirst: jest.fn().mockResolvedValue(null) },
+      dineInTable: { findFirst: jest.fn().mockResolvedValue(table) },
       $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => {
         const result = await callback(tx);
         committed = true;
@@ -105,5 +111,65 @@ describe('PosService atomic sale', () => {
       harness.tx, 'order-1', 'tenant-a', 'operator-1',
     );
     expect(harness.ordersService.runConfirmedOrderSideEffects).toHaveBeenCalledWith('order-1', 'tenant-a');
+  });
+
+  it('dual-writes the validated table id and its visual snapshot', async () => {
+    const harness = makeHarness(undefined, { id: 'table-1', tenantId: 'tenant-a', name: 'Mesa 01' });
+
+    await harness.service.createSale('tenant-a', 'operator-1', {
+      ...sale,
+      fulfillmentType: PosFulfillmentType.TABLE,
+      tableId: 'table-1',
+    }, true);
+
+    expect(harness.prisma.dineInTable.findFirst).toHaveBeenCalledWith({
+      where: { id: 'table-1', tenantId: 'tenant-a' },
+    });
+    expect(harness.tx.order.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tableId: 'table-1', tableNumber: 'Mesa 01' }),
+    }));
+  });
+
+  it('rejects a missing or cross-tenant table id', async () => {
+    const harness = makeHarness();
+
+    await expect(harness.service.createSale('tenant-a', 'operator-1', {
+      ...sale,
+      fulfillmentType: PosFulfillmentType.TABLE,
+      tableId: 'table-from-another-tenant',
+    }, true)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects conflicting tableId and tableNumber values', async () => {
+    const harness = makeHarness(undefined, { id: 'table-1', tenantId: 'tenant-a', name: 'Mesa 01' });
+
+    await expect(harness.service.createSale('tenant-a', 'operator-1', {
+      ...sale,
+      fulfillmentType: PosFulfillmentType.TABLE,
+      tableId: 'table-1',
+      tableNumber: 'Mesa 02',
+    }, true)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects finalization when the validated table becomes occupied', async () => {
+    const harness = makeHarness(undefined, { id: 'table-1', tenantId: 'tenant-a', name: 'Mesa 01' });
+    harness.tx.dineInTable.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(harness.service.createSale('tenant-a', 'operator-1', {
+      ...sale,
+      fulfillmentType: PosFulfillmentType.TABLE,
+      tableId: 'table-1',
+    }, true)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('does not transfer onto a table claimed concurrently', async () => {
+    const harness = makeHarness();
+    harness.prisma.dineInTable.findFirst
+      .mockResolvedValueOnce({ id: 'source-1', tenantId: 'tenant-a', name: 'Mesa 01', status: 'occupied', activeOrderId: 'order-1' })
+      .mockResolvedValueOnce({ id: 'target-1', tenantId: 'tenant-a', name: 'Mesa 02', status: 'free', activeOrderId: null });
+    harness.tx.dineInTable.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(harness.service.transferTable('tenant-a', 'source-1', 'target-1', 'operator-1'))
+      .rejects.toBeInstanceOf(ConflictException);
   });
 });

@@ -73,19 +73,26 @@ export class PosService {
     return tableNumber!.trim().replace(/\s+/g, ' ');
   }
 
-  private async resolveTableForTenant(tenantId: string, tableNumber: string | undefined) {
+  private async resolveTableForTenant(
+    tenantId: string,
+    tableId: string | undefined,
+    tableNumber: string | undefined,
+  ) {
     const normalizedTableNumber = this.normalizeTableNumber(tableNumber);
-    if (!normalizedTableNumber) {
+    if (!tableId && !normalizedTableNumber) {
       throw new BadRequestException('Uma mesa válida é obrigatória para atendimento de mesa.');
     }
 
-    const table = await this.prisma.dineInTable.findFirst({
-      where: { tenantId, name: normalizedTableNumber },
-    });
+    const table = tableId
+      ? await this.prisma.dineInTable.findFirst({ where: { id: tableId, tenantId } })
+      : await this.prisma.dineInTable.findFirst({ where: { tenantId, name: normalizedTableNumber! } });
     if (!table) {
       throw new BadRequestException('Mesa não encontrada neste tenant.');
     }
-    return { table, normalizedTableNumber };
+    if (normalizedTableNumber && normalizedTableNumber !== this.normalizeTableNumber(table.name)) {
+      throw new BadRequestException('tableId e tableNumber apontam para mesas diferentes.');
+    }
+    return { table, normalizedTableNumber: table.name };
   }
 
   private normalizeDeliveryAddress(dto: CreatePosOrderDTO, sourceAddress = dto.deliveryAddress): DeliveryAddressDTO | null {
@@ -245,7 +252,7 @@ export class PosService {
     }
 
     const tableAssignment = dto.fulfillmentType === PosFulfillmentType.TABLE
-      ? await this.resolveTableForTenant(tenantId, dto.tableNumber)
+      ? await this.resolveTableForTenant(tenantId, dto.tableId, dto.tableNumber)
       : null;
 
     // If we're finalizing a DRAFT, ensure it belongs to this tenant before updating it.
@@ -305,6 +312,7 @@ export class PosService {
             notes: dto.notes || null,
             waiterId: draftWaiterId || dto.waiterId || null,
             tableNumber: tableAssignment?.normalizedTableNumber || null,
+            tableId: tableAssignment?.table.id || null,
           }
         });
       } else {
@@ -334,6 +342,7 @@ export class PosService {
             customerId,
             waiterId: dto.waiterId || null,
             tableNumber: tableAssignment?.normalizedTableNumber || null,
+            tableId: tableAssignment?.table.id || null,
             couponId,
             cashbackUsed,
             publicTrackingToken: generatePublicTrackingToken(),
@@ -402,6 +411,25 @@ export class PosService {
         });
       }
 
+      // Claim before persisting a finalized table sale so a direct checkout
+      // cannot retain a relation to a table occupied by another order.
+      if (tableAssignment) {
+        const claimedTable = await tx.dineInTable.updateMany({
+          where: {
+            id: tableAssignment.table.id,
+            tenantId,
+            OR: [
+              { status: 'free', activeOrderId: null },
+              { activeOrderId: currentOrder.id },
+            ],
+          },
+          data: { status: 'occupied', activeOrderId: currentOrder.id },
+        });
+        if (claimedTable.count !== 1) {
+          throw new ConflictException(`A mesa ${tableAssignment.normalizedTableNumber} já está ocupada por outro atendimento ativo.`);
+        }
+      }
+
       // A finalized sale releases only tables currently tied to this order.
       await tx.dineInTable.updateMany({
         where: { tenantId, activeOrderId: currentOrder.id },
@@ -457,7 +485,7 @@ export class PosService {
   ): Promise<OrderResponseDTO> {
     const isUpdate = !!dto.id;
     const tableAssignment = dto.fulfillmentType === PosFulfillmentType.TABLE
-      ? await this.resolveTableForTenant(tenantId, dto.tableNumber)
+      ? await this.resolveTableForTenant(tenantId, dto.tableId, dto.tableNumber)
       : null;
     if (dto.id) {
       const existingDraft = await this.prisma.order.findFirst({
@@ -493,6 +521,7 @@ export class PosService {
             customerPhone: dto.customerPhone || '',
             notes: dto.notes || null,
             tableNumber: tableAssignment?.normalizedTableNumber || null,
+            tableId: tableAssignment?.table.id || null,
             fulfillmentType: this.mapPosFulfillment(dto.fulfillmentType),
           }
         });
@@ -520,6 +549,7 @@ export class PosService {
             customerId,
             waiterId: dto.waiterId || operatorId, // Default to current operator if not specified
             tableNumber: tableAssignment?.normalizedTableNumber || null,
+            tableId: tableAssignment?.table.id || null,
             couponId,
             publicTrackingToken: generatePublicTrackingToken(),
           }
@@ -656,16 +686,28 @@ export class PosService {
       throw new BadRequestException('Mesa de destino deve estar livre.');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.dineInTable.update({
-        where: { id: sourceTableId },
-        data: { status: 'free', activeOrderId: null }
-      }),
-      this.prisma.dineInTable.update({
-        where: { id: targetTableId },
-        data: { status: source.status, activeOrderId: source.activeOrderId }
-      }),
-      this.prisma.orderTimeline.create({
+    await this.prisma.$transaction(async (tx) => {
+      const claimedTarget = await tx.dineInTable.updateMany({
+        where: { id: targetTableId, tenantId, status: 'free', activeOrderId: null },
+        data: { status: source.status, activeOrderId: source.activeOrderId },
+      });
+      if (claimedTarget.count !== 1) {
+        throw new ConflictException('Mesa de destino foi ocupada por outro atendimento.');
+      }
+
+      const releasedSource = await tx.dineInTable.updateMany({
+        where: { id: sourceTableId, tenantId, activeOrderId: source.activeOrderId },
+        data: { status: 'free', activeOrderId: null },
+      });
+      if (releasedSource.count !== 1) {
+        throw new ConflictException('Atendimento da mesa de origem mudou durante a transferência.');
+      }
+
+      await tx.order.updateMany({
+        where: { id: source.activeOrderId, tenantId },
+        data: { tableId: target.id, tableNumber: target.name },
+      });
+      await tx.orderTimeline.create({
         data: {
           orderId: source.activeOrderId,
           tenantId,
@@ -673,9 +715,9 @@ export class PosService {
           note: `Transferência de mesa: ${source.name} -> ${target.name}`,
           actorId,
           actorType: 'tenant_user',
-        }
-      })
-    ]);
+        },
+      });
+    });
   }
 
   // ----------------------------------------------------------------
@@ -801,6 +843,7 @@ export class PosService {
       include: {
         items: true,
         deliveryAddress: true,
+        table: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
       },
     });
@@ -827,6 +870,8 @@ export class PosService {
       customerId: order.customerId,
       waiterId: order.waiterId,
       tableNumber: order.tableNumber,
+      tableId: order.tableId,
+      table: order.table ?? null,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
       items: order.items.map((item) => ({
