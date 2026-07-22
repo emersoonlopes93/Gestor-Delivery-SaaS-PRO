@@ -20,13 +20,13 @@ describe('printThermalText browser fallback', () => {
       focus,
       print,
       close,
-      get onload() {
+      get onload(): (() => void) | null {
         return onload;
       },
       set onload(value: (() => void) | null) {
         onload = value;
       },
-    } as unknown as Window;
+    };
     const open = vi.fn().mockReturnValue(printWindow);
     vi.stubGlobal('window', { open, setTimeout: vi.fn() });
 
