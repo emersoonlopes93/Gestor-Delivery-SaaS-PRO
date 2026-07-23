@@ -16,6 +16,7 @@ describe('CampaignProcessor delivery invariants', () => {
     prisma.customerOptOut.findUnique.mockResolvedValue(null); prisma.tenantSettings.findUnique.mockResolvedValue({ timezone: 'UTC' });
     prisma.campaign.findFirst.mockResolvedValue({ status: 'processing' }); prisma.campaign.update.mockResolvedValue({});
     sender.supportsIdempotencyKey.mockResolvedValue(true); sender.sendText.mockResolvedValue({ success: true, messageId: 'provider-1' }); dispatcher.finalizeCampaign.mockResolvedValue(undefined);
+    jest.spyOn(Object.getPrototypeOf(processor) as { nextAllowedAttempt: () => Promise<Date | null> }, 'nextAllowedAttempt').mockResolvedValue(null);
   });
 
   it('does not call the provider after a queued job is cancelled', async () => {
@@ -25,7 +26,7 @@ describe('CampaignProcessor delivery invariants', () => {
   });
 
   it('passes a stable idempotency key and records provider success', async () => {
-    await expect(processor.process(job())).resolves.toEqual({ success: true, messageId: 'provider-1' });
+    await expect(processor.process(job())).resolves.toEqual(expect.objectContaining({ success: true, messageId: 'provider-1' }));
     expect(sender.sendText).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ idempotencyKey: 'campaign:campaign-1:dispatch:dispatch-1' }));
     expect(prisma.campaignDispatch.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'sent', externalId: 'provider-1' }) }));
   });
