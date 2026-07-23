@@ -484,6 +484,40 @@ Nenhuma migration ou alteração de schema foi criada; nenhum banco remoto, depl
 
 ---
 
+## Sprint 6C — CRM, campanhas e WhatsApp
+
+Data: 2026-07-22
+Branch: `feat/sprint-6c-crm-campaigns-whatsapp`
+
+- `CustomerOptOut` permanece o modelo canônico e tenant-scoped, com unicidade
+  `(tenantId, phone)`. O `customerId` passou a ser opcional para registrar o
+  pedido recebido antes de existir vínculo com cliente; a FK usa `ON DELETE SET
+  NULL`. Não existe segundo modelo concorrente de opt-out.
+- O webhook normaliza telefone e palavras-chave, usa upsert idempotente antes da
+  deduplicação da mensagem e não despacha o fluxo pesado de IA para opt-out.
+- A migration `20260722120000_campaign_status_and_opt_out_compatibility`
+  converte `running` para `processing` e `paused` para `cancelled`, preservando
+  dados existentes. A máquina passa a usar `draft`, `scheduled`, `queued`,
+  `processing`, `completed`, `failed` e `cancelled` na API, tipos e UI.
+- Jobs validam campanha, dispatch, cliente e tenant antes do provider. IDs de
+  BullMQ são determinísticos, sucesso persistido não é reenviado e a fila exige
+  os três kill switches de Redis, BullMQ e campanhas.
+- Quiet hours usam `TenantSettings.timezone`; timezone ausente ou inválido tem
+  fallback explícito para `America/Sao_Paulo`.
+- A Inbox continua canonicamente em `ChatSession` e `ChatMessage`. Mensagens de
+  campanha gravam `campaignId` e `dispatchId` em `metadata`; nenhum
+  `MessageHistory` paralelo foi criado.
+- PostgreSQL 16 efêmero validou banco vazio, base populada pré-migration e
+  reaplicação. Redis/BullMQ efêmero validou deduplicação, retry limitado,
+  backoff, falha final e recuperação. O smoke integrado usou exclusivamente
+  provider fake e comprovou envio elegível, opt-out com motivo, reentrega sem
+  duplicação, resposta fake e ordenação da Inbox.
+
+Nenhum banco remoto ou provider real foi acessado. Não houve deploy, merge,
+alteração de `main`/`main-copy` ou aplicação/remoção de stash.
+
+---
+
 ## Sprint 6B.2 — relação persistida Pedido–Mesa
 
 Data: 2026-07-22

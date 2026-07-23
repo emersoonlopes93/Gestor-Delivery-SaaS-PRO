@@ -15,10 +15,9 @@ import { CrmModule } from '../crm/crm.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { BillingDomainModule } from '../billing/billing-domain.module';
+import { isCampaignDispatchEnabled } from './campaign-dispatch.config';
 
-const enableCampaignDispatch = 
-  process.env.REDIS_ENABLED !== 'false' && 
-  process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+const enableCampaignDispatch = isCampaignDispatchEnabled();
 
 // Log campaign dispatcher status at startup
 if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true') {

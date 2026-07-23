@@ -23,6 +23,12 @@ As configurações de BullMQ definidas centralmente em `app.module.ts` ditam as 
 
 > **Nota de Resiliência**: Nunca sobrescreva esses defaults para criar retries "infinitos" nas pontas.
 
+`campaign-dispatch` usa uma política deliberadamente mais restrita: 3 tentativas,
+backoff exponencial iniciado em 10 segundos e IDs determinísticos por dispatch. O
+módulo só registra producer e worker quando `REDIS_ENABLED`, `BULLMQ_ENABLED` e
+`CAMPAIGNS_DISPATCH_ENABLED` permitem a fila. Um dispatch já persistido como
+`sent`, `delivered`, `read`, `replied` ou `opt_out` não volta a chamar o provider.
+
 ## 3. Contrato de Payload (Mínimo Esperado)
 
 Sempre que possível, prefira o trafego de IDs e referências em vez de objetos complexos (JSON completos). Isso garante que o consumer recupere o estado mais recente da entidade, evitando condições de corrida (Stale Data).

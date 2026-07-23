@@ -265,7 +265,7 @@ export class BusinessIntelligenceService {
         roi: 0,
         conversionRate: totals.sent ? totals.converted / totals.sent : 0,
         active: center.active.length,
-        paused: center.paused.length,
+        queued: center.queued.length,
       };
     });
   }

@@ -9,7 +9,12 @@ import {
   Inject,
   forwardRef,
   Query,
+  BadRequestException,
+  UnauthorizedException,
+  HttpException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import { createHash, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppProviderRegistryService } from '../services/whatsapp-provider-registry.service';
 import type { WhatsAppWebhookEvent } from '../interfaces/whatsapp-provider.interface';
@@ -24,6 +29,10 @@ import {
 } from '../../common/utils/whatsapp-presence.util';
 import { isExitCommand } from '../../ai-agent/constants/session.constants';
 import { ChatGateway } from '../../chat/chat.gateway';
+import {
+  isMarketingOptOutMessage,
+  normalizeMarketingPhone,
+} from '../../common/utils/marketing-opt-out.util';
 
 
 /**
@@ -50,8 +59,7 @@ export class WhatsAppWebhookController {
     @Query('secret') webhookSecretQuery?: string,
   ) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      this.logger.warn('Webhook received with invalid body');
-      return { received: true, processed: false, error: 'Invalid body' };
+      throw new BadRequestException('Invalid webhook payload.');
     }
 
     const payload = body as Record<string, unknown>;
@@ -97,8 +105,7 @@ export class WhatsAppWebhookController {
         AiFlowLogger.ignored('missing_instance_identifier', {
           traceId: trace.traceId,
         });
-        this.logger.warn('Webhook received without instance identifier');
-        return { received: true, processed: false, error: 'Instance identifier missing' };
+        throw new BadRequestException('Invalid webhook payload.');
       }
       return this.processByInstanceName(
         instanceName,
@@ -110,16 +117,12 @@ export class WhatsAppWebhookController {
     }
 
     try {
-      const instance = await this.prisma.whatsAppInstance.findFirst({
+      const instance = await this.prisma.whatsAppInstance.findUnique({
         where: { evolutionInstanceId: instanceId },
       });
 
       if (!instance) {
-        AiFlowLogger.ignored('instance_not_found', {
-          traceId: trace.traceId,
-          instanceId,
-        });
-        return { received: true, processed: false, error: 'Instance not found' };
+        throw new UnauthorizedException('Webhook not accepted.');
       }
 
       const tenantId = instance.tenantId;
@@ -128,11 +131,7 @@ export class WhatsAppWebhookController {
 
       AiFlowLogger.flow('tenant_resolved', trace);
 
-      const providedSecret = webhookSecretHeader || webhookSecretQuery;
-      if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
-        AiFlowLogger.ignored('invalid_webhook_secret', trace);
-        return { received: true, processed: false, error: 'Invalid secret' };
-      }
+      this.assertSecret(instance.webhookSecret, webhookSecretHeader ?? webhookSecretQuery, trace);
 
       const provider = this.providerRegistry.getProvider(instance.providerType);
       const event = provider.parseWebhook(payload, tenantId);
@@ -167,10 +166,11 @@ export class WhatsAppWebhookController {
       AiFlowLogger.flow('webhook_message_flow_complete', trace);
       return { received: true, processed: true };
     } catch (error: unknown) {
+      if (error instanceof HttpException) throw error;
       const message = error instanceof Error ? error.message : 'Unknown error';
       AiFlowLogger.error('webhook_handler', trace, { error: message });
-      this.logger.error(`Webhook processing failed: ${message}`);
-      return { received: true, processed: false, error: message };
+      this.logger.error('Webhook processing failed.');
+      throw new ServiceUnavailableException('Webhook processing unavailable.');
     }
   }
 
@@ -183,29 +183,19 @@ export class WhatsAppWebhookController {
   ) {
     const flowTrace = trace ?? createAiTrace();
 
-    const instance = await this.prisma.whatsAppInstance.findFirst({
-      where: {
-        OR: [
-          { instanceName: instanceName },
-          { evolutionInstanceId: instanceName },
-        ],
-      },
+    const instance = await this.prisma.whatsAppInstance.findUnique({
+      where: { instanceName },
     });
 
     if (!instance) {
-      AiFlowLogger.ignored('instance_not_found', flowTrace, { instanceName });
-      return { received: true, processed: false, error: 'Instance not found' };
+      throw new UnauthorizedException('Webhook not accepted.');
     }
 
     flowTrace.tenantId = instance.tenantId;
     flowTrace.instanceId = instance.evolutionInstanceId ?? undefined;
     AiFlowLogger.flow('tenant_resolved', flowTrace, { via: 'instanceName' });
 
-    const providedSecret = headerSecret || querySecret;
-    if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
-      AiFlowLogger.ignored('invalid_webhook_secret', flowTrace);
-      return { received: true, processed: false, error: 'Invalid secret' };
-    }
+    this.assertSecret(instance.webhookSecret, headerSecret ?? querySecret, flowTrace);
 
     const provider = this.providerRegistry.getProvider(instance.providerType);
     const event = provider.parseWebhook(payload, instance.tenantId);
@@ -224,17 +214,18 @@ export class WhatsAppWebhookController {
   ) {
     const { tenantId, from: phone, content, messageType, externalId, chatJid, pushName, isFromMe } = event;
     trace.tenantId = tenantId;
-    trace.phone = phone;
     trace.chatJid = chatJid;
     if (externalId) trace.messageId = externalId;
 
     this.logger.log(`[WA_WEBHOOK] received traceId=${trace.traceId} tenantId=${tenantId}`);
-    this.logger.log(`[WA_WEBHOOK] message_event fromMe=${isFromMe} externalId=${externalId} contentPreview=${content?.substring(0, 20)}`);
+    this.logger.log(
+      `[WA_WEBHOOK] message_event fromMe=${isFromMe} hasExternalId=${Boolean(externalId)} messageType=${messageType}`,
+    );
 
     AiFlowLogger.flow('handle_message_start', trace, {
       hasChatJid: Boolean(chatJid),
       textLength: content?.length ?? 0,
-      pushName: pushName || 'none',
+      hasPushName: Boolean(pushName),
     });
 
     if (!phone || !content) {
@@ -245,12 +236,28 @@ export class WhatsAppWebhookController {
       return;
     }
 
+    const normalizedPhone = normalizeMarketingPhone(phone);
+    const isOptOut = !isFromMe && isMarketingOptOutMessage(content);
+    if (isOptOut) {
+      await this.prisma.customerOptOut.upsert({
+        where: { tenantId_phone: { tenantId, phone: normalizedPhone } },
+        create: { tenantId, phone: normalizedPhone, reason: 'whatsapp_keyword' },
+        update: { reason: 'whatsapp_keyword' },
+      });
+      this.logger.log(`Marketing opt-out registered tenantId=${tenantId}`);
+    }
+
     if (externalId) {
       const existing = await this.prisma.chatMessage.findUnique({
         where: { externalId },
+        include: { session: { select: { tenantId: true } } },
       });
       if (existing) {
-        this.logger.log(`[WA_WEBHOOK] duplicate_found updating externalId=${externalId} sessionId=${existing.sessionId}`);
+        if (existing.session.tenantId !== tenantId) {
+          this.logger.warn(`Webhook external ID collision rejected tenantId=${tenantId}`);
+          throw new Error('External message identifier collision');
+        }
+        this.logger.log(`Webhook duplicate message updated tenantId=${tenantId} sessionId=${existing.sessionId}`);
         await this.prisma.chatMessage.update({
           where: { id: existing.id },
           data: { externalStatus: 'sent' } // Atualiza o status
@@ -305,6 +312,13 @@ export class WhatsAppWebhookController {
             customerId,
           });
         }
+      }
+
+      if (isOptOut && customerId) {
+        await this.prisma.customerOptOut.update({
+          where: { tenantId_phone: { tenantId, phone: normalizedPhone } },
+          data: { customerId },
+        });
       }
 
       if (currentCustomer) {
@@ -457,6 +471,11 @@ export class WhatsAppWebhookController {
         }
       }
 
+      if (isOptOut) {
+        AiFlowLogger.ignored('marketing_opt_out', trace, { sessionId: session.id });
+        return;
+      }
+
       AiFlowLogger.flow('orchestrator_dispatch_start', trace);
 
       void this.aiOrchestrator
@@ -530,5 +549,14 @@ export class WhatsAppWebhookController {
         this.logger.debug(`Erro background ao atualizar foto de perfil do customer ${customerId}`);
       }
     })();
+  }
+
+  private assertSecret(configured: string | null, supplied: string | undefined, trace: ReturnType<typeof createAiTrace>) {
+    const actual = configured ? createHash('sha256').update(configured).digest() : null;
+    const provided = supplied ? createHash('sha256').update(supplied).digest() : null;
+    if (!actual || !provided || !timingSafeEqual(actual, provided)) {
+      AiFlowLogger.ignored('webhook_unauthorized', trace);
+      throw new UnauthorizedException('Webhook not accepted.');
+    }
   }
 }

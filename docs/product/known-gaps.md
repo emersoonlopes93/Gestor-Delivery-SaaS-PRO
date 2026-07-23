@@ -49,7 +49,7 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 
 - **Severidade:** Resolvido (anteriormente Alta)
 - **Componente:** `CampaignProcessor` (`apps/api/src/campaigns/services/campaign.processor.ts`)
-- **Resolução:** A janela de silêncio (08h às 21h) agora respeita a configuração de `timezone` definida no `TenantSettings`. Caso o tenant não possua configuração explícita, a aplicação fará o fallback para `America/Sao_Paulo`.
+- **Resolução:** A janela de silêncio (08h às 21h) agora respeita a configuração de `timezone` definida no `TenantSettings`. Configuração ausente ou timezone IANA inválido usa explicitamente `America/Sao_Paulo`, sem depender do timezone do host e sem derrubar o worker.
 
 ## 3. Swagger Inconsistente
 
