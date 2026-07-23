@@ -2,8 +2,8 @@
 title: Limitações e Gaps Conhecidos
 status: current
 owner: engineering
-last_verified: 2026-07-16
-verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
+last_verified: 2026-07-23
+verified_against: main-copy / 78daea7a
 ---
 
 # Gaps Conhecidos e Limitações (Known Gaps)
@@ -37,13 +37,24 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 
 ---
 
-## 1. Notificações Push Não Funcionais (Stub)
+## 1. Notificações Push — Implementadas (gaps remanescentes)
 
-- **Severidade:** Alta
-- **Componente:** `PushService` (`apps/api/src/notifications/push.service.ts`)
-- **Problema:** A documentação antiga referia push notifications web como funcionais. O serviço existe e chaves VAPID são lidas, mas não há modelo `PushSubscription` no banco de dados e os métodos fazem apenas chamadas de `logger` sem integração real.
-- **Impacto:** Clientes não recebem avisos push em seus dispositivos ao minimizar a aba.
-- **Ação:** Implementar biblioteca `web-push`, model Prisma e handlers Service Worker.
+- **Severidade dos gaps:** Média
+- **Componente:** `NotificationsModule` (`apps/api/src/notifications/`)
+- **Status:** ✅ Implementado desde 2026-07-15 (migration `20260715234118_create_push_subscriptions`)
+- **Implementação:**
+  - `PushService` usa `web-push` real com VAPID; entra em modo degradado (warn) sem chaves
+  - `PushSubscriptionService` com upsert e unique `(tenantId, recipientId, recipientType, endpoint)`
+  - `PushNotificationProcessor` (BullMQ) com `findMany` tenant-scoped e remoção de subscriptions expiradas (HTTP 404/410)
+  - Contrato: `docs/contracts/push-notifications.md`
+- **Gaps remanescentes:**
+
+| Gap | Severidade | Recomendação |
+|-----|-----------|-------------|
+| Push para `tenant_user` (staff) não implementado | Média | Adicionar `recipientType: 'tenant_user'` no processor e endpoints |
+| Notificação de cancelamento de pedido para entregador ausente | Média | Disparar em `OrdersService` ao cancelar pedido com driver atribuído |
+| Sem teste E2E automatizado do fluxo completo | Alta | Criar spec com service worker mockado e validar envio real |
+
 
 ## 2. Timezone Hardcoded em Automações (RESOLVIDO)
 
@@ -82,12 +93,19 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 - **Impacto:** Sem Redis ativado em produção, lojas não terão features avançadas disponíveis.
 - **Ação:** Manter configurável, mas alertar de forma visual no SaaS Admin caso a instalação esteja sem Redis.
 
-## 7. Scripts Perigosos na Raiz
+## 7. Scripts de Manutenção — RESOLVIDO
 
-- **Severidade:** Alta
-- **Componente:** `drop_models.js`, `clean_schema.js`
-- **Problema:** Scripts de manutenção avulsos que podem apagar o banco se rodados sem cuidado em ambientes produtivos conectados por URL direta.
-- **Ação:** Arquivá-los em `/scripts/maintenance/` e forçar barreira de confirmação (ex: `--force` ou variável `NODE_ENV!=production`).
+- **Severidade anterior:** Alta
+- **Componente:** `clean_schema.js`, `clean_schema2.js`
+- **Status:** ✅ **RESOLVIDO em 2026-07-23**
+- **Ação tomada:**
+  - Scripts movidos para `scripts/maintenance/` com:
+    - Barreira `--force` obrigatória
+    - Falha fechada em `NODE_ENV=production`
+    - Verificação de existência do schema antes de executar
+    - README com instruções de uso seguro
+  - Scripts originais removidos da raiz do repositório
+- **Nota:** `drop_models.js` não existe mais na raiz (verificado em 2026-07-23).
 
 ## 8. Operação de loja
 
