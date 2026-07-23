@@ -69,17 +69,21 @@ export function CustomersListPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-  useEffect(() => {
-    loadCustomers();
-  }, []);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const loadCustomers = async () => {
+  useEffect(() => {
+    loadCustomers(page);
+  }, [page]);
+
+  const loadCustomers = async (currentPage = 1) => {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await api.get<CustomerListItem[]>('/crm/customers');
+      const res = await api.get<{ data: CustomerListItem[], meta: { totalPages: number } }>(`/crm/customers?page=${currentPage}&limit=50`);
       if (res.success) {
-        setCustomers(res.data);
+        setCustomers(res.data.data);
+        setTotalPages(res.data.meta.totalPages);
       }
     } catch (err) {
       console.error(err);
@@ -125,7 +129,7 @@ export function CustomersListPage() {
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={loadCustomers} className="text-sm font-bold underline cursor-pointer">Tentar novamente</button>
+          <button onClick={() => loadCustomers()} className="text-sm font-bold underline cursor-pointer">Tentar novamente</button>
         </div>
       )}
 
@@ -193,6 +197,26 @@ export function CustomersListPage() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-between items-center">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 border rounded-md disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span>Página {page} de {totalPages}</span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-4 py-2 border rounded-md disabled:opacity-50"
+          >
+            Próxima
+          </button>
+        </div>
+      )}
 
       {selectedCustomerId && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40" role="dialog" aria-modal="true" aria-label="Perfil do cliente">
