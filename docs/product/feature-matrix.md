@@ -93,7 +93,7 @@ source_of_truth:
 | `loyalty` | **Beta** | Programa de selos e fidelização. | `crm.manage_loyalty_cashback`|
 | `crm_enterprise` | **Beta** | Pipeline e segmentação avançada de clientes. | `crm.read` |
 | `crm_operational_profile` | **Stable** | Perfil operacional do cliente com contatos, totais, ticket médio, últimos pedidos, endereços e observações internas. | `crm.read` |
-| `campaigns` | **Beta** | Disparos automáticos e campanhas (requer Redis). | `crm.read` |
+| `campaigns` | **Beta** | Disparos automáticos e campanhas tenant-safe; requer Redis, BullMQ e o dispatch explicitamente habilitado. | `crm.read` |
 | `whatsapp_connect` | **Beta** | Conexão com API Oficial do WhatsApp. | `settings.manage` |
 | `whatsapp_advanced` | **Beta** | Inbox de atendimento humano. | `orders.read` |
 | `ai_agent` | **Beta** | Assistente virtual IA (OpenAI/Gemini/Claude). | `settings.manage` |
