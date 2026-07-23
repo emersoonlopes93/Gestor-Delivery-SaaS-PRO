@@ -1,6 +1,14 @@
-# 🧪 Guia de Testes - Notificações Personalizadas
+# 🧪 Guia de Testes — Notificações Push e Personalizadas
+
+> **Status atualizado em 2026-07-23:**  
+> Push Notifications estão **implementadas** desde 2026-07-15 (migration `20260715234118`).  
+> O backend usa `web-push` real com VAPID, `PushSubscription` persistido no banco e processador BullMQ.  
+> Veja o contrato completo em [`docs/contracts/push-notifications.md`](docs/contracts/push-notifications.md).
+>
+> **Gaps remanescentes:** Push para `tenant_user` (staff) não implementado; sem teste E2E automatizado.
 
 ## Pré-requisitos para Testes
+
 
 ### 1. Compilação do Prisma
 ```bash

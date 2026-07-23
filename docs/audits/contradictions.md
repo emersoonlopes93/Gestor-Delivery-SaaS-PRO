@@ -2,8 +2,8 @@
 title: Registro de Contradições
 status: current
 owner: engineering
-last_verified: 2026-07-15
-verified_against: main-copy / c63d394
+last_verified: 2026-07-23
+verified_against: main-copy / 78daea7a
 ---
 
 # Registro de Contradições — Gestor Delivery SaaS PRO
@@ -15,18 +15,20 @@ verified_against: main-copy / c63d394
 ## C-001 — Push Notifications descritas como funcionais em TESTING-NOTIFICATIONS.md
 
 - **Documento:** `TESTING-NOTIFICATIONS.md` (raiz)
-- **Afirmação atual:** Descreve processo de testar notificações push como se fossem enviadas de fato.
+- **Afirmação anterior:** Descrevia processo de testar notificações push como se fossem enviadas de fato.
 - **Código correspondente:** `apps/api/src/notifications/push.service.ts`
-- **Comportamento verificado:** O método `subscribe()` faz apenas log e contém TODO explícito:
-  ```
-  // TODO: Criar model PushSubscription no Prisma quando quiser persistir.
-  ```
-  O método `sendNotification()` faz log mas **não** usa o pacote `web-push`. Nenhum modelo `PushSubscription` existe no schema Prisma.
-- **Risco:** Alto — operadores podem acreditar que push está funcional e tentar usar em produção.
-- **Decisão documental:** Classificar push como `Stub` na matriz de features. Adicionar aviso ao documento.
-- **Correção técnica recomendada:** Instalar `web-push`, criar model `PushSubscription` no Prisma, implementar `sendNotification` real.
-- **Responsável:** Não atribuído
-- **Status:** Aberto
+- **Status:** ✅ **RESOLVIDO em 2026-07-15 (migration `20260715234118`).**
+- **Resolução verificada em 2026-07-23:**
+  - `PushService` usa `web-push` real com VAPID; entra em modo degradado (warn) se chaves ausentes
+  - `PushSubscriptionService` implementado com upsert tenant-scoped e unique constraint
+  - `PushNotificationProcessor` (BullMQ) com `findMany` tenant-scoped e cleanup automático em HTTP 404/410
+  - Migration `20260715234118_create_push_subscriptions` cria tabela `push_subscriptions` com FK para `tenants`
+  - Contrato formal em `docs/contracts/push-notifications.md`
+  - `TESTING-NOTIFICATIONS.md` atualizado para refletir estado real
+- **Gaps remanescentes:**
+  - Push para `tenant_user` (staff) não implementado
+  - Notificação de cancelamento para entregador ausente
+  - Sem teste E2E automatizado do fluxo completo
 
 ---
 
@@ -78,18 +80,14 @@ verified_against: main-copy / c63d394
 ## C-005 — Timezone hardcoded em campaign.processor.ts
 
 - **Documento:** Nenhum documento descreve comportamento de timezone.
-- **Afirmação atual:** Não documentado.
-- **Código correspondente:** `apps/api/src/campaigns/services/campaign.processor.ts` linhas 258-262:
-  ```typescript
-  // TODO P1-TECH: buscar tenantSettings.timezone para suportar múltiplos fusos horários.
-  timeZone: 'America/Sao_Paulo', // TODO P1-TECH: substituir por tenantSettings.timezone
-  ```
-- **Comportamento verificado:** Campanhas e automações usam timezone fixo `America/Sao_Paulo`. Tenants em outros fusos horários terão comportamento incorreto de agendamento.
-- **Risco:** Alto — impacto direto em clientes fora do fuso de São Paulo.
-- **Decisão documental:** Documentar limitação em `docs/product/known-gaps.md`.
-- **Correção técnica recomendada:** Adicionar campo `timezone` a `TenantSettings` e usar nos cálculos de campanha.
-- **Responsável:** Não atribuído
-- **Status:** Aberto (gap técnico documentado)
+- **Afirmação anterior:** Não documentado.
+- **Código correspondente:** `apps/api/src/campaigns/services/campaign.processor.ts`
+- **Status:** ✅ **RESOLVIDO na Sprint 6C (2026-07-22).**
+- **Resolução verificada em 2026-07-23:**
+  - `nextAllowedAttempt()` busca `tenantSettings.timezone` via Prisma
+  - Fallback explícito para `America/Sao_Paulo` quando timezone ausente ou inválido
+  - Não depende do timezone do host; não derruba o worker
+  - Documentado em `docs/product/known-gaps.md` como resolvido
 
 ---
 
@@ -113,39 +111,37 @@ verified_against: main-copy / c63d394
 - **Afirmação atual:** N/A
 - **Código correspondente:** Arquivo `{console.error(e)` na raiz do repositório.
 - **Comportamento verificado:** Provavelmente criado por erro de shell. Nome inválido em sistemas de arquivo.
-- **Risco:** Baixo — pode causar erros em scripts ou CI que iterem arquivos da raiz.
-- **Decisão documental:** Registrar como artefato inválido.
-- **Correção técnica recomendada:** Remover o arquivo.
-- **Responsável:** Não atribuído
-- **Status:** Aberto
+- **Status:** ✅ **RESOLVIDO em 2026-07-23** — arquivo removido via `del /f`.
 
 ---
 
 ## C-008 — PushSubscription não tem model Prisma mas o serviço referencia persistência futura
 
 - **Documento:** Nenhum
-- **Afirmação atual:** `push.service.ts` menciona futura persistência em banco.
-- **Código correspondente:** Schema Prisma (`apps/api/prisma/schema.prisma`) — nenhum model `PushSubscription` encontrado.
-- **Comportamento verificado:** O comentário `// TODO: Criar model PushSubscription no Prisma` confirma que a funcionalidade não está implementada.
-- **Risco:** Alto — subscriptions de push não são persistidas; usuários perdem subscrições ao reiniciar.
-- **Decisão documental:** Classificar push como `Stub` em toda documentação.
-- **Correção técnica recomendada:** Criar migration com model `PushSubscription` e implementar persistência.
-- **Responsável:** Não atribuído
-- **Status:** Aberto
+- **Afirmação anterior:** `push.service.ts` mencionava futura persistência em banco.
+- **Código correspondente:** Schema Prisma (`apps/api/prisma/schema.prisma`)
+- **Status:** ✅ **RESOLVIDO em 2026-07-15 (migration `20260715234118`).**
+- **Resolução verificada em 2026-07-23:**
+  - Tabela `push_subscriptions` criada com:
+    - FK para `tenants` com `ON DELETE CASCADE`
+    - Unique `(tenant_id, recipient_id, recipient_type, endpoint)`
+    - Índice composto `(tenant_id, recipient_id, recipient_type, is_active)`
+    - Campos: `endpoint`, `p256dh_key`, `auth_key`, `user_agent`, `is_active`, `last_used_at`
+  - `PushSubscriptionService` usa upsert com a chave única composta
+  - `PushNotificationProcessor` faz `findMany` tenant-scoped e deleta subscriptions expiradas
 
 ---
 
 ## C-009 — `apps/api/.env` presente no repositório (possível vazamento de segredos)
 
 - **Documento:** Nenhum — deveria estar no `.gitignore`
-- **Afirmação atual:** N/A
-- **Código correspondente:** `apps/api/.env` (3782 bytes) listado via `list_dir`.
-- **Comportamento verificado:** O arquivo `.env` real existe no repositório. Verificar se está no `.gitignore` e se não contém credenciais reais.
-- **Risco:** **Crítico** — se contiver segredos reais e estiver comitado no git, representa vazamento de segurança.
-- **Decisão documental:** Registrar como item crítico de segurança.
-- **Correção técnica recomendada:** Verificar `.gitignore`, rotacionar credenciais se comitadas, remover do histórico git se necessário.
-- **Responsável:** Não atribuído
-- **Status:** **Requer verificação imediata**
+- **Afirmação anterior:** `apps/api/.env` (3782 bytes) listado via `list_dir`.
+- **Status:** ✅ **RESOLVIDO — verificado em 2026-07-23.**
+- **Verificação:**
+  - `git check-ignore -v apps/api/.env` → coberto pela regra `.env` na linha 10 do `.gitignore`
+  - `git ls-files --error-unmatch apps/api/.env` → `error: pathspec did not match any file(s) known to git` (arquivo NÃO rastreado)
+  - O arquivo existe localmente para desenvolvimento mas não está no histórico git
+- **Ação necessária:** Nenhuma — situação segura.
 
 ---
 

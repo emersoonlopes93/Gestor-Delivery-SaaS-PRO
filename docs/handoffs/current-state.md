@@ -529,3 +529,54 @@ Branch: `feat/sprint-6b2-table-relation`
 - A UI seleciona mesas do salão pelo ID. Leituras devolvem resumo da relação quando ela existe e preservam o fallback por `tableNumber`; impressão continua baseada no snapshot legível.
 
 PostgreSQL 16 local/descartável aplicou as 48 migrations, incluindo `20260722090000_add_order_table_relation`; a prova cobriu backfill unívoco, ambíguo e sem correspondência, FK/índice, `ON DELETE SET NULL` e reexecução idempotente. O container foi removido ao final. Nenhum banco remoto, deploy, merge, `main` ou `main-copy` foi alterado; o stash preexistente deve ser preservado.
+
+---
+
+## Análise Sistemática e Correções de Documentação
+
+**Data:** 2026-07-23 | **Branch:** `main-copy` | **Base:** `78daea7a`
+
+### Objetivo
+
+Análise sistemática do estado real do código vs. documentação, corrigindo contradições desatualizadas e criando contratos canônicos faltantes citados no `AGENTS.md`.
+
+### Alterações feitas
+
+**Removidas da raiz:**
+- `{console.error(e)` — arquivo inválido (erro de shell) — deletado
+- `clean_schema.js` — movido para `scripts/maintenance/`
+- `clean_schema2.js` — movido para `scripts/maintenance/`
+
+**Criados:**
+- `scripts/maintenance/clean_schema.js` — barreira `--force` + falha em `NODE_ENV=production`
+- `scripts/maintenance/clean_schema2.js` — idem
+- `scripts/maintenance/README.md` — instruções de uso seguro
+- `docs/contracts/authentication.md` — identidades, JWT, sessões
+- `docs/contracts/authorization-rbac.md` — roles, permissões, guards, resolução de feature
+- `docs/contracts/payments.md` — gateway de pedidos, billing SaaS, webhooks HMAC
+- `docs/contracts/feature-flags.md` — catálogo, resolução, kill switches
+- `docs/contracts/api.md` — prefixos, padrões de resposta, paginação, rate limiting
+- `docs/contracts/database-and-migrations.md` — Prisma 5, regras de migration, multi-tenancy
+
+**Atualizados:**
+- `docs/audits/contradictions.md` — C-001, C-005, C-007, C-008, C-009 marcadas resolvidas com evidência
+- `TESTING-NOTIFICATIONS.md` — push implementado desde Sprint 3 (migration 20260715234118)
+- `docs/product/known-gaps.md` — seção push (implementado, gaps remanescentes) e seção 7 (scripts resolvidos)
+
+### Testes executados
+
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm check:no-any` | ✅ PASS |
+| `pnpm check:features` | ✅ PASS |
+| `campaigns.service.spec.ts` | ✅ 4/4 |
+| `git ls-files --error-unmatch apps/api/.env` | ✅ SEGURO |
+
+### Riscos residuais
+
+| Risco | Severidade |
+|-------|-----------|
+| Incidente `DIRECT_URL` não auditado formalmente | Alta |
+| Homologação iFood pendente | Alta |
+| Push para `tenant_user` (staff) não implementado | Média |
+| Sem teste E2E de push | Alta |
