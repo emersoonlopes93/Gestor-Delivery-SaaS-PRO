@@ -529,3 +529,16 @@ Branch: `feat/sprint-6b2-table-relation`
 - A UI seleciona mesas do salão pelo ID. Leituras devolvem resumo da relação quando ela existe e preservam o fallback por `tableNumber`; impressão continua baseada no snapshot legível.
 
 PostgreSQL 16 local/descartável aplicou as 48 migrations, incluindo `20260722090000_add_order_table_relation`; a prova cobriu backfill unívoco, ambíguo e sem correspondência, FK/índice, `ON DELETE SET NULL` e reexecução idempotente. O container foi removido ao final. Nenhum banco remoto, deploy, merge, `main` ou `main-copy` foi alterado; o stash preexistente deve ser preservado.
+
+---
+
+## Refinamento visual — Configurações do Tenant
+
+Data: 2026-07-23
+Branch: `feat/settings-ui-refinement`
+
+- `apps/web-tenant/src/features/settings/SettingsPage.tsx` foi refinada visualmente sem mudar rotas, APIs, payloads, regras de negócio, sidebar ou RBAC.
+- As abas Loja, Endereço, Fiscal & Pagamento e Horários agora compartilham container, navegação responsiva com estados ativo/foco, cards e ações de salvamento contextuais.
+- Loja, endereço, pagamentos, upload de logo e horários preservam os handlers existentes; as mudanças são somente de estrutura visual, texto e acessibilidade.
+- A correção estrutural removeu a coluna vazia do conteúdo e alinhou painéis, cards e barras de salvamento à largura das abas; a Loja usa uma grade 7/5 e o endereço usa a grade de 12 colunas no desktop.
+- Validações: `pnpm --filter @gestor/web-tenant lint` PASS; `git diff --check` PASS. A execução do build chegou a `tsc --noEmit` e transformação Vite, mas o executor não devolveu o término/exit code do Vite; confirmação de build permanece pendente. A avaliação visual por código passou após segunda revisão; screenshots automatizados não estavam disponíveis no ambiente.
