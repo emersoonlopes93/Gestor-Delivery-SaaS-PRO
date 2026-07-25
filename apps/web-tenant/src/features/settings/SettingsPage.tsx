@@ -20,12 +20,13 @@ interface WhatsAppStatusPayload {
   phoneNumber?: string | null;
 }
 
-import { Clock, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store, MessageCircleWarning } from 'lucide-react';
+import { Building2, Calendar, ChefHat, Clock, Copy, Globe2, ImageIcon, MapPin, MessageCircleWarning, Save, Store, Trash2, Upload, Wallet } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StoreStatusControl } from '../../components/store/StoreStatusControl';
 import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 import { CurrencyInput } from '@gestor/ui';
+import { Button } from '../../components/ui/Button';
 
 interface BackendGeocodeResponse {
   provider?: string | null;
@@ -393,23 +394,26 @@ export function SettingsPage() {
   const isFinanceTab = activeTab === 'finance';
   const isHoursTab = activeTab === 'hours';
   const showMainColumn = !isHoursTab;
+  const saveLabel = isOverviewTab ? 'Salvar dados da loja' : isAddressTab ? 'Salvar endereço' : 'Salvar configurações';
+  const sectionClass = 'w-full min-w-0 bg-card rounded-2xl shadow-[0_8px_24px_-18px_rgba(15,23,42,0.55)] border border-border/80 p-5 sm:p-6';
+  const inputClass = 'input-premium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      <div className="flex justify-center items-center h-64" role="status" aria-label="Carregando configurações">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto text-left space-y-6 lg:space-y-8">
+    <main className="w-full max-w-6xl mx-auto p-4 text-left space-y-6 sm:p-6 lg:space-y-8">
       <PageHeader
         title="Configurações da Loja"
         description="Gerencie o funcionamento e informações do seu estabelecimento."
       />
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <nav className="grid w-full min-w-0 grid-cols-2 gap-2 rounded-2xl border border-border/80 bg-muted/35 p-2 sm:grid-cols-4" aria-label="Seções de configurações">
         {[
           { id: 'overview', label: 'Loja', subtitle: 'Identidade e ações rápidas', icon: Store },
           { id: 'address', label: 'Endereço', subtitle: 'CEP, rua e complemento', icon: MapPin },
@@ -423,23 +427,24 @@ export function SettingsPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`group w-full rounded-2xl border p-4 text-left transition-all min-h-[92px] ${
+              aria-current={active ? 'page' : undefined}
+              className={`group w-full rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 active
-                  ? 'bg-primary/10 text-primary border-primary/30 shadow-sm ring-1 ring-primary/20'
-                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-primary/20 hover:bg-muted/50'
+                  ? 'bg-primary/10 text-foreground border-primary/35 shadow-sm'
+                  : 'bg-transparent text-muted-foreground border-transparent hover:bg-card hover:text-foreground hover:border-border'
               }`}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-2.5">
                 <div
-                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
                     active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground group-hover:bg-primary/10 group-hover:text-primary'
                   }`}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-black leading-tight truncate">{tab.label}</div>
-                  <div className={`mt-1 text-xs leading-snug ${active ? 'text-primary/80' : 'text-muted-foreground'}`}>
+                  <div className="text-sm font-bold leading-tight truncate">{tab.label}</div>
+                  <div className={`mt-1 hidden sm:block text-[11px] leading-tight ${active ? 'text-primary' : 'text-muted-foreground'}`}>
                     {tab.subtitle}
                   </div>
                 </div>
@@ -447,100 +452,99 @@ export function SettingsPage() {
             </button>
           );
         })}
-      </div>
+      </nav>
 
-      <div className={`grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)] ${isOverviewTab ? '' : 'hidden'}`}>
-        <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+      <div className={`w-full min-w-0 space-y-6 ${isOverviewTab ? '' : 'hidden'}`}>
+        <div className="w-full min-w-0 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 sm:p-6 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.55)]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm shrink-0">
                 <ChefHat className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0">
-                <div className="font-black text-slate-900 dark:text-white text-sm">Importar Cardápio Base</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-xl">
+                <div className="font-bold text-foreground text-sm">Comece com um cardápio base</div>
+                <div className="text-xs text-muted-foreground mt-0.5 max-w-xl">
                   Adicione categorias e produtos pré-definidos para o seu segmento em segundos.
                 </div>
               </div>
             </div>
-            <button
+            <Button
+              type="button"
               onClick={() => navigate('/settings/menu-import')}
-              className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all shadow-md shadow-indigo-500/20 text-sm"
+              className="shrink-0 w-full sm:w-auto"
             >
-              Importar →
-            </button>
+              Importar cardápio
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-4">
-          {businessGroup && (
-            <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="bg-card/20 p-2.5 rounded-xl shrink-0">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
-                    <p className="font-black text-base leading-snug mt-1 truncate">{businessGroup.name}</p>
-                    <p className="font-medium text-indigo-100/90 text-sm mt-2 leading-snug">
-                      Esta unidade faz parte de um grupo multi-unidades e compartilha contexto operacional com a rede.
-                    </p>
-                  </div>
+        {businessGroup && (
+          <div className="w-full min-w-0 bg-indigo-600 rounded-2xl shadow-lg p-5 sm:p-6 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="bg-card/20 p-2.5 rounded-xl shrink-0">
+                  <Building2 className="w-6 h-6" />
                 </div>
-                <div className="hidden xl:flex shrink-0 items-center gap-2 bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
-                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                  {businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} lojas
+                <div className="min-w-0">
+                  <div className="text-[11px] font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
+                  <p className="font-black text-base leading-snug mt-1 truncate">{businessGroup.name}</p>
+                  <p className="font-medium text-indigo-100/90 text-sm mt-2 leading-snug">
+                    Esta unidade faz parte de um grupo multi-unidades e compartilha contexto operacional com a rede.
+                  </p>
                 </div>
               </div>
-
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Unidades vinculadas</div>
-                  <div className="mt-1 text-sm font-bold">{businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} unidade(s)</div>
-                </div>
-                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Gerenciamento</div>
-                  <div className="mt-1 text-sm font-bold">Feito pelo painel administrativo</div>
-                </div>
+              <div className="hidden xl:flex shrink-0 items-center gap-2 bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                {businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} lojas
               </div>
-
-              {businessGroup.tenants && businessGroup.tenants.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Lojas da rede</div>
-                  <div className="flex flex-wrap gap-2">
-                    {businessGroup.tenants.slice(0, 4).map((tenant) => (
-                      <span key={tenant.id} className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
-                        <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-300' : 'bg-amber-300'}`} />
-                        {tenant.name}
-                      </span>
-                    ))}
-                    {businessGroup.tenants.length > 4 && (
-                      <span className="inline-flex items-center rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
-                        +{businessGroup.tenants.length - 4}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
-          )}
 
-          <StoreStatusControl
-            isPaused={Boolean(settings.isStorePaused)}
-            pauseReason={settings.storePauseReason || ''}
-            onTogglePause={handleTogglePause}
-          />
-        </div>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Unidades vinculadas</div>
+                <div className="mt-1 text-sm font-bold">{businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} unidade(s)</div>
+              </div>
+              <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Gerenciamento</div>
+                <div className="mt-1 text-sm font-bold">Feito pelo painel administrativo</div>
+              </div>
+            </div>
+
+            {businessGroup.tenants && businessGroup.tenants.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Lojas da rede</div>
+                <div className="flex flex-wrap gap-2">
+                  {businessGroup.tenants.slice(0, 4).map((tenant) => (
+                    <span key={tenant.id} className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                      <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                      {tenant.name}
+                    </span>
+                  ))}
+                  {businessGroup.tenants.length > 4 && (
+                    <span className="inline-flex items-center rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                      +{businessGroup.tenants.length - 4}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <StoreStatusControl
+          isPaused={Boolean(settings.isStorePaused)}
+          pauseReason={settings.storePauseReason || ''}
+          onTogglePause={handleTogglePause}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="w-full min-w-0 space-y-6">
         {/* Coluna da Esquerda: Dados Básicos */}
-        <div className={`${showMainColumn ? 'lg:col-span-2' : 'hidden'} space-y-6`}>
-          <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isOverviewTab ? '' : 'hidden'}`}>
+        <div className={`${showMainColumn ? '' : 'hidden'} w-full min-w-0 space-y-6`}>
+          <form onSubmit={handleSaveSettings} className="w-full min-w-0 space-y-6">
+            <div className={`${sectionClass} ${isOverviewTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm">🏪</span>
+                <span className="p-1.5 bg-primary/10 text-primary rounded-lg"><Store className="h-4 w-4" /></span>
                 Identidade e Contato
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -551,13 +555,13 @@ export function SettingsPage() {
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
                       ) : (
-                        <span className="text-muted-foreground text-2xl">🖼️</span>
+                        <ImageIcon className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
                       )}
                     </div>
                     <div className="flex flex-col gap-2 text-left">
                       <div className="flex items-center gap-2">
-                        <label className="cursor-pointer bg-card text-foreground border border-border hover:bg-muted font-bold py-2 px-4 rounded-xl text-sm shadow-sm transition-all active:scale-95">
-                          <span>{uploading ? 'Enviando...' : 'Selecionar Imagem'}</span>
+                        <label className="cursor-pointer inline-flex items-center gap-2 bg-card text-foreground border border-border hover:bg-muted font-bold py-2 px-4 rounded-xl text-sm shadow-sm transition-all active:scale-95 focus-within:ring-2 focus-within:ring-primary">
+                          <Upload className="h-4 w-4" aria-hidden="true" /><span>{uploading ? 'Enviando...' : 'Selecionar imagem'}</span>
                           <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                         </label>
                         {settings.logoUrl && (
@@ -566,7 +570,7 @@ export function SettingsPage() {
                             onClick={() => setSettings({...settings, logoUrl: ''})}
                             className="text-destructive hover:text-destructive/80 font-medium text-xs px-2 py-1"
                           >
-                            Remover
+                            <Trash2 className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />Remover
                           </button>
                         )}
                       </div>
@@ -598,24 +602,24 @@ export function SettingsPage() {
                     Número usado no botão final do cardápio digital.
                   </p>
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">E-mail Comercial</label>
                   <input
                     type="email"
                     value={settings.businessEmail || ''}
                     onChange={e => setSettings({...settings, businessEmail: e.target.value})}
-                    className="input-premium"
+                    className={inputClass}
                   />
                 </div>
                 {connectedWhatsappNumber ? (
-                  <div className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <div className="md:col-span-2 rounded-2xl border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-sm text-foreground">
                     <div className="flex items-start gap-3">
-                      <MessageCircleWarning className="mt-0.5 h-4 w-4 shrink-0" />
+                      <MessageCircleWarning className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
                       <div>
                         <p className="font-black">WhatsApp conectado à IA: {maskPhone(connectedWhatsappNumber)}</p>
                         {unmask(settings.orderWhatsappNumber || settings.businessPhone || '') !== '' &&
                         unmask(settings.orderWhatsappNumber || settings.businessPhone || '') !== connectedWhatsappNumber ? (
-                          <p className="mt-1 text-xs">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             O WhatsApp de pedidos é diferente do WhatsApp conectado à IA. Os pedidos do cardápio serão enviados para o número configurado em “WhatsApp de Pedidos”.
                           </p>
                         ) : null}
@@ -626,14 +630,14 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isAddressTab ? '' : 'hidden'}`}>
+            <div className={`${sectionClass} ${isAddressTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
               </h2>
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="md:col-span-1">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CEP</label>
                     <input
                       type="text"
@@ -644,7 +648,7 @@ export function SettingsPage() {
                       className="input-premium"
                     />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="lg:col-span-8">
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Rua / Logradouro</label>
                     <input
                       type="text"
@@ -653,7 +657,7 @@ export function SettingsPage() {
                       className="input-premium"
                     />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Número</label>
                     <input
                       type="text"
@@ -664,8 +668,8 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                  <div className="lg:col-span-4">
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Bairro</label>
                     <input
                       type="text"
@@ -674,7 +678,7 @@ export function SettingsPage() {
                       className="input-premium"
                     />
                   </div>
-                  <div>
+                  <div className="lg:col-span-6">
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Cidade</label>
                     <input
                       type="text"
@@ -683,7 +687,7 @@ export function SettingsPage() {
                       className="input-premium"
                     />
                   </div>
-                  <div>
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Estado (UF)</label>
                     <input
                       type="text"
@@ -695,23 +699,21 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div>
-                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Complemento</label>
-                    <input
-                      type="text"
-                      value={settings.complement || ''}
-                      onChange={e => setSettings({...settings, complement: e.target.value})}
-                      placeholder="Apto, Bloco, etc."
-                      className="input-premium"
-                    />
-                  </div>
+                <div className="lg:col-span-12">
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Complemento</label>
+                  <input
+                    type="text"
+                    value={settings.complement || ''}
+                    onChange={e => setSettings({...settings, complement: e.target.value})}
+                    placeholder="Apto, Bloco, etc."
+                    className="input-premium"
+                  />
                 </div>
 
                               </div>
             </div>
 
-            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
+            <div className={`${sectionClass} ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
                 Dados Fiscais & Integração
@@ -786,9 +788,9 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
+            <div className={`${sectionClass} ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-status-success/10 text-status-success rounded-lg text-sm">💰</span>
+                <span className="p-1.5 bg-status-success/10 text-status-success rounded-lg"><Wallet className="h-4 w-4" /></span>
                 Configuração de Pagamento
               </h2>
               <div className="space-y-4">
@@ -799,7 +801,7 @@ export function SettingsPage() {
                     { id: 'cash', label: 'Dinheiro (Na entrega)' },
                     { id: 'card_on_delivery', label: 'Cartão (Na entrega)' },
                   ].map((m) => (
-                    <label key={m.id} className="flex items-center gap-3 p-3 border border-border rounded-xl hover:bg-muted cursor-pointer transition-all">
+                    <label key={m.id} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all focus-within:ring-2 focus-within:ring-primary/40 ${settings.paymentMethods?.includes(m.id) ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted'}`}>
                       <input
                         type="checkbox"
                         checked={settings.paymentMethods?.includes(m.id) ?? false}
@@ -874,9 +876,9 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
+            <div className={`${sectionClass} ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-status-warning/10 text-status-warning rounded-lg text-sm">🌍</span>
+                <span className="p-1.5 bg-status-warning/10 text-status-warning rounded-lg"><Globe2 className="h-4 w-4" /></span>
                 Configurações Regionais
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -905,7 +907,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
+            <div className={`${sectionClass} ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6">Cashback e Fidelidade</h2>
               <div className="space-y-8">
                 <div className="space-y-4">
@@ -975,37 +977,41 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className={`${showMainColumn ? 'flex justify-end' : 'hidden'}`}>
-              <button
+            <div className={`${showMainColumn ? 'sticky bottom-3 z-10 flex w-full min-w-0 justify-end rounded-xl border border-border/80 bg-card/95 p-3 shadow-lg backdrop-blur' : 'hidden'}`}>
+              <Button
                 type="submit"
                 disabled={saving}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold py-2.5 px-8 rounded-xl shadow-md transition-all active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
+                className="min-w-48"
               >
-                {saving ? 'Salvando...' : 'Salvar Dados Básicos'}
-              </button>
+                <Save className="mr-2 h-4 w-4" />{saving ? 'Salvando...' : saveLabel}
+              </Button>
             </div>
           </form>
         </div>
 
         {/* Coluna da Direita: Horários */}
-        <div className={`${isHoursTab ? 'lg:col-span-3' : 'hidden'} space-y-6`}>
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+        <div className={`${isHoursTab ? '' : 'hidden'} w-full min-w-0 space-y-6`}>
+          <div className={`${sectionClass}`}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary-500" />
                 Horário Semanal
               </h2>
               <div className="flex gap-1">
-                <button 
+                <button
+                  type="button"
                   onClick={copyFirstDayToAll}
                   title="Copiar Domingo para todos"
+                  aria-label="Copiar horários de domingo para todos os dias"
                   className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-primary transition-colors"
                 >
                   <Copy className="w-4 h-4" />
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={applyMonToFri}
                   title="Aplicar Seg a Sex"
+                  aria-label="Aplicar horários de segunda-feira aos dias úteis"
                   className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-primary transition-colors"
                 >
                   <Calendar className="w-4 h-4" />
@@ -1020,7 +1026,7 @@ export function SettingsPage() {
                 return (
                   <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-border hover:border-border/70 transition-colors">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-foreground">{name}</span>
+                      <div><span className="text-sm font-bold text-foreground">{name}</span><span className={`ml-2 text-xs font-medium ${isAnyOpen ? 'text-status-success' : 'text-muted-foreground'}`}>{isAnyOpen ? 'Aberto' : 'Fechado'}</span></div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
                           type="checkbox" 
@@ -1028,7 +1034,7 @@ export function SettingsPage() {
                           checked={isAnyOpen}
                           onChange={(e) => toggleDayOpen(i, e.target.checked)}
                         />
-                        <div className="w-9 h-5 bg-input peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                        <div className="w-9 h-5 bg-input rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2"></div>
                       </label>
                     </div>
                     {isAnyOpen && (
@@ -1055,8 +1061,9 @@ export function SettingsPage() {
                                 onClick={() => removeShift(index)}
                                 className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                                 title="Remover turno"
+                                aria-label={`Remover turno ${index + 1} de ${name}`}
                               >
-                                🗑️
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
                               </button>
                             </div>
                           );
@@ -1067,7 +1074,7 @@ export function SettingsPage() {
                             onClick={() => addShift(i)}
                             className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1 mt-1 pl-1"
                           >
-                            ➕ Adicionar Turno
+                            + Adicionar turno
                           </button>
                         )}
                       </div>
@@ -1077,17 +1084,19 @@ export function SettingsPage() {
               })}
             </div>
 
-            <button
+            <Button
+              type="button"
               onClick={handleSaveHours}
               disabled={saving}
-              className="w-full mt-6 bg-primary border border-primary text-primary-foreground font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
+              fullWidth
+              className="mt-6 h-11"
             >
-              <Save className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              {saving ? 'Salvando...' : 'Salvar Horários'}
-            </button>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Salvando...' : 'Salvar horários'}
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -124,39 +124,41 @@ export function StoreStatusControl({
   };
 
   return (
-    <div className={`rounded-3xl border p-5 shadow-sm ${isPaused ? 'border-status-warning/20 bg-status-warning/5' : 'border-border bg-card'}`}>
-      <div className="flex items-start gap-4">
-        <div className={`rounded-2xl p-3 ${isPaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
-          <Clock3 className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-foreground">Status da loja</h2>
-              <p className="mt-1 text-sm font-medium text-muted-foreground">
-                Pause temporariamente sua loja para não receber novos pedidos.
-              </p>
-            </div>
-            <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${isPaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
-              {isPaused ? 'Pausada' : 'Ativa'}
-            </span>
+    <div className={`w-full min-w-0 rounded-2xl border p-5 sm:p-6 shadow-sm ${isPaused ? 'border-status-warning/20 bg-status-warning/5' : 'border-border bg-card'}`}>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
+        <div className="flex items-start gap-4 lg:col-span-7">
+          <div className={`rounded-2xl p-3 shrink-0 ${isPaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
+            <Clock3 className="h-5 w-5" />
           </div>
-
-          <div className="mt-4">
-            <div className={`rounded-2xl border p-4 ${tone.wrapper}`}>
-              <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
-                <p className="text-sm font-black uppercase tracking-[0.22em]">{isPaused ? 'Loja pausada' : 'Loja aberta'}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-foreground">Status da loja</h2>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">
+                  Pause temporariamente sua loja para não receber novos pedidos.
+                </p>
               </div>
-              <p className="mt-2 text-xs font-medium opacity-80">
-                {isPaused
-                  ? 'Clique para reabrir quando estiver pronto.'
-                  : 'Clique para pausar a operação com segurança.'}
-              </p>
+              <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shrink-0 ${isPaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
+                {isPaused ? 'Pausada' : 'Ativa'}
+              </span>
             </div>
           </div>
+        </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="min-w-0 lg:col-span-5 space-y-4">
+          <div className={`rounded-2xl border p-4 ${tone.wrapper}`}>
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
+              <p className="text-sm font-black uppercase tracking-[0.22em]">{isPaused ? 'Loja pausada' : 'Loja aberta'}</p>
+            </div>
+            <p className="mt-2 text-xs font-medium opacity-80">
+              {isPaused
+                ? 'Clique para reabrir quando estiver pronto.'
+                : 'Clique para pausar a operação com segurança.'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => setIsConfirmOpen(true)}
@@ -170,7 +172,7 @@ export function StoreStatusControl({
           </div>
 
           {error ? (
-            <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
               {error}
             </div>
           ) : null}

@@ -529,3 +529,79 @@ Branch: `feat/sprint-6b2-table-relation`
 - A UI seleciona mesas do salão pelo ID. Leituras devolvem resumo da relação quando ela existe e preservam o fallback por `tableNumber`; impressão continua baseada no snapshot legível.
 
 PostgreSQL 16 local/descartável aplicou as 48 migrations, incluindo `20260722090000_add_order_table_relation`; a prova cobriu backfill unívoco, ambíguo e sem correspondência, FK/índice, `ON DELETE SET NULL` e reexecução idempotente. O container foi removido ao final. Nenhum banco remoto, deploy, merge, `main` ou `main-copy` foi alterado; o stash preexistente deve ser preservado.
+
+---
+
+## Refinamento visual — Configurações do Tenant
+
+Data: 2026-07-24
+Branch: `feat/settings-ui-refinement`
+Working tree inicial: `M apps/web-tenant/src/features/settings/SettingsPage.tsx` + `?? scripts/screenshot-settings.ts`
+
+- `apps/web-tenant/src/features/settings/SettingsPage.tsx` foi refinada visualmente sem mudar rotas, APIs, payloads, regras de negócio, sidebar ou RBAC.
+- As abas Loja, Endereço, Fiscal & Pagamento e Horários agora compartilham container, navegação responsiva com estados ativo/foco, cards e ações de salvamento contextuais.
+- Loja, endereço, pagamentos, upload de logo e horários preservam os handlers existentes; as mudanças são somente de estrutura visual, texto e acessibilidade.
+- A correção estrutural removeu a coluna vazia do conteúdo e alinhou painéis, cards e barras de salvamento à largura das abas; a Loja usa uma grade 7/5 (Cardápio Base 7/12 + Status 5/12) e os demais painéis usam a grade de 12 colunas full-width no desktop.
+
+### Gates determinísticos (exit codes)
+
+| Gate | Exit code | Últimas linhas |
+|---|---|---|
+| `pnpm --filter @gestor/web-tenant build` | 0 | tsc --noEmit + vite build; 5686 modules; dist/index.html + CSS/JS gerados |
+| `pnpm typecheck` (todos os apps) | 0 | api/web-tenant/web-admin/web-delivery/web-storefront sem erros |
+| `pnpm check:no-any` | 0 | Auditoria anti-any concluída, nenhuma tipagem frouxa |
+| `pnpm check:features` | 0 | Validação de stubs e gaps concluída; NotImplementedException somente em split-payment (preexistente) |
+
+### Sessão autenticada e ambiente
+
+- Banco: PostgreSQL 16-alpine em Docker (local/efêmero), porta host 5433, container `gestor-delivery-postgres`.
+- Redis: 7-alpine em Docker (local), porta 6379, container `gestor-delivery-redis`.
+- Conta de seed (seed oficial do repositório, conta não-efêmera): `demo@demo.com` / `demo123` / tenant `pizzaria-demo` (Pizzaria Demo).
+- 49 migrations aplicadas via `prisma migrate deploy`, seed completo via `prisma:seed` (permissions, roles, billing foundation, base menus, tenant Pizzaria Demo, catálogo, 12 mesas dine-in).
+- Nenhum banco remoto acessado. Nenhum bypass de autenticação. Backend/Prisma/migrations não foram alterados.
+
+### Screenshots geradas (Playwright headless, storageState via localStorage inject)
+
+Diretório (não versionado): `tmp/settings-visual-proof/`
+
+**1440×900:**
+- Loja → `settings-loja-1440x900.png`
+- Endereço → `settings-endereco-1440x900.png`
+- Fiscal & Pagamento → `settings-fiscal-pagamento-1440x900.png`
+- Horários → `settings-horarios-1440x900.png`
+
+**1366×768:**
+- Loja → `settings-loja-1366x768.png`
+- Endereço → `settings-endereco-1366x768.png`
+- Fiscal & Pagamento → `settings-fiscal-pagamento-1366x768.png`
+- Horários → `settings-horarios-1366x768.png`
+
+### Revisão visual rigorosa (APROVADO)
+
+Verificado nas 8 capturas, zoom 100%, sidebar visível, sem skeleton/toasts cobrindo painéis:
+
+- ✅ Abas/painéis alinhados (Δleft ≤ 2px e Δright ≤ 2px em ambos viewports)
+- ✅ Identidade e Contato (Loja) = full-width
+- ✅ Endereço (card + barra Salvar endereço) = full-width
+- ✅ Dados Fiscais & Integração + Configuração de Pagamento = full-width cada
+- ✅ Horário Semanal (cards de Domingo a Sábado) = full-width
+- ✅ Cardápio Base (7/12) + Status da loja (5/12) = proporção 7:5 mantida em ambos viewports
+- ✅ Sem espaço vazio estrutural à direita (coluna vazia eliminada)
+- ✅ Sem card torto (todos cards com cantos arredondados consistentes)
+- ✅ Sem scroll horizontal (scrollWidth ≤ clientWidth+4px)
+- ✅ Sidebar inalterada (mesmos grupos: DASHBOARD/CARDÁPIO/PEDIDOS/LOGÍSTICA/PDV E CAIXA/GESTÃO/CRM E MARKETING/GESTÃO & PERFORMANCE/WHATSAPP/SISTEMA)
+
+### Gates finais
+
+| Gate | Exit code |
+|---|---|
+| `pnpm --filter @gestor/web-tenant lint` | 0 (max-warnings 0) |
+| `pnpm --filter @gestor/web-tenant test` | 0 (5 arquivos / 14 testes PASS) |
+| `git diff --check` | 0 |
+
+### Pendências e decisão
+
+- Nenhuma pendência objetiva. Todos exit codes = 0.
+- Screenshots reais confirmam o alinhamento estrutural pretendido em 2 resoluções desktop.
+- Nenhum push, PR, merge, deploy, stash apply/drop ou commit foi realizado até aqui.
+- Próximo passo: commit somente de `SettingsPage.tsx` + `docs/handoffs/current-state.md` (o arquivo `scripts/screenshot-settings.ts` e o diretório `tmp/` permanecem fora do commit, conforme protocolo).
