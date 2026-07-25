@@ -454,10 +454,10 @@ export function SettingsPage() {
         })}
       </nav>
 
-      <div className={`grid w-full min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-12 ${isOverviewTab ? '' : 'hidden'}`}>
-        <div className="w-full min-w-0 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.55)] lg:col-span-7">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-start gap-4">
+      <div className={`w-full min-w-0 space-y-6 ${isOverviewTab ? '' : 'hidden'}`}>
+        <div className="w-full min-w-0 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 sm:p-6 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.55)]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-start gap-3 sm:gap-4">
               <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm shrink-0">
                 <ChefHat className="w-5 h-5 text-white" />
               </div>
@@ -471,73 +471,71 @@ export function SettingsPage() {
             <Button
               type="button"
               onClick={() => navigate('/settings/menu-import')}
-              className="shrink-0"
+              className="shrink-0 w-full sm:w-auto"
             >
               Importar cardápio
             </Button>
           </div>
         </div>
 
-        <div className="w-full min-w-0 space-y-4 lg:col-span-5">
-          {businessGroup && (
-            <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="bg-card/20 p-2.5 rounded-xl shrink-0">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
-                    <p className="font-black text-base leading-snug mt-1 truncate">{businessGroup.name}</p>
-                    <p className="font-medium text-indigo-100/90 text-sm mt-2 leading-snug">
-                      Esta unidade faz parte de um grupo multi-unidades e compartilha contexto operacional com a rede.
-                    </p>
-                  </div>
+        {businessGroup && (
+          <div className="w-full min-w-0 bg-indigo-600 rounded-2xl shadow-lg p-5 sm:p-6 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="bg-card/20 p-2.5 rounded-xl shrink-0">
+                  <Building2 className="w-6 h-6" />
                 </div>
-                <div className="hidden xl:flex shrink-0 items-center gap-2 bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
-                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                  {businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} lojas
+                <div className="min-w-0">
+                  <div className="text-[11px] font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
+                  <p className="font-black text-base leading-snug mt-1 truncate">{businessGroup.name}</p>
+                  <p className="font-medium text-indigo-100/90 text-sm mt-2 leading-snug">
+                    Esta unidade faz parte de um grupo multi-unidades e compartilha contexto operacional com a rede.
+                  </p>
                 </div>
               </div>
-
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Unidades vinculadas</div>
-                  <div className="mt-1 text-sm font-bold">{businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} unidade(s)</div>
-                </div>
-                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Gerenciamento</div>
-                  <div className="mt-1 text-sm font-bold">Feito pelo painel administrativo</div>
-                </div>
+              <div className="hidden xl:flex shrink-0 items-center gap-2 bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                {businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} lojas
               </div>
-
-              {businessGroup.tenants && businessGroup.tenants.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Lojas da rede</div>
-                  <div className="flex flex-wrap gap-2">
-                    {businessGroup.tenants.slice(0, 4).map((tenant) => (
-                      <span key={tenant.id} className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
-                        <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-300' : 'bg-amber-300'}`} />
-                        {tenant.name}
-                      </span>
-                    ))}
-                    {businessGroup.tenants.length > 4 && (
-                      <span className="inline-flex items-center rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
-                        +{businessGroup.tenants.length - 4}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
-          )}
 
-          <StoreStatusControl
-            isPaused={Boolean(settings.isStorePaused)}
-            pauseReason={settings.storePauseReason || ''}
-            onTogglePause={handleTogglePause}
-          />
-        </div>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Unidades vinculadas</div>
+                <div className="mt-1 text-sm font-bold">{businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} unidade(s)</div>
+              </div>
+              <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Gerenciamento</div>
+                <div className="mt-1 text-sm font-bold">Feito pelo painel administrativo</div>
+              </div>
+            </div>
+
+            {businessGroup.tenants && businessGroup.tenants.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Lojas da rede</div>
+                <div className="flex flex-wrap gap-2">
+                  {businessGroup.tenants.slice(0, 4).map((tenant) => (
+                    <span key={tenant.id} className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                      <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                      {tenant.name}
+                    </span>
+                  ))}
+                  {businessGroup.tenants.length > 4 && (
+                    <span className="inline-flex items-center rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                      +{businessGroup.tenants.length - 4}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <StoreStatusControl
+          isPaused={Boolean(settings.isStorePaused)}
+          pauseReason={settings.storePauseReason || ''}
+          onTogglePause={handleTogglePause}
+        />
       </div>
 
       <div className="w-full min-w-0 space-y-6">
