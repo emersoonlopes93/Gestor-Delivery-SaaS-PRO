@@ -54,7 +54,7 @@ async function installInstrumentation(context: BrowserContext, token: string): P
       sampleRate = 44_100;
       destination = {} as AudioDestinationNode;
       constructor() { audit.audioContextState = 'suspended'; }
-      resume = async () => { audit.resumes += 1; this.state = 'running'; audit.audioContextState = 'running'; };
+      resume = () => { audit.resumes += 1; this.state = 'running'; audit.audioContextState = 'running'; return Promise.resolve(); };
       createGain = () => ({ connect: () => undefined, gain: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined, setTargetAtTime: () => undefined } }) as unknown as GainNode;
       createOscillator = () => ({ connect: () => undefined, start: () => { audit.oscillators += 1; }, stop: () => undefined, frequency: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined }, detune: { setValueAtTime: () => undefined } }) as unknown as OscillatorNode;
       createBuffer = () => ({ getChannelData: () => new Float32Array(1) }) as unknown as AudioBuffer;
