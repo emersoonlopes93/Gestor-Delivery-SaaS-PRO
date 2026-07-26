@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+import { equal, ok } from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { chromium, type BrowserContext, type Page } from '@playwright/test';
@@ -11,8 +11,8 @@ const apiBase = process.env.NOTIFICATION_E2E_API_BASE ?? 'http://127.0.0.1:3333/
 const webUrl = process.env.NOTIFICATION_E2E_WEB_URL ?? 'http://127.0.0.1:5173';
 const artifactDir = resolve(process.env.NOTIFICATION_E2E_ARTIFACT_DIR ?? 'qa-artifacts/notification-audio');
 const tenantSlug = process.env.NOTIFICATION_E2E_TENANT_SLUG ?? 'pizzaria-demo';
-const tenantEmail = process.env.NOTIFICATION_E2E_TENANT_EMAIL ?? 'demo@demo.com';
-const tenantPassword = process.env.NOTIFICATION_E2E_TENANT_PASSWORD ?? 'demo123';
+const tenantEmail = process.env.NOTIFICATION_E2E_TENANT_EMAIL ?? 'owner@pizzariademo.com';
+const tenantPassword = process.env.NOTIFICATION_E2E_TENANT_PASSWORD ?? 'Owner@123';
 
 async function requestJson<T>(pathname: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${pathname}`, {
@@ -20,19 +20,19 @@ async function requestJson<T>(pathname: string, init?: RequestInit): Promise<T> 
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   });
   const payload = await response.json().catch((): unknown => ({}));
-  assert.ok(response.ok, `${pathname} returned ${response.status}`);
+  ok(response.ok, `${pathname} returned ${response.status}`);
   return payload as T;
 }
 
 function unwrapAccessToken(response: LoginResponse): string {
   const token = response.accessToken ?? response.data?.accessToken;
-  assert.ok(token, 'tenant login did not return an access token');
+  ok(token, 'tenant login did not return an access token');
   return token;
 }
 
 function unwrapTenantId(response: LoginResponse): string {
   const tenantId = response.user?.tenantId ?? response.data?.user?.tenantId;
-  assert.ok(tenantId, 'tenant login did not return a tenantId');
+  ok(tenantId, 'tenant login did not return a tenantId');
   return tenantId;
 }
 
@@ -88,7 +88,7 @@ async function createLocalOrder(token: string): Promise<string> {
   const storefront = await requestJson<StorefrontResponse>(`/public/storefront/${tenantSlug}`);
   const products = storefront.data?.products ?? storefront.products ?? [];
   const productId = products.find((product) => product.type === 'simple')?.id ?? products.find((product) => product.id)?.id;
-  assert.ok(productId, 'seed storefront did not expose a product');
+  ok(productId, 'seed storefront did not expose a product');
   const order = await requestJson<CheckoutResponse>(`/orders/public-checkout/${tenantSlug}`, {
     method: 'POST',
     body: JSON.stringify({
@@ -101,7 +101,7 @@ async function createLocalOrder(token: string): Promise<string> {
     }),
   });
   const orderId = order.data?.id ?? order.id;
-  assert.ok(orderId, 'checkout did not return an order id');
+  ok(orderId, 'checkout did not return an order id');
   await requestJson(`/orders/${orderId}`, { headers: { authorization: `Bearer ${token}` } });
   return orderId;
 }
@@ -122,18 +122,18 @@ async function main(): Promise<void> {
 
   try {
     await Promise.all([waitForApp(leader), waitForApp(secondary)]);
-    assert.ok((await audit(leader)).resumes >= 1, 'AudioContext was not resumed after the CTA interaction');
+    ok((await audit(leader)).resumes >= 1, 'AudioContext was not resumed after the CTA interaction');
 
     const orderId = await createLocalOrder(token);
     await emit(leader, { id: `order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
     await emit(secondary, { id: `order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
     await leader.waitForTimeout(250);
-    assert.equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators > 0, true, 'order.created did not call the sound engine');
+    equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators > 0, true, 'order.created did not call the sound engine');
 
     const beforeDuplicate = (await audit(leader)).oscillators + (await audit(secondary)).oscillators;
     await emit(leader, { id: `legacy:order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
     await leader.waitForTimeout(250);
-    assert.equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators, beforeDuplicate, 'duplicate order event replayed audio');
+    equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators, beforeDuplicate, 'duplicate order event replayed audio');
 
     await emit(leader, { id: `order.cancelled:${orderId}`, type: 'order.cancelled', title: 'Pedido cancelado', priority: 'high' });
     await emit(leader, { id: `order.ready:${orderId}`, type: 'order.ready', title: 'Pedido pronto', priority: 'high' });
@@ -141,7 +141,7 @@ async function main(): Promise<void> {
     await emit(leader, { id: `connection.lost:${tenantId}`, type: 'connection.lost', title: 'Conexao perdida', priority: 'critical' });
     await emit(leader, { id: `connection.restored:${tenantId}`, type: 'connection.restored', title: 'Conexao restaurada', priority: 'low' });
     await leader.waitForTimeout(500);
-    assert.ok((await audit(leader)).oscillators + (await audit(secondary)).oscillators > beforeDuplicate, 'critical event matrix did not call the sound engine');
+    ok((await audit(leader)).oscillators + (await audit(secondary)).oscillators > beforeDuplicate, 'critical event matrix did not call the sound engine');
 
     await leader.screenshot({ path: join(artifactDir, 'leader-before-handoff.png'), fullPage: true });
     await leader.close();
@@ -149,7 +149,7 @@ async function main(): Promise<void> {
     const beforeHandoff = (await audit(secondary)).oscillators;
     await emit(secondary, { id: `order.created:handoff:${orderId}`, type: 'order.created', title: 'Novo pedido apos troca de lider', priority: 'critical' });
     await secondary.waitForTimeout(300);
-    assert.ok((await audit(secondary)).oscillators > beforeHandoff, 'secondary tab did not take over audio after leader close');
+    ok((await audit(secondary)).oscillators > beforeHandoff, 'secondary tab did not take over audio after leader close');
     await secondary.screenshot({ path: join(artifactDir, 'secondary-after-handoff.png'), fullPage: true });
   } finally {
     await context.close();
