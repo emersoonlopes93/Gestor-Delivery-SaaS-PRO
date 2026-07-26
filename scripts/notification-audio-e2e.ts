@@ -1,11 +1,13 @@
 import { equal, ok } from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { chromium, type BrowserContext, type Page } from '@playwright/test';
 
 type LoginResponse = { accessToken?: string; data?: { accessToken?: string; user?: { tenantId?: string } }; user?: { tenantId?: string } };
 type StorefrontResponse = { data?: { products?: Array<{ id?: string; type?: string }> }; products?: Array<{ id?: string; type?: string }> };
 type CheckoutResponse = { data?: { id?: string }; id?: string };
+type BrowserLog = { console: string[]; pageErrors: string[]; requestFailures: string[] };
+type AudioAudit = { oscillators: number; resumes: number; notifications: number; events: string[]; audioContextState: 'not-created' | 'suspended' | 'running' | 'closed' };
 
 const apiBase = process.env.NOTIFICATION_E2E_API_BASE ?? 'http://127.0.0.1:3333/api/v1';
 const webUrl = process.env.NOTIFICATION_E2E_WEB_URL ?? 'http://127.0.0.1:5173';
@@ -38,8 +40,8 @@ function unwrapTenantId(response: LoginResponse): string {
 
 async function installInstrumentation(context: BrowserContext, token: string): Promise<void> {
   await context.addInitScript((accessToken) => {
-    type Audit = { oscillators: number; resumes: number; notifications: number; events: string[] };
-    const audit: Audit = { oscillators: 0, resumes: 0, notifications: 0, events: [] };
+    type Audit = { oscillators: number; resumes: number; notifications: number; events: string[]; audioContextState: 'not-created' | 'suspended' | 'running' | 'closed' };
+    const audit: Audit = { oscillators: 0, resumes: 0, notifications: 0, events: [], audioContextState: 'not-created' };
     Object.defineProperty(window, '__notificationAudioAudit', { configurable: true, value: audit });
     window.localStorage.setItem('accessToken', accessToken);
     window.localStorage.setItem('tenantNotificationSoundEnabled', 'true');
@@ -49,7 +51,8 @@ async function installInstrumentation(context: BrowserContext, token: string): P
       currentTime = 0;
       sampleRate = 44_100;
       destination = {} as AudioDestinationNode;
-      resume = async () => { audit.resumes += 1; this.state = 'running'; };
+      constructor() { audit.audioContextState = 'suspended'; }
+      resume = async () => { audit.resumes += 1; this.state = 'running'; audit.audioContextState = 'running'; };
       createGain = () => ({ connect: () => undefined, gain: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined, setTargetAtTime: () => undefined } }) as unknown as GainNode;
       createOscillator = () => ({ connect: () => undefined, start: () => { audit.oscillators += 1; }, stop: () => undefined, frequency: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined }, detune: { setValueAtTime: () => undefined } }) as unknown as OscillatorNode;
       createBuffer = () => ({ getChannelData: () => new Float32Array(1) }) as unknown as AudioBuffer;
@@ -66,6 +69,27 @@ async function installInstrumentation(context: BrowserContext, token: string): P
   }, token);
 }
 
+function collectBrowserLog(page: Page, browserLog: BrowserLog): void {
+  page.on('console', (message) => browserLog.console.push(`${message.type()}: ${message.text()}`));
+  page.on('pageerror', (error) => browserLog.pageErrors.push(error.stack ?? error.message));
+  page.on('requestfailed', (request) => browserLog.requestFailures.push(`${request.method()} ${request.url()} :: ${request.failure()?.errorText ?? 'unknown failure'}`));
+}
+
+async function captureFailureEvidence(page: Page, name: string, browserLog: BrowserLog): Promise<void> {
+  const state = await page.evaluate(() => ({
+    url: window.location.href,
+    audioAudit: (window as unknown as { __notificationAudioAudit?: AudioAudit }).__notificationAudioAudit ?? null,
+    soundPreferenceEnabled: window.localStorage.getItem('tenantNotificationSoundEnabled'),
+    soundVolume: window.localStorage.getItem('tenantNotificationVolume'),
+    soundLegacyUnlock: window.localStorage.getItem('tenantNotificationAudioUnlocked'),
+    notificationCenterText: Array.from(document.querySelectorAll('[role="alert"]')).map((element) => element.textContent?.trim() ?? ''),
+    visibleText: document.body.innerText,
+  }));
+  await page.screenshot({ path: join(artifactDir, `${name}-failure.png`), fullPage: true });
+  await writeFile(join(artifactDir, `${name}-failure-dom.html`), await page.content());
+  await writeFile(join(artifactDir, `${name}-failure-state.json`), JSON.stringify({ ...state, browserLog }, null, 2));
+}
+
 async function waitForApp(page: Page): Promise<void> {
   await page.goto(`${webUrl}/settings/notifications`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1_000);
@@ -80,8 +104,8 @@ async function emit(page: Page, input: { id: string; type: string; title: string
   }, input);
 }
 
-async function audit(page: Page): Promise<{ oscillators: number; resumes: number; notifications: number; events: string[] }> {
-  return page.evaluate(() => (window as unknown as { __notificationAudioAudit: { oscillators: number; resumes: number; notifications: number; events: string[] } }).__notificationAudioAudit);
+async function audit(page: Page): Promise<AudioAudit> {
+  return page.evaluate(() => (window as unknown as { __notificationAudioAudit: AudioAudit }).__notificationAudioAudit);
 }
 
 async function createLocalOrder(token: string): Promise<string> {
@@ -119,6 +143,10 @@ async function main(): Promise<void> {
   await installInstrumentation(context, token);
   const leader = await context.newPage();
   const secondary = await context.newPage();
+  const leaderLog: BrowserLog = { console: [], pageErrors: [], requestFailures: [] };
+  const secondaryLog: BrowserLog = { console: [], pageErrors: [], requestFailures: [] };
+  collectBrowserLog(leader, leaderLog);
+  collectBrowserLog(secondary, secondaryLog);
 
   try {
     await Promise.all([waitForApp(leader), waitForApp(secondary)]);
@@ -151,6 +179,12 @@ async function main(): Promise<void> {
     await secondary.waitForTimeout(300);
     ok((await audit(secondary)).oscillators > beforeHandoff, 'secondary tab did not take over audio after leader close');
     await secondary.screenshot({ path: join(artifactDir, 'secondary-after-handoff.png'), fullPage: true });
+  } catch (error: unknown) {
+    await Promise.all([
+      captureFailureEvidence(leader, 'leader', leaderLog),
+      captureFailureEvidence(secondary, 'secondary', secondaryLog),
+    ]);
+    throw error;
   } finally {
     await context.close();
     await browser.close();
