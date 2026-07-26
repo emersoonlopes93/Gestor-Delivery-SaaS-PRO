@@ -93,7 +93,7 @@ async function captureFailureEvidence(page: Page, name: string, browserLog: Brow
 async function waitForApp(page: Page): Promise<void> {
   await page.goto(`${webUrl}/settings/notifications`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1_000);
-  await page.getByRole('button', { name: 'Ativar sons', exact: true }).click();
+  await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').click();
 }
 
 async function emit(page: Page, input: { id: string; type: string; title: string; message?: string; priority?: 'low' | 'high' | 'critical' }): Promise<void> {
