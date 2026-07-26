@@ -117,31 +117,6 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  /**
-   * Emite evento de transferência de IA para agente humano
-   */
-  emitAiHandoff(tenantId: string, sessionId: string, sessionName?: string, customerName?: string) {
-    if (!this.server) {
-      this.logger.warn('WebSocket server not initialized. Skipping emitAiHandoff.');
-      return;
-    }
-    const timestamp = new Date().toISOString();
-    this.logger.log(`[Handoff] AI transferring session ${sessionId} to human agent for tenant ${tenantId}`);
-    this.server.to(`tenant:${tenantId}`).emit('whatsapp.handoff', {
-      type: 'whatsapp.handoff',
-      sessionId,
-      sessionName,
-      customerName,
-      timestamp,
-    } satisfies TenantNotificationEventPayload);
-    this.server.to(`tenant:${tenantId}`).emit('aiHandoff', {
-      sessionId,
-      sessionName,
-      customerName,
-      timestamp,
-    });
-  }
-
   emitOrderCancelled(tenantId: string, input: { orderId: string; orderNumber: string }) {
     if (!this.server) {
       this.logger.warn('WebSocket server not initialized. Skipping emitOrderCancelled.');
@@ -161,12 +136,14 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * Emite evento de pedido marcado como pronto
+   * @param orderId ID do pedido (incluso no payload canônico para deduplicação determinística)
    */
   emitOrderReady(
     tenantId: string,
     orderNumber: string,
     customerName?: string,
     fulfillmentType?: string,
+    orderId?: string,
   ) {
     if (!this.server) {
       this.logger.warn('WebSocket server not initialized. Skipping emitOrderReady.');
@@ -176,12 +153,14 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`[Ready] Order ${orderNumber} marked as ready for tenant ${tenantId}`);
     this.server.to(`tenant:${tenantId}`).emit('order.ready', {
       type: 'order.ready',
+      orderId,
       orderNumber,
       customerName,
       fulfillmentType,
       timestamp,
     } satisfies TenantNotificationEventPayload);
     this.server.to(`tenant:${tenantId}`).emit('orderReady', {
+      orderId,
       orderNumber,
       customerName,
       fulfillmentType,

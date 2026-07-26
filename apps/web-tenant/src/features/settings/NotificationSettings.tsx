@@ -156,8 +156,8 @@ export function NotificationSettings() {
         <section className="bg-card rounded-3xl border border-border p-3 sm:p-6 lg:p-8 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-8">
             <div className="flex items-start gap-3 min-w-0">
-              <div className={`p-2.5 rounded-2xl transition-colors ${soundManager.isEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                {soundManager.isEnabled ? <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" /> : <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />}
+              <div className={`p-2.5 rounded-2xl transition-colors ${soundManager.soundPreferenceEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                {soundManager.soundPreferenceEnabled ? <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" /> : <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />}
               </div>
               <div className="min-w-0">
                 <h2 className="text-base sm:text-lg font-black text-foreground">Alertas sonoros</h2>
@@ -167,14 +167,15 @@ export function NotificationSettings() {
               </div>
             </div>
             <button
-              onClick={() => soundManager.setEnabled(!soundManager.isEnabled)}
-              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${soundManager.isEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+              onClick={() => soundManager.setSoundPreferenceEnabled(!soundManager.soundPreferenceEnabled)}
+              aria-label={soundManager.soundPreferenceEnabled ? "Desativar notificacoes sonoras" : "Ativar notificacoes sonoras"}
+              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${soundManager.soundPreferenceEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${soundManager.isEnabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${soundManager.soundPreferenceEnabled ? 'right-1' : 'left-1'}`} />
             </button>
           </div>
 
-          <div className={`space-y-4 sm:space-y-6 transition-opacity ${soundManager.isEnabled ? 'opacity-100' : 'opacity-50'}`}>
+          <div className={`space-y-4 sm:space-y-6 transition-opacity ${soundManager.soundPreferenceEnabled ? 'opacity-100' : 'opacity-50'}`}>
             <div className="flex flex-col gap-1.5 sm:gap-2">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Volume neste dispositivo</label>
@@ -185,6 +186,7 @@ export function NotificationSettings() {
                 min="0"
                 max="1"
                 step="0.1"
+                aria-label="Volume das notificacoes sonoras"
                 value={soundManager.volume}
                 onChange={(event) => soundManager.setVolume(parseFloat(event.target.value))}
                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
@@ -199,14 +201,16 @@ export function NotificationSettings() {
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   type="button"
+                  aria-label="Ativar notificacoes sonoras"
                   onClick={() => void soundManager.unlockAudio()}
                   className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-xs hover:bg-primary/90 transition-all active:scale-95"
                 >
                   <Volume2 className="w-3.5 h-3.5" />
-                  {soundManager.isUnlocked ? 'Sons ativados' : 'Ativar sons'}
+                  {!soundManager.needsAudioUnlock ? 'Sons ativados' : 'Ativar sons'}
                 </button>
                 <button
                   type="button"
+                  aria-label="Testar som"
                   onClick={() => void soundManager.testSound()}
                   className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95"
                 >
@@ -214,14 +218,14 @@ export function NotificationSettings() {
                   Testar som
                 </button>
               </div>
-              {!soundManager.isUnlocked ? (
+              {soundManager.needsAudioUnlock ? (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700">
                   Ative as notificacoes sonoras para nao perder novos pedidos.
                 </div>
               ) : null}
-              {soundManager.lastPlaybackBlocked ? (
+              {soundManager.lastPlaybackError ? (
                 <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground">
-                  O navegador pode exigir uma interacao para liberar o audio. Os alertas visuais continuarao ativos.
+                  O navegador pode exigir uma interacao para liberar o audio. Erro: {soundManager.lastPlaybackError}
                 </div>
               ) : null}
             </div>

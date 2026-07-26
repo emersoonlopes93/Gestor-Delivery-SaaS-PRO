@@ -3,8 +3,6 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { api } from '../../../lib/api-client';
 import type { ChatSessionListItem, ChatSession, ChatInboxStats, PaginatedChatSessions } from '@gestor/types';
 import { ChatArea } from '../components/ChatArea';
-import { useChatSocket } from '../hooks/useChatSocket';
-import { useTenantAuth } from '../../../hooks/use-tenant-auth';
 import { Search, Loader2, Bot, UserCircle, AlertCircle, CheckCircle } from 'lucide-react';
 
 export function InboxPage() {
@@ -15,11 +13,8 @@ export function InboxPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'ai_active' | 'human' | 'closed'>('all');
   const [periodFilter, setPeriodFilter] = useState<'all' | 'today' | 'yesterday' | '7days'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const { user } = useTenantAuth();
 
-  // Enable WebSocket for real-time updates
-  useChatSocket(user?.tenantId);
+  // WebSocket para atualizacoes em tempo real gerenciado pelo AppLayout (useChatSocket).
 
   const [socketConnected, setSocketConnected] = useState<boolean>(
     typeof window !== 'undefined' ? !!window.__CHAT_SOCKET_CONNECTED : false,

@@ -1,32 +1,53 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSoundCatalogEntry, type SystemSoundEvent } from './soundCatalog';
-import { playNotificationSound, unlockNotificationAudio } from './soundEngine';
+import { getAudioContextState, playNotificationSound, unlockNotificationAudio } from './soundEngine';
+
+// ---------------------------------------------------------------------------
+// Chaves de localStorage (preferências do utilizador)
+// ---------------------------------------------------------------------------
 
 export const TENANT_NOTIFICATION_SOUND_ENABLED_KEY = 'tenantNotificationSoundEnabled';
 export const TENANT_NOTIFICATION_VOLUME_KEY = 'tenantNotificationVolume';
+
+/**
+ * @deprecated Chave legada que misturava preferência com estado do AudioContext.
+ * Mantida apenas para leitura de migração — não escrever.
+ */
 export const TENANT_NOTIFICATION_AUDIO_UNLOCKED_KEY = 'tenantNotificationAudioUnlocked';
 
 const SOUND_MANAGER_STATE_EVENT = 'tenant:sound-manager-state';
 
+// ---------------------------------------------------------------------------
+// Tipos
+// ---------------------------------------------------------------------------
+
+/** Estado real do AudioContext — verificado ao vivo, nunca lido do localStorage. */
+export type AudioContextState = 'running' | 'suspended' | 'closed' | 'unavailable';
+
 type SoundManagerSnapshot = {
-  enabled: boolean;
+  /** Preferência do utilizador: quer ouvir sons? (persistida em localStorage) */
+  soundPreferenceEnabled: boolean;
+  /** Volume atual (0.0 – 1.0, persistido em localStorage) */
   volume: number;
-  unlocked: boolean;
 };
 
-function readBool(key: string, fallback: boolean) {
+// ---------------------------------------------------------------------------
+// Helpers de leitura de localStorage
+// ---------------------------------------------------------------------------
+
+function readBool(key: string, fallback: boolean): boolean {
   if (typeof window === 'undefined') return fallback;
   const raw = window.localStorage.getItem(key);
   if (raw === null) return fallback;
   return raw === 'true';
 }
 
-function clampVolume(volume: number) {
+function clampVolume(volume: number): number {
   if (!Number.isFinite(volume)) return 1;
   return Math.max(0, Math.min(1, volume));
 }
 
-function readVolume() {
+function readVolume(): number {
   if (typeof window === 'undefined') return 1;
   const raw = Number(window.localStorage.getItem(TENANT_NOTIFICATION_VOLUME_KEY) ?? '1');
   return clampVolume(raw);
@@ -34,9 +55,8 @@ function readVolume() {
 
 function readSnapshot(): SoundManagerSnapshot {
   return {
-    enabled: readBool(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, true),
+    soundPreferenceEnabled: readBool(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, true),
     volume: readVolume(),
-    unlocked: readBool(TENANT_NOTIFICATION_AUDIO_UNLOCKED_KEY, false),
   };
 }
 
@@ -48,31 +68,40 @@ function emitStateChanged() {
 function persistSnapshot(next: Partial<SoundManagerSnapshot>) {
   if (typeof window === 'undefined') return;
 
-  if (typeof next.enabled === 'boolean') {
-    window.localStorage.setItem(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, String(next.enabled));
+  if (typeof next.soundPreferenceEnabled === 'boolean') {
+    window.localStorage.setItem(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, String(next.soundPreferenceEnabled));
   }
 
   if (typeof next.volume === 'number') {
     window.localStorage.setItem(TENANT_NOTIFICATION_VOLUME_KEY, String(clampVolume(next.volume)));
   }
 
-  if (typeof next.unlocked === 'boolean') {
-    window.localStorage.setItem(TENANT_NOTIFICATION_AUDIO_UNLOCKED_KEY, String(next.unlocked));
-  }
-
   emitStateChanged();
 }
+
+// ---------------------------------------------------------------------------
+// SoundPlaybackController
+// ---------------------------------------------------------------------------
 
 export class SoundPlaybackController {
   private readonly lastPlayedAt = new Map<SystemSoundEvent, number>();
 
-  resolveVolume(volume: number) {
+  resolveVolume(volume: number): number {
     return clampVolume(volume);
   }
 
-  canPlay(event: SystemSoundEvent, input: { enabled: boolean; unlocked?: boolean }, now = Date.now()) {
-    if (!input.enabled) return false;
-    if (input.unlocked === false) return false;
+  /**
+   * Verifica se o som pode ser reproduzido.
+   * @param soundPreferenceEnabled - o utilizador quer sons?
+   * @param audioContextState     - estado real do AudioContext (ao vivo, não localStorage)
+   */
+  canPlay(
+    event: SystemSoundEvent,
+    input: { soundPreferenceEnabled: boolean; audioContextState: AudioContextState },
+    now = Date.now(),
+  ): boolean {
+    if (!input.soundPreferenceEnabled) return false;
+    if (input.audioContextState !== 'running') return false;
 
     const definition = getSoundCatalogEntry(event);
     const lastPlayed = this.lastPlayedAt.get(event);
@@ -87,27 +116,52 @@ export class SoundPlaybackController {
 
 const playbackController = new SoundPlaybackController();
 
+// ---------------------------------------------------------------------------
+// useSoundManager hook
+// ---------------------------------------------------------------------------
+
 export function useSoundManager() {
   const [snapshot, setSnapshot] = useState<SoundManagerSnapshot>(() => readSnapshot());
-  const [lastPlaybackBlocked, setLastPlaybackBlocked] = useState<string | null>(null);
+  const [audioContextState, setAudioContextState] = useState<AudioContextState>(() => getAudioContextState());
+  const [lastPlaybackError, setLastPlaybackError] = useState<string | null>(null);
 
+  // Sincronizar preferências entre abas via storage event
   useEffect(() => {
-    const sync = () => {
+    const syncPrefs = () => {
       setSnapshot(readSnapshot());
     };
 
     if (typeof window === 'undefined') return;
-    window.addEventListener('storage', sync);
-    window.addEventListener(SOUND_MANAGER_STATE_EVENT, sync as EventListener);
+    window.addEventListener('storage', syncPrefs);
+    window.addEventListener(SOUND_MANAGER_STATE_EVENT, syncPrefs as EventListener);
     return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener(SOUND_MANAGER_STATE_EVENT, sync as EventListener);
+      window.removeEventListener('storage', syncPrefs);
+      window.removeEventListener(SOUND_MANAGER_STATE_EVENT, syncPrefs as EventListener);
     };
   }, []);
 
-  const setEnabled = useCallback((enabled: boolean) => {
-    persistSnapshot({ enabled });
-    setSnapshot((prev) => ({ ...prev, enabled }));
+  // Verificar estado real do AudioContext periodicamente (não depende de localStorage)
+  useEffect(() => {
+    const checkContextState = () => {
+      setAudioContextState(getAudioContextState());
+    };
+
+    // Verificar imediatamente
+    checkContextState();
+
+    // Verificar quando a aba volta ao foco (o context pode ter mudado de estado)
+    window.addEventListener('focus', checkContextState);
+    document.addEventListener('visibilitychange', checkContextState);
+
+    return () => {
+      window.removeEventListener('focus', checkContextState);
+      document.removeEventListener('visibilitychange', checkContextState);
+    };
+  }, []);
+
+  const setSoundPreferenceEnabled = useCallback((enabled: boolean) => {
+    persistSnapshot({ soundPreferenceEnabled: enabled });
+    setSnapshot((prev) => ({ ...prev, soundPreferenceEnabled: enabled }));
   }, []);
 
   const setVolume = useCallback((volume: number) => {
@@ -116,59 +170,101 @@ export function useSoundManager() {
     setSnapshot((prev) => ({ ...prev, volume: nextVolume }));
   }, []);
 
-  const unlockAudio = useCallback(async () => {
+  /**
+   * Desbloqueia o AudioContext após interação do utilizador.
+   * Não altera a preferência de som — apenas inicializa o contexto.
+   */
+  const unlockAudio = useCallback(async (): Promise<boolean> => {
     try {
       await unlockNotificationAudio();
-      persistSnapshot({ unlocked: true });
-      setSnapshot((prev) => ({ ...prev, unlocked: true }));
-      setLastPlaybackBlocked(null);
-      return true;
+      const newState = getAudioContextState();
+      setAudioContextState(newState);
+      setLastPlaybackError(null);
+      return newState === 'running';
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nao foi possivel ativar os sons neste navegador.';
-      setLastPlaybackBlocked(message);
+      setLastPlaybackError(message);
       return false;
     }
   }, []);
 
-  const playEvent = useCallback(async (event: SystemSoundEvent, options?: { force?: boolean }) => {
-    const current = readSnapshot();
-    if (!options?.force && !playbackController.canPlay(event, current)) {
+  /**
+   * Reproduz um evento sonoro.
+   * Respeita: soundPreferenceEnabled → audioContextState → cooldown.
+   * Não lança — retorna false se qualquer condição impedir.
+   */
+  const playEvent = useCallback(async (event: SystemSoundEvent, options?: { force?: boolean }): Promise<boolean> => {
+    const currentPrefs = readSnapshot();
+    const currentContextState = getAudioContextState();
+
+    if (!options?.force && !playbackController.canPlay(event, {
+      soundPreferenceEnabled: currentPrefs.soundPreferenceEnabled,
+      audioContextState: currentContextState,
+    })) {
       return false;
     }
 
-    try {
-      await playNotificationSound(event, current.volume);
-      setLastPlaybackBlocked(null);
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'O navegador bloqueou a reproducao de audio.';
-      setLastPlaybackBlocked(message);
-      return false;
+    const played = await playNotificationSound(event, currentPrefs.volume);
+
+    if (!played) {
+      // Atualiza estado do contexto caso tenha mudado
+      setAudioContextState(getAudioContextState());
+    } else {
+      setLastPlaybackError(null);
     }
+
+    return played;
   }, []);
 
-  const testSound = useCallback(async () => {
-    const current = readSnapshot();
-    if (!current.enabled) {
-      return false;
-    }
+  /**
+   * Testa o som de um novo pedido.
+   * Se o contexto estiver suspenso, tenta desbloqueá-lo primeiro.
+   */
+  const testSound = useCallback(async (): Promise<boolean> => {
+    const currentPrefs = readSnapshot();
+    if (!currentPrefs.soundPreferenceEnabled) return false;
 
-    if (!current.unlocked) {
+    const currentState = getAudioContextState();
+    if (currentState !== 'running') {
       const unlocked = await unlockAudio();
       if (!unlocked) return false;
     }
-    return playEvent('order.created');
+
+    return playEvent('order.created', { force: true });
   }, [playEvent, unlockAudio]);
 
+  // Indicador: o utilizador quer sons mas o contexto está bloqueado
+  const needsAudioUnlock = useMemo(
+    () => snapshot.soundPreferenceEnabled && audioContextState === 'suspended',
+    [snapshot.soundPreferenceEnabled, audioContextState],
+  );
+
   return useMemo(() => ({
-    isEnabled: snapshot.enabled,
+    /** Preferência do utilizador (o que ele escolheu) */
+    soundPreferenceEnabled: snapshot.soundPreferenceEnabled,
+    /** Estado real do AudioContext ao vivo */
+    audioContextState,
+    /** Volume atual (0.0–1.0) */
     volume: snapshot.volume,
-    isUnlocked: snapshot.unlocked,
-    lastPlaybackBlocked,
-    setEnabled,
+    /** Verdadeiro quando o utilizador quer som mas o navegador ainda não desbloqueou */
+    needsAudioUnlock,
+    /** Último erro de reprodução (null se não houve) */
+    lastPlaybackError,
+    setSoundPreferenceEnabled,
     setVolume,
     unlockAudio,
     playEvent,
     testSound,
-  }), [lastPlaybackBlocked, playEvent, setEnabled, setVolume, snapshot.enabled, snapshot.unlocked, snapshot.volume, testSound, unlockAudio]);
+  }), [
+    audioContextState,
+    lastPlaybackError,
+    needsAudioUnlock,
+    playEvent,
+    setSoundPreferenceEnabled,
+    setVolume,
+    snapshot.soundPreferenceEnabled,
+    snapshot.volume,
+    testSound,
+    unlockAudio,
+  ]);
 }

@@ -97,4 +97,48 @@ describe('NotificationDeduper', () => {
 
     expect(event.type).toBe('order.created');
   });
+
+  it('deduplicates simultaneous canonical and legacy events', () => {
+    const deduper = new NotificationDeduper();
+    const canonicalEvent = createNotificationEvent({
+      id: 'socket:order.created:order-123',
+      type: 'order.created',
+      orderId: 'order-123',
+      title: 'Novo pedido',
+      priority: 'critical',
+      source: 'socket',
+    });
+
+    // Simulate legacy event arriving
+    const legacyEvent = createNotificationEvent({
+      id: 'socket:newOrder:order-123',
+      type: 'order.new' as import('../../../../packages/types/src/notifications').NotificationLegacyEvent, // correct legacy type
+      orderId: 'order-123',
+      title: 'Novo pedido',
+      priority: 'critical',
+      source: 'socket',
+    });
+
+    // The first one processed should pass, the second should be deduped
+    expect(deduper.shouldProcess(canonicalEvent, 1000)).toBe(true);
+    expect(deduper.shouldProcess(legacyEvent, 1001)).toBe(false);
+  });
+
+  it('rejects events that were already seen before a reconnection (same id)', () => {
+    const deduper = new NotificationDeduper();
+    const event1 = createNotificationEvent({
+      id: 'socket:order.ready:999',
+      type: 'order.ready',
+      orderId: '999',
+      title: 'Pedido pronto',
+      priority: 'high',
+      source: 'socket',
+    });
+
+    expect(deduper.shouldProcess(event1, 1000)).toBe(true);
+
+    // Reconnection happens, same event arrives again 2 seconds later
+    const event2 = { ...event1 };
+    expect(deduper.shouldProcess(event2, 3000)).toBe(false);
+  });
 });

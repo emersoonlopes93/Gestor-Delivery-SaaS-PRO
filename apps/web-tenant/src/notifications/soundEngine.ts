@@ -13,6 +13,17 @@ export function hasSoundEngine(): boolean {
   return getAudioContextCtor() !== null;
 }
 
+/**
+ * Retorna o estado real do AudioContext compartilhado.
+ * 'unavailable' quando o navegador nao suporta Web Audio API.
+ * Chamadores devem verificar esse estado ao vivo — nao contar com localStorage.
+ */
+export function getAudioContextState(): 'running' | 'suspended' | 'closed' | 'unavailable' {
+  if (!getAudioContextCtor()) return 'unavailable';
+  if (!sharedAudioContext) return 'suspended'; // contexto ainda nao criado = suspenso implicitamente
+  return sharedAudioContext.state as 'running' | 'suspended' | 'closed';
+}
+
 function clampVolume(volume: number) {
   if (!Number.isFinite(volume)) return 1;
   return Math.max(0, Math.min(1, volume));
@@ -130,8 +141,13 @@ export async function unlockNotificationAudio() {
   return true;
 }
 
-export async function playNotificationSound(event: SystemSoundEvent, volume: number) {
-  const entry = getSoundCatalogEntry(event);
-  await playPattern(entry.pattern, volume);
-  return true;
+export async function playNotificationSound(event: SystemSoundEvent, volume: number): Promise<boolean> {
+  try {
+    const entry = getSoundCatalogEntry(event);
+    await playPattern(entry.pattern, volume);
+    return true;
+  } catch {
+    // AudioContext suspenso ou indisponivel — retorna false sem lancar
+    return false;
+  }
 }
