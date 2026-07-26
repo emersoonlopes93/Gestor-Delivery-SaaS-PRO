@@ -332,7 +332,7 @@ jobs:
           done
 
       - name: Notification audio E2E
-        run: pnpm exec ts-node scripts/notification-audio-e2e.ts
+        run: pnpm exec ts-node --transpile-only scripts/notification-audio-e2e.ts
 
       - name: Upload notification artifacts
         if: always()
