@@ -318,7 +318,7 @@ jobs:
         run: |
           (cd apps/api && exec node dist/apps/api/src/main.js) >"$RUNNER_TEMP/notification-api.log" 2>&1 &
           echo "$!" >"$RUNNER_TEMP/notification-api.pid"
-          (exec pnpm --filter @gestor/web-tenant dev -- --host 127.0.0.1) >"$RUNNER_TEMP/notification-web.log" 2>&1 &
+          (exec pnpm --filter @gestor/web-tenant dev --host 127.0.0.1) >"$RUNNER_TEMP/notification-web.log" 2>&1 &
           echo "$!" >"$RUNNER_TEMP/notification-web.pid"
 
       - name: Wait for readiness
