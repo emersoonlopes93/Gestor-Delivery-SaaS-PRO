@@ -4,7 +4,9 @@ import { join, resolve } from 'node:path';
 import { chromium, type BrowserContext, type Page } from '@playwright/test';
 
 type LoginResponse = { accessToken?: string; data?: { accessToken?: string; user?: { tenantId?: string } }; user?: { tenantId?: string } };
-type StorefrontResponse = { data?: { products?: Array<{ id?: string; type?: string }> }; products?: Array<{ id?: string; type?: string }> };
+type StorefrontProduct = { id?: string; type?: string; isAvailable?: boolean; basePrice?: number };
+type StorefrontResponse = { data?: { categories?: Array<{ products?: StorefrontProduct[] }> }; categories?: Array<{ products?: StorefrontProduct[] }> };
+type CreatedResource = { id?: string };
 type CheckoutResponse = { data?: { id?: string }; id?: string };
 type BrowserLog = { console: string[]; pageErrors: string[]; requestFailures: string[] };
 type AudioAudit = { oscillators: number; resumes: number; notifications: number; events: string[]; audioContextState: 'not-created' | 'suspended' | 'running' | 'closed' };
@@ -111,11 +113,28 @@ async function audit(page: Page): Promise<AudioAudit> {
   return page.evaluate(() => (window as unknown as { __notificationAudioAudit: AudioAudit }).__notificationAudioAudit);
 }
 
+async function createStorefrontFixture(token: string): Promise<string> {
+  const runId = `notification-e2e-${Date.now()}`;
+  const headers = { authorization: `Bearer ${token}` };
+  const category = await requestJson<CreatedResource>('/catalog/categories', {
+    method: 'POST', headers,
+    body: JSON.stringify({ name: `Notification E2E ${runId}`, isActive: true, order: 99_999 }),
+  });
+  ok(category.id, 'notification E2E category did not return an id');
+  const product = await requestJson<CreatedResource>('/catalog/products', {
+    method: 'POST', headers,
+    body: JSON.stringify({ name: `Notification E2E ${runId}`, categoryId: category.id, type: 'simple', basePrice: 10, isActive: true, isAvailable: true, sellableOnline: true, order: 99_999 }),
+  });
+  ok(product.id, 'notification E2E product did not return an id');
+  const storefront = await requestJson<StorefrontResponse>(`/public/storefront/${tenantSlug}?fulfillmentType=pickup`);
+  const categories = storefront.data?.categories ?? storefront.categories ?? [];
+  const visibleProduct = categories.flatMap((categoryRow) => categoryRow.products ?? []).find((candidate) => candidate.id === product.id);
+  ok(visibleProduct?.isAvailable && visibleProduct.basePrice === 10, `storefront fixture unavailable: tenant=${tenantSlug} category=${category.id} product=${product.id} response=${JSON.stringify(categories.map((categoryRow) => categoryRow.products?.map((candidate) => ({ id: candidate.id, isAvailable: candidate.isAvailable, basePrice: candidate.basePrice }))))}`);
+  return product.id;
+}
+
 async function createLocalOrder(token: string): Promise<string> {
-  const storefront = await requestJson<StorefrontResponse>(`/public/storefront/${tenantSlug}`);
-  const products = storefront.data?.products ?? storefront.products ?? [];
-  const productId = products.find((product) => product.type === 'simple')?.id ?? products.find((product) => product.id)?.id;
-  ok(productId, 'seed storefront did not expose a product');
+  const productId = await createStorefrontFixture(token);
   const order = await requestJson<CheckoutResponse>(`/orders/public-checkout/${tenantSlug}`, {
     method: 'POST',
     body: JSON.stringify({
