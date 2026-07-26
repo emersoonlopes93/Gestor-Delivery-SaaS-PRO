@@ -69,7 +69,7 @@ async function installInstrumentation(context: BrowserContext, token: string): P
 async function waitForApp(page: Page): Promise<void> {
   await page.goto(`${webUrl}/settings/notifications`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1_000);
-  await page.getByRole('button', { name: 'Ativar notificacoes sonoras' }).first().click();
+  await page.getByRole('button', { name: 'Ativar sons', exact: true }).click();
 }
 
 async function emit(page: Page, input: { id: string; type: string; title: string; message?: string; priority?: 'low' | 'high' | 'critical' }): Promise<void> {
