@@ -6,7 +6,8 @@ import { chromium, type BrowserContext, type Page } from '@playwright/test';
 type LoginResponse = { accessToken?: string; data?: { accessToken?: string; user?: { tenantId?: string } }; user?: { tenantId?: string } };
 type StorefrontProduct = { id?: string; type?: string; isAvailable?: boolean; basePrice?: number };
 type StorefrontResponse = { data?: { categories?: Array<{ products?: StorefrontProduct[] }> }; categories?: Array<{ products?: StorefrontProduct[] }> };
-type CreatedResource = { id?: string };
+type CreatedResource = { id?: string; data?: { id?: string }; category?: { id?: string } };
+type JsonResponse<T> = { status: number; payload: T };
 type CheckoutResponse = { data?: { id?: string }; id?: string };
 type BrowserLog = { console: string[]; pageErrors: string[]; requestFailures: string[] };
 type AudioAudit = { oscillators: number; resumes: number; notifications: number; events: string[]; audioContextState: 'not-created' | 'suspended' | 'running' | 'closed' };
@@ -20,13 +21,21 @@ const tenantEmail = process.env.NOTIFICATION_E2E_TENANT_EMAIL ?? 'owner@pizzaria
 const tenantPassword = process.env.NOTIFICATION_E2E_TENANT_PASSWORD ?? 'Owner@123';
 
 async function requestJson<T>(pathname: string, init?: RequestInit): Promise<T> {
+  return (await requestJsonWithMeta<T>(pathname, init)).payload;
+}
+
+async function requestJsonWithMeta<T>(pathname: string, init?: RequestInit): Promise<JsonResponse<T>> {
   const response = await fetch(`${apiBase}${pathname}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   });
   const payload = await response.json().catch((): unknown => ({}));
-  ok(response.ok, `${pathname} returned ${response.status}`);
-  return payload as T;
+  ok(response.ok, `${pathname} returned ${response.status}: ${JSON.stringify(payload)}`);
+  return { status: response.status, payload: payload as T };
+}
+
+function extractCreatedId(resource: CreatedResource): string | undefined {
+  return resource.id ?? resource.data?.id ?? resource.category?.id;
 }
 
 function unwrapAccessToken(response: LoginResponse): string {
@@ -116,21 +125,23 @@ async function audit(page: Page): Promise<AudioAudit> {
 async function createStorefrontFixture(token: string): Promise<string> {
   const runId = `notification-e2e-${Date.now()}`;
   const headers = { authorization: `Bearer ${token}` };
-  const category = await requestJson<CreatedResource>('/catalog/categories', {
+  const categoryResponse = await requestJsonWithMeta<CreatedResource>('/catalog/categories', {
     method: 'POST', headers,
     body: JSON.stringify({ name: `Notification E2E ${runId}`, isActive: true, order: 99_999 }),
   });
-  ok(category.id, 'notification E2E category did not return an id');
+  const categoryId = extractCreatedId(categoryResponse.payload);
+  ok(categoryId, `notification E2E category did not return an id: tenant=${tenantSlug} status=${categoryResponse.status} body=${JSON.stringify(categoryResponse.payload)}`);
   const product = await requestJson<CreatedResource>('/catalog/products', {
     method: 'POST', headers,
-    body: JSON.stringify({ name: `Notification E2E ${runId}`, categoryId: category.id, type: 'simple', basePrice: 10, isActive: true, isAvailable: true, sellableOnline: true, order: 99_999 }),
+    body: JSON.stringify({ name: `Notification E2E ${runId}`, categoryId, type: 'simple', basePrice: 10, isActive: true, isAvailable: true, sellableOnline: true, order: 99_999 }),
   });
-  ok(product.id, 'notification E2E product did not return an id');
+  const productId = extractCreatedId(product);
+  ok(productId, `notification E2E product did not return an id: body=${JSON.stringify(product)}`);
   const storefront = await requestJson<StorefrontResponse>(`/public/storefront/${tenantSlug}?fulfillmentType=pickup`);
   const categories = storefront.data?.categories ?? storefront.categories ?? [];
-  const visibleProduct = categories.flatMap((categoryRow) => categoryRow.products ?? []).find((candidate) => candidate.id === product.id);
-  ok(visibleProduct?.isAvailable && visibleProduct.basePrice === 10, `storefront fixture unavailable: tenant=${tenantSlug} category=${category.id} product=${product.id} response=${JSON.stringify(categories.map((categoryRow) => categoryRow.products?.map((candidate) => ({ id: candidate.id, isAvailable: candidate.isAvailable, basePrice: candidate.basePrice }))))}`);
-  return product.id;
+  const visibleProduct = categories.flatMap((categoryRow) => categoryRow.products ?? []).find((candidate) => candidate.id === productId);
+  ok(visibleProduct?.isAvailable && visibleProduct.basePrice === 10, `storefront fixture unavailable: tenant=${tenantSlug} category=${categoryId} product=${productId} response=${JSON.stringify(categories.map((categoryRow) => categoryRow.products?.map((candidate) => ({ id: candidate.id, isAvailable: candidate.isAvailable, basePrice: candidate.basePrice }))))}`);
+  return productId;
 }
 
 async function createLocalOrder(token: string): Promise<string> {
