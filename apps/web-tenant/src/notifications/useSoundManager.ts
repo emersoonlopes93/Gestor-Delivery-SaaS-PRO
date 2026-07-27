@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSoundCatalogEntry, type SystemSoundEvent } from './soundCatalog';
 import { getAudioContextState, playNotificationSound, unlockNotificationAudio } from './soundEngine';
+import { traceNotificationE2E } from './e2eTrace';
 
 // ---------------------------------------------------------------------------
 // Chaves de localStorage (preferências do utilizador)
@@ -196,14 +197,35 @@ export function useSoundManager() {
   const playEvent = useCallback(async (event: SystemSoundEvent, options?: { force?: boolean }): Promise<boolean> => {
     const currentPrefs = readSnapshot();
     const currentContextState = getAudioContextState();
+    const canPlayReason = options?.force
+      ? 'forced'
+      : !currentPrefs.soundPreferenceEnabled
+      ? 'sound-preference-disabled'
+      : currentContextState !== 'running'
+        ? `audio-context-${currentContextState}`
+        : 'accepted';
+    const canPlay = options?.force
+      ? true
+      : playbackController.canPlay(event, {
+          soundPreferenceEnabled: currentPrefs.soundPreferenceEnabled,
+          audioContextState: currentContextState,
+        });
 
-    if (!options?.force && !playbackController.canPlay(event, {
+    traceNotificationE2E({
+      stage: 'playback.can-play',
+      eventType: event,
       soundPreferenceEnabled: currentPrefs.soundPreferenceEnabled,
+      effectiveVolume: currentPrefs.volume,
       audioContextState: currentContextState,
-    })) {
+      accepted: canPlay,
+      reason: canPlayReason,
+    });
+
+    if (!canPlay) {
       return false;
     }
 
+    traceNotificationE2E({ stage: 'playback.requested', eventType: event, playbackRequested: true });
     const played = await playNotificationSound(event, currentPrefs.volume);
 
     if (!played) {

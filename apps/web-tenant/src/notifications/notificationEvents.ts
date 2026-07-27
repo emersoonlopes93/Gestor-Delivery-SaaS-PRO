@@ -1,6 +1,7 @@
 import type { NotificationCanonicalEvent, NotificationLegacyEvent } from '../../../../packages/types/src/notifications';
 import { normalizeNotificationEvent } from '../../../../packages/types/src/notifications';
 import type { SoundPriority } from './soundCatalog';
+import { traceNotificationE2E } from './e2eTrace';
 
 export type NotificationEventType = NotificationCanonicalEvent;
 export type NotificationEventInputType = NotificationCanonicalEvent | NotificationLegacyEvent;
@@ -56,12 +57,21 @@ export function createNotificationEvent(
 ): NotificationEvent {
   const type = normalizeNotificationEvent(input.type);
 
-  return {
+  const event = {
     ...input,
     type,
     id: input.id ?? buildNotificationEventId(type, input.source, input.orderId),
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
+  traceNotificationE2E({
+    stage: 'event.normalized',
+    eventType: event.type,
+    eventId: event.id,
+    orderId: event.orderId,
+    source: event.source,
+    accepted: true,
+  });
+  return event;
 }
 
 export function emitNotificationEvent(event: NotificationEvent) {
@@ -75,6 +85,13 @@ export function subscribeNotificationEvents(listener: (event: NotificationEvent)
   const handler = (rawEvent: Event) => {
     const customEvent = rawEvent as CustomEvent<NotificationEvent>;
     if (customEvent.detail) {
+      traceNotificationE2E({
+        stage: 'event.received',
+        eventType: customEvent.detail.type,
+        eventId: customEvent.detail.id,
+        orderId: customEvent.detail.orderId,
+        source: customEvent.detail.source,
+      });
       listener(customEvent.detail);
     }
   };

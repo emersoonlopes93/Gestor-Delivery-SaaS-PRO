@@ -11,6 +11,7 @@ import {
 import { useSoundManager } from './useSoundManager';
 import { useTenantAuth } from '../hooks/use-tenant-auth';
 import { createTabLeader, type TabLeader } from './tabLeader';
+import { traceNotificationE2E } from './e2eTrace';
 
 function shouldShowBrowserNotification(event: NotificationEvent) {
   if (typeof document === 'undefined') return false;
@@ -62,7 +63,18 @@ export function NotificationCenter() {
 
   useEffect(() => {
     const unsubscribe = subscribeNotificationEvents(async (event) => {
-      if (!deduperRef.current.shouldProcess(event)) {
+      const dedupeAccepted = deduperRef.current.shouldProcess(event);
+      traceNotificationE2E({
+        stage: 'event.dedupe',
+        eventType: event.type,
+        eventId: event.id,
+        tenantId: user?.tenantId,
+        orderId: event.orderId,
+        source: event.source,
+        accepted: dedupeAccepted,
+        reason: dedupeAccepted ? 'accepted' : 'duplicate',
+      });
+      if (!dedupeAccepted) {
         return;
       }
 
@@ -77,6 +89,16 @@ export function NotificationCenter() {
 
       // Som e Browser Notification devem acontecer apenas na aba líder
       const isLeader = leaderRef.current?.isLeader() ?? false;
+      traceNotificationE2E({
+        stage: 'event.leader-check',
+        eventType: event.type,
+        eventId: event.id,
+        tenantId: user?.tenantId,
+        orderId: event.orderId,
+        source: event.source,
+        isLeader,
+        lockStrategy: typeof navigator !== 'undefined' && 'locks' in navigator ? 'web-locks' : 'local-storage',
+      });
 
       // Se outra aba líder já tocou este evento, não tentamos tocar novamente,
       // mesmo que a aba atual acabe de se tornar líder.
@@ -100,7 +122,7 @@ export function NotificationCenter() {
     });
 
     return unsubscribe;
-  }, [soundManager]);
+  }, [soundManager, user?.tenantId]);
 
   useEffect(() => {
     const onOffline = () => {

@@ -1,4 +1,5 @@
 import { getSoundCatalogEntry, type SoundPattern, type SoundStep, type SystemSoundEvent } from './soundCatalog';
+import { traceNotificationE2E } from './e2eTrace';
 
 type AudioContextCtor = typeof AudioContext;
 
@@ -133,6 +134,7 @@ function scheduleToneStep(
   }
 
   const oscillator = context.createOscillator();
+  traceNotificationE2E({ stage: 'sound-engine.oscillator-created' });
   oscillator.type = step.waveform ?? 'sine';
   const initialFrequency = step.frequency ?? 440;
   oscillator.frequency.setValueAtTime(initialFrequency, startTime);
@@ -182,6 +184,7 @@ export async function unlockNotificationAudio() {
 
 export async function playNotificationSound(event: SystemSoundEvent, volume: number): Promise<boolean> {
   try {
+    traceNotificationE2E({ stage: 'sound-engine.entered', eventType: event, effectiveVolume: volume });
     const entry = getSoundCatalogEntry(event);
     await playPattern(entry.pattern, volume);
     return true;

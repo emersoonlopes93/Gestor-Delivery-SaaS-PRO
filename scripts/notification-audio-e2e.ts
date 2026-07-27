@@ -12,6 +12,7 @@ type CheckoutResponse = { data?: { id?: string }; id?: string };
 type BrowserLog = { console: string[]; pageErrors: string[]; requestFailures: string[] };
 type AudioAudit = { oscillators: number; resumes: number; notifications: number; events: string[]; audioContextState: 'not-created' | 'suspended' | 'running' | 'closed' };
 type UnlockTrace = { step: string; state: 'running' | 'suspended' | 'closed' | null; error?: { name: string; message: string } };
+type NotificationTrace = { stage: string; eventType?: string; eventId?: string; tenantId?: string; orderId?: string; sourceEventName?: string; source?: string; accepted?: boolean; reason?: string; isLeader?: boolean; tabId?: string; lockStrategy?: string; soundPreferenceEnabled?: boolean; effectiveVolume?: number; audioContextState?: string; playbackRequested?: boolean };
 
 const apiBase = process.env.NOTIFICATION_E2E_API_BASE ?? 'http://127.0.0.1:3333/api/v1';
 const webUrl = process.env.NOTIFICATION_E2E_WEB_URL ?? 'http://127.0.0.1:5173';
@@ -56,6 +57,7 @@ async function installInstrumentation(context: BrowserContext, token: string): P
     const audit: Audit = { oscillators: 0, resumes: 0, notifications: 0, events: [], audioContextState: 'not-created' };
     Object.defineProperty(window, '__notificationAudioAudit', { configurable: true, value: audit });
     Object.defineProperty(window, '__notificationAudioE2ETrace', { configurable: true, value: [] });
+    Object.defineProperty(window, '__notificationE2ETrace', { configurable: true, value: [] });
     window.localStorage.setItem('accessToken', accessToken);
     window.localStorage.setItem('tenantNotificationSoundEnabled', 'true');
 
@@ -93,6 +95,7 @@ async function captureFailureEvidence(page: Page, name: string, browserLog: Brow
     url: window.location.href,
     audioAudit: (window as unknown as { __notificationAudioAudit?: AudioAudit }).__notificationAudioAudit ?? null,
     unlockTrace: (window as unknown as { __notificationAudioE2ETrace?: UnlockTrace[] }).__notificationAudioE2ETrace ?? [],
+    notificationTrace: (window as unknown as { __notificationE2ETrace?: NotificationTrace[] }).__notificationE2ETrace ?? [],
     soundPreferenceEnabled: window.localStorage.getItem('tenantNotificationSoundEnabled'),
     soundVolume: window.localStorage.getItem('tenantNotificationVolume'),
     soundLegacyUnlock: window.localStorage.getItem('tenantNotificationAudioUnlocked'),
@@ -112,6 +115,16 @@ async function waitForApp(page: Page): Promise<void> {
 
 async function emit(page: Page, input: { id: string; type: string; title: string; message?: string; priority?: 'low' | 'high' | 'critical' }): Promise<void> {
   await page.evaluate((event) => {
+    const trace = (window as unknown as { __notificationE2ETrace?: NotificationTrace[] }).__notificationE2ETrace;
+    trace?.push({
+      stage: 'e2e.emit',
+      eventType: event.type,
+      eventId: event.id,
+      orderId: event.orderId,
+      sourceEventName: 'tenant:notification-event',
+      source: 'e2e-direct',
+      reason: 'socket-bypassed',
+    });
     window.dispatchEvent(new CustomEvent('tenant:notification-event', {
       detail: {
         id: event.id,
