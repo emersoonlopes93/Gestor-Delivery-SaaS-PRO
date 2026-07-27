@@ -62,7 +62,7 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
   }, [orders]);
 
   return {
-    isAudioEnabled: soundManager.isEnabled,
-    enableAudio: () => soundManager.setEnabled(!soundManager.isEnabled),
+    isAudioEnabled: soundManager.soundPreferenceEnabled,
+    enableAudio: () => soundManager.setSoundPreferenceEnabled(!soundManager.soundPreferenceEnabled),
   };
 }

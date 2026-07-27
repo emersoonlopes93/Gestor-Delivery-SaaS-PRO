@@ -9,15 +9,20 @@ describe('SoundPlaybackController', () => {
     expect(controller.resolveVolume(0.4)).toBe(0.4);
   });
 
-  it('respects mute/disabled preference', () => {
+  it('respects mute/disabled preference even if context is running', () => {
     const controller = new SoundPlaybackController();
-    expect(controller.canPlay('order.created', { enabled: false, unlocked: true }, 1000)).toBe(false);
+    expect(controller.canPlay('order.created', { soundPreferenceEnabled: false, audioContextState: 'running' }, 1000)).toBe(false);
+  });
+
+  it('blocks playback if context is suspended', () => {
+    const controller = new SoundPlaybackController();
+    expect(controller.canPlay('order.created', { soundPreferenceEnabled: true, audioContextState: 'suspended' }, 1000)).toBe(false);
   });
 
   it('respects cooldown between repeated plays of the same event', () => {
     const controller = new SoundPlaybackController();
-    expect(controller.canPlay('order.created', { enabled: true, unlocked: true }, 1000)).toBe(true);
-    expect(controller.canPlay('order.created', { enabled: true, unlocked: true }, 2000)).toBe(false);
-    expect(controller.canPlay('order.created', { enabled: true, unlocked: true }, 10_000)).toBe(true);
+    expect(controller.canPlay('order.created', { soundPreferenceEnabled: true, audioContextState: 'running' }, 1000)).toBe(true);
+    expect(controller.canPlay('order.created', { soundPreferenceEnabled: true, audioContextState: 'running' }, 2000)).toBe(false);
+    expect(controller.canPlay('order.created', { soundPreferenceEnabled: true, audioContextState: 'running' }, 10_000)).toBe(true);
   });
 });

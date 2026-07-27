@@ -1,8 +1,35 @@
 import { getSoundCatalogEntry, type SoundPattern, type SoundStep, type SystemSoundEvent } from './soundCatalog';
+import { traceNotificationE2E } from './e2eTrace';
 
 type AudioContextCtor = typeof AudioContext;
 
+type E2EUnlockTrace = {
+  step: string;
+  state: NotificationAudioContextState | null;
+  error?: { name: string; message: string };
+};
+
+type NotificationAudioContextState = 'running' | 'suspended' | 'closed' | 'interrupted';
+
+declare global {
+  interface Window {
+    __notificationAudioE2ETrace?: E2EUnlockTrace[];
+  }
+}
+
 let sharedAudioContext: AudioContext | null = null;
+
+function traceUnlock(step: string, context: AudioContext | null, error?: unknown) {
+  if (typeof window === 'undefined' || !window.__notificationAudioE2ETrace) return;
+  const entry: E2EUnlockTrace = {
+    step,
+    state: context?.state ?? null,
+  };
+  if (error instanceof Error) {
+    entry.error = { name: error.name, message: error.message };
+  }
+  window.__notificationAudioE2ETrace.push(entry);
+}
 
 function getAudioContextCtor(): AudioContextCtor | null {
   if (typeof window === 'undefined') return null;
@@ -11,6 +38,17 @@ function getAudioContextCtor(): AudioContextCtor | null {
 
 export function hasSoundEngine(): boolean {
   return getAudioContextCtor() !== null;
+}
+
+/**
+ * Retorna o estado real do AudioContext compartilhado.
+ * 'unavailable' quando o navegador nao suporta Web Audio API.
+ * Chamadores devem verificar esse estado ao vivo — nao contar com localStorage.
+ */
+export function getAudioContextState(): Exclude<NotificationAudioContextState, 'interrupted'> | 'unavailable' {
+  if (!getAudioContextCtor()) return 'unavailable';
+  if (!sharedAudioContext) return 'suspended'; // contexto ainda nao criado = suspenso implicitamente
+  return sharedAudioContext.state as 'running' | 'suspended' | 'closed';
 }
 
 function clampVolume(volume: number) {
@@ -26,10 +64,20 @@ async function getAudioContext() {
 
   if (!sharedAudioContext) {
     sharedAudioContext = new Ctor();
+    traceUnlock('context:create', sharedAudioContext);
   }
 
   if (sharedAudioContext.state === 'suspended') {
-    await sharedAudioContext.resume();
+    traceUnlock('resume:called', sharedAudioContext);
+    try {
+      await sharedAudioContext.resume();
+      traceUnlock('resume:resolved', sharedAudioContext);
+      await Promise.resolve();
+      traceUnlock('resume:microtask', sharedAudioContext);
+    } catch (error) {
+      traceUnlock('resume:rejected', sharedAudioContext, error);
+      throw error;
+    }
   }
 
   return sharedAudioContext;
@@ -86,6 +134,7 @@ function scheduleToneStep(
   }
 
   const oscillator = context.createOscillator();
+  traceNotificationE2E({ stage: 'sound-engine.oscillator-created' });
   oscillator.type = step.waveform ?? 'sine';
   const initialFrequency = step.frequency ?? 440;
   oscillator.frequency.setValueAtTime(initialFrequency, startTime);
@@ -119,7 +168,9 @@ async function playPattern(pattern: SoundPattern, volume: number) {
 }
 
 export async function unlockNotificationAudio() {
+  traceUnlock('unlock:start', sharedAudioContext);
   const context = await getAudioContext();
+  traceUnlock('unlock:context-ready', context);
   const buffer = context.createBuffer(1, 1, context.sampleRate);
   const source = context.createBufferSource();
   source.buffer = buffer;
@@ -127,11 +178,18 @@ export async function unlockNotificationAudio() {
   source.start();
   source.stop(context.currentTime + 0.02);
   await new Promise((resolve) => window.setTimeout(resolve, 25));
+  traceUnlock('unlock:success', context);
   return true;
 }
 
-export async function playNotificationSound(event: SystemSoundEvent, volume: number) {
-  const entry = getSoundCatalogEntry(event);
-  await playPattern(entry.pattern, volume);
-  return true;
+export async function playNotificationSound(event: SystemSoundEvent, volume: number): Promise<boolean> {
+  try {
+    traceNotificationE2E({ stage: 'sound-engine.entered', eventType: event, effectiveVolume: volume });
+    const entry = getSoundCatalogEntry(event);
+    await playPattern(entry.pattern, volume);
+    return true;
+  } catch {
+    // AudioContext suspenso ou indisponivel — retorna false sem lancar
+    return false;
+  }
 }

@@ -5,6 +5,7 @@ import { requestNotificationPermission } from '../lib/notification-support';
 import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
 import { playNotificationSound } from '../notifications/soundEngine';
+import { traceNotificationE2E } from '../notifications/e2eTrace';
 
 export function useNotificationAudio(
   tenantId: string | undefined,
@@ -93,8 +94,17 @@ export function useNotificationAudio(
 
     const emitOrderCreated = (
       data: { orderId?: string; orderNumber: string; customerName: string; total: number | string },
+      sourceEventName: 'order.created' | 'newOrder',
     ) => {
       const orderId = data.orderId ?? data.orderNumber;
+      traceNotificationE2E({
+        stage: 'socket.received',
+        eventType: 'order.created',
+        tenantId,
+        orderId,
+        sourceEventName,
+        source: 'socket',
+      });
       if (!shouldProcessSocketEvent(`order.created:${orderId}`)) return;
       const total = typeof data.total === 'number' ? data.total : Number(data.total);
       const safeTotal = Number.isFinite(total) ? total : 0;
@@ -127,7 +137,7 @@ export function useNotificationAudio(
         orderNumber: data.orderNumber,
         customerName: data.customerName,
         total: data.total,
-      });
+      }, 'order.created');
     });
 
     socket.on('newOrder', (data: { order: { id?: string; orderNumber: string; customerName: string; total: number } }) => {
@@ -136,7 +146,7 @@ export function useNotificationAudio(
         orderNumber: data.order.orderNumber,
         customerName: data.order.customerName,
         total: data.order.total,
-      });
+      }, 'newOrder');
     });
 
     socket.on('order.auto_accepted', (data: TenantNotificationEventPayload) => {

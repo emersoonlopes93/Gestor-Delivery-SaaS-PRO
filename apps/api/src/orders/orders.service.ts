@@ -1173,8 +1173,8 @@ export class OrdersService {
 
       // Se for cancelamento, emitir evento específico para o painel administrativo
       if (nextStatus === 'cancelled') {
-        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken || '', order.orderNumber, OrderStatus.cancelled, dto.note);
-        // Também emitimos para o tenant room caso o painel administrativo queira ouvir por lá
+        // emitOrderCancelled cobre o room do tenant (painel)
+        // emitOrderStatusUpdated já foi enviado acima (linha 1171) para o storefront via publicTrackingToken
         this.ordersGateway.emitOrderCancelled(tenantId, {
           orderId,
           orderNumber: order.orderNumber,
@@ -1193,6 +1193,7 @@ export class OrdersService {
           order.orderNumber,
           order.customerName || undefined,
           order.fulfillmentType || undefined,
+          orderId,
         );
       }
 

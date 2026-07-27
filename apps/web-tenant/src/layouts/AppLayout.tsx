@@ -51,6 +51,7 @@ import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useTenantCapabilities } from '../hooks/useTenantCapabilities';
 import { usePlatformBranding } from '../hooks/usePlatformBranding';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
+import { useChatSocket } from '../features/whatsapp/hooks/useChatSocket';
 import { StoreStatusBadge } from '../components/store/StoreStatusControl';
 import { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
@@ -481,6 +482,11 @@ export function AppLayout() {
   };
 
   useNotificationAudio(tenantData?.id);
+
+  // Mantém conexão ao namespace /chat ativa em qualquer rota autenticada.
+  // Necessário para que whatsapp.handoff chegue ao bus de notificação
+  // independentemente de o operador estar ou não na InboxPage.
+  useChatSocket(tenantData?.id);
 
   // Browser Notifications Integration
   useBrowserNotifications(
