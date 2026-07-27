@@ -113,7 +113,15 @@ async function waitForApp(page: Page): Promise<void> {
 async function emit(page: Page, input: { id: string; type: string; title: string; message?: string; priority?: 'low' | 'high' | 'critical' }): Promise<void> {
   await page.evaluate((event) => {
     window.dispatchEvent(new CustomEvent('tenant:notification-event', {
-      detail: { ...event, createdAt: new Date().toISOString(), priority: event.priority ?? 'high', source: 'socket' },
+      detail: {
+        id: event.id,
+        type: event.type,
+        title: event.title,
+        message: event.message,
+        priority: event.priority ?? 'high',
+        createdAt: new Date().toISOString(),
+        source: 'socket',
+      },
     }));
   }, input);
 }
