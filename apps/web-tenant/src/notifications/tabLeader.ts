@@ -91,13 +91,15 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
     }
   }
 
-  // Tenta adquirir lock exclusivo sem esperar (ifAvailable: true)
+  // Enfileira a disputa do lock. `ifAvailable` faria uma aba que perdeu para
+  // uma instancia temporaria (por exemplo, o ciclo de cleanup do StrictMode)
+  // permanecer seguidora para sempre, mesmo depois que o lock fosse liberado.
   function tryAcquire() {
     abortController = new AbortController();
     navigator.locks
       .request(
         lockName,
-        { mode: 'exclusive', ifAvailable: true },
+        { mode: 'exclusive', signal: abortController.signal },
         (lock) => {
           if (!lock) {
             // Lock ocupado por outra aba — não é líder
@@ -154,6 +156,7 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
 
     destroy() {
       destroyed = true;
+      traceNotificationE2E({ stage: 'leader.destroyed', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: leaderState });
       leaderState = false;
       fallbackLeader?.destroy();
       try { abortController?.abort(); } catch { /* ignore */ }

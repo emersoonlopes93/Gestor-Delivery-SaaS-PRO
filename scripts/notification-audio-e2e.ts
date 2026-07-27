@@ -117,7 +117,9 @@ async function waitForLeader(pages: Page[]): Promise<Page> {
   return Promise.any(pages.map(async (page) => {
     await page.waitForFunction(() => {
       const trace = (window as unknown as { __notificationE2ETrace?: NotificationTrace[] }).__notificationE2ETrace ?? [];
-      return trace.some((entry) => entry.stage === 'leader.ready' && entry.isLeader === true);
+      const currentLeader = [...trace].reverse().find((entry) => entry.stage === 'leader.ready' && entry.isLeader === true);
+      return currentLeader !== undefined
+        && !trace.some((entry) => entry.stage === 'leader.destroyed' && entry.tabId === currentLeader.tabId);
     }, { timeout: 5_000 });
     return page;
   }));

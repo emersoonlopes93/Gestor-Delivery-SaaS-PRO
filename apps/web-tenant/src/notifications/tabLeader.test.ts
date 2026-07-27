@@ -95,7 +95,7 @@ describe('tabLeader', () => {
     follower.destroy();
   });
 
-  it('acquires a Web Lock without combining ifAvailable and signal', async () => {
+  it('acquires a Web Lock with an abortable queued request', async () => {
     const request = vi.fn((_name: string, _options: unknown, callback: (lock: object) => Promise<void>) => {
       void callback({});
       return Promise.resolve();
@@ -110,7 +110,45 @@ describe('tabLeader', () => {
     await Promise.resolve();
 
     expect(leader.isLeader()).toBe(true);
-    expect(request.mock.calls[0]?.[1]).toEqual({ mode: 'exclusive', ifAvailable: true });
+    expect(request.mock.calls[0]?.[1]).toMatchObject({ mode: 'exclusive' });
+    expect(request.mock.calls[0]?.[1]).toHaveProperty('signal');
+    expect(request.mock.calls[0]?.[1]).not.toHaveProperty('ifAvailable');
     leader.destroy();
+  });
+
+  it('promotes a queued follower after the Web Locks leader is destroyed', async () => {
+    type LockCallback = (lock: object) => Promise<void>;
+    const queue: Array<() => void> = [];
+    let lockHeld = false;
+    const request = vi.fn((_name: string, _options: unknown, callback: LockCallback) => new Promise<void>((resolve) => {
+      const run = () => {
+        lockHeld = true;
+        void callback({}).then(() => {
+          lockHeld = false;
+          queue.shift()?.();
+          resolve();
+        });
+      };
+      if (lockHeld) queue.push(run);
+      else run();
+    }));
+    Object.defineProperty(global, 'navigator', {
+      value: { locks: { request } },
+      configurable: true,
+      writable: true,
+    });
+
+    const first = createTabLeader('tenant-1');
+    const second = createTabLeader('tenant-1');
+    await Promise.resolve();
+
+    expect(first.isLeader()).toBe(true);
+    expect(second.isLeader()).toBe(false);
+
+    first.destroy();
+    await Promise.resolve();
+
+    expect(second.isLeader()).toBe(true);
+    second.destroy();
   });
 });
