@@ -51,6 +51,10 @@ function randomId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function isSecureContextAvailable(): boolean {
+  return typeof window !== 'undefined' && window.isSecureContext;
+}
+
 // ---------------------------------------------------------------------------
 // Estratégia 1: Web Locks API
 // ---------------------------------------------------------------------------
@@ -63,6 +67,8 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
   const ownerId = randomId();
 
   let leaderState = false;
+  let destroyed = false;
+  let fallbackLeader: TabLeader | null = null;
   let abortController: AbortController | null = null;
   let channel: BroadcastChannel | null = null;
   const playedEvents = new Map<string, number>();
@@ -96,12 +102,12 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
           if (!lock) {
             // Lock ocupado por outra aba — não é líder
             leaderState = false;
-            traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: false, reason: 'lock-unavailable' });
+            traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: false, reason: 'lock-unavailable', webLocksAvailable: true, secureContext: isSecureContextAvailable(), lockReceived: 'null' });
             return Promise.resolve();
           }
           // É líder enquanto a Promise não resolver
           leaderState = true;
-          traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: true, reason: 'lock-acquired' });
+          traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: true, reason: 'lock-acquired', webLocksAvailable: true, secureContext: isSecureContextAvailable(), lockReceived: 'object' });
           // Promise que nunca resolve mantém o lock ativo até destroy()
           return new Promise<void>((resolve) => {
             // guardamos resolve para chamar no destroy()
@@ -112,18 +118,28 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
           });
         },
       )
-      .catch(() => {
+      .catch((error: unknown) => {
         leaderState = false;
-        traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: false, reason: 'lock-error' });
+        const errorDetails = error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : { name: 'UnknownError', message: String(error) };
+        traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: false, reason: 'lock-error', webLocksAvailable: true, secureContext: isSecureContextAvailable(), error: errorDetails });
+        if (!destroyed) {
+          fallbackLeader = createLocalStorageLeader(tenantId);
+        }
       });
   }
 
   tryAcquire();
 
   return {
-    isLeader: () => leaderState,
+    isLeader: () => fallbackLeader?.isLeader() ?? leaderState,
 
     markEventPlayed(eventId: string) {
+      if (fallbackLeader) {
+        fallbackLeader.markEventPlayed(eventId);
+        return;
+      }
       playedEvents.set(eventId, Date.now());
       try {
         channel?.postMessage({ type: 'event-played', ownerId, eventId } satisfies ChannelMessage);
@@ -131,12 +147,15 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
     },
 
     wasEventPlayed(eventId: string): boolean {
+      if (fallbackLeader) return fallbackLeader.wasEventPlayed(eventId);
       prunePlayed();
       return playedEvents.has(eventId);
     },
 
     destroy() {
+      destroyed = true;
       leaderState = false;
+      fallbackLeader?.destroy();
       try { abortController?.abort(); } catch { /* ignore */ }
       try { channel?.close(); } catch { /* ignore */ }
       playedEvents.clear();

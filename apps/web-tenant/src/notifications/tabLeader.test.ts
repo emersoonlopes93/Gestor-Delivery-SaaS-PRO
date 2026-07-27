@@ -58,4 +58,40 @@ describe('tabLeader', () => {
     leader1.destroy();
     leader2.destroy();
   });
+
+  it('falls back to a single localStorage leader when Web Locks reject', async () => {
+    Object.defineProperty(global, 'navigator', {
+      value: { locks: { request: vi.fn().mockRejectedValue(new Error('Web Locks unavailable')) } },
+      configurable: true,
+      writable: true,
+    });
+
+    const leader1 = createTabLeader('tenant-1');
+    const leader2 = createTabLeader('tenant-1');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(Number(leader1.isLeader()) + Number(leader2.isLeader())).toBe(1);
+
+    leader1.destroy();
+    leader2.destroy();
+  });
+
+  it('keeps a Web Locks follower as a follower when the lock is unavailable', async () => {
+    Object.defineProperty(global, 'navigator', {
+      value: {
+        locks: {
+          request: vi.fn((_name: string, _options: unknown, callback: (lock: null) => Promise<void>) => callback(null)),
+        },
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    const follower = createTabLeader('tenant-1');
+    await Promise.resolve();
+
+    expect(follower.isLeader()).toBe(false);
+    follower.destroy();
+  });
 });

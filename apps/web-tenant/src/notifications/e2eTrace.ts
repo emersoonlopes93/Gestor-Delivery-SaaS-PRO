@@ -15,6 +15,10 @@ export type NotificationE2ETraceEntry = {
   effectiveVolume?: number;
   audioContextState?: string;
   playbackRequested?: boolean;
+  webLocksAvailable?: boolean;
+  secureContext?: boolean;
+  lockReceived?: 'null' | 'object';
+  error?: { name: string; message: string; stack?: string };
 };
 
 declare global {
