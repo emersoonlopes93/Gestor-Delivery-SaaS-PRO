@@ -1,3 +1,5 @@
+import { traceNotificationE2E } from './e2eTrace';
+
 /**
  * tabLeader.ts
  *
@@ -94,10 +96,12 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
           if (!lock) {
             // Lock ocupado por outra aba — não é líder
             leaderState = false;
+            traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: false, reason: 'lock-unavailable' });
             return Promise.resolve();
           }
           // É líder enquanto a Promise não resolver
           leaderState = true;
+          traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: true, reason: 'lock-acquired' });
           // Promise que nunca resolve mantém o lock ativo até destroy()
           return new Promise<void>((resolve) => {
             // guardamos resolve para chamar no destroy()
@@ -110,6 +114,7 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
       )
       .catch(() => {
         leaderState = false;
+        traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'web-locks', isLeader: false, reason: 'lock-error' });
       });
   }
 
@@ -207,6 +212,7 @@ function createLocalStorageLeader(tenantId: string): TabLeader {
 
   // Eleição inicial
   leaderState = tryElect();
+  traceNotificationE2E({ stage: 'leader.ready', tenantId, tabId: ownerId, lockStrategy: 'local-storage', isLeader: leaderState, reason: leaderState ? 'lease-acquired' : 'lease-held' });
 
   // Heartbeat: renovar lease a cada HEARTBEAT_MS
   heartbeatTimer = setInterval(() => {

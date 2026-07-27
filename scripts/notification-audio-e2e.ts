@@ -113,6 +113,16 @@ async function waitForApp(page: Page): Promise<void> {
   await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').click();
 }
 
+async function waitForLeader(pages: Page[]): Promise<Page> {
+  return Promise.any(pages.map(async (page) => {
+    await page.waitForFunction(() => {
+      const trace = (window as unknown as { __notificationE2ETrace?: NotificationTrace[] }).__notificationE2ETrace ?? [];
+      return trace.some((entry) => entry.stage === 'leader.ready' && entry.isLeader === true);
+    }, { timeout: 5_000 });
+    return page;
+  }));
+}
+
 async function emit(page: Page, input: { id: string; type: string; title: string; message?: string; priority?: 'low' | 'high' | 'critical' }): Promise<void> {
   await page.evaluate((event) => {
     const trace = (window as unknown as { __notificationE2ETrace?: NotificationTrace[] }).__notificationE2ETrace;
@@ -206,10 +216,10 @@ async function main(): Promise<void> {
   try {
     await Promise.all([waitForApp(leader), waitForApp(secondary)]);
     ok((await audit(leader)).resumes >= 1, 'AudioContext was not resumed after the CTA interaction');
+    const activeLeader = await waitForLeader([leader, secondary]);
 
     const orderId = await createLocalOrder(token);
-    await emit(leader, { id: `order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
-    await emit(secondary, { id: `order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
+    await emit(activeLeader, { id: `order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
     await leader.waitForTimeout(250);
     equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators > 0, true, 'order.created did not call the sound engine');
 
