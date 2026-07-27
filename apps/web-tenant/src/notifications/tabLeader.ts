@@ -97,7 +97,7 @@ function createWebLocksLeader(tenantId: string): TabLeader | null {
     navigator.locks
       .request(
         lockName,
-        { mode: 'exclusive', ifAvailable: true, signal: abortController.signal },
+        { mode: 'exclusive', ifAvailable: true },
         (lock) => {
           if (!lock) {
             // Lock ocupado por outra aba — não é líder

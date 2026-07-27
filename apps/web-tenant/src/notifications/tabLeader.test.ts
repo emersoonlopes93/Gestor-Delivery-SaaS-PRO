@@ -94,4 +94,23 @@ describe('tabLeader', () => {
     expect(follower.isLeader()).toBe(false);
     follower.destroy();
   });
+
+  it('acquires a Web Lock without combining ifAvailable and signal', async () => {
+    const request = vi.fn((_name: string, _options: unknown, callback: (lock: object) => Promise<void>) => {
+      void callback({});
+      return Promise.resolve();
+    });
+    Object.defineProperty(global, 'navigator', {
+      value: { locks: { request } },
+      configurable: true,
+      writable: true,
+    });
+
+    const leader = createTabLeader('tenant-1');
+    await Promise.resolve();
+
+    expect(leader.isLeader()).toBe(true);
+    expect(request.mock.calls[0]?.[1]).toEqual({ mode: 'exclusive', ifAvailable: true });
+    leader.destroy();
+  });
 });
