@@ -217,6 +217,7 @@ async function main(): Promise<void> {
     await Promise.all([waitForApp(leader), waitForApp(secondary)]);
     ok((await audit(leader)).resumes >= 1, 'AudioContext was not resumed after the CTA interaction');
     const activeLeader = await waitForLeader([leader, secondary]);
+    const standby = activeLeader === leader ? secondary : leader;
 
     const orderId = await createLocalOrder(token);
     await emit(activeLeader, { id: `order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
@@ -224,30 +225,30 @@ async function main(): Promise<void> {
     equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators > 0, true, 'order.created did not call the sound engine');
 
     const beforeDuplicate = (await audit(leader)).oscillators + (await audit(secondary)).oscillators;
-    await emit(leader, { id: `legacy:order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
-    await leader.waitForTimeout(250);
+    await emit(activeLeader, { id: `legacy:order.created:${orderId}`, type: 'order.created', title: 'Novo pedido', priority: 'critical' });
+    await activeLeader.waitForTimeout(250);
     equal((await audit(leader)).oscillators + (await audit(secondary)).oscillators, beforeDuplicate, 'duplicate order event replayed audio');
 
-    await emit(leader, { id: `order.cancelled:${orderId}`, type: 'order.cancelled', title: 'Pedido cancelado', priority: 'high' });
-    await emit(leader, { id: `order.ready:${orderId}`, type: 'order.ready', title: 'Pedido pronto', priority: 'high' });
-    await emit(leader, { id: `whatsapp.handoff:${tenantId}`, type: 'whatsapp.handoff', title: 'Transferencia para atendimento humano', priority: 'high' });
-    await emit(leader, { id: `connection.lost:${tenantId}`, type: 'connection.lost', title: 'Conexao perdida', priority: 'critical' });
-    await emit(leader, { id: `connection.restored:${tenantId}`, type: 'connection.restored', title: 'Conexao restaurada', priority: 'low' });
-    await leader.waitForTimeout(500);
+    await emit(activeLeader, { id: `order.cancelled:${orderId}`, type: 'order.cancelled', title: 'Pedido cancelado', priority: 'high' });
+    await emit(activeLeader, { id: `order.ready:${orderId}`, type: 'order.ready', title: 'Pedido pronto', priority: 'high' });
+    await emit(activeLeader, { id: `whatsapp.handoff:${tenantId}`, type: 'whatsapp.handoff', title: 'Transferencia para atendimento humano', priority: 'high' });
+    await emit(activeLeader, { id: `connection.lost:${tenantId}`, type: 'connection.lost', title: 'Conexao perdida', priority: 'critical' });
+    await emit(activeLeader, { id: `connection.restored:${tenantId}`, type: 'connection.restored', title: 'Conexao restaurada', priority: 'low' });
+    await activeLeader.waitForTimeout(500);
     ok((await audit(leader)).oscillators + (await audit(secondary)).oscillators > beforeDuplicate, 'critical event matrix did not call the sound engine');
 
-    await leader.screenshot({ path: join(artifactDir, 'leader-before-handoff.png'), fullPage: true });
-    await leader.close();
-    await secondary.waitForTimeout(300);
-    const beforeHandoff = (await audit(secondary)).oscillators;
-    await emit(secondary, { id: `order.created:handoff:${orderId}`, type: 'order.created', title: 'Novo pedido apos troca de lider', priority: 'critical' });
-    await secondary.waitForTimeout(300);
-    ok((await audit(secondary)).oscillators > beforeHandoff, 'secondary tab did not take over audio after leader close');
-    await secondary.screenshot({ path: join(artifactDir, 'secondary-after-handoff.png'), fullPage: true });
+    await activeLeader.screenshot({ path: join(artifactDir, 'leader-before-handoff.png'), fullPage: true });
+    await activeLeader.close();
+    await waitForLeader([standby]);
+    const beforeHandoff = (await audit(standby)).oscillators;
+    await emit(standby, { id: `order.created:handoff:${orderId}`, type: 'order.created', title: 'Novo pedido apos troca de lider', priority: 'critical' });
+    await standby.waitForTimeout(300);
+    ok((await audit(standby)).oscillators > beforeHandoff, 'secondary tab did not take over audio after leader close');
+    await standby.screenshot({ path: join(artifactDir, 'secondary-after-handoff.png'), fullPage: true });
   } catch (error: unknown) {
     await Promise.all([
-      captureFailureEvidence(leader, 'leader', leaderLog),
-      captureFailureEvidence(secondary, 'secondary', secondaryLog),
+      !leader.isClosed() && captureFailureEvidence(leader, 'leader', leaderLog),
+      !secondary.isClosed() && captureFailureEvidence(secondary, 'secondary', secondaryLog),
     ]);
     throw error;
   } finally {
