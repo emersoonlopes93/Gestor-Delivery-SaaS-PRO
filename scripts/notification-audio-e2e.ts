@@ -153,6 +153,7 @@ async function createLocalOrder(token: string): Promise<string> {
       items: [{ lineType: 'product', productId, quantity: 1 }],
       customerName: 'Notification E2E',
       customerPhone: '11999990000',
+      customerEmail: 'notification-e2e@example.test',
       fulfillmentType: 'pickup',
       payment: { method: 'pix' },
     }),
