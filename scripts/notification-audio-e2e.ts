@@ -150,7 +150,7 @@ async function createLocalOrder(token: string): Promise<string> {
     method: 'POST',
     body: JSON.stringify({
       idempotencyKey: `notification-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      items: [{ lineType: 'product', productId, quantity: 1, complements: [] }],
+      items: [{ lineType: 'product', productId, quantity: 1 }],
       customerName: 'Notification E2E',
       customerPhone: '11999990000',
       fulfillmentType: 'pickup',
