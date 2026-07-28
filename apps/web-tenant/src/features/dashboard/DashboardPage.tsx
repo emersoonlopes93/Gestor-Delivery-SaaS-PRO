@@ -13,6 +13,8 @@ import { OperationsDashboard } from './components/OperationsDashboard';
 
 export const DASHBOARD_ACTION_MENU_ITEM_CLASS = 'block rounded-lg px-3 py-2 font-semibold transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring dark:hover:bg-slate-800';
 export const DASHBOARD_ACTION_MENU_DISABLED_CLASS = 'block w-full rounded-lg px-3 py-2 text-left font-semibold transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-70 dark:hover:bg-slate-800 dark:disabled:text-slate-400';
+export const DASHBOARD_PERIOD_SELECT_CLASS = 'appearance-none border-0 bg-white py-2 pl-8 pr-7 text-xs font-semibold text-slate-900 outline-none dark:bg-slate-900 dark:text-slate-100';
+export const DASHBOARD_PERIOD_OPTION_CLASS = 'bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100';
 
 function greeting(now = new Date()) {
   const hour = now.getHours();
@@ -69,10 +71,10 @@ export function DashboardPage() {
               aria-label="Período do dashboard"
               value={periodPreset}
               onChange={(event) => setPeriodPreset(event.target.value as DashboardPeriodPreset)}
-              className="appearance-none border-0 bg-transparent py-2 pl-8 pr-7 text-xs font-semibold text-foreground outline-none"
+              className={DASHBOARD_PERIOD_SELECT_CLASS}
             >
               {(Object.entries(DASHBOARD_PERIOD_LABELS) as Array<[DashboardPeriodPreset, { control: string; sentence: string }]>).map(([value, label]) => (
-                <option key={value} value={value}>{label.control}</option>
+                <option key={value} value={value} className={DASHBOARD_PERIOD_OPTION_CLASS}>{label.control}</option>
               ))}
             </select>
             <span className="pointer-events-none absolute right-2 text-[10px] text-muted-foreground" aria-hidden="true">▾</span>
