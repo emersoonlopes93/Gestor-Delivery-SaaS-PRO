@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BellRing, WifiOff } from 'lucide-react';
+import { BellRing, Loader2, WifiOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getNotificationPermission, showWebNotification } from '../lib/notification-support';
 import {
@@ -48,7 +48,17 @@ export function NotificationCenter() {
   const deduperRef = useRef(new NotificationDeduper());
   const soundManager = useSoundManager();
   const [connectionBanner, setConnectionBanner] = useState<string | null>(null);
+  const [ownsActivationBanner, setOwnsActivationBanner] = useState(false);
   const leaderRef = useRef<TabLeader | null>(null);
+
+  // The large CTA belongs to the first mount in a browser session. It stays
+  // visible for that mount until the user resolves it, but route remounts,
+  // focus and reconnects cannot claim it again.
+  useEffect(() => {
+    if (!soundManager.activationBannerEligible || soundManager.activationBannerShownForSession || ownsActivationBanner) return;
+    soundManager.markActivationBannerShownForSession();
+    setOwnsActivationBanner(true);
+  }, [ownsActivationBanner, soundManager]);
 
   // Inicializa o líder de aba quando temos o tenantId
   useEffect(() => {
@@ -159,15 +169,14 @@ export function NotificationCenter() {
   }, []);
 
   const audioWarning = useMemo(() => {
-    if (!soundManager.needsAudioUnlock) return null;
-    if (soundManager.lastPlaybackError) return 'O navegador ainda nao liberou os sons automaticamente.';
-    return 'Ative as notificacoes sonoras para nao perder novos pedidos.';
-  }, [soundManager.needsAudioUnlock, soundManager.lastPlaybackError]);
+    if (!ownsActivationBanner || !soundManager.activationBannerEligible) return null;
+    return soundManager.activationError || 'Ative os sons para nao perder novos pedidos.';
+  }, [ownsActivationBanner, soundManager.activationBannerEligible, soundManager.activationError]);
 
   return (
     <>
       {audioWarning ? (
-        <div className="fixed left-1/2 top-4 z-[70] w-[min(92vw,680px)] -translate-x-1/2" role="alert" aria-live="assertive">
+        <div className="fixed inset-x-3 bottom-3 z-[70] sm:left-1/2 sm:top-4 sm:bottom-auto sm:w-[min(92vw,680px)] sm:-translate-x-1/2" role="alert" aria-live="assertive">
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 shadow-lg backdrop-blur">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
@@ -184,17 +193,10 @@ export function NotificationCenter() {
                   type="button"
                   aria-label="Ativar notificacoes sonoras"
                   onClick={() => void soundManager.unlockAudio()}
+                  disabled={soundManager.activationInProgress}
                   className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground transition hover:bg-primary/90"
                 >
-                  Ativar sons
-                </button>
-                <button
-                  type="button"
-                  aria-label="Testar som"
-                  onClick={() => void soundManager.testSound()}
-                  className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-black text-foreground transition hover:bg-muted"
-                >
-                  Testar som
+                  {soundManager.activationInProgress ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Ativando sons...</> : soundManager.activationError ? 'Tentar novamente' : 'Ativar sons'}
                 </button>
               </div>
             </div>
@@ -212,24 +214,6 @@ export function NotificationCenter() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-foreground">Conexao perdida</p>
                 <p className="text-xs font-medium text-muted-foreground">{connectionBanner}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-
-
-      {soundManager.lastPlaybackError && !soundManager.needsAudioUnlock ? (
-        <div className="fixed bottom-4 left-1/2 z-[68] w-[min(92vw,560px)] -translate-x-1/2" role="status" aria-live="polite">
-          <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
-              <div>
-                <p className="text-sm font-bold text-foreground">Audio aguardando permissao do navegador</p>
-                <p className="text-xs text-muted-foreground">
-                  Voce ainda continuara vendo os alertas visuais, mesmo sem som. Erro: {soundManager.lastPlaybackError}
-                </p>
               </div>
             </div>
           </div>

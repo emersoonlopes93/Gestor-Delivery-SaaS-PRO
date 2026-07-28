@@ -199,33 +199,37 @@ export function NotificationSettings() {
                 Essas preferencias sao locais e ficam salvas apenas neste navegador/dispositivo.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  type="button"
-                  aria-label="Ativar notificacoes sonoras"
-                  onClick={() => void soundManager.unlockAudio()}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-xs hover:bg-primary/90 transition-all active:scale-95"
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  {!soundManager.needsAudioUnlock ? 'Sons ativados' : 'Ativar sons'}
-                </button>
-                <button
-                  type="button"
-                  aria-label="Testar som"
-                  onClick={() => void soundManager.testSound()}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  Testar som
-                </button>
+                {soundManager.activationUiState !== 'ready' ? (
+                  <button
+                    type="button"
+                    aria-label="Ativar notificacoes sonoras"
+                    onClick={() => void soundManager.unlockAudio()}
+                    disabled={!soundManager.soundPreferenceEnabled || soundManager.activationInProgress || soundManager.activationUiState === 'unavailable'}
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-xs hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    {soundManager.activationInProgress ? 'Ativando sons...' : soundManager.activationError ? 'Tentar novamente' : 'Ativar sons'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label="Testar som"
+                    onClick={() => void soundManager.testSound()}
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    Testar som
+                  </button>
+                )}
               </div>
               {soundManager.needsAudioUnlock ? (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700">
                   Ative as notificacoes sonoras para nao perder novos pedidos.
                 </div>
               ) : null}
-              {soundManager.lastPlaybackError ? (
+              {soundManager.activationError ? (
                 <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground">
-                  O navegador pode exigir uma interacao para liberar o audio. Erro: {soundManager.lastPlaybackError}
+                  O navegador ainda nao liberou os sons. Tente novamente com uma interacao direta.
                 </div>
               ) : null}
             </div>
