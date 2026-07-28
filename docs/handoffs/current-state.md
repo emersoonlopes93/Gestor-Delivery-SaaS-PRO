@@ -16,7 +16,7 @@ Base: `main-copy` / `17e436a7`
 
 - O pulso de operação deixou de usar superfície escura fixa: light usa fundo branco, borda clara e texto escuro; dark usa superfície elevada, borda escura e texto claro.
 - O menu de ações rápidas agora declara explicitamente superfície e texto para ambos os temas, com hover, foco e estado disabled legíveis.
-- A validação automatizada local cobre os pares de tema do status e os estados de ação. A captura autenticada local permanece pendente porque o login da fixture disponível retornou `Credenciais inválidas ou erro no servidor`; nenhum banco remoto foi acessado.
+- A validação automatizada local cobre os pares de tema do status e os estados de ação. A prova autenticada foi adicionada à CI com PostgreSQL efêmero, seed suportado, login e seis capturas light/dark; aguarda execução da PR. O login local disponível retornou `Credenciais inválidas ou erro no servidor`, portanto nenhum banco remoto foi acessado.
 
 Data: 2026-07-28
 Branch: `feat/premium-commercial-dashboard`
