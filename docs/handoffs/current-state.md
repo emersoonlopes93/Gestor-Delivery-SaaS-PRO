@@ -2,17 +2,35 @@
 title: Handoff — Sprint 5B Reconciliação e Operação iFood
 status: current
 owner: engineering
-last_verified: 2026-07-16
-verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
+last_verified: 2026-07-28
+verified_against: feat/storefront-consent-foundation / 5a3422a4 (base)
 ---
+
+## Fundação mínima de consentimento do storefront (PR 0B)
+
+Data: 2026-07-28
+
+Branch: `feat/storefront-consent-foundation`
+
+Base: `origin/main-copy` / `5a3422a4`
+
+- O storefront público agora resolve consentimento somente depois de obter o identificador confiável do tenant e persiste uma decisão versionada em chave isolada por tenant.
+- O contrato compartilhado Zod/TypeScript mantém `necessary: true`, inicia `analytics` e `marketing` em `false`, registra versão da política, versão do schema, origem e timestamps, e produz o snapshot compatível com a fundação de Analytics da PR 0A.
+- O banner permanece no fluxo do documento e não cobre carrinho, checkout ou CTA de instalação. A ação permanente no rodapé reabre um diálogo acessível com foco inicial, trap de foco, `Escape` e restauração de foco.
+- Aceitar tudo, aceitar somente necessários, personalizar, salvar preferências e revogar foram implementados. Decisão ausente, inválida ou de versão antiga falha fechada e volta a exibir o banner.
+- Carrinho, autenticação de cliente, tema, PWA/cache e tracking funcional existente foram classificados como storage necessário e não são apagados nem condicionados por esta fundação.
+- Testes Node cobrem contrato, persistência, `default deny`, versão e isolamento. O E2E real cobre sete cenários, incluindo reload, revogação, tenant A/B, política antiga, teclado e ausência de overflow, com oito capturas light/dark em desktop e mobile.
+- Gates locais: `pnpm lint` exit `0` (16 warnings preexistentes no storefront); `pnpm typecheck` exit `0`; build e testes focados do storefront exit `0` (4 arquivos, 26 testes); build de `@gestor/types`, `check:no-any`, `check:features` e E2E exit `0`.
+- Escopo excluído: ingestão de eventos, GA4, Meta Pixel, Google Ads, cookies opcionais, backend/Prisma/migrations, providers, banco remoto e deploy.
+- Pendente: commits, push, Draft PR contra `main-copy` e CI no SHA publicado. Merge e deploy permanecem proibidos.
 
 ## Fundação canônica de Marketing Analytics do cardápio
 
 Data: 2026-07-28
 
-Branch: `feat/marketing-analytics-foundation`
+Branch: `feat/marketing-analytics-foundation` (PR #25, mergeada)
 
-Base: `origin/main-copy` / `fbaa2714`
+Merge em `main-copy`: `5a3422a4`
 
 - A auditoria foi versionada sem alterar suas 24 seções. O drift direcionado desde `9d04645e` ficou vazio; o único delta global, `DriverSelectionModal.tsx`, foi classificado como sem impacto.
 - A ADR define analytics first-party como fonte do dashboard, separa comportamento/domínio/provider e formaliza métricas, consentimento default deny, PII, atribuição, retenção, escala, threat model e plano de PRs.
@@ -21,7 +39,7 @@ Base: `origin/main-copy` / `fbaa2714`
 - Gates locais finais: `pnpm lint` exit `0` (16 warnings preexistentes no storefront); `pnpm typecheck` exit `0`; `pnpm --filter @gestor/types build` exit `0`; teste focado Jest exit `0` (1 suíte, 11 testes); lint focado do teste exit `0`; `pnpm check:no-any` exit `0`; `pnpm check:features` exit `0`; `git diff --check` exit `0`.
 - `@gestor/types` não possui scripts próprios de lint ou teste. O lint raiz e o Jest existente da API foram usados, sem adicionar scripts ou dependências.
 - A validação na worktree reutilizou a instalação local existente por junctions ignoradas pelo Git; nenhum pacote foi instalado. Nenhum banco, provider, deploy ou migration foi acessado.
-- Pendente: push, Draft PR contra `main-copy` e CI. Merge e deploy permanecem proibidos neste escopo.
+- PR #25 mergeada; CI pós-merge verde. O runtime de produção permaneceu inalterado e não houve deploy.
 
 ## Dashboard comercial premium do tenant
 
