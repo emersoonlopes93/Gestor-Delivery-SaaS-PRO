@@ -6,6 +6,27 @@ last_verified: 2026-07-16
 verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
 ---
 
+## Dashboard comercial premium do tenant
+
+Data: 2026-07-28
+Branch: `feat/premium-commercial-dashboard`
+Base: `main-copy` / `e07ed925`
+
+- O dashboard foi reorganizado como central operacional compacta: status real da loja, fluxo do dia e ação contextual aparecem na primeira dobra.
+- KPIs, fluxo, atenção, receita, canais, cozinha, produtos, horários de pico e delivery usam apenas os contratos existentes.
+- O seletor acessível oferece Hoje, Ontem e Últimos 7 dias. `/analytics/dashboard` consulta o período escolhido e o período anterior equivalente; comparações sem baseline válido aparecem como indisponíveis.
+- Receita, ticket e produtos são rotulados como dados de pedidos concluídos. `cancellationRate` é exibido diretamente, sem multiplicação adicional.
+- Status aberto/fechado/pausado deriva de `/tenant/me`, timezone, horários e pausa manual. Billing é permissionado por `billing.read` e reduzido a aviso compacto.
+- Receita horária, impressora, SLA real e cozinha no prazo não existem no contrato atual e não foram simulados.
+- `SetupWizard` foi preservado. Sidebar/AppLayout, backend, Prisma, migrations, auth, RBAC e regras de pedidos/KDS não foram alterados.
+- Analytics exige simultaneamente `reports.read` e o módulo `reports`; sem o módulo, a consulta não é disparada e a UI mostra o estado de acesso indisponível sem falso erro parcial.
+- Testes cobrem derivações puras, períodos, gating, estado vazio, conteúdo suportado e ausência de detalhes técnicos da sessão.
+- Gates finais: lint `0`; 33 testes web `0`; build web `0` (5692 módulos); typecheck raiz `0`; check:no-any `0`; check:features `0`; diff-check `0`.
+- A validação visual autenticada usou `http://localhost:5173` com fixture local e plano local ativado pela API suportada, sem banco remoto ou provider real. Capturas dark em 1440×900, 1366×768, 1024×768 e 390×844, mais light em 1440×900, ficaram sem overflow horizontal em `qa-artifacts/dashboard-premium/` (não versionado).
+- A avaliação visual independente terminou `PASS` (8/12), sem bloqueadores. O aviso global de desbloqueio sonoro sobrepõe parte do cabeçalho no mobile e permanece fora deste escopo por pertencer ao layout global.
+
+---
+
 # Handoff — Sprint 5B: Reconciliação e Operação iFood
 
 ## UX de ativacao sonora
