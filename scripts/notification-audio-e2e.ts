@@ -107,10 +107,24 @@ async function captureFailureEvidence(page: Page, name: string, browserLog: Brow
   await writeFile(join(artifactDir, `${name}-failure-state.json`), JSON.stringify({ ...state, browserLog }, null, 2));
 }
 
-async function waitForApp(page: Page): Promise<void> {
+async function openNotificationSettings(page: Page): Promise<void> {
   await page.goto(`${webUrl}/settings/notifications`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1_000);
+  await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').waitFor({ timeout: 10_000 });
+}
+
+async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 4);
+  equal(overflow, false, `${label} has horizontal overflow`);
+}
+
+async function activateSounds(page: Page): Promise<void> {
   await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').click();
+  await page.waitForFunction(() => {
+    const audit = (window as unknown as { __notificationAudioAudit?: AudioAudit }).__notificationAudioAudit;
+    return audit?.audioContextState === 'running';
+  }, { timeout: 5_000 });
+  equal(await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').count(), 0, 'activation banner remained visible after AudioContext became running');
+  equal(await page.getByRole('button', { name: 'Testar som' }).count() > 0, true, 'test sound control was not available after activation');
 }
 
 async function waitForLeader(pages: Page[]): Promise<Page> {
@@ -220,7 +234,27 @@ async function main(): Promise<void> {
   collectBrowserLog(secondary, secondaryLog);
 
   try {
-    await Promise.all([waitForApp(leader), waitForApp(secondary)]);
+    await secondary.setViewportSize({ width: 390, height: 844 });
+    await Promise.all([openNotificationSettings(leader), openNotificationSettings(secondary)]);
+    equal(await leader.getByRole('button', { name: 'Testar som' }).count(), 0, 'test sound control was visible while desktop context was blocked');
+    equal(await secondary.getByRole('button', { name: 'Testar som' }).count(), 0, 'test sound control was visible while mobile context was blocked');
+    await Promise.all([
+      leader.screenshot({ path: join(artifactDir, 'sound-activation-desktop-blocked.png'), fullPage: true }),
+      secondary.screenshot({ path: join(artifactDir, 'sound-activation-mobile-blocked.png'), fullPage: true }),
+    ]);
+    await Promise.all([
+      assertNoHorizontalOverflow(leader, 'desktop blocked activation'),
+      assertNoHorizontalOverflow(secondary, 'mobile blocked activation'),
+    ]);
+    await Promise.all([activateSounds(leader), activateSounds(secondary)]);
+    await Promise.all([
+      leader.screenshot({ path: join(artifactDir, 'sound-activation-desktop-active.png'), fullPage: true }),
+      secondary.screenshot({ path: join(artifactDir, 'sound-activation-mobile-active.png'), fullPage: true }),
+    ]);
+    await Promise.all([
+      assertNoHorizontalOverflow(leader, 'desktop active activation'),
+      assertNoHorizontalOverflow(secondary, 'mobile active activation'),
+    ]);
     ok((await audit(leader)).resumes >= 1, 'AudioContext was not resumed after the CTA interaction');
     const activeLeader = await waitForLeader([leader, secondary]);
     const standby = activeLeader === leader ? secondary : leader;
