@@ -38,6 +38,7 @@ export * from './customer';
 export * from './promotions';
 export * from './inventory';
 export * from './analytics';
+export * from './marketing-analytics';
 export * from './goals';
 export * from './campaigns';
 export * from './chat';

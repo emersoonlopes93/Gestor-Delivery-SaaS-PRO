@@ -6,6 +6,23 @@ last_verified: 2026-07-16
 verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
 ---
 
+## Fundação canônica de Marketing Analytics do cardápio
+
+Data: 2026-07-28
+
+Branch: `feat/marketing-analytics-foundation`
+
+Base: `origin/main-copy` / `fbaa2714`
+
+- A auditoria foi versionada sem alterar suas 24 seções. O drift direcionado desde `9d04645e` ficou vazio; o único delta global, `DriverSelectionModal.tsx`, foi classificado como sem impacto.
+- A ADR define analytics first-party como fonte do dashboard, separa comportamento/domínio/provider e formaliza métricas, consentimento default deny, PII, atribuição, retenção, escala, threat model e plano de PRs.
+- O contrato `schemaVersion: 1` exporta 14 eventos de browser e 3 eventos autoritativos de servidor por união discriminada e schemas Zod estritos. O envelope público não aceita `tenantId`, metadata livre, PII ou currency diferente de BRL.
+- Escopo alterado: documentação, `packages/types` e um teste contratual; Prisma, migrations, runtime, providers, dependências, lockfile e CI permanecem inalterados.
+- Gates locais finais: `pnpm lint` exit `0` (16 warnings preexistentes no storefront); `pnpm typecheck` exit `0`; `pnpm --filter @gestor/types build` exit `0`; teste focado Jest exit `0` (1 suíte, 11 testes); lint focado do teste exit `0`; `pnpm check:no-any` exit `0`; `pnpm check:features` exit `0`; `git diff --check` exit `0`.
+- `@gestor/types` não possui scripts próprios de lint ou teste. O lint raiz e o Jest existente da API foram usados, sem adicionar scripts ou dependências.
+- A validação na worktree reutilizou a instalação local existente por junctions ignoradas pelo Git; nenhum pacote foi instalado. Nenhum banco, provider, deploy ou migration foi acessado.
+- Pendente: push, Draft PR contra `main-copy` e CI. Merge e deploy permanecem proibidos neste escopo.
+
 ## Dashboard comercial premium do tenant
 
 ### Consistência de tema (pendente de prova visual autenticada)

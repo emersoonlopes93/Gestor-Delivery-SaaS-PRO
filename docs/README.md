@@ -94,6 +94,7 @@
 
 | ADR | Título |
 |-----|--------|
+| [Marketing Analytics do cardápio](./adr/marketing-analytics-foundation.md) | Fundação first-party, taxonomia, métricas, privacidade e evolução incremental |
 | [ADR-0001](./decisions/ADR-0001-multi-tenancy-strategy.md) | Estratégia de multi-tenancy |
 | [ADR-0002](./decisions/ADR-0002-feature-flags-governance.md) | Governança de feature flags |
 | [ADR-0003](./decisions/ADR-0003-redis-bullmq-requirement.md) | Redis e BullMQ como dependência condicional |
@@ -116,6 +117,7 @@
 
 | Documento | Descrição |
 |-----------|-----------|
+| [Marketing, Analytics e Desempenho do Cardápio](./audits/marketing-analytics-cardapio-audit.md) | Estado atual, lacunas, riscos e plano incremental |
 | [Inventário documental](./audits/documentation-inventory.md) | Todos os docs com estado e ação |
 | [Relatório de auditoria](./audits/documentation-audit.md) | Análise de consistência código vs docs |
 | [Contradições](./audits/contradictions.md) | Divergências documentadas |
