@@ -8,6 +8,19 @@ verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial
 
 # Handoff — Sprint 5B: Reconciliação e Operação iFood
 
+## UX de ativacao sonora
+
+Data: 2026-07-28
+Branch: `fix/notification-sound-activation-ux`
+Base: `main-copy` / `e07ed925`
+
+- Preferencia local de som permanece ativa por padrao, enquanto `AudioContext` usa estados reais e nao persistidos: `not-created`, `suspended`, `running`, `closed` e `unavailable`.
+- O banner grande pertence apenas ao primeiro mount da sessao: nao e recuperado por rota, foco, visibilitychange ou reconexao. A ativacao bem-sucedida registra a dispensa da sessao e o remove imediatamente.
+- O banner bloqueado exibe somente Ativar sons; Testar som so aparece na configuracao quando o contexto esta `running`. Erros de `resume()` viram Tentar novamente, sem expor detalhes tecnicos ao operador.
+- Mobile posiciona o CTA na parte inferior, sem cobrir header ou menu. Sidebar, eventos, deduplicacao, lideranca e browser notification leader-only permanecem inalterados.
+- Gates: lint `0`; testes web `0` (6 arquivos / 28 testes); build web `0`; typecheck raiz `0`; check:no-any `0`; check:features `0`; diff-check `0`.
+- Pendente somente a captura autenticada: API local indisponivel e `apps/api/.env` aponta para host remoto, que ficou fora do escopo. Nenhum banco remoto, provider, push, PR, merge ou deploy foi usado.
+
 ## Objetivo e estado
 
 A integração iFood agora possui inbox com claim idempotente, proteção contra eventos fora de ordem, reconciliação recorrente, classificação persistente de divergências, SLA de confirmação, endpoints SaaS Admin sanitizados, retry com linhagem/auditoria, métricas operacionais e rotação de chave AES-GCM.

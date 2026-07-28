@@ -45,9 +45,9 @@ export function hasSoundEngine(): boolean {
  * 'unavailable' quando o navegador nao suporta Web Audio API.
  * Chamadores devem verificar esse estado ao vivo — nao contar com localStorage.
  */
-export function getAudioContextState(): Exclude<NotificationAudioContextState, 'interrupted'> | 'unavailable' {
+export function getAudioContextState(): Exclude<NotificationAudioContextState, 'interrupted'> | 'not-created' | 'unavailable' {
   if (!getAudioContextCtor()) return 'unavailable';
-  if (!sharedAudioContext) return 'suspended'; // contexto ainda nao criado = suspenso implicitamente
+  if (!sharedAudioContext) return 'not-created';
   return sharedAudioContext.state as 'running' | 'suspended' | 'closed';
 }
 
