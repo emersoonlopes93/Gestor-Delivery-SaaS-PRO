@@ -128,6 +128,12 @@ Sem consentimento analytics não haverá `visitorId` persistente nem telemetria 
 
 A revogação interrompe novas emissões. Uma mudança na versão da política exige tratamento explícito; não converte consentimento antigo silenciosamente. O snapshot `{ analytics, marketing, version }` acompanha cada evento aceito. Esta é uma política técnica, não um parecer jurídico.
 
+### Implementação da fundação local (PR 0B)
+
+A fundação mínima do storefront persiste `StorefrontConsentRecordV1` somente no browser, em chave first-party separada por `StorefrontPayload.tenant.id`. `necessary` é sempre ativo; `analytics` e `marketing` começam inativos. Registro inválido, versão de política incompatível ou falha de storage volta ao default deny sem impedir compra ou navegação.
+
+Não há persistência server-side nesta fase porque ainda não existe ingestão, provider ou finalidade operacional aprovada para um registro anônimo no backend. O consent manager expõe gates para implementações futuras e converte explicitamente sua decisão para `AnalyticsConsentSnapshotV1`. A arquitetura detalhada e a classificação dos storages existentes estão no [contrato de consentimento do storefront](../contracts/storefront-consent.md).
+
 ## Contrato de eventos
 
 O contrato público está em `packages/types/src/marketing-analytics.ts`, usa `schemaVersion: 1`, união discriminada por `eventName` e schemas estritos.

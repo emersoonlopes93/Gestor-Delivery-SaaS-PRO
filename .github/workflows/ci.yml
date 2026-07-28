@@ -455,3 +455,70 @@ jobs:
               kill "$(cat "$pid_file")"
             fi
           done
+
+  storefront-consent-e2e:
+    needs: build-and-migrate
+    runs-on: ubuntu-latest
+
+    env:
+      STOREFRONT_CONSENT_E2E_WEB_URL: http://127.0.0.1:3000
+      STOREFRONT_CONSENT_E2E_ARTIFACT_DIR: qa-artifacts/storefront-consent
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build storefront
+        run: pnpm --filter @gestor/web-storefront build
+
+      - name: Start storefront
+        run: |
+          (exec pnpm --filter @gestor/web-storefront dev --host 127.0.0.1) >"$RUNNER_TEMP/storefront-consent-web.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/storefront-consent-web.pid"
+
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
+            if [ "$i" = "60" ]; then
+              echo "Readiness failed: http://127.0.0.1:3000"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Storefront consent E2E
+        run: pnpm exec ts-node --transpile-only scripts/storefront-consent-e2e.ts
+
+      - name: Upload storefront consent artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storefront-consent-e2e
+          path: |
+            qa-artifacts/storefront-consent
+            ${{ runner.temp }}/storefront-consent-web.log
+
+      - name: Cleanup storefront process
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/storefront-consent-web.pid" ] && kill -0 "$(cat "$RUNNER_TEMP/storefront-consent-web.pid")" 2>/dev/null; then
+            kill "$(cat "$RUNNER_TEMP/storefront-consent-web.pid")"
+          fi

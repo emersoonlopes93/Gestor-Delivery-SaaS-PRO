@@ -6,6 +6,12 @@ import { StorefrontShell } from '@gestor/storefront-ui';
 import { useStorefrontThemeStore } from '../stores/theme.store';
 import type { StorefrontThemeSettings } from '@gestor/theme';
 import { useDynamicManifest } from '../hooks/useDynamicManifest';
+import {
+  ConsentBanner,
+  ConsentFooterAction,
+  ConsentPreferencesDialog,
+  StorefrontConsentProvider,
+} from '../features/consent';
 
 export function StorefrontLayout() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -40,16 +46,32 @@ export function StorefrontLayout() {
 
   const effectiveTheme = {
     ...themeSettings,
-    colorMode: (storefrontTheme === 'system' 
-      ? (themeSettings.colorMode || 'light') 
+    colorMode: (storefrontTheme === 'system'
+      ? (themeSettings.colorMode || 'light')
       : storefrontTheme) as 'light' | 'dark',
   };
 
   return (
     <StorefrontShell settings={effectiveTheme} className="flex flex-col w-full min-h-screen">
-      <main className="flex-1 w-full max-w-4xl mx-auto relative z-10">
-        <Outlet />
-      </main>
+      {data?.tenant.id ? (
+        <StorefrontConsentProvider
+          key={data.tenant.id}
+          tenantKey={data.tenant.id}
+        >
+          <div className="flex min-h-screen w-full flex-col">
+            <ConsentBanner />
+            <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
+              <Outlet />
+            </main>
+            <ConsentFooterAction />
+          </div>
+          <ConsentPreferencesDialog />
+        </StorefrontConsentProvider>
+      ) : (
+        <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
+          <Outlet />
+        </main>
+      )}
     </StorefrontShell>
   );
-}
+}
