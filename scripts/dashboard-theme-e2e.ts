@@ -62,14 +62,6 @@ async function main(): Promise<void> {
 
       try {
         await page.goto(`${webUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
-        const continueLater = page.getByRole('button', { name: 'Continuar depois' }).first();
-        if (await continueLater.isVisible().catch(() => false)) {
-          await continueLater.click();
-          await page.waitForURL(/\/dashboard$/, { timeout: 10_000 });
-          browserLog.console.length = 0;
-          browserLog.pageErrors.length = 0;
-          browserLog.requestFailures.length = 0;
-        }
         await page.getByRole('button', { name: 'Abrir ações rápidas' }).waitFor({ timeout: 10_000 });
         await page.waitForFunction((expectedTheme) => document.documentElement.getAttribute('data-theme') === expectedTheme, capture.theme, { timeout: 5_000 });
         equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 4), false, `${name} has horizontal overflow`);
