@@ -547,6 +547,39 @@ async function seedDemoTenant() {
       create: { userId: owner.id, roleId: ownerRole.id },
     });
 
+    if (isEphemeralSmokeSeed) {
+      await prisma.tenantOnboarding.upsert({
+        where: { tenantId: tenant.id },
+        create: {
+          tenantId: tenant.id,
+          stepBasicInfo: true,
+          stepOperatingHours: true,
+          stepLogo: true,
+          stepAddress: true,
+          stepDelivery: true,
+          stepPayments: true,
+          stepWhatsapp: true,
+          stepMenu: true,
+          stepCatalog: true,
+          stepFirstOrder: true,
+          completedAt: new Date(),
+        },
+        update: {
+          stepBasicInfo: true,
+          stepOperatingHours: true,
+          stepLogo: true,
+          stepAddress: true,
+          stepDelivery: true,
+          stepPayments: true,
+          stepWhatsapp: true,
+          stepMenu: true,
+          stepCatalog: true,
+          stepFirstOrder: true,
+          completedAt: new Date(),
+        },
+      });
+    }
+
     console.log(`   👤 Demo tenant created: ${tenant.name}`);
     console.log(`   👤 Tenant owner: ${ownerEmail}`);
 

@@ -68,4 +68,17 @@ describe('OperationsDashboard', () => {
     expect(html).toContain('Comparação indisponível');
     expect(html).not.toContain('Ãƒ');
   });
+  it('uses explicit light and dark theme pairs for the store status card', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <OperationsDashboard current={overview} previous={null} storeStatus="closed" tenantSlug="demo" onCopyMenu={() => undefined} onRefresh={() => undefined} refreshing={false} periodLabel="hoje" />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain('border-slate-200 bg-white');
+    expect(html).toContain('dark:border-slate-800 dark:bg-slate-900');
+    expect(html).toContain('text-slate-900 dark:text-slate-100');
+    expect(html).toContain('Loja fechada');
+    expect(html).not.toContain('bg-slate-950');
+  });
 });

@@ -126,30 +126,30 @@ export function OperationsDashboard({
         </div>
       ) : null}
 
-      <section aria-label="Pulso da operação" className="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950 px-4 py-4 text-white shadow-[0_18px_45px_-28px_rgba(15,23,42,0.9)] sm:px-5">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-60 w-60 rounded-full bg-indigo-500/15 blur-3xl" />
+      <section aria-label="Pulso da operação" className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:px-5">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-60 w-60 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/15" />
         <div className="relative grid items-center gap-4 lg:grid-cols-[1.2fr_auto_1fr]">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-              <Store className="h-5 w-5 text-slate-200" aria-hidden="true" />
-              <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-slate-950 ${status.tone}`} />
+            <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+              <Store className="h-5 w-5 text-slate-700 dark:text-slate-200" aria-hidden="true" />
+              <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-slate-900 ${status.tone}`} />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold">{status.label}</p>
-              <p className="truncate text-xs text-slate-400">{status.detail}</p>
+              <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{status.label}</p>
+              <p className="truncate text-xs text-slate-600 dark:text-slate-400">{status.detail}</p>
             </div>
           </div>
-          <div className="hidden h-9 w-px bg-white/10 lg:block" />
+          <div className="hidden h-9 w-px bg-slate-200 dark:bg-slate-700 lg:block" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Fluxo {periodLabel}</p>
-              <p className="mt-1 text-base font-bold tabular-nums">{total} <span className="text-xs font-medium text-slate-400">pedidos</span></p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Fluxo {periodLabel}</p>
+              <p className="mt-1 text-base font-bold tabular-nums text-slate-900 dark:text-slate-100">{total} <span className="text-xs font-medium text-slate-600 dark:text-slate-400">pedidos</span></p>
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Atenção</p>
-              <p className={`mt-1 text-base font-bold tabular-nums ${pending > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>{pending} <span className="text-xs font-medium text-slate-400">aguardando</span></p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Atenção</p>
+              <p className={`mt-1 text-base font-bold tabular-nums ${pending > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{pending} <span className="text-xs font-medium text-slate-600 dark:text-slate-400">aguardando</span></p>
             </div>
-            <Link to={pending > 0 ? '/orders' : storeStatus === 'open' ? '/orders' : '/settings'} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold transition hover:border-indigo-400/50 hover:bg-indigo-500/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 sm:col-span-1">
+            <Link to={pending > 0 ? '/orders' : storeStatus === 'open' ? '/orders' : '/settings'} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:border-indigo-400 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/15 dark:focus:ring-indigo-400 dark:focus:ring-offset-slate-900 sm:col-span-1">
               {pending > 0 ? 'Ver fila' : storeStatus === 'open' ? 'Ver pedidos' : 'Ajustar operação'}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>

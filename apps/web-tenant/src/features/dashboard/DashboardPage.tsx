@@ -11,6 +11,9 @@ import {
 import { DashboardSkeleton } from './components/DashboardSkeleton';
 import { OperationsDashboard } from './components/OperationsDashboard';
 
+export const DASHBOARD_ACTION_MENU_ITEM_CLASS = 'block rounded-lg px-3 py-2 font-semibold transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring dark:hover:bg-slate-800';
+export const DASHBOARD_ACTION_MENU_DISABLED_CLASS = 'block w-full rounded-lg px-3 py-2 text-left font-semibold transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-70 dark:hover:bg-slate-800 dark:disabled:text-slate-400';
+
 function greeting(now = new Date()) {
   const hour = now.getHours();
   if (hour < 12) return 'Bom dia';
@@ -78,7 +81,7 @@ export function DashboardPage() {
             type="button"
             onClick={() => void overview.refetch()}
             disabled={overview.isLoading}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-card transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-card transition hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Atualizar dashboard"
           >
             <RefreshCw className={`h-4 w-4 ${overview.isLoading ? 'animate-spin' : ''}`} />
@@ -89,17 +92,17 @@ export function DashboardPage() {
               onClick={() => setActionsOpen((open) => !open)}
               aria-expanded={actionsOpen}
               aria-label="Abrir ações rápidas"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-background transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
             {actionsOpen ? (
-              <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-xs shadow-dropdown">
-                <Link to="/orders" className="block rounded-lg px-3 py-2 font-semibold hover:bg-accent" onClick={() => setActionsOpen(false)}>Abrir pedidos</Link>
-                <Link to="/cash" className="block rounded-lg px-3 py-2 font-semibold hover:bg-accent" onClick={() => setActionsOpen(false)}>Abrir caixa</Link>
-                <Link to="/catalog/products" className="block rounded-lg px-3 py-2 font-semibold hover:bg-accent" onClick={() => setActionsOpen(false)}>Gerenciar produtos</Link>
-                <Link to="/settings" className="block rounded-lg px-3 py-2 font-semibold hover:bg-accent" onClick={() => setActionsOpen(false)}>Configurar loja</Link>
-                {menuUrl ? <button type="button" onClick={() => { setActionsOpen(false); void copyMenu(); }} className="block w-full rounded-lg px-3 py-2 text-left font-semibold hover:bg-accent">Copiar link do cardápio</button> : null}
+              <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-slate-900 shadow-dropdown dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
+                <Link to="/orders" className={DASHBOARD_ACTION_MENU_ITEM_CLASS} onClick={() => setActionsOpen(false)}>Abrir pedidos</Link>
+                <Link to="/cash" className={DASHBOARD_ACTION_MENU_ITEM_CLASS} onClick={() => setActionsOpen(false)}>Abrir caixa</Link>
+                <Link to="/catalog/products" className={DASHBOARD_ACTION_MENU_ITEM_CLASS} onClick={() => setActionsOpen(false)}>Gerenciar produtos</Link>
+                <Link to="/settings" className={DASHBOARD_ACTION_MENU_ITEM_CLASS} onClick={() => setActionsOpen(false)}>Configurar loja</Link>
+                {menuUrl ? <button type="button" onClick={() => { setActionsOpen(false); void copyMenu(); }} className={DASHBOARD_ACTION_MENU_DISABLED_CLASS}>Copiar link do cardápio</button> : null}
               </div>
             ) : null}
           </div>
