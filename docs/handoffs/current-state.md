@@ -44,8 +44,9 @@ DEFERIDO PARA MARCO 2 FINAL: Playwright, screenshots, light/dark/mobile,
 validação visual do dashboard, teste de carga amplo, p95 de produção,
 comparação manual de todas as métricas e GA4/Meta/Ads.
 
-Status: implementação e gates locais concluídos; Draft PR e CI do SHA publicado
-ainda pendentes neste ponto do handoff.
+Status: implementação e gates locais concluídos. Draft PR #30 publicada contra
+`main-copy`; code head validado `bdb791ed`. CI do SHA final da documentação
+ainda pendente neste ponto do handoff. Nenhum merge ou deploy realizado.
 
 ---
 
