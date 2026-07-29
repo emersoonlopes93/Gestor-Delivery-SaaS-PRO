@@ -81,6 +81,9 @@ jobs:
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
 
+      - name: Test consolidated milestone 1 analytics validation
+        run: pnpm --filter @gestor/api test -- src/analytics/milestone-1-consolidated-analytics.spec.ts
+
   smoke-with-ephemeral-seed:
     needs: build-and-migrate
     runs-on: ubuntu-latest

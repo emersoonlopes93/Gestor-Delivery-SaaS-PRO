@@ -6,6 +6,7 @@ import {
   Logger,
   Inject,
   forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
@@ -48,6 +49,7 @@ import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-
 import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
 import { canAutoAcceptOrder } from './order-auto-accept.policy';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
+import { AuthoritativeOrderAnalyticsService } from '../analytics/authoritative-order-analytics.service';
 
 @Injectable()
 export class OrdersService {
@@ -174,6 +176,7 @@ export class OrdersService {
     @Inject(forwardRef(() => MarketplaceStatusSyncService))
     private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
     private readonly pushService: PushService,
+    @Optional() private readonly authoritativeOrderAnalyticsService?: AuthoritativeOrderAnalyticsService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -1166,6 +1169,15 @@ export class OrdersService {
         tx,
       });
 
+      await this.authoritativeOrderAnalyticsService?.recordOrderStatusEvent({
+        tenantId,
+        orderId,
+        orderStatus: nextStatus,
+        orderTotal: order.total,
+        occurredAt: new Date(),
+        tx,
+      });
+
       // Emitir via Socket para o storefront (tempo real)
       if (order.publicTrackingToken) {
         this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, order.orderNumber, nextStatus, dto.note);
@@ -1273,6 +1285,15 @@ export class OrdersService {
       actorType: 'tenant_user',
       actorId,
       reason: 'Venda finalizada via PDV.',
+      tx,
+    });
+
+    await this.authoritativeOrderAnalyticsService?.recordOrderStatusEvent({
+      tenantId,
+      orderId,
+      orderStatus: OrderStatus.confirmed,
+      orderTotal: order.total,
+      occurredAt: new Date(),
       tx,
     });
 

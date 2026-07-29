@@ -1,5 +1,22 @@
 ---
 
+## Marco 1 — PR 1C eventos autoritativos de pedido (Draft publicada)
+
+Data: 2026-07-29
+Branch: `feat/order-analytics-authoritative`
+Base: `feat/storefront-analytics-dispatcher` / `31de6fbf76505e08f9de0d969780f3c09d36cc4a`
+
+- O backend origina `order_confirmed`, `order_completed` e `order_cancelled` no serviço central de transição e no caminho de confirmação de PDV.
+- Cada evento é gravado na mesma transação do pedido, é `source: server`, tenant-scoped, sem dependência do browser e sem PII.
+- O `eventId` é determinístico por `(tenantId, orderId, eventName)` e usa `skipDuplicates`, protegendo reprocessamentos sem duplicidade.
+- Eventos usam `schemaVersion: 1`, `sessionId` técnico não persistente de browser, `consentAnalytics: true`, `consentMarketing: false` e valor/currency do pedido.
+- Testes focados de analytics passaram: 2 suítes / 10 testes. API build e lint passaram. O teste legado de atomicidade não iniciou por resolução de `@gestor/core` na worktree isolada; não houve falha funcional observada nesse caminho.
+- Nenhuma migration, alteração de schema, provider, dependência, lockfile, banco remoto, merge ou deploy foi realizado.
+
+Status: PR #29 Draft publicada; validação consolidada local passou em 1 suíte / 3 testes. Novo SHA aguarda CI remoto. Nenhum merge ou deploy realizado.
+
+---
+
 ## Marco 1 — PR 1B storefront analytics dispatcher (Draft local)
 
 Data: 2026-07-29
