@@ -34,6 +34,7 @@ model Tenant {
   paymentTransactions            PaymentTransaction[]
   TenantSubscription             TenantSubscription?
   aiAgentConfig                  AiAgentConfig?
+  analyticsEvents                AnalyticsEvent[]
   auditLogs                      AuditLog[]
   baseMenuImportLogs             BaseMenuImportLog[]
   billingCycles                  BillingCycleRecord[]
@@ -138,6 +139,46 @@ model Tenant {
   pushSubscriptions              PushSubscription[]
 
   @@map("tenants")
+}
+
+model AnalyticsEvent {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  eventId          String   @map("event_id") @db.VarChar(128)
+  schemaVersion    Int      @map("schema_version")
+  eventName        String   @map("event_name") @db.VarChar(64)
+  source           String   @db.VarChar(16)
+  occurredAt       DateTime @map("occurred_at")
+  receivedAt       DateTime @map("received_at")
+  sessionId        String   @map("session_id") @db.VarChar(128)
+  visitorId        String?  @map("visitor_id") @db.VarChar(128)
+  categoryId       String?  @map("category_id") @db.VarChar(128)
+  productId        String?  @map("product_id") @db.VarChar(128)
+  orderId          String?  @map("order_id") @db.VarChar(128)
+  pagePath         String?  @map("page_path") @db.VarChar(512)
+  landingPath      String?  @map("landing_path") @db.VarChar(512)
+  referrerHost     String?  @map("referrer_host") @db.VarChar(253)
+  utmSource        String?  @map("utm_source") @db.VarChar(100)
+  utmMedium        String?  @map("utm_medium") @db.VarChar(100)
+  utmCampaign      String?  @map("utm_campaign") @db.VarChar(100)
+  utmContent       String?  @map("utm_content") @db.VarChar(100)
+  utmTerm          String?  @map("utm_term") @db.VarChar(100)
+  quantity         Int?
+  itemCount        Int?     @map("item_count")
+  unitPrice        Decimal? @map("unit_price") @db.Decimal(14, 2)
+  value            Decimal? @db.Decimal(16, 2)
+  currency         String?  @db.VarChar(3)
+  consentAnalytics Boolean  @map("consent_analytics")
+  consentMarketing Boolean  @map("consent_marketing")
+  createdAt        DateTime @default(now()) @map("created_at")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, eventId])
+  @@index([tenantId, eventName, occurredAt])
+  @@index([tenantId, sessionId, occurredAt])
+  @@index([tenantId, productId, eventName, occurredAt])
+  @@index([tenantId, orderId, eventName, occurredAt])
+  @@map("analytics_events")
 }
 
 model AuditLog {
