@@ -1,6 +1,6 @@
 ---
 
-## PR 1A — ingestão segura de eventos de analytics (bloqueada)
+## PR 1A — ingestão segura de eventos de analytics (Draft publicada, CI verde)
 
 Data: 2026-07-29
 Branch: `feat/analytics-event-ingestion`
@@ -9,8 +9,9 @@ Base: `origin/main-copy` / `f41d488d`
 - Adicionados o modelo tenant-scoped `AnalyticsEvent`, migration explícita `20260729120000_add_analytics_event_ingestion` e índice único `(tenantId, eventId)`.
 - A rota pública proposta é `POST /public/storefront/:slug/analytics/events`. Ela resolve o tenant somente pelo slug, usa o contrato Zod v1 estrito, aceita no máximo 20 eventos, aplica o consent gate, restringe eventos a browser, valida referências por `tenantId`, limita timestamps e usa `createMany(skipDuplicates)` para deduplicação protegida pelo banco.
 - Testes focados passaram: contrato e serviço de ingestão, 2 suites / 16 testes. Lint da API passou.
-- Não houve alteração do runtime do storefront, provider, dashboard, dependências, lockfile, banco remoto, migration de produção, deploy, push, PR ou merge.
-- Bloqueadores para criar Draft PR: Docker Desktop não está em execução, impedindo a migration PostgreSQL efêmera; build da API e typecheck global excederam o limite local de 120s sem exit code de conclusão. Reexecutar os três gates com ambiente local saudável antes de aprovar ou publicar.
+- Não houve alteração do runtime do storefront, provider, dashboard, dependências, lockfile, banco remoto, migration de produção, merge ou deploy.
+- A Draft PR #27 foi publicada com head `e172543b`. A CI validou `build-and-migrate`, `Ephemeral PostgreSQL proof`, `smoke-with-ephemeral-seed`, typecheck/build incluídos nos quality gates e os checks globais, todos com sucesso. Estado da PR: `OPEN`, `Draft`, `CLEAN`.
+- Os gates locais de migration, build e typecheck permanecem inconclusivos por Docker indisponível/limite de 120s, mas foram substituídos pela validação equivalente da CI.
 
 ### Contrato para PR 1B (somente após a PR 1A verde)
 
@@ -19,6 +20,7 @@ Base: `origin/main-copy` / `f41d488d`
 - response: `{ accepted, duplicates, ignored }`
 - consent rule: `analytics=false` retorna sucesso estável e não persiste
 - branch base: `feat/analytics-event-ingestion`
+- HEAD SHA: `e172543b5b21401a99169e0faeced7a29d79bcc9`
 
 title: Handoff — Sprint 5B Reconciliação e Operação iFood
 status: current
