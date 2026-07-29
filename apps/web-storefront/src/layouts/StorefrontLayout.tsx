@@ -12,6 +12,7 @@ import {
   ConsentPreferencesDialog,
   StorefrontConsentProvider,
 } from '../features/consent';
+import { AnalyticsProvider } from '../features/analytics';
 
 export function StorefrontLayout() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -58,14 +59,16 @@ export function StorefrontLayout() {
           key={data.tenant.id}
           tenantKey={data.tenant.id}
         >
-          <div className="flex min-h-screen w-full flex-col">
-            <ConsentBanner />
-            <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
-              <Outlet />
-            </main>
-            <ConsentFooterAction />
-          </div>
-          <ConsentPreferencesDialog />
+          <AnalyticsProvider tenantSlug={tenantSlug ?? data.tenant.id}>
+            <div className="flex min-h-screen w-full flex-col">
+              <ConsentBanner />
+              <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
+                <Outlet />
+              </main>
+              <ConsentFooterAction />
+            </div>
+            <ConsentPreferencesDialog />
+          </AnalyticsProvider>
         </StorefrontConsentProvider>
       ) : (
         <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
