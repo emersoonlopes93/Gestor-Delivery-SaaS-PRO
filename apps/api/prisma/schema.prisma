@@ -34,6 +34,7 @@ model Tenant {
   paymentTransactions            PaymentTransaction[]
   TenantSubscription             TenantSubscription?
   aiAgentConfig                  AiAgentConfig?
+  analyticsDailyAggregates       AnalyticsDailyAggregate[]
   analyticsEvents                AnalyticsEvent[]
   auditLogs                      AuditLog[]
   baseMenuImportLogs             BaseMenuImportLog[]
@@ -179,6 +180,33 @@ model AnalyticsEvent {
   @@index([tenantId, productId, eventName, occurredAt])
   @@index([tenantId, orderId, eventName, occurredAt])
   @@map("analytics_events")
+}
+
+model AnalyticsDailyAggregate {
+  id                  String   @id
+  tenantId            String   @map("tenant_id")
+  bucketDate          DateTime @map("bucket_date") @db.Date
+  timezone            String   @db.VarChar(64)
+  eventName           String   @map("event_name") @db.VarChar(64)
+  dimensionType       String   @map("dimension_type") @db.VarChar(32)
+  dimensionKey        String   @map("dimension_key") @db.VarChar(128)
+  eventCount          Int      @map("event_count")
+  uniqueSessions      Int      @map("unique_sessions")
+  valueSum            Decimal  @default(0) @map("value_sum") @db.Decimal(20, 2)
+  quantitySum         Int      @default(0) @map("quantity_sum")
+  itemCountSum        Int      @default(0) @map("item_count_sum")
+  firstOccurredAt     DateTime @map("first_occurred_at")
+  lastOccurredAt      DateTime @map("last_occurred_at")
+  computedAt          DateTime @map("computed_at")
+  sourceMaxReceivedAt DateTime @map("source_max_received_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, bucketDate, eventName, dimensionType, dimensionKey], map: "analytics_daily_aggregates_scope_key")
+  @@index([tenantId, bucketDate, eventName], map: "analytics_daily_aggregates_tenant_date_event_idx")
+  @@index([tenantId, bucketDate, dimensionType, dimensionKey], map: "analytics_daily_aggregates_tenant_date_dimension_idx")
+  @@map("analytics_daily_aggregates")
 }
 
 model AuditLog {
