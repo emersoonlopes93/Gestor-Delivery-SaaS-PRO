@@ -1,6 +1,6 @@
 ---
 
-## Marco 1 — PR 1C eventos autoritativos de pedido (implementação local)
+## Marco 1 — PR 1C eventos autoritativos de pedido (Draft publicada)
 
 Data: 2026-07-29
 Branch: `feat/order-analytics-authoritative`
@@ -13,7 +13,7 @@ Base: `feat/storefront-analytics-dispatcher` / `31de6fbf76505e08f9de0d969780f3c0
 - Testes focados de analytics passaram: 2 suítes / 10 testes. API build e lint passaram. O teste legado de atomicidade não iniciou por resolução de `@gestor/core` na worktree isolada; não houve falha funcional observada nesse caminho.
 - Nenhuma migration, alteração de schema, provider, dependência, lockfile, banco remoto, merge ou deploy foi realizado.
 
-Status: pronto para commit/push após revisão final do diff.
+Status: PR #29 Draft publicada no SHA `632c980a`; CI remoto em andamento. Nenhum merge ou deploy realizado.
 
 ---
 
