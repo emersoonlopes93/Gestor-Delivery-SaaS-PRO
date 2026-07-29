@@ -13,7 +13,7 @@ Base: `feat/storefront-analytics-dispatcher` / `31de6fbf76505e08f9de0d969780f3c0
 - Testes focados de analytics passaram: 2 suítes / 10 testes. API build e lint passaram. O teste legado de atomicidade não iniciou por resolução de `@gestor/core` na worktree isolada; não houve falha funcional observada nesse caminho.
 - Nenhuma migration, alteração de schema, provider, dependência, lockfile, banco remoto, merge ou deploy foi realizado.
 
-Status: PR #29 Draft publicada no SHA `632c980a`; CI remoto em andamento. Nenhum merge ou deploy realizado.
+Status: PR #29 Draft publicada; validação consolidada local passou em 1 suíte / 3 testes. Novo SHA aguarda CI remoto. Nenhum merge ou deploy realizado.
 
 ---
 
