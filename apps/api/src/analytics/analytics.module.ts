@@ -8,11 +8,13 @@ import { RbacModule } from '../rbac/rbac.module';
 import { CrmModule } from '../crm/crm.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
 import { BusinessIntelligenceService } from './business-intelligence.service';
+import { AnalyticsIngestionController } from './analytics-ingestion.controller';
+import { AnalyticsIngestionService } from './analytics-ingestion.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule, forwardRef(() => CrmModule), forwardRef(() => CampaignsModule)],
-  controllers: [AnalyticsController],
-  providers: [AnalyticsService, BusinessInsightsService, BusinessIntelligenceService],
+  controllers: [AnalyticsController, AnalyticsIngestionController],
+  providers: [AnalyticsService, BusinessInsightsService, BusinessIntelligenceService, AnalyticsIngestionService],
   exports: [AnalyticsService, BusinessInsightsService, BusinessIntelligenceService],
 })
 export class AnalyticsModule {}
