@@ -27,6 +27,7 @@ import { CashbackSelector } from '../components/CashbackSelector';
 import { SchedulingSelector } from '../components/SchedulingSelector';
 import { CardPayment } from '../components/CardPayment';
 import { maskPhone, maskCEP, unmask } from '@gestor/utils';
+import { useAnalytics } from '../features/analytics';
 
 interface MercadoPagoCardFormData {
   token: string;
@@ -46,6 +47,7 @@ export function CheckoutPage() {
   const tableId = useCartStore(s => s.tableId);
   const clearCart = useCartStore(s => s.clearCart);
   const setCartTenantSlug = useCartStore(s => s.setTenantSlug);
+  const analytics = useAnalytics();
 
   const { customer, isLoggedIn, setTenantSlug } = useCustomerStore();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -489,6 +491,7 @@ export function CheckoutPage() {
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
       hasCompletedCheckoutRef.current = true;
+      analytics.track('order_submitted', { orderId: res.data.id, itemCount: items.length, value: subtotal });
       clearCart();
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
     } catch (err: unknown) {
@@ -563,6 +566,7 @@ export function CheckoutPage() {
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
       hasCompletedCheckoutRef.current = true;
+      analytics.track('order_submitted', { orderId: res.data.id, itemCount: items.length, value: subtotal });
       clearCart();
       const summaryIdentifier = res.data.publicTrackingToken || res.data.id;
       

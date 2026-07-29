@@ -1,5 +1,23 @@
 ---
 
+## Marco 1 — PR 1B storefront analytics dispatcher (Draft local)
+
+Data: 2026-07-29
+Branch: `feat/storefront-analytics-dispatcher`
+Base: `feat/analytics-event-ingestion` / `bdd194d7162645dc69042a9012a4fecd23cf53f5`
+
+- Reutiliza `AnalyticsEventEnvelopeV1`, `AnalyticsConsentSnapshotV1`, a taxonomia browser e o consent manager canônicos.
+- Implementa sessão efêmera tenant-scoped em `sessionStorage`, rotação após 30 minutos, fallback em memória e limpeza por tenant na revogação; não adiciona visitorId, fingerprint ou fila persistente.
+- Implementa dispatcher first-party com validação Zod v1, lotes de até 20, flush curto, retry limitado preservando eventId e descarte seguro em revogação.
+- Instrumenta menu, seleção/detalhe de produto, add/remove, abertura do carrinho, início do checkout e submissão somente após resposta 2xx. Não envia tenantId, PII ou metadata irrestrita.
+- Alterações limitadas ao storefront e testes focados; Prisma, migration da 1A, API, providers, dependências e lockfile não foram alterados.
+- Gates locais: types build, storefront lint, storefront tests (6 arquivos / 32 testes), storefront build, typecheck, check:no-any, check:features e diff-check passaram. Lint mantém 17 warnings preexistentes, sem erros.
+- Playwright completo, dois tenants no navegador, offline real, screenshots, carga, funil consolidado e eventos autoritativos da PR 1C permanecem deferidos para o Marco 1 final.
+
+Status operacional: branch ainda não publicada; nenhum merge, deploy ou acesso a banco remoto realizado.
+
+---
+
 ## PR 1A — ingestão segura de eventos de analytics (Draft publicada, CI verde)
 
 Data: 2026-07-29
@@ -10,7 +28,7 @@ Base: `origin/main-copy` / `f41d488d`
 - A rota pública proposta é `POST /public/storefront/:slug/analytics/events`. Ela resolve o tenant somente pelo slug, usa o contrato Zod v1 estrito, aceita no máximo 20 eventos, aplica o consent gate, restringe eventos a browser, valida referências por `tenantId`, limita timestamps e usa `createMany(skipDuplicates)` para deduplicação protegida pelo banco.
 - Testes focados passaram: contrato e serviço de ingestão, 2 suites / 16 testes. Lint da API passou.
 - Não houve alteração do runtime do storefront, provider, dashboard, dependências, lockfile, banco remoto, migration de produção, merge ou deploy.
-- A Draft PR #27 foi publicada com head `e172543b`. A CI validou `build-and-migrate`, `Ephemeral PostgreSQL proof`, `smoke-with-ephemeral-seed`, typecheck/build incluídos nos quality gates e os checks globais, todos com sucesso. Estado da PR: `OPEN`, `Draft`, `CLEAN`.
+- A Draft PR #27 foi validada no head real `bdd194d7162645dc69042a9012a4fecd23cf53f5`. A CI validou `build-and-migrate`, `Ephemeral PostgreSQL proof`, `smoke-with-ephemeral-seed`, typecheck/build incluídos nos quality gates e os checks globais, todos com sucesso. Estado da PR: `OPEN`, `Draft`, `CLEAN`.
 - Os gates locais de migration, build e typecheck permanecem inconclusivos por Docker indisponível/limite de 120s, mas foram substituídos pela validação equivalente da CI.
 
 ### Contrato para PR 1B (somente após a PR 1A verde)
@@ -20,7 +38,7 @@ Base: `origin/main-copy` / `f41d488d`
 - response: `{ accepted, duplicates, ignored }`
 - consent rule: `analytics=false` retorna sucesso estável e não persiste
 - branch base: `feat/analytics-event-ingestion`
-- HEAD SHA: `e172543b5b21401a99169e0faeced7a29d79bcc9`
+- HEAD SHA: `bdd194d7162645dc69042a9012a4fecd23cf53f5`
 
 title: Handoff — Sprint 5B Reconciliação e Operação iFood
 status: current
