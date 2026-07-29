@@ -23,6 +23,15 @@ jobs:
           --health-interval=10s 
           --health-timeout=5s 
           --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     env:
       NODE_ENV: test
@@ -30,6 +39,8 @@ jobs:
       API_PREFIX: /api/v1
       DATABASE_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
       DIRECT_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      ANALYTICS_ROLLUP_POSTGRES_TEST: "true"
+      ANALYTICS_ROLLUP_REDIS_TEST_URL: redis://localhost:6379
       JWT_SECRET: test-jwt-secret-change-me-please
       JWT_REFRESH_SECRET: test-refresh-secret-change-me-please
       JWT_EXPIRES_IN: 15m
@@ -80,6 +91,9 @@ jobs:
 
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
+
+      - name: Test analytics deterministic rollups with ephemeral PostgreSQL and Redis
+        run: pnpm --filter @gestor/api test -- src/analytics/analytics-rollup src/analytics/analytics-retention
 
       - name: Test consolidated milestone 1 analytics validation
         run: pnpm --filter @gestor/api test -- src/analytics/milestone-1-consolidated-analytics.spec.ts

@@ -403,3 +403,37 @@ export type AnalyticsEventMetricsV1 =
   | z.infer<typeof cartMetricsSchema>
   | z.infer<typeof resultMetricsSchema>
   | z.infer<typeof serverOrderMetricsSchema>;
+
+export const ANALYTICS_ROLLUP_QUEUE = 'analytics-rollup' as const;
+export const ANALYTICS_DAILY_ROLLUP_JOB = 'analytics.daily-rollup' as const;
+
+export const ANALYTICS_AGGREGATE_DIMENSION_TYPES = [
+  'overall',
+  'product',
+  'category',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+] as const;
+
+export type AnalyticsAggregateDimensionType =
+  (typeof ANALYTICS_AGGREGATE_DIMENSION_TYPES)[number];
+
+export const ANALYTICS_ROLLUP_REASONS = [
+  'scheduled',
+  'backfill',
+  'late-event-recompute',
+] as const;
+
+export const AnalyticsRollupJobV1Schema = z
+  .object({
+    tenantId: opaqueIdSchema,
+    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    timezone: z.string().min(1).max(64),
+    reason: z.enum(ANALYTICS_ROLLUP_REASONS),
+    requestedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export type AnalyticsRollupJobV1 = z.infer<typeof AnalyticsRollupJobV1Schema>;

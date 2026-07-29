@@ -36,6 +36,7 @@
     "check:features": "node scripts/check-stub-features.js",
     "smoke:p1": "pnpm -C apps/api smoke:p1",
     "smoke:media": "pnpm -C apps/api smoke:media",
+    "analytics:rollup-backfill": "pnpm -C apps/api analytics:rollup-backfill",
     "qa:visual": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts",
     "qa:visual:update": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts"
   },
