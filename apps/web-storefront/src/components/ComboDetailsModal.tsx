@@ -7,6 +7,7 @@ import type {
   StorefrontComboBlockItemPayload
 } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
+import { useAnalytics } from '../features/analytics';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -21,6 +22,7 @@ interface ComboDetailsModalProps {
 }
 
 export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetailsModalProps) {
+  const analytics = useAnalytics();
   const addItem = useCartStore(s => s.addItem);
   const isBundle = (combo.comboMode ?? 'bundle') === 'bundle';
   const [quantity, setQuantity] = useState(1);
@@ -130,6 +132,12 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       bundleItems: isBundle ? combo.bundleItems.map(bi => ({ ...bi, name: bi.productName })) : undefined,
       computedUnitPrice: computed.unitPrice,
       compositionLabel: computed.compositionLabel
+    });
+    analytics.track('add_to_cart', {
+      productId: combo.id,
+      quantity,
+      unitPrice: computed.unitPrice,
+      value: computed.totalPrice,
     });
     
     onClose();

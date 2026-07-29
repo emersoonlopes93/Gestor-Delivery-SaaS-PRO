@@ -17,6 +17,7 @@ import {
 } from '@gestor/utils';
 import { api } from '../lib/api-client';
 import { useCartStore } from '../store/use-cart-store';
+import { useAnalytics } from '../features/analytics';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -46,6 +47,7 @@ type PizzaPreview = {
 };
 
 export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, isStoreClosed, onClose }: ProductDetailsModalProps) {
+  const analytics = useAnalytics();
   const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
@@ -384,6 +386,12 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       pizzaComposition,
       computedUnitPrice: computed.unitPrice,
       compositionLabel: computed.compositionLabel,
+    });
+    analytics.track('add_to_cart', {
+      productId: product.id,
+      quantity,
+      unitPrice: computed.unitPrice,
+      value: computed.totalPrice,
     });
 
     onClose();

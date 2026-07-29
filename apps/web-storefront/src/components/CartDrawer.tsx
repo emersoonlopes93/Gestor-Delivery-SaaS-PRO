@@ -2,6 +2,7 @@ import { X, Trash2, ShoppingBag, Plus, Minus, ChevronRight, Sparkles } from 'luc
 import { useCartStore } from '../store/use-cart-store';
 import { useNavigate, useParams } from 'react-router-dom';
 import { StorefrontUpsellPayload, StorefrontUpsellItemPayload, StorefrontProductPayload } from '@gestor/types';
+import { useAnalytics } from '../features/analytics';
 
 interface CartDrawerProps {
   onClose: () => void;
@@ -13,8 +14,10 @@ export function CartDrawer({ onClose, upsells, minimumOrderValue }: CartDrawerPr
   const { items, subtotal, addItem, removeItem, updateQuantity } = useCartStore();
   const navigate = useNavigate();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const analytics = useAnalytics();
 
   const handleCheckout = () => {
+    analytics.track('checkout_started', { itemCount: items.length, value: subtotal });
     onClose();
     navigate(`/${tenantSlug}/checkout`);
   };
@@ -135,7 +138,15 @@ export function CartDrawer({ onClose, upsells, minimumOrderValue }: CartDrawerPr
                   </div>
                   
                   <button 
-                    onClick={() => removeItem(item.cartLineId)}
+                    onClick={() => {
+                      removeItem(item.cartLineId);
+                      analytics.track('remove_from_cart', {
+                        productId: item.productId ?? item.comboId ?? item.cartLineId,
+                        quantity: item.quantity,
+                        unitPrice: item.snapshot.lineSubtotal / item.quantity,
+                        value: item.snapshot.lineSubtotal,
+                      });
+                    }}
                     className="text-gray-400 hover:text-red-500 transition-colors p-1"
                   >
                     <Trash2 className="w-4 h-4" />
