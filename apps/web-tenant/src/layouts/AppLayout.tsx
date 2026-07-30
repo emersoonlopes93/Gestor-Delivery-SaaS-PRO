@@ -189,6 +189,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'analytics-reports', label: 'Relatórios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
       { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED', featureKey: 'bi_advanced' },
+      { id: 'analytics-performance', label: 'Desempenho', to: '/analytics/performance', icon: BarChart3, permission: 'reports.read', match: (p) => p === '/analytics/performance' },
       { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS', featureKey: 'goals' },
     ],
   },
