@@ -38,6 +38,7 @@ export * from './customer';
 export * from './promotions';
 export * from './inventory';
 export * from './analytics';
+export * from './analytics-performance';
 export * from './marketing-analytics';
 export * from './storefront-consent';
 export * from './goals';
