@@ -10,6 +10,7 @@ Atualmente operamos com as seguintes filas canônicas:
 |------|------------|-----------------|----------|-----------------------|
 | `campaign-dispatch` | Disparo e automação de campanhas via WhatsApp | `system-feed-queue`, `system-automation-scan`, (default/dispatch) | `CampaignProcessor` | Sim (verificar status prévio e cooldown/opt-out) |
 | `marketplace-event-ingest` | Ingestão, polling e sincronização de eventos externos | `order-status-sync`, `event-inbox-process`, `operation-reconciliation-scan`, `ifood-polling-scan`, `ifood-poll-connection` | `MarketplaceEventProcessor` | Sim (`MarketplaceOperation`, inbox, telemetria e constraints) |
+| `analytics-rollup` | Recomposição diária tenant-scoped de eventos first-party | `analytics.daily-rollup` | `AnalyticsRollupProcessor` | Sim (job ID, advisory lock e replace transacional) |
 | `orders` | (Reservada) Confirmações automáticas, KDS, Spooler | (Reservada) | (A ser implementado) | Sim |
 
 ## 2. Configurações Globais (Defaults)
@@ -28,6 +29,13 @@ backoff exponencial iniciado em 10 segundos e IDs determinísticos por dispatch.
 módulo só registra producer e worker quando `REDIS_ENABLED`, `BULLMQ_ENABLED` e
 `CAMPAIGNS_DISPATCH_ENABLED` permitem a fila. Um dispatch já persistido como
 `sent`, `delivered`, `read`, `replied` ou `opt_out` não volta a chamar o provider.
+
+`analytics-rollup` usa 3 tentativas, backoff exponencial iniciado em 5 segundos
+e concorrência 2. A fila só é registrada com Redis/BullMQ e
+`ANALYTICS_ROLLUP_ENABLED=true`; o scheduler também exige
+`ANALYTICS_ROLLUP_SCHEDULER_ENABLED=true` e nunca inicia em `NODE_ENV=test`.
+Detalhes de grão, janela tardia e backfill estão em
+[`analytics-rollups.md`](./analytics-rollups.md).
 
 ## 3. Contrato de Payload (Mínimo Esperado)
 

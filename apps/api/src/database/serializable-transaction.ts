@@ -12,6 +12,7 @@ export type SerializableTransactionRetryOptions = {
   maxBackoffMs?: number;
   maxWait?: number;
   timeout?: number;
+  isAdditionalRetryableError?: (error: unknown) => boolean;
   onRetry?: (attempt: number, delayMs: number) => void;
 };
 
@@ -39,7 +40,9 @@ export async function runSerializableTransactionWithRetry<T>(
         timeout: options.timeout,
       });
     } catch (error) {
-      if (!isSerializableTransactionConflict(error) || attempt === maxAttempts) {
+      const shouldRetry = isSerializableTransactionConflict(error)
+        || options.isAdditionalRetryableError?.(error) === true;
+      if (!shouldRetry || attempt === maxAttempts) {
         throw error;
       }
 

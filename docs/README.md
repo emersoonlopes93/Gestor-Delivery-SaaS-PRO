@@ -43,6 +43,7 @@
 | [Autorização / RBAC](./contracts/authorization-rbac.md) | Permissões, papéis, guards |
 | [Isolamento de tenant](./contracts/tenant-isolation.md) | Como o tenant é propagado e protegido |
 | [Consentimento do storefront](./contracts/storefront-consent.md) | Categorias, default deny, persistência local e isolamento por tenant |
+| [Agregação diária de Analytics](./contracts/analytics-rollups.md) | Grão, fórmulas, timezone, worker, backfill e retenção |
 | [Ciclo de vida do pedido](./contracts/order-lifecycle.md) | Máquina de estados, transições, eventos |
 | [Feature Flags](./contracts/feature-flags.md) | Catálogo, precedência, presets |
 | [Banco e Migrations](./contracts/database-and-migrations.md) | Quando criar, como nomear, produção |

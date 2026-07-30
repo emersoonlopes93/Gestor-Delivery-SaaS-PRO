@@ -1,5 +1,55 @@
 ---
 
+## Marco 2 — PR 2A agregação diária determinística de Analytics
+
+Data: 2026-07-29
+
+Branch: `feat/analytics-daily-rollups`
+
+Base: `origin/main-copy` / `f4552d10`
+
+- `AnalyticsDailyAggregate` usa chave lógica integralmente não nula por tenant,
+  dia, evento, tipo e chave de dimensão. `overall` usa `__all__`; checks no
+  PostgreSQL restringem taxonomia, dimensões, chave overall e métricas.
+- O rollup lê `AnalyticsEvent` tenant-scoped em páginas, calcula overall,
+  product, category e UTM, soma decimais sem ponto flutuante e substitui somente
+  linhas alteradas dentro de transação serializável com advisory lock por
+  tenant/dia. Replay idêntico não reescreve linhas.
+- O bucket usa `TenantSettings.timezone` e Luxon. Timezone divergente de
+  histórico já materializado falha fechada e exige migração explícita.
+- A fila `analytics-rollup` processa `analytics.daily-rollup` com payload Zod,
+  job ID determinístico compatível com BullMQ, 3 tentativas, backoff exponencial
+  de 5 segundos e concorrência 2. Scheduler e worker ficam desativados por
+  default; `NODE_ENV=test` não agenda.
+- O scheduler recompõe 3 dias a cada 6 horas por default. Um slot determinístico
+  no job ID impede duplicação entre boots/réplicas no mesmo período.
+- O backfill exige tenant/from/to, limita 31 dias, rejeita produção/banco não
+  efêmero e oferece `--dry-run`. A retenção é tenant-scoped, em chunks, sem
+  scheduler e exige `ANALYTICS_RAW_RETENTION_ENABLED=true`.
+- Migration PostgreSQL efêmera: exit 0. Provas focadas com PostgreSQL 16 e Redis
+  7: 10 suítes / 42 testes, exit 0, cobrindo migration, unique/checks/FK/defaults,
+  isolamento, dimensões/somas/sessões, determinismo, timezone/boundary, late
+  events, concorrência, rollback, fila/jobId/retry, backfill e retenção.
+- Backfill efêmero: dry-run exit 0 e 0 escritas; execução exit 0 e 1 agregado com
+  `eventCount=1` / `valueSum=12.50`.
+- Gates locais: types build, API lint, API build, typecheck, check:no-any,
+  check:features e diff-check em exit 0. O comando regex literal
+  `test -- analytics` colide com o nome absoluto desta worktree e seleciona
+  testes alheios; o gate equivalente por `--runTestsByPath` executou somente os
+  10 arquivos canônicos de Analytics e passou.
+- Nenhum storefront, web-tenant, regra de pedidos, provider, dependência,
+  lockfile, banco remoto, migration de produção, merge ou deploy foi alterado.
+
+DEFERIDO PARA MARCO 2 FINAL: Playwright, screenshots, light/dark/mobile,
+validação visual do dashboard, teste de carga amplo, p95 de produção,
+comparação manual de todas as métricas e GA4/Meta/Ads.
+
+Status: implementação e gates locais concluídos. Draft PR #30 publicada contra
+`main-copy`; code head validado `bdb791ed`. CI do SHA final da documentação
+ainda pendente neste ponto do handoff. Nenhum merge ou deploy realizado.
+
+---
+
 ## Marco 1 — PR 1C eventos autoritativos de pedido (Draft publicada)
 
 Data: 2026-07-29
