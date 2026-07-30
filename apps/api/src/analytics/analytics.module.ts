@@ -21,6 +21,7 @@ import {
 } from './analytics-rollup.queue.service';
 import { isAnalyticsRollupQueueEnabled } from './analytics-rollup.config';
 import { AnalyticsRetentionService } from './analytics-retention.service';
+import { AnalyticsPerformanceService } from './analytics-performance.service';
 
 const enableAnalyticsRollupQueue = isAnalyticsRollupQueueEnabled();
 
@@ -54,6 +55,7 @@ const enableAnalyticsRollupQueue = isAnalyticsRollupQueueEnabled();
     AuthoritativeOrderAnalyticsService,
     AnalyticsRollupService,
     AnalyticsRetentionService,
+    AnalyticsPerformanceService,
     ...(enableAnalyticsRollupQueue
       ? [AnalyticsRollupQueueService, AnalyticsRollupSchedulerService, AnalyticsRollupProcessor]
       : []),

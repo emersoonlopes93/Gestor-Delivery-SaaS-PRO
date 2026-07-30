@@ -1,3 +1,14 @@
+## PR 2B - Performance API
+
+Branch `feat/analytics-performance-api`, stacked on `feat/analytics-daily-rollups` at `a9d11ca7`.
+Authenticated tenant-scoped routes under `/analytics/performance/*` expose overview,
+funnel, products and partial UTM acquisition. Behavioral reads use daily rollups;
+realized revenue and completed quantities use authoritative orders and order items.
+Acquisition is deliberately `utm_tagged_only`: direct/unknown and channel revenue
+are unavailable and must not be shown by UI. PR 3A owns direct/referrer,
+first/last-touch and session-to-order attribution. No Prisma schema, migration,
+rollup, worker, storefront, UI, provider or dependency change is part of this PR.
+
 ---
 
 ## Marco 2 — PR 2A agregação diária determinística de Analytics
