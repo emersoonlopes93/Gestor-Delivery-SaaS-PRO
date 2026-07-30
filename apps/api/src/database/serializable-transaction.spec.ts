@@ -75,4 +75,28 @@ describe('runSerializableTransactionWithRetry', () => {
 
     expect(runner.$transaction).toHaveBeenCalledTimes(1);
   });
+
+  it('retries an explicitly opted-in conflict and re-executes the transaction', async () => {
+    const aggregateIdConflict = new Prisma.PrismaClientKnownRequestError('aggregate id conflict', {
+      code: 'P2002',
+      clientVersion: '5.22.0',
+      meta: { target: ['id'] },
+    });
+    const runner = makeRunner(aggregateIdConflict, 'success');
+    const operation = jest.fn().mockResolvedValue('committed');
+
+    await expect(runSerializableTransactionWithRetry(
+      runner as never,
+      operation,
+      {
+        baseBackoffMs: 0,
+        isAdditionalRetryableError: (error) => (
+          error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+        ),
+      },
+    )).resolves.toBe('committed');
+
+    expect(runner.$transaction).toHaveBeenCalledTimes(2);
+    expect(operation).toHaveBeenCalledTimes(1);
+  });
 });
