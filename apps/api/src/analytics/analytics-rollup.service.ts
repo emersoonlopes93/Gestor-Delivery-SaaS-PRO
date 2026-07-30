@@ -19,6 +19,13 @@ const EVENT_PAGE_SIZE = 1_000;
 const MAX_EVENTS_PER_DAY = 250_000;
 export const MAX_ANALYTICS_BACKFILL_DAYS = 31;
 
+const isAggregatePrimaryKeyConflict = (error: unknown): boolean => (
+  error instanceof Prisma.PrismaClientKnownRequestError
+  && error.code === 'P2002'
+  && Array.isArray(error.meta?.target)
+  && error.meta.target.includes('id')
+);
+
 type RollupEvent = {
   id: string;
   eventName: string;
@@ -192,8 +199,9 @@ export class AnalyticsRollupService {
       {
         maxWait: 10_000,
         timeout: 60_000,
+        isAdditionalRetryableError: isAggregatePrimaryKeyConflict,
         onRetry: (attempt, delayMs) => this.logger.warn(
-          `analytics_rollup_serialization_retry tenantId=${tenantId} bucketDate=${bucketDate}`
+          `analytics_rollup_transaction_retry tenantId=${tenantId} bucketDate=${bucketDate}`
           + ` attempt=${attempt + 1} delayMs=${delayMs}`,
         ),
       },
