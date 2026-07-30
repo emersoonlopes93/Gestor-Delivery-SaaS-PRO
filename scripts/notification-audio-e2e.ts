@@ -109,7 +109,9 @@ async function captureFailureEvidence(page: Page, name: string, browserLog: Brow
 
 async function openNotificationSettings(page: Page): Promise<void> {
   await page.goto(`${webUrl}/settings/notifications`, { waitUntil: 'domcontentloaded' });
-  await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').waitFor({ timeout: 10_000 });
+  await page.getByRole('alert')
+    .getByRole('button', { name: /Permitir notificacoes e ativar som|Tentar novamente/ })
+    .waitFor({ timeout: 10_000 });
 }
 
 async function assertNoHorizontalOverflow(page: Page, label: string): Promise<void> {
@@ -118,12 +120,14 @@ async function assertNoHorizontalOverflow(page: Page, label: string): Promise<vo
 }
 
 async function activateSounds(page: Page): Promise<void> {
-  await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').click();
+  const activationButton = page.getByRole('alert')
+    .getByRole('button', { name: /Permitir notificacoes e ativar som|Tentar novamente/ });
+  await activationButton.click();
   await page.waitForFunction(() => {
     const audit = (window as unknown as { __notificationAudioAudit?: AudioAudit }).__notificationAudioAudit;
     return audit?.audioContextState === 'running';
   }, { timeout: 5_000 });
-  equal(await page.locator('[role="alert"] button[aria-label="Ativar notificacoes sonoras"]').count(), 0, 'activation banner remained visible after AudioContext became running');
+  equal(await activationButton.count(), 0, 'activation banner remained visible after AudioContext became running');
   equal(await page.getByRole('button', { name: 'Testar som' }).count() > 0, true, 'test sound control was not available after activation');
 }
 
