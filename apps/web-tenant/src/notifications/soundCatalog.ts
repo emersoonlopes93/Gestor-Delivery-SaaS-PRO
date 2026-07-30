@@ -28,6 +28,7 @@ export type SoundCatalogEntry = {
   event: SystemSoundEvent;
   pattern: SoundPattern;
   priority: SoundPriority;
+  silent?: boolean;
   repeat?: boolean;
   cooldownMs?: number;
 };
@@ -42,11 +43,14 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
     event: 'order.created',
     pattern: {
       steps: [
-        { frequency: 784, durationMs: 120, waveform: CHIME, gain: 0.45, attackMs: 8, releaseMs: 24 },
-        { frequency: 988, durationMs: 140, waveform: CHIME, gain: 0.55, attackMs: 8, releaseMs: 24 },
-        { frequency: 1175, durationMs: 200, waveform: CHIME, gain: 0.6, attackMs: 10, releaseMs: 36 },
+        { frequency: 659.25, durationMs: 150, waveform: CHIME, gain: 0.62, attackMs: 8, releaseMs: 30 },
+        { frequency: 783.99, durationMs: 170, waveform: CHIME, gain: 0.7, attackMs: 8, releaseMs: 32 },
+        { frequency: 987.77, durationMs: 220, waveform: CHIME, gain: 0.78, attackMs: 10, releaseMs: 44 },
+        { frequency: 783.99, durationMs: 130, waveform: CHIME, gain: 0.58, attackMs: 8, releaseMs: 28 },
+        { frequency: 987.77, durationMs: 170, waveform: CHIME, gain: 0.7, attackMs: 8, releaseMs: 34 },
+        { frequency: 1318.51, durationMs: 300, waveform: CHIME, gain: 0.8, attackMs: 12, releaseMs: 70 },
       ],
-      gapMs: 28,
+      gapMs: 36,
     },
     priority: 'critical',
     cooldownMs: 8_000,
@@ -208,28 +212,16 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
   },
   'connection.lost': {
     event: 'connection.lost',
-    pattern: {
-      steps: [
-        { noise: true, noiseFilter: 'highpass', durationMs: 60, gain: 0.28, attackMs: 1, releaseMs: 24 },
-        { frequency: 196, durationMs: 160, waveform: ALERT, gain: 0.3, attackMs: 4, releaseMs: 26 },
-        { frequency: 174.61, durationMs: 220, waveform: ALERT, gain: 0.36, attackMs: 4, releaseMs: 32 },
-      ],
-      gapMs: 18,
-    },
+    pattern: { steps: [] },
     priority: 'critical',
+    silent: true,
     cooldownMs: 12_000,
   },
   'connection.restored': {
     event: 'connection.restored',
-    pattern: {
-      steps: [
-        { frequency: 523.25, durationMs: 110, waveform: CHIME, gain: 0.28, attackMs: 10, releaseMs: 20 },
-        { frequency: 659.25, durationMs: 120, waveform: CHIME, gain: 0.34, attackMs: 10, releaseMs: 22 },
-        { frequency: 783.99, durationMs: 160, waveform: CHIME, gain: 0.4, attackMs: 12, releaseMs: 30 },
-      ],
-      gapMs: 22,
-    },
+    pattern: { steps: [] },
     priority: 'low',
+    silent: true,
     cooldownMs: 8_000,
   },
   'print.completed': {

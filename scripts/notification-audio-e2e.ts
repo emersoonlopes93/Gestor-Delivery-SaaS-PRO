@@ -272,10 +272,17 @@ async function main(): Promise<void> {
     await emit(activeLeader, { id: `order.cancelled:${orderId}`, type: 'order.cancelled', title: 'Pedido cancelado', priority: 'high' });
     await emit(activeLeader, { id: `order.ready:${orderId}`, type: 'order.ready', title: 'Pedido pronto', priority: 'high' });
     await emit(activeLeader, { id: `whatsapp.handoff:${tenantId}`, type: 'whatsapp.handoff', title: 'Transferencia para atendimento humano', priority: 'high' });
+    await activeLeader.waitForTimeout(500);
+    const beforeConnectivity = (await audit(leader)).oscillators + (await audit(secondary)).oscillators;
     await emit(activeLeader, { id: `connection.lost:${tenantId}`, type: 'connection.lost', title: 'Conexao perdida', priority: 'critical' });
     await emit(activeLeader, { id: `connection.restored:${tenantId}`, type: 'connection.restored', title: 'Conexao restaurada', priority: 'low' });
     await activeLeader.waitForTimeout(500);
-    ok((await audit(leader)).oscillators + (await audit(secondary)).oscillators > beforeDuplicate, 'critical event matrix did not call the sound engine');
+    equal(
+      (await audit(leader)).oscillators + (await audit(secondary)).oscillators,
+      beforeConnectivity,
+      'connectivity events must remain silent',
+    );
+    ok(beforeConnectivity > beforeDuplicate, 'attention event matrix did not call the sound engine');
 
     await activeLeader.screenshot({ path: join(artifactDir, 'leader-before-handoff.png'), fullPage: true });
     await activeLeader.close();

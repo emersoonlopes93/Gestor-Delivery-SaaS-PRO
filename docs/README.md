@@ -25,6 +25,7 @@
 | [Estrutura do repositório](./architecture/repository-structure.md) | Mapa de apps e packages |
 | [Backend](./architecture/backend.md) | NestJS, módulos, interceptors, guards |
 | [Frontends](./architecture/frontends.md) | Aplicações React e seus públicos |
+| [Notificações mobile](./notifications-mobile.md) | Lifecycle, conectividade, permissões, safe area e áudio |
 | [Multi-tenancy](./architecture/multi-tenancy.md) | Como o isolamento de tenant funciona |
 | [Modelo de dados](./architecture/data-model.md) | Schema Prisma e relações principais |
 | [Filas e cache](./architecture/queues-and-cache.md) | Redis, BullMQ, configurações |

@@ -6,13 +6,17 @@ import { requestNativeNotificationPermission, showNewOrderNotification } from '.
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
 import { playNotificationSound } from '../notifications/soundEngine';
 import { traceNotificationE2E } from '../notifications/e2eTrace';
+import {
+  CONNECTION_GRACE_PERIOD_MS,
+  OFFLINE_DEBOUNCE_MS,
+  connectionIssueCopy,
+  type ConnectivityIssue,
+} from '../notifications/connectivityState';
 
 export function useNotificationAudio(
   tenantId: string | undefined,
 ) {
   const socketRef = useRef<Socket | null>(null);
-  const hadConnectionRef = useRef(false);
-  const isConnectionLostRef = useRef(false);
   const processedSocketEventsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -30,51 +34,127 @@ export function useNotificationAudio(
 
     const socket = io(socketPath, {
       reconnection: true,
-      reconnectionAttempts: 3,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 4000,
     });
+    let disposed = false;
+    let appActive = document.visibilityState !== 'hidden';
+    let activeIssue: ConnectivityIssue | null = null;
+    let alertTimer: number | null = null;
 
-    socket.on('connect', () => {
-      socket.emit('joinTenant', { tenantId });
-
-      if (isConnectionLostRef.current) {
-        emitNotificationEvent(createNotificationEvent({
-          id: `orders:connection.restored:${tenantId}`,
-          type: 'connection.restored',
-          title: 'Conexao restaurada',
-          message: 'O painel voltou a receber atualizacoes em tempo real.',
-          priority: 'low',
-          source: 'connection',
-        }));
+    const clearAlertTimer = () => {
+      if (alertTimer !== null) {
+        window.clearTimeout(alertTimer);
+        alertTimer = null;
       }
+    };
 
-      hadConnectionRef.current = true;
-      isConnectionLostRef.current = false;
-    });
-
-    const emitConnectionLost = () => {
-      if (isConnectionLostRef.current) return;
-      isConnectionLostRef.current = true;
+    const emitRestored = () => {
+      if (!activeIssue) return;
+      activeIssue = null;
       emitNotificationEvent(createNotificationEvent({
-        id: `orders:connection.lost:${tenantId}`,
-        type: 'connection.lost',
-        title: 'Conexao perdida',
-        message: 'Novos pedidos podem atrasar enquanto a conexao estiver indisponivel.',
-        priority: 'critical',
+        id: `orders:connection.restored:${tenantId}:${Date.now()}`,
+        type: 'connection.restored',
+        title: 'Conexao restaurada',
+        message: 'O painel voltou a receber atualizacoes em tempo real.',
+        priority: 'low',
         source: 'connection',
       }));
     };
 
+    const emitIssue = (issue: ConnectivityIssue) => {
+      if (disposed || !appActive || activeIssue === issue) return;
+      activeIssue = issue;
+      const copy = connectionIssueCopy(issue);
+      emitNotificationEvent(createNotificationEvent({
+        id: `orders:connection.${issue}:${tenantId}:${Date.now()}`,
+        type: 'connection.lost',
+        title: copy.title,
+        message: copy.message,
+        priority: issue === 'offline' ? 'critical' : 'high',
+        source: 'connection',
+      }));
+    };
+
+    const serviceIsReachable = async () => {
+      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 3_000);
+      try {
+        const response = await fetch(`${apiBase}/health/ready/websocket`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        return response.ok;
+      } catch {
+        return false;
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    };
+
+    const scheduleConnectionCheck = (delayMs = CONNECTION_GRACE_PERIOD_MS) => {
+      clearAlertTimer();
+      alertTimer = window.setTimeout(async () => {
+        alertTimer = null;
+        if (disposed || !appActive || socket.connected) return;
+        if (!navigator.onLine) {
+          emitIssue('offline');
+          return;
+        }
+        const serviceReachable = await serviceIsReachable();
+        if (!disposed && appActive && !socket.connected && navigator.onLine) {
+          emitIssue(serviceReachable ? 'reconnecting' : 'service_unavailable');
+        }
+      }, delayMs);
+    };
+
+    socket.on('connect', () => {
+      socket.emit('joinTenant', { tenantId });
+      clearAlertTimer();
+      emitRestored();
+    });
+
     socket.on('connect_error', () => {
-      emitConnectionLost();
+      scheduleConnectionCheck();
     });
 
     socket.on('disconnect', () => {
-      if (hadConnectionRef.current) {
-        emitConnectionLost();
-      }
+      scheduleConnectionCheck();
     });
+
+    const onOffline = () => {
+      if (appActive) scheduleConnectionCheck(OFFLINE_DEBOUNCE_MS);
+    };
+
+    const onOnline = () => {
+      if (!appActive) return;
+      clearAlertTimer();
+      socket.connect();
+      if (socket.connected) emitRestored();
+      else scheduleConnectionCheck();
+    };
+
+    const onVisibilityChange = () => {
+      appActive = document.visibilityState !== 'hidden';
+      clearAlertTimer();
+      if (!appActive) {
+        emitRestored();
+        return;
+      }
+      if (!navigator.onLine) {
+        scheduleConnectionCheck(OFFLINE_DEBOUNCE_MS);
+        return;
+      }
+      socket.connect();
+      if (!socket.connected) scheduleConnectionCheck();
+    };
+
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const shouldProcessSocketEvent = (key: string) => {
       const now = Date.now();
@@ -254,6 +334,11 @@ export function useNotificationAudio(
     socketRef.current = socket;
 
     return () => {
+      disposed = true;
+      clearAlertTimer();
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       socket.disconnect();
       if (socketRef.current === socket) {
         socketRef.current = null;

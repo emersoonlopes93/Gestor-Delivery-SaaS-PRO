@@ -1,3 +1,36 @@
+## Notificações mobile — lifecycle, permissões, safe area e áudio
+
+Data: 2026-07-30
+
+Branch: `fix/mobile-notification-lifecycle-safe-area`
+
+Base: `origin/main-copy` / `ca762a79`
+
+- `socket.disconnect` deixou de significar internet offline. Background/hidden
+  suspende avisos; offline real usa debounce de 1,2 s; socket/serviço usa grace
+  period de 5 s e health check WebSocket.
+- Conectividade é visual, deduplicada e silenciosa. Novo pedido mantém som,
+  liderança multi-tab e dedupe por pedido.
+- Preferência sonora ficou durável, versionada e isolada por tenant/usuário.
+  O onboarding web/nativo ocorre por gesto, não repete `denied` automaticamente
+  e possui fechamento acessível.
+- Toasts possuem `aria-label="Fechar notificação"`, Escape, máximo de dois e
+  pilha sem sobreposição. Banner inferior e toasts respeitam safe areas, header
+  mobile e landscape.
+- Novo chime Web Audio tem duração superior a 1 s. Android usa canal
+  `new-orders-v2` e WAV original de 1,48 s, pico 0,86.
+- Não existe push nativo/FCM; alertas com tela desligada não são prometidos e
+  permanecem como PR separada.
+- Gates: web-tenant lint, typecheck, build, 10 arquivos/46 testes,
+  `check:no-any`, `check:features`, diff-check e E2E visual mobile passaram.
+  `npx cap sync android` passou e confirmou Local Notifications 7.0.6.
+- Pendente: `assembleDebug` e validação em dispositivo. O ambiente não possui
+  Java/JDK (`JAVA_HOME` ausente; Gradle exit 9009).
+- Nenhum Prisma, migration, analytics, billing, regra de pedido, dependência,
+  lockfile, banco remoto ou deploy foi alterado.
+
+---
+
 ## PR 2B - Performance API
 
 Branch `feat/analytics-performance-api`, stacked on `feat/analytics-daily-rollups` at `a9d11ca7`.
