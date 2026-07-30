@@ -173,6 +173,24 @@ describe('AnalyticsRollupService', () => {
     expect(fixture.tx.analyticsDailyAggregate.createMany).toHaveBeenCalledTimes(1);
   });
 
+  it('recomputes the complete bucket after an aggregate primary-key conflict', async () => {
+    const fixture = harness([event()]);
+    const primaryKeyConflict = new Prisma.PrismaClientKnownRequestError('aggregate id conflict', {
+      code: 'P2002',
+      clientVersion: '5.22.0',
+      meta: { target: ['id'] },
+    });
+    fixture.tx.analyticsDailyAggregate.createMany.mockRejectedValueOnce(primaryKeyConflict);
+
+    await expect(fixture.service.recomputeRange(job())).resolves.toMatchObject({
+      aggregateRowCount: 5,
+    });
+
+    expect(fixture.prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(fixture.tx.analyticsDailyAggregate.createMany).toHaveBeenCalledTimes(2);
+    expect(fixture.rows).toHaveLength(5);
+  });
+
   it('uses tenant-scoped boundaries for the local day and rejects silent timezone rewrites', async () => {
     const fixture = harness([event()]);
     await fixture.service.recomputeRange(job());
