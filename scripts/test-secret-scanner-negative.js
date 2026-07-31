@@ -10,7 +10,7 @@ if (!match) {
 
 const detector = new RegExp(match[1].replace('(?i)', ''), 'i');
 const key = ['JWT', 'SECRET'].join('_');
-const controlledSyntheticValue = ['synthetic', 'scanner', 'negative', 'test', 'only', '1234567890'].join('-');
+const controlledSyntheticValue = 'syntheticScannerNegativeTestOnly1234567890';
 
 if (!detector.test(`${key}=${controlledSyntheticValue}`)) {
   throw new Error('The JWT secret-scanning rule did not detect the controlled synthetic pattern.');
