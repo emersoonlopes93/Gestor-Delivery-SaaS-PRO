@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { BellRing, Loader2, WifiOff } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { getNotificationPermission, showWebNotification } from '../lib/notification-support';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BellRing, Loader2, ServerCrash, WifiOff, X } from 'lucide-react';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  showWebNotification,
+} from '../lib/notification-support';
+import {
+  checkNativeNotificationPermission,
+  requestNativeNotificationPermission,
+} from '../lib/native-notifications';
 import {
   NotificationDeduper,
   type NotificationEvent,
-  emitNotificationEvent,
   subscribeNotificationEvents,
 } from './notificationEvents';
 import { useSoundManager } from './useSoundManager';
@@ -13,54 +19,92 @@ import { useTenantAuth } from '../hooks/use-tenant-auth';
 import { createTabLeader, type TabLeader } from './tabLeader';
 import { traceNotificationE2E } from './e2eTrace';
 
-function shouldShowBrowserNotification(event: NotificationEvent) {
-  if (typeof document === 'undefined') return false;
-  if (document.visibilityState !== 'hidden') return false;
-  if (getNotificationPermission() !== 'granted') return false;
+const MAX_TRANSIENT_TOASTS = 2;
 
+type ConnectionBanner = {
+  title: string;
+  message: string;
+  offline: boolean;
+};
+
+function isConnectionEvent(event: NotificationEvent) {
+  return event.type === 'connection.lost' || event.type === 'connection.restored';
+}
+
+function shouldShowBrowserNotification(event: NotificationEvent) {
+  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return false;
+  if (getNotificationPermission() !== 'granted' || isConnectionEvent(event)) return false;
   return event.priority === 'high' || event.priority === 'critical';
 }
 
-function showToastForEvent(event: NotificationEvent) {
-  const message = event.message ? `${event.title}\n${event.message}` : event.title;
-
-  if (event.type === 'connection.lost') {
-    toast.error(message, { duration: Infinity, id: 'tenant-connection-lost' });
-    return;
-  }
-
-  if (event.type === 'connection.restored') {
-    toast.dismiss('tenant-connection-lost');
-    toast.success(message, { duration: 4000, id: 'tenant-connection-restored' });
-    return;
-  }
-
-  if (event.priority === 'critical' || event.priority === 'high') {
-    toast.error(message, { duration: 6000, id: event.id });
-    return;
-  }
-
-  toast.success(message, { duration: 5000, id: event.id });
+function transientPriority(event: NotificationEvent) {
+  if (event.type === 'order.created') return 100;
+  if (event.priority === 'critical') return 80;
+  if (event.priority === 'high') return 60;
+  if (event.priority === 'medium') return 40;
+  return 20;
 }
 
 export function NotificationCenter() {
   const { user } = useTenantAuth();
   const deduperRef = useRef(new NotificationDeduper());
   const soundManager = useSoundManager();
-  const [connectionBanner, setConnectionBanner] = useState<string | null>(null);
+  const [connectionBanner, setConnectionBanner] = useState<ConnectionBanner | null>(null);
+  const [transientEvents, setTransientEvents] = useState<NotificationEvent[]>([]);
   const [ownsActivationBanner, setOwnsActivationBanner] = useState(false);
+  const [nativePermission, setNativePermission] = useState<string>('unsupported');
+  const [permissionOnboardingHandled, setPermissionOnboardingHandled] = useState(true);
   const leaderRef = useRef<TabLeader | null>(null);
+  const transientTimersRef = useRef<number[]>([]);
 
-  // The large CTA belongs to the first mount in a browser session. It stays
-  // visible for that mount until the user resolves it, but route remounts,
-  // focus and reconnects cannot claim it again.
+  const dismissTransient = useCallback((eventId: string) => {
+    setTransientEvents((current) => current.filter((event) => event.id !== eventId));
+  }, []);
+
+  const enqueueTransient = useCallback((event: NotificationEvent) => {
+    if (document.visibilityState === 'hidden') return;
+    setTransientEvents((current) => {
+      const next = [...current.filter((item) => item.id !== event.id), event];
+      return next
+        .sort((left, right) => transientPriority(right) - transientPriority(left))
+        .slice(0, MAX_TRANSIENT_TOASTS);
+    });
+    const timer = window.setTimeout(
+      () => dismissTransient(event.id),
+      event.priority === 'critical' ? 8_000 : 6_000,
+    );
+    transientTimersRef.current.push(timer);
+  }, [dismissTransient]);
+
+  useEffect(() => () => {
+    for (const timer of transientTimersRef.current) window.clearTimeout(timer);
+    transientTimersRef.current = [];
+  }, []);
+
+  const onboardingKey = useMemo(
+    () => user?.tenantId && user?.userId
+      ? `gestor:notifications:onboarding:v1:${user.tenantId}:${user.userId}`
+      : null,
+    [user?.tenantId, user?.userId],
+  );
+
+  useEffect(() => {
+    if (!onboardingKey) return;
+    setPermissionOnboardingHandled(localStorage.getItem(onboardingKey) === 'handled');
+    void checkNativeNotificationPermission().then(setNativePermission);
+  }, [onboardingKey]);
+
+  const markPermissionOnboardingHandled = useCallback(() => {
+    if (onboardingKey) localStorage.setItem(onboardingKey, 'handled');
+    setPermissionOnboardingHandled(true);
+  }, [onboardingKey]);
+
   useEffect(() => {
     if (!soundManager.activationBannerEligible || soundManager.activationBannerShownForSession || ownsActivationBanner) return;
     soundManager.markActivationBannerShownForSession();
     setOwnsActivationBanner(true);
   }, [ownsActivationBanner, soundManager]);
 
-  // Inicializa o líder de aba quando temos o tenantId
   useEffect(() => {
     if (!user?.tenantId) return;
     const leader = createTabLeader(user.tenantId);
@@ -84,20 +128,20 @@ export function NotificationCenter() {
         accepted: dedupeAccepted,
         reason: dedupeAccepted ? 'accepted' : 'duplicate',
       });
-      if (!dedupeAccepted) {
-        return;
-      }
+      if (!dedupeAccepted) return;
 
       if (event.type === 'connection.lost') {
-        setConnectionBanner(event.message || 'A conexao com o painel foi perdida.');
+        setConnectionBanner({
+          title: event.title,
+          message: event.message || 'O painel esta restabelecendo a conexao.',
+          offline: event.title.toLowerCase().includes('internet'),
+        });
       } else if (event.type === 'connection.restored') {
         setConnectionBanner(null);
+      } else {
+        enqueueTransient(event);
       }
 
-      // Toast é local (cada aba mostra o seu se quiser, o deduplicador já limita)
-      showToastForEvent(event);
-
-      // Som e Browser Notification devem acontecer apenas na aba líder
       const isLeader = leaderRef.current?.isLeader() ?? false;
       traceNotificationE2E({
         stage: 'event.leader-check',
@@ -110,111 +154,181 @@ export function NotificationCenter() {
         lockStrategy: typeof navigator !== 'undefined' && 'locks' in navigator ? 'web-locks' : 'local-storage',
       });
 
-      // Se outra aba líder já tocou este evento, não tentamos tocar novamente,
-      // mesmo que a aba atual acabe de se tornar líder.
-      if (leaderRef.current?.wasEventPlayed(event.id)) {
-        return;
-      }
-
-      if (isLeader) {
+      if (leaderRef.current?.wasEventPlayed(event.id)) return;
+      if (isLeader && !isConnectionEvent(event)) {
         leaderRef.current?.markEventPlayed(event.id);
-
         if (shouldShowBrowserNotification(event)) {
           showWebNotification(event.title, {
             body: event.message,
             icon: '/favicon.ico',
-            tag: event.type,
+            tag: event.orderId ? `${event.type}:${event.orderId}` : event.type,
           });
         }
-
         await soundManager.playEvent(event.type);
       }
     });
 
     return unsubscribe;
-  }, [soundManager, user?.tenantId]);
+  }, [enqueueTransient, soundManager, user?.tenantId]);
 
   useEffect(() => {
-    const onOffline = () => {
-      emitNotificationEvent({
-        id: 'browser:connection.lost',
-        type: 'connection.lost',
-        title: 'Conexao instavel',
-        message: 'Voce ficou offline. Novos pedidos podem atrasar.',
-        priority: 'critical',
-        createdAt: new Date().toISOString(),
-        source: 'connection',
-      });
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setTransientEvents((current) => current.slice(1));
     };
-
-    const onOnline = () => {
-      emitNotificationEvent({
-        id: `browser:connection.restored:${Date.now()}`,
-        type: 'connection.restored',
-        title: 'Conexao restaurada',
-        message: 'O painel voltou a receber atualizacoes em tempo real.',
-        priority: 'low',
-        createdAt: new Date().toISOString(),
-        source: 'connection',
-      });
-    };
-
-    window.addEventListener('offline', onOffline);
-    window.addEventListener('online', onOnline);
-
-    return () => {
-      window.removeEventListener('offline', onOffline);
-      window.removeEventListener('online', onOnline);
-    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const audioWarning = useMemo(() => {
-    if (!ownsActivationBanner || !soundManager.activationBannerEligible) return null;
-    return soundManager.activationError || 'Ative os sons para nao perder novos pedidos.';
-  }, [ownsActivationBanner, soundManager.activationBannerEligible, soundManager.activationError]);
+  const webPermission = getNotificationPermission();
+  const permissionNeedsOnboarding = !permissionOnboardingHandled
+    && (webPermission === 'default' || nativePermission === 'prompt');
+  const permissionDenied = webPermission === 'denied' || nativePermission === 'denied';
+  const audioWarning = ownsActivationBanner && soundManager.activationBannerEligible
+    ? soundManager.activationError || 'Ative os sons para nao perder novos pedidos.'
+    : null;
+  const showActivationBanner = Boolean(audioWarning || permissionNeedsOnboarding);
+
+  const dismissActivationBanner = () => {
+    soundManager.dismissActivationBannerForSession();
+    setOwnsActivationBanner(false);
+    if (permissionNeedsOnboarding) markPermissionOnboardingHandled();
+  };
+
+  const activateNotifications = async () => {
+    const permissionResults = await Promise.all([
+      webPermission === 'default' ? requestNotificationPermission() : Promise.resolve(webPermission),
+      requestNativeNotificationPermission(),
+      soundManager.unlockAudio(),
+    ]);
+    setNativePermission(permissionResults[1]);
+    markPermissionOnboardingHandled();
+    if (permissionResults[0] === 'denied' || permissionResults[1] === 'denied') {
+      enqueueTransient({
+        id: 'permission-notifications',
+        type: 'system.error',
+        title: 'Permissão de notificações negada',
+        message: 'Ative as notificações nas configurações do dispositivo.',
+        priority: 'high',
+        createdAt: new Date().toISOString(),
+        source: 'system',
+      });
+    }
+  };
 
   return (
     <>
-      {audioWarning ? (
-        <div className="fixed inset-x-3 bottom-3 z-[70] sm:left-1/2 sm:top-4 sm:bottom-auto sm:w-[min(92vw,680px)] sm:-translate-x-1/2" role="alert" aria-live="assertive">
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 shadow-lg backdrop-blur">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-amber-500/15 p-2 text-amber-700">
-                  <BellRing className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-black text-foreground">Ative as notificacoes sonoras</p>
-                  <p className="text-xs font-medium text-muted-foreground">{audioWarning}</p>
+      {transientEvents.length > 0 ? (
+        <div
+          className="pointer-events-none fixed left-1/2 z-[71] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col gap-2"
+          style={{ top: 'calc(var(--safe-area-top) + var(--mobile-header-height) + 12px)' }}
+          aria-label="Notificações"
+        >
+          {transientEvents.map((event) => (
+            <div
+              key={event.id}
+              role={event.priority === 'critical' ? 'alert' : 'status'}
+              aria-live={event.priority === 'critical' ? 'assertive' : 'polite'}
+              className="pointer-events-auto flex items-start gap-3 rounded-2xl border border-border bg-card p-3 text-foreground shadow-xl"
+            >
+              <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black">{event.title}</p>
+                {event.message ? <p className="mt-0.5 text-xs font-medium text-muted-foreground">{event.message}</p> : null}
+              </div>
+              <button
+                type="button"
+                aria-label="Fechar notificação"
+                onClick={() => dismissTransient(event.id)}
+                className="grid min-h-11 min-w-11 place-items-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {showActivationBanner ? (
+        <div
+          className="fixed inset-x-3 z-[70] sm:left-1/2 sm:w-[min(92vw,680px)] sm:-translate-x-1/2"
+          style={{ bottom: 'calc(12px + var(--safe-area-bottom))' }}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="rounded-2xl border border-amber-500/30 bg-card px-4 py-3 text-foreground shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-amber-500/15 p-2 text-amber-700">
+                <BellRing className="h-4 w-4" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black">Receba alertas de novos pedidos</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {permissionNeedsOnboarding
+                    ? 'Ative notificacoes e som neste dispositivo. Alertas com a tela desligada exigem push nativo, que ainda nao existe.'
+                    : audioWarning}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void activateNotifications()}
+                    disabled={soundManager.activationInProgress}
+                    className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    {soundManager.activationInProgress
+                      ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Ativando...</>
+                      : permissionDenied ? 'Tentar novamente' : 'Permitir notificacoes e ativar som'}
+                  </button>
+                  {permissionNeedsOnboarding ? (
+                    <button
+                      type="button"
+                      onClick={dismissActivationBanner}
+                      className="rounded-xl border border-border px-3 py-2 text-xs font-black text-muted-foreground hover:bg-muted"
+                    >
+                      Agora nao
+                    </button>
+                  ) : null}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  aria-label="Ativar notificacoes sonoras"
-                  onClick={() => void soundManager.unlockAudio()}
-                  disabled={soundManager.activationInProgress}
-                  className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground transition hover:bg-primary/90"
-                >
-                  {soundManager.activationInProgress ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Ativando sons...</> : soundManager.activationError ? 'Tentar novamente' : 'Ativar sons'}
-                </button>
-              </div>
+              <button
+                type="button"
+                aria-label="Fechar notificação"
+                onClick={dismissActivationBanner}
+                className="grid min-h-11 min-w-11 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
             </div>
           </div>
         </div>
       ) : null}
 
       {connectionBanner ? (
-        <div className="fixed left-1/2 top-24 z-[69] w-[min(92vw,720px)] -translate-x-1/2" role="alert" aria-live="assertive">
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 shadow-lg backdrop-blur">
+        <div
+          className="fixed left-1/2 z-[69] w-[min(92vw,720px)] -translate-x-1/2"
+          style={{ top: 'calc(var(--safe-area-top) + var(--mobile-header-height) + 12px)' }}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="rounded-2xl border border-destructive/30 bg-card px-4 py-3 text-foreground shadow-xl">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-destructive/10 p-2 text-destructive">
-                <WifiOff className="h-4 w-4" />
+                {connectionBanner.offline
+                  ? <WifiOff className="h-4 w-4" aria-hidden />
+                  : <ServerCrash className="h-4 w-4" aria-hidden />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-foreground">Conexao perdida</p>
-                <p className="text-xs font-medium text-muted-foreground">{connectionBanner}</p>
+                <p className="text-sm font-black">{connectionBanner.title}</p>
+                <p className="text-xs font-medium text-muted-foreground">{connectionBanner.message}</p>
               </div>
+              <button
+                type="button"
+                aria-label="Fechar notificação"
+                onClick={() => setConnectionBanner(null)}
+                className="grid min-h-11 min-w-11 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
             </div>
           </div>
         </div>

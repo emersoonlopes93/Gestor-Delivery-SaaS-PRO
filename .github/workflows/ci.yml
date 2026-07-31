@@ -354,6 +354,9 @@ jobs:
       - name: Notification audio E2E
         run: pnpm exec ts-node --transpile-only scripts/notification-audio-e2e.ts
 
+      - name: Notification mobile safe-area visual E2E
+        run: pnpm exec ts-node --transpile-only scripts/notification-mobile-visual-e2e.ts
+
       - name: Upload notification artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -361,6 +364,7 @@ jobs:
           name: notification-audio-e2e
           path: |
             qa-artifacts/notification-audio
+            tmp/notification-visual-proof
             ${{ runner.temp }}/notification-api.log
             ${{ runner.temp }}/notification-web.log
 
