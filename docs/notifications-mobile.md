@@ -56,6 +56,16 @@ O volume percebido e a entrega da notificação exigem validação em dispositiv
 real. Alterar um arquivo não muda canais Android já criados, por isso o ID é
 versionado.
 
+## Identidade Android
+
+- Nome: `PedeHub Lojista`, configurado em `capacitor.config.ts` e em
+  `res/values/strings.xml`.
+- Fonte visual: `apps/web-tenant/public/favicon.svg`, o asset oficial do
+  web-tenant. `scripts/generate-android-branding-assets.mjs` gera launcher,
+  round/adaptive icon e splash em todas as densidades Android.
+- Small icon de notificação: `drawable/ic_stat_pedehub.xml`, monocromático;
+  ele não reutiliza o launcher colorido. O tint segue o verde oficial `#22c55e`.
+
 ## Limite de background
 
 Não existe Push Notifications/FCM/APNs no `web-tenant`. Local Notifications são

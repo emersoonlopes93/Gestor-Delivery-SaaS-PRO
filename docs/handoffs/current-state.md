@@ -1,3 +1,28 @@
+## Branding Android — nome, ícones e splash
+
+Data: 2026-07-31
+
+Branch: `fix/mobile-notification-lifecycle-safe-area`
+
+- Fonte canônica: `apps/web-tenant/public/favicon.svg` e o nome móvel
+  `PedeHub Lojista` já definido em `apps/web-tenant/capacitor.config.ts`.
+  Os recursos template do Capacitor (`My App` e ícone/splash genéricos) foram
+  substituídos por launcher, round/adaptive icon e splash derivados do SVG.
+- `LocalNotifications` agora usa o vetor monocromático
+  `drawable/ic_stat_pedehub.xml`, com tint `#22c55e`; o canal
+  `new-orders-v2` e o chime não foram alterados.
+- `pnpm --filter @gestor/web-tenant build`, lint, typecheck, `check:no-any`,
+  `check:features`, 22 testes de notificações e `git diff --check` passaram.
+  `cap sync android` e `clean assembleDebug --stacktrace` passaram usando
+  JBR 21 do Android Studio. O APK foi inspecionado por `aapt2`: label
+  `PedeHub Lojista`, applicationId preservado `com.getcapacitor.app`,
+  MainActivity launchable, launcher/round/adaptive icon e small icon presentes.
+- Não havia alvo em `adb devices` nem AVD local; instalação e confirmação visual
+  no launcher/configurações/diálogo permanecem pendentes. PR segue Draft;
+  não houve deploy, merge, migration, lockfile ou dependência nova.
+
+---
+
 ## Notificações mobile — lifecycle, permissões, safe area e áudio
 
 Data: 2026-07-30
