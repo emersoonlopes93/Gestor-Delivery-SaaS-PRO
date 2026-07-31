@@ -287,18 +287,23 @@ export function useOnboardingState() {
   }, []);
 
   const saveStep = useCallback(async (saveFn: () => Promise<void>) => {
-    triggerAutoSave(async () => {
+    setAutoSaveStatus('saving');
+    try {
       await saveFn();
       await syncCurrentStepToBackend(currentStep);
       await checkValidationFromApi();
-    });
-
-    setCurrentStep((prev) => {
-      const next = Math.min(prev + 1, TOTAL_STEPS - 1);
-      setVisitedSteps((vs) => (vs.includes(next) ? vs : [...vs, next]));
-      return next;
-    });
-  }, [checkValidationFromApi, currentStep, syncCurrentStepToBackend, triggerAutoSave]);
+      setCurrentStep((prev) => {
+        const next = Math.min(prev + 1, TOTAL_STEPS - 1);
+        setVisitedSteps((vs) => (vs.includes(next) ? vs : [...vs, next]));
+        return next;
+      });
+      setAutoSaveStatus('saved');
+      window.setTimeout(() => setAutoSaveStatus('idle'), 2500);
+    } catch {
+      setAutoSaveStatus('error');
+      window.setTimeout(() => setAutoSaveStatus('idle'), 3000);
+    }
+  }, [checkValidationFromApi, currentStep, syncCurrentStepToBackend]);
 
   const completeOnboarding = useCallback(async () => {
     setAutoSaveStatus('saving');

@@ -106,8 +106,8 @@ export function OnboardingWizard() {
     triggerAutoSave,
   } = useOnboardingState();
 
-  const handleSaveAndNext = useCallback((saveFn: () => Promise<void>) => {
-    saveStep(saveFn);
+  const handleSaveAndNext = useCallback(async (saveFn: () => Promise<void>) => {
+    await saveStep(saveFn);
   }, [saveStep]);
 
   const handleContinueLater = useCallback(() => {
