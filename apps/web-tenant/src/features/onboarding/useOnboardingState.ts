@@ -2,8 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { OnboardingBackendStep, TenantUserSession } from '@gestor/types';
+import { DeliveryCoverageCompletion } from './deliveryCoverageCompletion';
 
 export type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+export interface SaveStepOptions {
+  resumePersistedDeliveryCoverage?: boolean;
+}
 
 export interface OnboardingValidation {
   hasStoreName: boolean;
@@ -144,6 +149,8 @@ export function useOnboardingState() {
   });
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deliveryCoverageCompletion = useRef<DeliveryCoverageCompletion | null>(null);
+  const submittingStep = useRef(false);
 
   useEffect(() => {
     saveToStorage({ currentStep, visitedSteps, validation, ifoodChoice });
@@ -161,8 +168,14 @@ export function useOnboardingState() {
     }
   }, []);
 
-  const checkValidationFromApi = useCallback(async () => {
+  const checkValidationFromApi = useCallback(async (options?: { throwOnFailure?: boolean }) => {
     try {
+      const coverageRequest = api.get<{
+        isDeliveryEnabled?: boolean;
+        maxRadiusKm?: number | string;
+        defaultPricePerKm?: number | string;
+      } | null>('/delivery/coverage');
+
       const [tenantRes, hoursRes, productsRes, coverageRes] = await Promise.all([
         api.get<{
           name: string;
@@ -181,12 +194,12 @@ export function useOnboardingState() {
         }>('/tenant/me'),
         api.get<{ isOpen: boolean }[]>('/tenant/operating-hours'),
         api.get<{ id: string; isActive?: boolean }[]>('/catalog/products'),
-        api.get<{
-          isDeliveryEnabled?: boolean;
-          maxRadiusKm?: number | string;
-          defaultPricePerKm?: number | string;
-        } | null>('/delivery/coverage').catch(() => ({ success: true, data: null })),
+        options?.throwOnFailure ? coverageRequest : coverageRequest.catch(() => ({ success: true, data: null })),
       ]);
+
+      if (options?.throwOnFailure && (!tenantRes.success || !hoursRes.success || !productsRes.success || !coverageRes.success)) {
+        throw new Error('Nao foi possivel revalidar o onboarding.');
+      }
 
       const settings = tenantRes.success ? tenantRes.data?.settings : undefined;
       const hasAddress = Boolean(
@@ -219,8 +232,9 @@ export function useOnboardingState() {
           productsRes.data?.some((product) => product.isActive !== false)
         ),
       });
-    } catch {
-      // silent - keep existing validation state
+    } catch (error) {
+      if (options?.throwOnFailure) throw error;
+      // Keep the last known state during background validation failures.
     }
   }, []);
 
@@ -239,9 +253,10 @@ export function useOnboardingState() {
     if (backendSteps.length === 0) return;
 
     await Promise.all(
-      backendSteps.map((step) =>
-        api.patch('/tenant/onboarding-step', { step, completed: true }),
-      ),
+      backendSteps.map(async (step) => {
+        const response = await api.patch('/tenant/onboarding-step', { step, completed: true });
+        if (!response.success) throw new Error('Nao foi possivel marcar a etapa do onboarding.');
+      }),
     );
   }, []);
 
@@ -286,24 +301,50 @@ export function useOnboardingState() {
     setIfoodChoiceState(choice);
   }, []);
 
-  const saveStep = useCallback(async (saveFn: () => Promise<void>) => {
+  const advanceCurrentStep = useCallback(() => {
+    setCurrentStep((prev) => {
+      const next = Math.min(prev + 1, TOTAL_STEPS - 1);
+      setVisitedSteps((vs) => (vs.includes(next) ? vs : [...vs, next]));
+      return next;
+    });
+  }, []);
+
+  const saveStep = useCallback(async (saveFn: () => Promise<void>, options?: SaveStepOptions): Promise<boolean> => {
+    if (options?.resumePersistedDeliveryCoverage) {
+      if (!deliveryCoverageCompletion.current) {
+        deliveryCoverageCompletion.current = new DeliveryCoverageCompletion({
+          markStep: () => syncCurrentStepToBackend(2),
+          revalidate: () => checkValidationFromApi({ throwOnFailure: true }),
+          advance: advanceCurrentStep,
+          onStatus: setAutoSaveStatus,
+        });
+      }
+
+      const advanced = await deliveryCoverageCompletion.current.submit(saveFn);
+      if (advanced) deliveryCoverageCompletion.current = null;
+      window.setTimeout(() => setAutoSaveStatus('idle'), advanced ? 2500 : 3000);
+      return advanced;
+    }
+
+    if (submittingStep.current) return false;
+    submittingStep.current = true;
     setAutoSaveStatus('saving');
     try {
       await saveFn();
       await syncCurrentStepToBackend(currentStep);
-      await checkValidationFromApi();
-      setCurrentStep((prev) => {
-        const next = Math.min(prev + 1, TOTAL_STEPS - 1);
-        setVisitedSteps((vs) => (vs.includes(next) ? vs : [...vs, next]));
-        return next;
-      });
+      await checkValidationFromApi({ throwOnFailure: true });
+      advanceCurrentStep();
       setAutoSaveStatus('saved');
       window.setTimeout(() => setAutoSaveStatus('idle'), 2500);
+      return true;
     } catch {
       setAutoSaveStatus('error');
       window.setTimeout(() => setAutoSaveStatus('idle'), 3000);
+      return false;
+    } finally {
+      submittingStep.current = false;
     }
-  }, [checkValidationFromApi, currentStep, syncCurrentStepToBackend]);
+  }, [advanceCurrentStep, checkValidationFromApi, currentStep, syncCurrentStepToBackend]);
 
   const completeOnboarding = useCallback(async () => {
     setAutoSaveStatus('saving');
