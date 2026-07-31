@@ -1,0 +1,12 @@
+title = "Gestor Delivery secret scanning policy"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "gestor-jwt-env-assignment"
+description = "JWT signing secret in an environment assignment"
+regex = '''(?i)\bJWT_(?:REFRESH_)?SECRET\s*=\s*["']?(?!REPLACE_IN_DOKPLOY_SECRET_MANAGER\b)([A-Za-z0-9+/=_-]{16,})'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["jwt_secret", "jwt_refresh_secret"]
