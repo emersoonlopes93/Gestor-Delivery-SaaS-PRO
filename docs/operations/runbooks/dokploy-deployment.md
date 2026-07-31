@@ -35,6 +35,14 @@ Executar novamente é seguro apenas para confirmar que não há migrations pende
 3. Validar health, readiness, Redis/BullMQ e executar os smokes aprovados para o ambiente.
 4. Confirmar que nenhum tenant ou recurso iFood foi habilitado automaticamente.
 
+5. Para rotação de JWT ou revogação de sessões, seguir também o runbook
+   [`secret-rotation.md`](./secret-rotation.md); não executar migration nesta
+   janela.
+6. Valores reais pertencem somente ao secret manager do Dokploy. Antes de
+   restart ou deploy, confirmar que não há definições conflitantes entre
+   environment, env files montados, compose, build args, shared variables e
+   variáveis de projeto/serviço. Nunca imprimir valores.
+
 ## Rollback
 
 1. Desligar primeiro os kill switches da capacidade afetada.
