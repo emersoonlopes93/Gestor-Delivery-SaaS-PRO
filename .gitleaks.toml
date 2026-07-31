@@ -15,20 +15,20 @@ keywords = ["jwt_secret", "jwt_refresh_secret"]
 description = "Documented synthetic marketplace credential examples"
 targetRules = ["generic-api-key"]
 paths = [
-  '''^apps/api/docs/marketplace-ifood-p1-smoke\.md$''',
+  '''(^|.*/)apps/api/docs/marketplace-ifood-p1-smoke\.md$''',
 ]
 
 [[allowlists]]
 description = "Synthetic commercial AI certification fixture"
 targetRules = ["generic-api-key"]
 paths = [
-  '''^apps/api/scripts/e2e-certification-commercial-ai\.ts$''',
+  '''(^|.*/)apps/api/scripts/e2e-certification-commercial-ai\.ts$''',
 ]
 
 [[allowlists]]
 description = "Documented Authorization header placeholders"
 targetRules = ["curl-auth-header"]
 paths = [
-  '''^docs/evolution-go/events-system\.md$''',
-  '''^docs/evolution-go/api-overview\.md$''',
+  '''(^|.*/)docs/evolution-go/events-system\.md$''',
+  '''(^|.*/)docs/evolution-go/api-overview\.md$''',
 ]
