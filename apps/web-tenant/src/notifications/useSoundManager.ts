@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSoundCatalogEntry, type SystemSoundEvent } from './soundCatalog';
 import { getAudioContextState, playNotificationSound, unlockNotificationAudio } from './soundEngine';
 import { traceNotificationE2E } from './e2eTrace';
+import { useAuthStore } from '../stores/auth.store';
 
 export const TENANT_NOTIFICATION_SOUND_ENABLED_KEY = 'tenantNotificationSoundEnabled';
 export const TENANT_NOTIFICATION_VOLUME_KEY = 'tenantNotificationVolume';
+export const TENANT_NOTIFICATION_AUDIO_CONFIRMED_KEY = 'tenantNotificationAudioConfirmedV2';
 /** @deprecated This key used to mix user preference and AudioContext state. */
 export const TENANT_NOTIFICATION_AUDIO_UNLOCKED_KEY = 'tenantNotificationAudioUnlocked';
 
@@ -17,6 +19,7 @@ export type SoundActivationUiState = 'disabled' | 'blocked' | 'activating' | 're
 
 type SoundManagerSnapshot = {
   soundPreferenceEnabled: boolean;
+  audioActivationConfirmed: boolean;
   volume: number;
 };
 
@@ -25,9 +28,18 @@ type SoundActivationSession = {
   bannerShown: boolean;
 };
 
-function readBool(key: string, fallback: boolean): boolean {
+export function getSoundStorageKey(key: string, scopeKey?: string) {
+  return scopeKey ? `gestor:notifications:v2:${scopeKey}:${key}` : key;
+}
+
+function readBool(key: string, fallback: boolean, scopeKey?: string): boolean {
   if (typeof window === 'undefined') return fallback;
-  const raw = window.localStorage.getItem(key);
+  const keyForScope = getSoundStorageKey(key, scopeKey);
+  let raw = window.localStorage.getItem(keyForScope);
+  if (raw === null && scopeKey) {
+    raw = window.localStorage.getItem(key);
+    if (raw !== null) window.localStorage.setItem(keyForScope, raw);
+  }
   return raw === null ? fallback : raw === 'true';
 }
 
@@ -36,11 +48,18 @@ function clampVolume(volume: number): number {
   return Math.max(0, Math.min(1, volume));
 }
 
-function readSnapshot(): SoundManagerSnapshot {
-  if (typeof window === 'undefined') return { soundPreferenceEnabled: true, volume: 1 };
+function readSnapshot(scopeKey?: string): SoundManagerSnapshot {
+  if (typeof window === 'undefined') return { soundPreferenceEnabled: true, audioActivationConfirmed: false, volume: 1 };
+  const volumeKey = getSoundStorageKey(TENANT_NOTIFICATION_VOLUME_KEY, scopeKey);
+  let storedVolume = window.localStorage.getItem(volumeKey);
+  if (storedVolume === null && scopeKey) {
+    storedVolume = window.localStorage.getItem(TENANT_NOTIFICATION_VOLUME_KEY);
+    if (storedVolume !== null) window.localStorage.setItem(volumeKey, storedVolume);
+  }
   return {
-    soundPreferenceEnabled: readBool(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, true),
-    volume: clampVolume(Number(window.localStorage.getItem(TENANT_NOTIFICATION_VOLUME_KEY) ?? '1')),
+    soundPreferenceEnabled: readBool(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, true, scopeKey),
+    audioActivationConfirmed: readBool(TENANT_NOTIFICATION_AUDIO_CONFIRMED_KEY, false, scopeKey),
+    volume: clampVolume(Number(storedVolume ?? '1')),
   };
 }
 
@@ -56,13 +75,16 @@ function emitStateChanged() {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SOUND_MANAGER_STATE_EVENT));
 }
 
-function persistSnapshot(next: Partial<SoundManagerSnapshot>) {
+function persistSnapshot(next: Partial<SoundManagerSnapshot>, scopeKey?: string) {
   if (typeof window === 'undefined') return;
   if (typeof next.soundPreferenceEnabled === 'boolean') {
-    window.localStorage.setItem(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, String(next.soundPreferenceEnabled));
+    window.localStorage.setItem(getSoundStorageKey(TENANT_NOTIFICATION_SOUND_ENABLED_KEY, scopeKey), String(next.soundPreferenceEnabled));
+  }
+  if (typeof next.audioActivationConfirmed === 'boolean') {
+    window.localStorage.setItem(getSoundStorageKey(TENANT_NOTIFICATION_AUDIO_CONFIRMED_KEY, scopeKey), String(next.audioActivationConfirmed));
   }
   if (typeof next.volume === 'number') {
-    window.localStorage.setItem(TENANT_NOTIFICATION_VOLUME_KEY, String(clampVolume(next.volume)));
+    window.localStorage.setItem(getSoundStorageKey(TENANT_NOTIFICATION_VOLUME_KEY, scopeKey), String(clampVolume(next.volume)));
   }
   emitStateChanged();
 }
@@ -97,8 +119,10 @@ export function shouldShowSoundActivationBanner(input: {
   audioContextState: AudioContextState;
   activationInProgress: boolean;
   bannerDismissedForSession: boolean;
+  activationConfirmed?: boolean;
 }): boolean {
   return input.soundPreferenceEnabled
+    && !input.activationConfirmed
     && (input.audioContextState === 'not-created' || input.audioContextState === 'suspended')
     && !input.activationInProgress
     && !input.bannerDismissedForSession;
@@ -114,6 +138,7 @@ export class SoundPlaybackController {
   canPlay(event: SystemSoundEvent, input: { soundPreferenceEnabled: boolean; audioContextState: AudioContextState }, now = Date.now()): boolean {
     if (!input.soundPreferenceEnabled || input.audioContextState !== 'running') return false;
     const definition = getSoundCatalogEntry(event);
+    if (definition.silent) return false;
     const lastPlayed = this.lastPlayedAt.get(event);
     if (typeof lastPlayed === 'number' && definition.cooldownMs && now - lastPlayed < definition.cooldownMs) return false;
     this.lastPlayedAt.set(event, now);
@@ -124,7 +149,9 @@ export class SoundPlaybackController {
 const playbackController = new SoundPlaybackController();
 
 export function useSoundManager() {
-  const [snapshot, setSnapshot] = useState<SoundManagerSnapshot>(() => readSnapshot());
+  const user = useAuthStore((state) => state.user);
+  const scopeKey = user ? `${user.tenantId}:${user.userId}` : undefined;
+  const [snapshot, setSnapshot] = useState<SoundManagerSnapshot>(() => readSnapshot(scopeKey));
   const [audioContextState, setAudioContextState] = useState<AudioContextState>(() => getAudioContextState());
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activationInProgress, setActivationInProgress] = useState(false);
@@ -132,7 +159,7 @@ export function useSoundManager() {
 
   useEffect(() => {
     const syncState = () => {
-      setSnapshot(readSnapshot());
+      setSnapshot(readSnapshot(scopeKey));
       setAudioContextState(getAudioContextState());
       setActivationSession(readActivationSession());
     };
@@ -142,7 +169,24 @@ export function useSoundManager() {
       window.removeEventListener('storage', syncState);
       window.removeEventListener(SOUND_MANAGER_STATE_EVENT, syncState as EventListener);
     };
-  }, []);
+  }, [scopeKey]);
+
+  useEffect(() => {
+    if (!snapshot.soundPreferenceEnabled || !snapshot.audioActivationConfirmed || audioContextState === 'running') return;
+    const resumeFromGesture = () => {
+      void unlockNotificationAudio().then(() => {
+        setAudioContextState(getAudioContextState());
+      }).catch(() => {
+        setAudioContextState(getAudioContextState());
+      });
+    };
+    window.addEventListener('pointerdown', resumeFromGesture, { once: true, capture: true });
+    window.addEventListener('keydown', resumeFromGesture, { once: true, capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', resumeFromGesture, { capture: true });
+      window.removeEventListener('keydown', resumeFromGesture, { capture: true });
+    };
+  }, [audioContextState, snapshot.audioActivationConfirmed, snapshot.soundPreferenceEnabled]);
 
   useEffect(() => {
     const syncAudioContext = () => setAudioContextState(getAudioContextState());
@@ -156,19 +200,19 @@ export function useSoundManager() {
   }, []);
 
   const setSoundPreferenceEnabled = useCallback((enabled: boolean) => {
-    persistSnapshot({ soundPreferenceEnabled: enabled });
+    persistSnapshot({ soundPreferenceEnabled: enabled }, scopeKey);
     setSnapshot((previous) => ({ ...previous, soundPreferenceEnabled: enabled }));
     const nextSession = { bannerDismissed: !enabled, bannerShown: !enabled };
     persistActivationSession(nextSession);
     setActivationSession((previous) => ({ ...previous, ...nextSession }));
     if (enabled) setActivationError(null);
-  }, []);
+  }, [scopeKey]);
 
   const setVolume = useCallback((volume: number) => {
     const nextVolume = clampVolume(volume);
-    persistSnapshot({ volume: nextVolume });
+    persistSnapshot({ volume: nextVolume }, scopeKey);
     setSnapshot((previous) => ({ ...previous, volume: nextVolume }));
-  }, []);
+  }, [scopeKey]);
 
   const unlockAudio = useCallback(async (): Promise<boolean> => {
     setActivationInProgress(true);
@@ -182,6 +226,8 @@ export function useSoundManager() {
         return false;
       }
       persistActivationSession({ bannerDismissed: true, bannerShown: true });
+      persistSnapshot({ audioActivationConfirmed: true }, scopeKey);
+      setSnapshot((previous) => ({ ...previous, audioActivationConfirmed: true }));
       setActivationSession((previous) => ({ ...previous, bannerDismissed: true, bannerShown: true }));
       return true;
     } catch (error) {
@@ -191,10 +237,10 @@ export function useSoundManager() {
     } finally {
       setActivationInProgress(false);
     }
-  }, []);
+  }, [scopeKey]);
 
   const playEvent = useCallback(async (event: SystemSoundEvent, options?: { force?: boolean }): Promise<boolean> => {
-    const currentPrefs = readSnapshot();
+    const currentPrefs = readSnapshot(scopeKey);
     const currentContextState = getAudioContextState();
     const canPlay = options?.force
       ? currentPrefs.soundPreferenceEnabled && currentContextState === 'running'
@@ -210,12 +256,12 @@ export function useSoundManager() {
     setAudioContextState(getAudioContextState());
     if (played) setActivationError(null);
     return played;
-  }, []);
+  }, [scopeKey]);
 
   const testSound = useCallback(async (): Promise<boolean> => {
-    if (!readSnapshot().soundPreferenceEnabled || getAudioContextState() !== 'running') return false;
+    if (!readSnapshot(scopeKey).soundPreferenceEnabled || getAudioContextState() !== 'running') return false;
     return playEvent('order.created', { force: true });
-  }, [playEvent]);
+  }, [playEvent, scopeKey]);
 
   const needsAudioUnlock = snapshot.soundPreferenceEnabled && (audioContextState === 'not-created' || audioContextState === 'suspended');
   const activationUiState = getSoundActivationUiState({ soundPreferenceEnabled: snapshot.soundPreferenceEnabled, audioContextState, activationInProgress, activationError });
@@ -224,10 +270,15 @@ export function useSoundManager() {
     audioContextState,
     activationInProgress,
     bannerDismissedForSession: activationSession.bannerDismissed,
+    activationConfirmed: snapshot.audioActivationConfirmed,
   });
   const markActivationBannerShownForSession = useCallback(() => {
     persistActivationSession({ bannerShown: true });
     setActivationSession((previous) => ({ ...previous, bannerShown: true }));
+  }, []);
+  const dismissActivationBannerForSession = useCallback(() => {
+    persistActivationSession({ bannerDismissed: true, bannerShown: true });
+    setActivationSession((previous) => ({ ...previous, bannerDismissed: true, bannerShown: true }));
   }, []);
 
   return useMemo(() => ({
@@ -246,5 +297,6 @@ export function useSoundManager() {
     playEvent,
     testSound,
     markActivationBannerShownForSession,
-  }), [activationBannerEligible, activationError, activationInProgress, activationSession.bannerShown, activationUiState, audioContextState, markActivationBannerShownForSession, needsAudioUnlock, playEvent, setSoundPreferenceEnabled, setVolume, snapshot.soundPreferenceEnabled, snapshot.volume, testSound, unlockAudio]);
+    dismissActivationBannerForSession,
+  }), [activationBannerEligible, activationError, activationInProgress, activationSession.bannerShown, activationUiState, audioContextState, dismissActivationBannerForSession, markActivationBannerShownForSession, needsAudioUnlock, playEvent, setSoundPreferenceEnabled, setVolume, snapshot.soundPreferenceEnabled, snapshot.volume, testSound, unlockAudio]);
 }

@@ -722,7 +722,7 @@ export function AppLayout() {
         position="top-right"
         containerClassName="safe-x"
         containerStyle={{
-          top: 'calc(12px + var(--safe-area-top))',
+          top: 'calc(12px + var(--safe-area-top) + var(--mobile-header-height))',
           right: 'calc(12px + var(--safe-area-right))',
           left: 'calc(12px + var(--safe-area-left))',
         }}
@@ -938,7 +938,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ height: '52px', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="px-4 flex items-center justify-between w-full h-full gap-4">
             <div className="flex items-center gap-2 min-w-0">
               <button

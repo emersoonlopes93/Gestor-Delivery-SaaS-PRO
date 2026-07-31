@@ -1,3 +1,61 @@
+## Branding Android — nome, ícones e splash
+
+Data: 2026-07-31
+
+Branch: `fix/mobile-notification-lifecycle-safe-area`
+
+- Fonte canônica: `apps/web-tenant/public/favicon.svg` e o nome móvel
+  `PedeHub Lojista` já definido em `apps/web-tenant/capacitor.config.ts`.
+  Os recursos template do Capacitor (`My App` e ícone/splash genéricos) foram
+  substituídos por launcher, round/adaptive icon e splash derivados do SVG.
+- `LocalNotifications` agora usa o vetor monocromático
+  `drawable/ic_stat_pedehub.xml`, com tint `#22c55e`; o canal
+  `new-orders-v2` e o chime não foram alterados.
+- `pnpm --filter @gestor/web-tenant build`, lint, typecheck, `check:no-any`,
+  `check:features`, 22 testes de notificações e `git diff --check` passaram.
+  `cap sync android` e `clean assembleDebug --stacktrace` passaram usando
+  JBR 21 do Android Studio. O APK foi inspecionado por `aapt2`: label
+  `PedeHub Lojista`, applicationId preservado `com.getcapacitor.app`,
+  MainActivity launchable, launcher/round/adaptive icon e small icon presentes.
+- Não havia alvo em `adb devices` nem AVD local; instalação e confirmação visual
+  no launcher/configurações/diálogo permanecem pendentes. PR segue Draft;
+  não houve deploy, merge, migration, lockfile ou dependência nova.
+
+---
+
+## Notificações mobile — lifecycle, permissões, safe area e áudio
+
+Data: 2026-07-30
+
+Branch: `fix/mobile-notification-lifecycle-safe-area`
+
+Base: `origin/main-copy` / `ca762a79`
+
+- `socket.disconnect` deixou de significar internet offline. Background/hidden
+  suspende avisos; offline real usa debounce de 1,2 s; socket/serviço usa grace
+  period de 5 s e health check WebSocket.
+- Conectividade é visual, deduplicada e silenciosa. Novo pedido mantém som,
+  liderança multi-tab e dedupe por pedido.
+- Preferência sonora ficou durável, versionada e isolada por tenant/usuário.
+  O onboarding web/nativo ocorre por gesto, não repete `denied` automaticamente
+  e possui fechamento acessível.
+- Toasts possuem `aria-label="Fechar notificação"`, Escape, máximo de dois e
+  pilha sem sobreposição. Banner inferior e toasts respeitam safe areas, header
+  mobile e landscape.
+- Novo chime Web Audio tem duração superior a 1 s. Android usa canal
+  `new-orders-v2` e WAV original de 1,48 s, pico 0,86.
+- Não existe push nativo/FCM; alertas com tela desligada não são prometidos e
+  permanecem como PR separada.
+- Gates: web-tenant lint, typecheck, build, 10 arquivos/46 testes,
+  `check:no-any`, `check:features`, diff-check e E2E visual mobile passaram.
+  `npx cap sync android` passou e confirmou Local Notifications 7.0.6.
+- Pendente: `assembleDebug` e validação em dispositivo. O ambiente não possui
+  Java/JDK (`JAVA_HOME` ausente; Gradle exit 9009).
+- Nenhum Prisma, migration, analytics, billing, regra de pedido, dependência,
+  lockfile, banco remoto ou deploy foi alterado.
+
+---
+
 ## PR 2B - Performance API
 
 Branch `feat/analytics-performance-api`, stacked on `feat/analytics-daily-rollups` at `a9d11ca7`.
