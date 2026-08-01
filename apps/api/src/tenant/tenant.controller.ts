@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Logger, ForbiddenException } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, CurrentUser, RequirePermissions } from '../common/decorators';
@@ -80,6 +80,14 @@ export class TenantController {
     @CurrentUser('sub') userId: string,
     @Body() body: CreateBranchRequest,
   ) {
+    const capability = this.featureControlService.getTenantActionCapability('branches.create');
+    if (!capability.enabled) {
+      throw new ForbiddenException({
+        code: capability.code,
+        message: capability.message,
+      });
+    }
+
     return this.tenantService.createBranch(tenantId, userId, body);
   }
 
