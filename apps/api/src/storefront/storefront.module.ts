@@ -12,9 +12,10 @@ import { AnalyticsModule } from '../analytics/analytics.module';
 import { StorefrontCacheService } from './services/storefront-cache.service';
 import { FeatureControlModule } from '../feature-control/feature-control.module';
 import { StorefrontPreviewController } from './storefront-preview.controller';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
-  imports: [DatabaseModule, CatalogModule, SchedulingModule, forwardRef(() => UploadModule), AnalyticsModule, FeatureControlModule],
+  imports: [DatabaseModule, CatalogModule, SchedulingModule, forwardRef(() => UploadModule), AnalyticsModule, FeatureControlModule, RbacModule],
   controllers: [StorefrontController, StorefrontPreviewController],
   providers: [StorefrontService, StorefrontCacheService],
   exports: [StorefrontService, StorefrontCacheService],
