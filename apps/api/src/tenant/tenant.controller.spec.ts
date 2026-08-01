@@ -20,6 +20,7 @@ describe('TenantController branch creation capability', () => {
       {} as never,
       {} as never,
       featureControlService as never,
+      {} as never,
     );
 
     await expect(controller.createBranch('tenant-1', 'user-1', { name: 'Centro' }))
@@ -29,5 +30,30 @@ describe('TenantController branch creation capability', () => {
     await expect(controller.getNetworkContext('tenant-1')).resolves.toEqual({
       stores: [{ id: 'branch-1' }],
     });
+  });
+
+  it('forwards preview resolution only for the tenant from the authenticated context', async () => {
+    const storefrontService = {
+      getStorefrontPreviewPayload: jest.fn().mockResolvedValue({ categories: [] }),
+    };
+    const controller = new TenantController(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      storefrontService as never,
+    );
+    const request = {
+      customization: { theme: {}, layout: {} },
+      fulfillmentType: 'delivery' as const,
+    };
+
+    await controller.getStorefrontPreview('tenant-from-token', request);
+
+    expect(storefrontService.getStorefrontPreviewPayload).toHaveBeenCalledWith(
+      'tenant-from-token',
+      request.customization,
+      'delivery',
+    );
   });
 });
