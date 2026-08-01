@@ -1087,3 +1087,40 @@ Base: `origin/main-copy` / `6ed4c043e693bac98cb21509e87590f080d599f2`
 - Próximo passo obrigatório: E0 emergencial para rotação dos secrets, invalidação
   de sessões, saneamento do arquivo/histórico e gate de secret scanning. Retomar
   a R0 somente após evidência da contenção.
+
+---
+
+## R4 - segurança da criação de filiais e bloqueio inicial
+
+Data: 2026-08-01
+
+- Branch `fix/go-live-r4-branch-creation-safety`, worktree isolada, baseada no
+  merge da PR #40 em `origin/main-copy` (`940d60f8`). Checkout principal,
+  `stash@{0}` e worktrees R0/R1/R2/R2.5/R3/E0 foram preservados.
+- Auditoria canônica: `docs/audits/r4-branch-creation-safety-audit.md`.
+  Filial é um `Tenant`; `TenantUser` é identidade tenant-scoped; a semântica
+  aprovada é **CREATE NEW LINK**, sem `User` global ou membership separado.
+- Constraint observada: `tenant_users_tenant_id_email_key`. O mesmo email em
+  tenants distintos é permitido. O erro prova um vínculo preexistente no mesmo
+  tenant-alvo, mas a primeira execução isolada do código auditado usa o UUID do
+  novo Tenant; por isso nenhum `upsert` cego foi adotado.
+- A criação agora relê matriz/grupo/owner dentro de transação `Serializable`,
+  recupera somente estado completo equivalente por slug natural e retorna 409
+  estável para conflito de slug ou de owner link. Todos os writes permanecem na
+  mesma transação e não há efeito externo pós-commit.
+- `branches.create` foi adicionada à resposta canônica de
+  `/tenant/capabilities` com política de release OFF. O controller bloqueia o
+  POST com HTTP 403 e código `BRANCH_CREATION_TEMPORARILY_DISABLED`; a UI consome
+  a mesma capability, mostra indisponibilidade e mantém leitura das lojas.
+- O cliente possui trava síncrona de reentrada além de `isPending`; erro HTTP
+  estável continua mapeado para a mensagem do formulário.
+- Testes focados: API branch/controller/feature-control e frontend safety PASS.
+  Cobrem criação, vínculo owner, grupo na mesma transação, retry equivalente,
+  conflito cross-group, permissão, P2002 específico, falha intermediária,
+  capability server/client, leitura preservada, erro e double-submit.
+- Gates locais PASS: install frozen, lint (0 erros; 17 warnings preexistentes no
+  storefront), typecheck, check:no-any, check:features, API build, web-tenant
+  build, web-admin build e diff-check.
+- Prisma/schema/migration/seed, billing/subscription, dependência/lockfile,
+  provider, credencial, E0-OPS, produção e deploy não foram alterados.
+- R4 deve permanecer Draft e não deve ser integrada nesta sessão.

@@ -18,6 +18,8 @@ import {
   type FeatureOperationalStatus,
   type FeaturePresetKey,
   type FeatureStatus,
+  TENANT_ACTION_CAPABILITIES,
+  type TenantActionCapabilityKey,
 } from '@gestor/core';
 import type {
   AdminFeatureCatalogItem,
@@ -136,6 +138,10 @@ export class FeatureControlService {
     private readonly rbacService: RbacService,
   ) {}
 
+  getTenantActionCapability(actionKey: TenantActionCapabilityKey) {
+    return TENANT_ACTION_CAPABILITIES[actionKey];
+  }
+
   async resolveTenantFeature(input: ResolveTenantFeatureInput): Promise<TenantCapabilityDecision> {
     const feature = this.requireFeature(input.featureKey);
     if (feature.essential) {
@@ -190,6 +196,7 @@ export class FeatureControlService {
     return {
       features: Object.fromEntries(featureEntries),
       modules: Object.fromEntries(moduleEntries),
+      actions: TENANT_ACTION_CAPABILITIES,
       plan: {
         id: context.billingState.plan?.id ?? null,
         name: context.billingState.plan?.name ?? null,
