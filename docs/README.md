@@ -123,6 +123,7 @@
 | [Marketing, Analytics e Desempenho do Cardápio](./audits/marketing-analytics-cardapio-audit.md) | Estado atual, lacunas, riscos e plano incremental |
 | [R2.5 — Vitrine inteligente](./audits/r2-5-smart-storefront-showcase-audit.md) | Auditoria de contratos, ranking, disponibilidade, cache e arquitetura mínima da vitrine |
 | [R3 — Login do entregador sem slug](./audits/r3-driver-login-no-slug-audit.md) | Auditoria de identidade, ambiguidade, sessão, enumeração e WebSocket do entregador |
+| [R4 — Segurança da criação de filiais](./audits/r4-branch-creation-safety-audit.md) | Modelo de identidade, causa do conflito, atomicidade, idempotência e bloqueio temporário da criação |
 | [Inventário documental](./audits/documentation-inventory.md) | Todos os docs com estado e ação |
 | [Relatório de auditoria](./audits/documentation-audit.md) | Análise de consistência código vs docs |
 | [Contradições](./audits/contradictions.md) | Divergências documentadas |
