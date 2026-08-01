@@ -861,3 +861,37 @@ Verificado nas 8 capturas, zoom 100%, sidebar visível, sem skeleton/toasts cobr
 - Screenshots reais confirmam o alinhamento estrutural pretendido em 2 resoluções desktop.
 - Nenhum push, PR, merge, deploy, stash apply/drop ou commit foi realizado até aqui.
 - Próximo passo: commit somente de `SettingsPage.tsx` + `docs/handoffs/current-state.md` (o arquivo `scripts/screenshot-settings.ts` e o diretório `tmp/` permanecem fora do commit, conforme protocolo).
+
+---
+
+## R0 Go-Live Readiness — interrompida por P0 de segurança
+
+Data: 2026-07-31
+
+Branch: `docs/go-live-readiness-audit`
+
+Base: `origin/main-copy` / `6ed4c043e693bac98cb21509e87590f080d599f2`
+
+- O checkout principal e `stash@{0}` foram preservados; a auditoria ocorreu em
+  worktree isolada.
+- PR #33 foi confirmada integrada no SHA-base. PR #34 permanece aberta, Draft e
+  fora de `main-copy`.
+- `.env.docker` está versionado e contém valores concretos para os dois secrets
+  JWT. Os valores não foram copiados para o handoff.
+- O arquivo está no histórico Git. O compose de produção atual lê `.env`, não
+  `.env.docker`; o uso efetivo dos valores na VPS não foi verificado porque
+  acesso à produção é proibido.
+- O achado foi classificado P0 de segurança e acionou a stop-rule do briefing.
+  A auditoria consolidada, o escopo do Go-Live, R1-R10 e os checklists não foram
+  concluídos.
+- Foram criados localmente apenas `docs/go-live/README.md`,
+  `docs/go-live/readiness-audit-2026-07-31.md` e
+  `docs/go-live/issue-matrix.md` para registrar o bloqueador.
+- Baselines: `pnpm lint` exit 1 por `eslint` ausente; `pnpm typecheck` exit 1 por
+  `tsc` ausente. Nenhuma dependência foi instalada.
+- Nenhum código funcional, Prisma, migration, dependência, lockfile, feature
+  flag, banco, produção ou deploy foi alterado.
+- Nenhum commit, push, PR, merge ou deploy foi realizado.
+- Próximo passo obrigatório: E0 emergencial para rotação dos secrets, invalidação
+  de sessões, saneamento do arquivo/histórico e gate de secret scanning. Retomar
+  a R0 somente após evidência da contenção.
