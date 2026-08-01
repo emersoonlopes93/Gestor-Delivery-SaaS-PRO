@@ -1124,3 +1124,34 @@ Data: 2026-08-01
 - Prisma/schema/migration/seed, billing/subscription, dependência/lockfile,
   provider, credencial, E0-OPS, produção e deploy não foram alterados.
 - R4 deve permanecer Draft e não deve ser integrada nesta sessão.
+
+---
+
+## R5 — paridade do preview administrativo com o storefront
+
+Data: 2026-08-01
+
+- Branch `fix/go-live-r5-storefront-preview-parity`, worktree isolada, baseada no
+  merge da PR #41 em `origin/main-copy` (`7b9d89c6`). Checkout principal,
+  `stash@{0}` e worktrees anteriores foram preservados.
+- Auditoria canônica: `docs/audits/r5-storefront-preview-parity-audit.md`.
+  O público já era autoritativo para catálogo, availability por fulfillment e
+  ranking R2.5; o preview usava catálogo bruto, filtros, tema, categorias, cards
+  e showcase manual reimplementados no navegador.
+- Foi adicionada uma rota autenticada e tenant-scoped de preview. Ela reutiliza
+  `StorefrontService.getStorefrontPayload`, aplica somente os overrides locais
+  ainda não salvos, respeita delivery/pickup e não lê ou grava cache público.
+- O editor agora consome `StorefrontPayload` e reutiliza `StorefrontShell`,
+  `StorefrontThemeProvider`, `CategoryNavigation`, `ProductRenderer`, o adapter
+  de produto e `SmartShowcase` compartilhados. O storefront público usa o mesmo
+  adapter e showcase compartilhado.
+- MANUAL, AUTOMATIC BEST_SELLING, AUTOMATIC PROMOTIONS e HYBRID permanecem
+  resolvidos apenas no servidor, com ordem, deduplicação, maxItems,
+  eligibility/availability e fallback canônicos. Não há ranking no browser.
+- O estado não salvo continua local; não há autosave, publicação automática,
+  versão draft persistida nem alteração da semântica de publicação.
+- Não houve Prisma/schema/migration/seed, provedor externo, credencial,
+  produção, Dokploy, deploy, E0-OPS ou refactor global de tema R6.
+- Testes focados de API, showcase público e preview administrativo passam. Não
+  existe fixture Playwright econômica para este editor; a validação visual
+  pesada não foi criada.
