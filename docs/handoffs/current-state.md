@@ -25,6 +25,13 @@ Data: 2026-08-01
   Testes focados: 5 suites/19 testes API PASS e 1 suite/1 teste frontend PASS.
 - Prisma/schema, migrations, seed, dependências, lockfile, provider, secrets,
   E0-OPS, banco remoto, produção e deploy não foram alterados.
+- Recuperação do proof da PR #40: o run `30693717516` perdeu o diagnóstico
+  quando a API encerrou antes do health check porque consultava somente
+  containers em execução (`docker compose ps -q api`) e abortava antes do
+  bloco sanitizado. O workflow agora captura o container criado com `ps -aq`,
+  preserva o ID após saída e limita `docker inspect` aos campos seguros de
+  estado, exit code, OOM, erro e timestamps. A próxima execução instrumentada
+  continua sendo o gate; a PR permanece Draft e sem deploy.
 
 ---
 
