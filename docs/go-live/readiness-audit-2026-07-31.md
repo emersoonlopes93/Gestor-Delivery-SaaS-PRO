@@ -1,123 +1,67 @@
-# Auditoria de prontidão para Go-Live — 2026-07-31
+# R0 - Auditoria funcional de prontidao Go-Live - 2026-07-31
 
-## Resumo executivo
+## Decisao
 
-**Decisão: BLOQUEADO.**
+**APROVADO PARA INICIAR P1/R1; Go-Live definitivo permanece BLOQUEADO por E0-OPS.**
 
-A auditoria foi iniciada sobre `origin/main-copy` no SHA
-`6ed4c043e693bac98cb21509e87590f080d599f2`. Durante a inspeção de secrets e
-configuração foi confirmado que `.env.docker` é versionado e contém valores
-concretos para `JWT_SECRET` e `JWT_REFRESH_SECRET`, além de se declarar como
-configuração de produção e listar domínios públicos.
+Esta retomada auditou estaticamente a branch `docs/go-live-readiness-audit` no
+SHA `0ecfe5dfbdd91bfd5ec0b1238d97d926139c36ab`, cuja base E0 e
+`efbfefa31992fcd5d485067bd0b3323ef56c14e4`. A CI pos-merge da E0 esta verde:
+CI `30678152290` e Secret scanning `30678152243` concluiram com sucesso. O
+remoto `main-copy` avancou depois para `6e5acfa3`; essa deriva nao foi trazida
+para a PR R0 documental.
 
-Os valores não são reproduzidos neste documento. O arquivo está no histórico Git
-desde commits anteriores. O compose de produção atual referencia `.env`, e não
-`.env.docker`, portanto não é possível afirmar sem acesso à VPS se as credenciais
-versionadas são as credenciais efetivas do ambiente. Esse acesso é expressamente
-proibido pelo briefing.
+Nao foi encontrado novo P0 de codigo/repository no preset estavel auditado.
+`NotImplementedException` persiste somente em `split-payment`, feature beta e
+fora do preset de Go-Live. A E0 esta **MITIGADA**, mas E0-OPS continua o unico
+bloqueador operacional: redeploy do SHA integrado, revogacao global de
+`AuthSession`, e smoke autenticado de nova sessao. E0H (purga coordenada do
+historico) permanece planejada e nao foi executada.
 
-Credenciais de assinatura versionadas devem ser tratadas como comprometidas até
-prova em contrário. O achado é P0 e aciona a regra: registrar, parar, não corrigir
-na PR documental e propor uma PR emergencial separada.
+## Preservacao e limites
 
-## SHA e preservação
+- Worktree: `Gestor-Delivery-SaaS-PRO-go-live-audit`; branch limpa no inicio.
+- `stash@{0}` e checkout principal foram preservados; nenhuma outra worktree
+  foi modificada.
+- PR #34 e PR #35 estavam integradas; a PR R0 #36 permanece Draft.
+- Nenhuma producao, Dokploy, banco remoto, migration, seed, secret ou provider
+  foi acessado. Resultado de UX, RBAC real e integracoes externas sem fixture
+  autenticada e **BLOQUEADO POR AMBIENTE**, nao uma alegacao de passagem.
 
-- Repositório: `emersoonlopes93/Gestor-Delivery-SaaS-PRO`
-- Base: `origin/main-copy`
-- SHA auditado: `6ed4c043e693bac98cb21509e87590f080d599f2`
-- Worktree: `Gestor-Delivery-SaaS-PRO-go-live-audit`
-- Branch: `docs/go-live-readiness-audit`
-- Checkout principal: preservado, inclusive alterações locais preexistentes
-- `stash@{0}`: preservado; nenhum `stash apply`, `pop` ou `drop`
-- PR #33: confirmada como integrada no SHA-base
-- PR #34: confirmada aberta, Draft e fora de `main-copy`
+## Evidencia funcional R1-R10
 
-## Metodologia executada antes da parada
+| ID | Resultado | Prioridade | Evidencia estatica | Lacuna / proximo aceite |
+|---|---|---|---|---|
+| R1 pedido, resumo e envio duplicado | PARCIALMENTE CONFIRMADO | P1 | `CheckoutPage.tsx:228-229,446-447,516,977`; `orders.service.ts:241-245,285`; `orders.atomicity.spec.ts` | Smoke autenticado com dupla submissao e retry de rede deve provar um unico pedido. |
+| R2 checkout progressivo e endereco | PARCIALMENTE CONFIRMADO | P1 | `CheckoutPage.tsx`; `checkout-validator.service.ts:63,273-306`; rotas `public-checkout/:slug` | Validar entrega, retirada, cobertura e endereco incompleto em tenant de teste. |
+| R3 login de entregador sem slug manual | PARCIALMENTE CONFIRMADO | P1 | `web-delivery/src/pages/LoginPage.tsx:17`; `auth/driver-auth.controller.ts` e `driver-auth.service.ts` | Provar dominio principal, subdominio e erro seguro sem tenant/slug. |
+| R4 criar/desativar filial | NAO CONFIRMADO | P1 | dominio tenant/admin localizado; exige fluxo e fixture com RBAC | Definir contrato de criacao, isolamento e desativacao sem apagar dados. |
+| R5 preview versus storefront publico | PARCIALMENTE CONFIRMADO | P2 | `StorefrontCustomizationPage.tsx:346,974-982`; `storefront.service.ts` | Provar que preview nunca publica mudanca sem salvar/publicar. |
+| R6 safe-area e temas mobile | JA CORRIGIDO ESTATICAMENTE | P2 | `web-tenant/src/index.css:320-377`; `AppLayout.tsx:723-727,941`; modais usam `safe-modal` | Prova visual autenticada em aparelho continua pendente. |
+| R7 uploads, categoria e fallback de nicho | PARCIALMENTE CONFIRMADO | P2 | Catalogo/menu import existentes em `catalog/menu-import`; UI de customizacao usa fallback visual | Provar upload, erro de arquivo e fallback por nicho sem dados quebrados. |
+| R8 importacao opcional de cardapio base | PARCIALMENTE CONFIRMADO | P2 | `catalog/menu-import/menu-import.service.ts`; `MenuImportPage.tsx` | Executar importacao reversivel em tenant de teste e provar ausencia de importacao automatica. |
+| R9 disponibilidade de categoria/dias | PARCIALMENTE CONFIRMADO | P1 | `categories.service.ts:65,148`; `publication.service.ts:100-184`; `storefront.service.ts:205-229` | Confirmar no storefront que categoria/produto indisponivel nao pode ser comprado. |
+| R10 login Google | NAO IMPLEMENTAR NO V1 | P2 | nao foi localizado provider OAuth de identidade; Google Maps nao e login | Exige decisao comercial, credenciais e revisao de privacidade; fora do Go-Live. |
 
-1. `git fetch origin --prune` e inventário de checkout, SHA, stash e worktrees.
-2. Criação de worktree isolada em `origin/main-copy`.
-3. Verificação explícita das PRs #33 e #34 com
-   `--repo emersoonlopes93/Gestor-Delivery-SaaS-PRO`.
-4. Leitura inicial da documentação canônica e buscas read-only sobre checkout,
-   autenticação do entregador, endereços, mídia, safe area, filial, catálogo,
-   features, filas, health, CORS e secrets.
-5. Interrupção imediata após confirmação e verificação mínima do alcance do P0.
+## Achados transversais
 
-## P0 confirmado
+- O caminho de pedido usa validacao server-side, chave de idempotencia e teste
+  de atomicidade. Isso reduz o risco de pedido duplicado, mas nao substitui o
+  smoke real R1.
+- `scheduling`, `push_notifications`, marketplace/iFood, campanhas, KDS,
+  printing e split payment sao beta/coming-soon ou tem dependencia operacional;
+  ficam desabilitados no preset V1. Um TODO de upload de midia em WhatsApp nao
+  pertence ao fluxo estavel do V1.
+- A disponibilidade publica usa `AvailabilityService`; categorias possuem
+  `isActive`. A combinacao categoria-dias precisa de prova funcional antes de
+  promocao de escopo.
+- Health, Redis/BullMQ, storage, CORS, logs e migrations requerem confirmacao
+  operacional do ambiente. Nenhum P0 adicional foi inferido apenas por ausencia
+  dessa evidência.
 
-| ID | Evidência | Estado | Severidade | Risco | Bloqueia Go-Live |
-|---|---|---|---|---|---|
-| SEC-001 | `.env.docker:14-16`; histórico do arquivo; `docker-compose.prod.yml:17-24` | CONFIRMADO | P0 | segurança | Sim |
+## Proximo passo seguro
 
-### Causa provável
-
-Um arquivo de configuração operacional foi versionado com valores reais em vez
-de conter somente placeholders. A existência no histórico impede considerar a
-simples remoção do HEAD como contenção suficiente.
-
-### Limitação de evidência
-
-O uso das mesmas credenciais pela VPS é **BLOQUEADO POR AMBIENTE**. Confirmá-lo
-exigiria inspeção de secrets ou runtime de produção, que não foi autorizada. Essa
-incerteza não reduz a necessidade de rotação: um segredo versionado deve ser
-presumido comprometido.
-
-## PR emergencial proposta — E0
-
-Objetivo: conter o incidente antes de retomar a R0.
-
-Escopo recomendado:
-
-1. Rotacionar `JWT_SECRET` e `JWT_REFRESH_SECRET` no secret manager efetivo.
-2. Reiniciar a API de forma controlada e invalidar todas as sessões existentes.
-3. Remover valores concretos do arquivo rastreado, substituir por exemplo seguro
-   e impedir reincidência via `.gitignore` e verificação de secrets na CI.
-4. Avaliar limpeza do histórico com procedimento coordenado; a rotação deve
-   ocorrer antes e não depende da reescrita do histórico.
-5. Verificar outros tokens/segredos rastreados sem imprimir valores em logs.
-
-Fora de escopo da E0:
-
-- mudança funcional;
-- Prisma ou migration;
-- deploy de features;
-- alteração de presets;
-- correção dos achados R1-R10.
-
-Evidência mínima para encerrar E0:
-
-- confirmação do responsável operacional de que ambos os secrets foram rotacionados;
-- prova de que tokens e refresh tokens anteriores foram rejeitados;
-- smoke de login, refresh, logout e revogação global no SHA implantado;
-- CI com detector de secrets e `git diff --check` verdes;
-- registro sanitizado de restart/rollout e rollback;
-- nenhuma credencial em logs, PR ou documentos.
-
-Rollback:
-
-- manter o valor anterior disponível somente no secret manager durante a janela
-  controlada, sem reintroduzi-lo no Git;
-- reverter a aplicação para o SHA anterior apenas se necessário, mantendo os
-  secrets novos;
-- nunca restaurar as credenciais versionadas.
-
-## Itens não concluídos
-
-A verificação consolidada dos quinze itens do proprietário, bloqueadores
-adicionais, escopo do Go-Live, roadmap R1-R10 e checklist de aceitação foi
-interrompida. Resultados exploratórios anteriores à parada não são classificados
-como auditoria concluída.
-
-## Validação
-
-- Baseline `pnpm lint`: exit 1, não iniciou completamente por `eslint` ausente na
-  worktree isolada.
-- Baseline `pnpm typecheck`: exit 1, não iniciou por `tsc` ausente.
-- Dependências não foram instaladas, conforme limite do briefing.
-- Validação documental final: pendente, pois a auditoria foi interrompida.
-
-## Decisão
-
-**BLOQUEADO — credenciais JWT concretas estão versionadas em `.env.docker`; a
-R0 só deve ser retomada após contenção, rotação comprovada e invalidação de
-sessões pela PR emergencial E0.**
+Pode iniciar a PR P1/R1 de **prova e ajuste minimo do checkout**, sem migration,
+sem mudanca de preset e sem deploy. A aceitacao deve cobrir um unico pedido sob
+duplo clique/retry, resumo correto, entrega/retirada e erro recuperavel. A
+integracao de qualquer P1 continua condicionada a E0-OPS documentada e CI verde.
