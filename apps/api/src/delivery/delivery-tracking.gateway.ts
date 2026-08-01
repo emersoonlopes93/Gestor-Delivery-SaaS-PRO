@@ -6,11 +6,13 @@ import {
   OnGatewayDisconnect,
   MessageBody,
   ConnectedSocket,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger, Inject, forwardRef } from '@nestjs/common';
 import { DriverLocationUpdatedEvent } from '@gestor/types';
 import { DriversService } from './drivers.service';
+import { DriverAuthService } from '../auth/driver-auth.service';
 
 @WebSocketGateway({
   cors: true,
@@ -26,11 +28,22 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   constructor(
     @Inject(forwardRef(() => DriversService))
     private readonly driversService: DriversService,
+    private readonly driverAuthService: DriverAuthService,
   ) {
     DeliveryTrackingGateway.instance = this;
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
+    const token = client.handshake.auth?.token;
+    if (typeof token === 'string' && token.length > 0) {
+      try {
+        const payload = await this.driverAuthService.validateAccessToken(token);
+        client.data.driver = { driverId: payload.sub, tenantId: payload.tenantId };
+      } catch {
+        client.disconnect(true);
+        return;
+      }
+    }
     this.logger.log(`Client connected: ${client.id}`);
   }
 
@@ -86,29 +99,35 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
    */
   @SubscribeMessage('updateDriverLocation')
   async handleUpdateDriverLocation(
-    @MessageBody() data: { driverId: string; tenantId: string; lat: number; lng: number },
+    @MessageBody() data: { lat: number; lng: number },
+    @ConnectedSocket() client: Socket,
   ) {
+    const driver = client.data.driver as { driverId: string; tenantId: string } | undefined;
+    if (!driver || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) {
+      throw new WsException('Unauthorized driver location update');
+    }
+
     // Persist to DB so polling-based map always has fresh coords
     try {
-      await this.driversService.updateDriverLocation(data.tenantId, data.driverId, {
+      await this.driversService.updateDriverLocation(driver.tenantId, driver.driverId, {
         lat: data.lat,
         lng: data.lng,
       });
     } catch (err) {
       this.logger.warn(
-        `Failed to persist location for driver ${data.driverId}: ${(err as Error).message}`,
+        `Failed to persist authenticated driver location: ${(err as Error).message}`,
       );
     }
 
     const event: DriverLocationUpdatedEvent = {
-      driverId: data.driverId,
-      tenantId: data.tenantId,
+      driverId: driver.driverId,
+      tenantId: driver.tenantId,
       lat: data.lat,
       lng: data.lng,
       lastLocationAt: new Date().toISOString(),
     };
 
     // Fire to tenant tracking UI
-    this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', event);
+    this.server.to(`tenant:${driver.tenantId}`).emit('driverLocationUpdated', event);
   }
 }
