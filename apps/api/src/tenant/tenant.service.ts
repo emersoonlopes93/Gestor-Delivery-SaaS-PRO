@@ -651,7 +651,24 @@ export class TenantService {
     }
 
     if (data.layout) {
-      updateData.storefrontLayoutJson = normalizeStorefrontLayout(data.layout) as Prisma.InputJsonValue;
+      const layoutSettings = normalizeStorefrontLayout(data.layout);
+      const configuredProductIds = layoutSettings.showcase.manualProductIds;
+
+      if (configuredProductIds.length > 0) {
+        const tenantProducts = await this.prisma.product.findMany({
+          where: {
+            tenantId,
+            id: { in: configuredProductIds },
+          },
+          select: { id: true },
+        });
+
+        if (tenantProducts.length !== configuredProductIds.length) {
+          throw new BadRequestException('Um ou mais produtos da vitrine são inválidos para esta loja.');
+        }
+      }
+
+      updateData.storefrontLayoutJson = layoutSettings as Prisma.InputJsonValue;
     }
 
     if (!updateData.storefrontThemeJson && !updateData.storefrontLayoutJson) {

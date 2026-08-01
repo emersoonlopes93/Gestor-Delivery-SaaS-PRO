@@ -10,7 +10,10 @@ import {
   Zap,
   Upload,
   Trash2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ChevronUp,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -28,7 +31,10 @@ import {
   StorefrontImageMode,
   StorefrontRadius,
   ThemeMode,
-  StorefrontPreset
+  StorefrontPreset,
+  StorefrontShowcaseMode,
+  StorefrontShowcaseSettings,
+  StorefrontShowcaseStrategy
 } from '@gestor/theme';
 import { ProductCategory, Product, Tenant, TenantSettings } from '@gestor/types';
 
@@ -217,6 +223,30 @@ export function StorefrontCustomizationPage() {
     }));
   };
 
+  const updateShowcase = (updates: Partial<StorefrontShowcaseSettings>) => {
+    updateLayout({
+      showcase: { ...customization.layout.showcase, ...updates },
+    });
+  };
+
+  const toggleShowcaseProduct = (productId: string) => {
+    const currentIds = customization.layout.showcase.manualProductIds;
+    updateShowcase({
+      manualProductIds: currentIds.includes(productId)
+        ? currentIds.filter((id) => id !== productId)
+        : [...currentIds, productId].slice(0, 12),
+    });
+  };
+
+  const moveShowcaseProduct = (productId: string, direction: -1 | 1) => {
+    const currentIds = [...customization.layout.showcase.manualProductIds];
+    const currentIndex = currentIds.indexOf(productId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= currentIds.length) return;
+    [currentIds[currentIndex], currentIds[nextIndex]] = [currentIds[nextIndex], currentIds[currentIndex]];
+    updateShowcase({ manualProductIds: currentIds });
+  };
+
   const applyPreset = (preset: StorefrontPreset) => {
     if (window.confirm(`Deseja aplicar o preset "${preset.name}"? Isso substituirá suas configurações atuais.`)) {
       setCustomization({
@@ -282,6 +312,17 @@ export function StorefrontCustomizationPage() {
 
   const displayCategories = rawNormalized.length > 0 ? rawNormalized : DEMO_CATEGORIES;
   const displayCombos = categories.length > 0 ? [] : DEMO_COMBOS; // Exibe combos de demonstração se banco estiver vazio
+  const eligibleShowcaseProducts = products.filter((product) => {
+    const category = categories.find((item) => item.id === product.categoryId);
+    return product.isActive && product.isAvailable && product.sellableOnline && !product.deletedAt && category?.isActive;
+  });
+  const orderedShowcaseProducts = customization.layout.showcase.manualProductIds
+    .map((id) => products.find((product) => product.id === id))
+    .filter((product): product is Product => Boolean(product))
+    .slice(0, customization.layout.showcase.maxItems);
+  const previewShowcaseProducts = orderedShowcaseProducts.filter((product) =>
+    eligibleShowcaseProducts.some((eligibleProduct) => eligibleProduct.id === product.id),
+  );
 
   // Utilitários de Estilização Reativa em Tempo Real (Real-time updates)
   const primaryHex = customization.theme.primaryColor.startsWith('#') 
@@ -862,6 +903,7 @@ export function StorefrontCustomizationPage() {
           )}
 
           {activeTab === 'layout' && (
+            <>
             <Card className="p-6 bg-card border-border shadow-sm">
               <div className="flex items-center gap-2 mb-6">
                 <Layout className="w-5 h-5 text-primary" />
@@ -954,6 +996,127 @@ export function StorefrontCustomizationPage() {
                 </div>
               </div>
             </Card>
+            <Card className="p-6 bg-card border-border shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Vitrine de destaques</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Uma faixa editorial no topo do cardápio, usando somente produtos disponíveis.
+                  </p>
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={customization.layout.showcase.enabled}
+                    onChange={(event) => updateShowcase({ enabled: event.target.checked })}
+                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
+                  />
+                  <span className="text-sm font-semibold text-foreground">Ativar vitrine</span>
+                </label>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium text-foreground" htmlFor="showcase-title">Título</label>
+                  <input
+                    id="showcase-title"
+                    value={customization.layout.showcase.title}
+                    maxLength={80}
+                    onChange={(event) => updateShowcase({ title: event.target.value })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground" htmlFor="showcase-max-items">Quantidade máxima</label>
+                  <input
+                    id="showcase-max-items"
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={customization.layout.showcase.maxItems}
+                    onChange={(event) => updateShowcase({ maxItems: Number(event.target.value) })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground" htmlFor="showcase-mode">Modo</label>
+                  <select
+                    id="showcase-mode"
+                    value={customization.layout.showcase.mode}
+                    onChange={(event) => updateShowcase({ mode: event.target.value as StorefrontShowcaseMode })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  >
+                    <option value="manual">Manual</option>
+                    <option value="automatic">Automático</option>
+                    <option value="hybrid">Híbrido</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium text-foreground" htmlFor="showcase-strategy">Estratégia automática</label>
+                  <select
+                    id="showcase-strategy"
+                    value={customization.layout.showcase.automaticStrategy}
+                    disabled={customization.layout.showcase.mode === 'manual'}
+                    onChange={(event) => updateShowcase({ automaticStrategy: event.target.value as StorefrontShowcaseStrategy })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm disabled:opacity-50"
+                  >
+                    <option value="none">Nenhuma</option>
+                    <option value="best_selling">Mais vendidos — últimos 30 dias</option>
+                    <option value="promotions">Promoções vigentes</option>
+                  </select>
+                </div>
+              </div>
+
+              {(customization.layout.showcase.mode === 'manual' || customization.layout.showcase.mode === 'hybrid') && (
+                <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-semibold text-foreground">Produtos elegíveis</legend>
+                    <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                      {eligibleShowcaseProducts.length === 0 ? (
+                        <p className="p-3 text-sm text-muted-foreground">Nenhum produto elegível no cardápio.</p>
+                      ) : eligibleShowcaseProducts.map((product) => (
+                        <label key={product.id} className="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-muted">
+                          <input
+                            type="checkbox"
+                            checked={customization.layout.showcase.manualProductIds.includes(product.id)}
+                            onChange={() => toggleShowcaseProduct(product.id)}
+                            className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{product.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-foreground">Ordem manual</p>
+                    <div className="min-h-24 space-y-2 rounded-lg border border-border p-2">
+                      {orderedShowcaseProducts.length === 0 ? (
+                        <p className="p-3 text-sm text-muted-foreground">Selecione produtos para definir a ordem editorial.</p>
+                      ) : orderedShowcaseProducts.map((product, index) => (
+                        <div key={product.id} className="flex items-center gap-2 rounded-md bg-muted p-2">
+                          <span className="w-6 text-center text-xs font-black text-muted-foreground">{index + 1}</span>
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{product.name}</span>
+                          <button type="button" onClick={() => moveShowcaseProduct(product.id, -1)} disabled={index === 0} aria-label={`Mover ${product.name} para cima`} className="rounded p-1 hover:bg-background disabled:opacity-30">
+                            <ChevronUp className="h-4 w-4" />
+                          </button>
+                          <button type="button" onClick={() => moveShowcaseProduct(product.id, 1)} disabled={index === orderedShowcaseProducts.length - 1} aria-label={`Mover ${product.name} para baixo`} className="rounded p-1 hover:bg-background disabled:opacity-30">
+                            <ChevronDown className="h-4 w-4" />
+                          </button>
+                          <button type="button" onClick={() => toggleShowcaseProduct(product.id)} aria-label={`Remover ${product.name} da vitrine`} className="rounded p-1 text-red-500 hover:bg-red-500/10">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+            </>
           )}
         </div>
 
@@ -1097,6 +1260,20 @@ export function StorefrontCustomizationPage() {
                         </div>
                       ))}
                     </div>
+
+                    {customization.layout.showcase.enabled && previewShowcaseProducts.length > 0 && (
+                      <div className="border-b p-3">
+                        <p className="text-[7px] font-black uppercase tracking-[0.18em] text-[var(--preview-primary)]">Seleção da casa</p>
+                        <h3 className="mb-2 text-left text-[10px] font-black text-foreground">{customization.layout.showcase.title}</h3>
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                          {previewShowcaseProducts.map((product) => (
+                            <div key={product.id} className="w-36 shrink-0">
+                              {renderProductCard(product)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Content Section (Combos and Products) */}
                     <div className="p-3 space-y-5">
