@@ -1,3 +1,38 @@
+## E0 — JWT secret containment
+
+Data: 2026-07-31
+Branch: `security/e0-jwt-secret-containment`
+
+Atualização de estado E0:
+
+- Tokens JWT antigos foram rejeitados após a rotação; nenhum valor foi registrado.
+- O HEAD está sanitizado e o gate Gitleaks/CI da PR #35 está verde.
+- O SHA que inclui o comando operacional ainda não foi redeployado. A
+  revogação global de `AuthSession` e os smokes de nova sessão permanecem
+  pendentes; `DB_PASSWORD` continua NÃO CONFIRMADO.
+- E0 está MITIGADO: a pendência E0-OPS (redeploy, revogação e smokes) e E0H
+  (purga coordenada do histórico) bloqueia o Go-Live definitivo, mas não a
+  continuidade documental da R0.
+
+- O HEAD deixa de rastrear `.env.docker`; o arquivo local fica ignorado e
+  `.env.docker.example` contém somente placeholders não utilizáveis.
+- A auditoria redigida confirmou material JWT concreto no arquivo rastreado e
+  identificou `DB_PASSWORD` como credencial adicional a confirmar no runtime.
+  Valores, hashes parciais e tamanhos não foram registrados.
+- O gate `Secret scanning` usa Gitleaks com checkout completo, redaction e
+  permissões `contents: read`. A varredura inclui PR, HEAD e histórico que o
+  GitHub Actions disponibilizar.
+- `AuthSession` possui revogação global idempotente por status ativo. O comando
+  operacional exige `NODE_ENV=production` e
+  `CONFIRM_GLOBAL_SESSION_REVOCATION=true`, retorna somente contagens e não
+  roda no startup.
+- A rotação no Dokploy, captura de tokens antigos, smoke e merge permanecem
+  bloqueados até confirmar acesso, serviço correto, backup utilizável e fonte
+  canônica de environment. E0H planejará a purga coordenada do histórico sem
+  reescrevê-lo nesta sessão.
+
+---
+
 ## Branding Android — nome, ícones e splash
 
 Data: 2026-07-31
