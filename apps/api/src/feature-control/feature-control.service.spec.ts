@@ -184,6 +184,18 @@ describe('FeatureControlService', () => {
     return { service, prisma };
   };
 
+  it('publishes the canonical initial go-live branch creation policy', () => {
+    const { service } = makeService();
+
+    expect(service.getTenantActionCapability('branches.create')).toEqual({
+      enabled: false,
+      reason: 'release_disabled',
+      source: 'initial_go_live_release_policy',
+      code: 'BRANCH_CREATION_TEMPORARILY_DISABLED',
+      message: 'A criação de novas filiais está temporariamente indisponível.',
+    });
+  });
+
   it('returns essential for mandatory core features', async () => {
     const { service } = makeService();
 
