@@ -28,6 +28,12 @@ import { SchedulingSelector } from '../components/SchedulingSelector';
 import { CardPayment } from '../components/CardPayment';
 import { maskPhone, maskCEP, unmask } from '@gestor/utils';
 import { useAnalytics } from '../features/analytics';
+import { CheckoutFinalSummary } from '../components/CheckoutFinalSummary';
+import {
+  CheckoutSubmitGuard,
+  createCheckoutIdempotencyKey,
+  isAmbiguousCheckoutError,
+} from '../lib/checkout-submission';
 
 interface MercadoPagoCardFormData {
   token: string;
@@ -99,11 +105,14 @@ export function CheckoutPage() {
   const [couponError, setCouponError] = useState<string>('');
   const [usedCashback, setUsedCashback] = useState<number>(0);
   const hasCompletedCheckoutRef = useRef(false);
+  const submitGuardRef = useRef(new CheckoutSubmitGuard());
+  const checkoutAttemptIdRef = useRef(crypto.randomUUID());
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [deliveryEstimatedMinutes, setDeliveryEstimatedMinutes] = useState<number | null>(null);
   const [discountTotal, setDiscountTotal] = useState(0);
+  const [validatedCashbackUsed, setValidatedCashbackUsed] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
   const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
@@ -225,9 +234,6 @@ export function CheckoutPage() {
     }
   }, [tableId]);
 
-  // Idempotency key — generated once per checkout session
-  const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
-
   // Real-time server-side validation for delivery fee and address availability
   const addressObject = useMemo(() => ({
     street,
@@ -300,6 +306,7 @@ export function CheckoutPage() {
         setDeliveryFee(result.deliveryFee || 0);
         setDeliveryEstimatedMinutes(result.estimatedDeliveryMinutes ?? null);
         setDiscountTotal(result.discountTotal || 0);
+        setValidatedCashbackUsed(result.cashbackUsed || 0);
         if (isDelivery) setSubmitError(null);
       } catch (err) {
         const error = err as Error;
@@ -313,6 +320,7 @@ export function CheckoutPage() {
         setDeliveryFee(0);
         setDeliveryEstimatedMinutes(null);
         setDiscountTotal(0);
+        setValidatedCashbackUsed(0);
       } finally {
         setIsValidating(false);
       }
@@ -442,63 +450,86 @@ export function CheckoutPage() {
     setSelectedSavedAddressId(address.id);
   }
 
+  function buildOrderPayload(
+    submissionPayment: PaymentInput,
+    submissionEmail: string | undefined,
+  ): CreateOrderDTO {
+    return {
+      customerName: customerName.trim(),
+      customerPhone: unmask(customerPhone.trim()),
+      customerEmail: submissionEmail,
+      fulfillmentType,
+      items: items.map(serializeCartItem),
+      idempotencyKey: '',
+      notes: notes.trim() || undefined,
+      payment: submissionPayment,
+      sourceChannel: 'direct_online',
+      couponCode: appliedCoupon || undefined,
+      useCashbackAmount: usedCashback || undefined,
+      deliveryAddress: fulfillmentType === 'delivery' ? {
+        street: street.trim(),
+        number: number.trim(),
+        complement: complement.trim() || undefined,
+        neighborhood: neighborhood.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        zipCode: unmask(zipCode),
+        reference: reference.trim() || undefined,
+        lat: lat ?? undefined,
+        lng: lng ?? undefined,
+      } : undefined,
+      scheduledFor: isScheduled ? scheduledFor : undefined,
+      timeSlotId: isScheduled ? timeSlotId : undefined,
+      returnUrl: window.location.origin + `/${tenantSlug}`,
+      tableId: tableId || undefined,
+    };
+  }
+
+  const addressSummary = fulfillmentType === 'delivery'
+    ? [
+        `${street.trim()}, ${number.trim()}`,
+        complement.trim(),
+        neighborhood.trim(),
+        `${city.trim()} - ${state.trim()}`,
+        maskCEP(zipCode),
+      ].filter(Boolean).join(' · ')
+    : undefined;
+
   const handleCardSubmit = async (formData: unknown) => {
-    if (isSubmitting) return;
+    if (!submitGuardRef.current.tryStart()) return;
     setIsSubmitting(true);
     setSubmitError(null);
 
     const paymentData = formData as MercadoPagoCardFormData;
 
     try {
-      const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
-
-      const payload: CreateOrderDTO = {
-        customerName: customerName.trim(),
-        customerPhone: unmask(customerPhone.trim()),
-        customerEmail: paymentData.payer?.email || customerEmail.trim() || customer?.email || undefined,
-        fulfillmentType,
-        items: orderItems,
-        idempotencyKey,
-        notes,
-        payment: {
+      const payload = buildOrderPayload(
+        {
           method: PaymentMethod.credit_card,
           cardToken: paymentData.token,
           paymentMethodId: paymentData.payment_method_id,
           issuerId: paymentData.issuer_id,
           installments: paymentData.installments,
         },
-        sourceChannel: 'direct_online',
-        couponCode: appliedCoupon || undefined,
-        useCashbackAmount: usedCashback || undefined,
-        deliveryAddress: fulfillmentType === 'delivery' ? {
-          street,
-          number,
-          complement: complement || undefined,
-          neighborhood,
-          city,
-          state,
-          zipCode: unmask(zipCode),
-          reference: reference || undefined,
-          lat: lat ?? undefined,
-          lng: lng ?? undefined,
-        } : undefined,
-        scheduledFor: isScheduled ? scheduledFor : undefined,
-        timeSlotId: isScheduled ? timeSlotId : undefined,
-        returnUrl: window.location.origin + `/${tenantSlug}`,
-        tableId: tableId || undefined,
-      };
+        paymentData.payer?.email || customerEmail.trim() || customer?.email || undefined,
+      );
+      payload.idempotencyKey = await createCheckoutIdempotencyKey(checkoutAttemptIdRef.current, payload);
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
+      submitGuardRef.current.succeed();
       hasCompletedCheckoutRef.current = true;
       analytics.track('order_submitted', { orderId: res.data.id, itemCount: items.length, value: subtotal });
       clearCart();
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
     } catch (err: unknown) {
+      submitGuardRef.current.fail();
       const error = err as Error & { details?: { validationErrors?: string[] } };
       console.error('Card checkout error:', error);
       const message = error.message || 'Erro ao processar pagamento com cartão.';
-      if (isScheduled && /(horário|slot|limite|agendamento)/i.test(message)) {
+      if (isAmbiguousCheckoutError(error)) {
+        setSubmitError('Não foi possível confirmar o resultado. Tente novamente: a mesma tentativa será consultada sem duplicar o pedido.');
+      } else if (isScheduled && /(horário|slot|limite|agendamento)/i.test(message)) {
         setTimeSlotId('');
         setScheduledFor('');
         setSchedulingRefreshKey((value) => value + 1);
@@ -513,7 +544,7 @@ export function CheckoutPage() {
   };
 
   const handleSubmit = async () => {
-    if (!isFormValid || isSubmitting) return;
+    if (!isFormValid) return;
     
     // Se for cartão, o botão do brick cuida do submit (ou chamamos via ref se necessário)
     // Mas aqui o usuário clicou no botão "Enviar Pedido" customizado.
@@ -523,48 +554,25 @@ export function CheckoutPage() {
       return;
     }
 
+    if (!submitGuardRef.current.tryStart()) return;
+
     setIsSubmitting(true);
     setSubmitError(null);
     setValidationErrors([]);
 
     try {
-      const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
-
-      const payload: CreateOrderDTO = {
-        customerName: customerName.trim(),
-        customerPhone: unmask(customerPhone.trim()),
-        customerEmail: customerEmail.trim() || customer?.email || undefined,
-        fulfillmentType,
-        items: orderItems,
-        idempotencyKey,
-        notes: notes.trim() || undefined,
-        payment: {
+      const payload = buildOrderPayload(
+        {
           ...payment,
           changeFor: payment.method === 'cash' ? (payment.changeFor ?? undefined) : undefined,
         },
-        sourceChannel: 'direct_online',
-        couponCode: appliedCoupon || undefined,
-        useCashbackAmount: usedCashback || undefined,
-        deliveryAddress: fulfillmentType === 'delivery' ? {
-          street: street.trim(),
-          number: number.trim(),
-          complement: complement?.trim() || undefined,
-          neighborhood: neighborhood.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          zipCode: unmask(zipCode),
-          reference: reference?.trim() || undefined,
-          lat: lat ?? undefined,
-          lng: lng ?? undefined,
-        } : undefined,
-        scheduledFor: isScheduled ? scheduledFor : undefined,
-        timeSlotId: isScheduled ? timeSlotId : undefined,
-        returnUrl: window.location.origin + `/${tenantSlug}`,
-        tableId: tableId || undefined,
-      };
+        customerEmail.trim() || customer?.email || undefined,
+      );
+      payload.idempotencyKey = await createCheckoutIdempotencyKey(checkoutAttemptIdRef.current, payload);
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
+      submitGuardRef.current.succeed();
       hasCompletedCheckoutRef.current = true;
       analytics.track('order_submitted', { orderId: res.data.id, itemCount: items.length, value: subtotal });
       clearCart();
@@ -578,10 +586,13 @@ export function CheckoutPage() {
         navigate(`/${tenantSlug}/order/${summaryIdentifier}`, { state: { order: res.data } });
       }
     } catch (err: unknown) {
+      submitGuardRef.current.fail();
       const error = err as Error & { details?: { validationErrors?: string[] } };
       console.error('Checkout error:', error);
       
-      if (error.details?.validationErrors) {
+      if (isAmbiguousCheckoutError(error)) {
+        setSubmitError('Não foi possível confirmar o resultado. Tente novamente: a mesma tentativa será consultada sem duplicar o pedido.');
+      } else if (error.details?.validationErrors) {
         setSubmitError('Erro de validação. Verifique os campos abaixo:');
         setValidationErrors(error.details.validationErrors);
       } else {
@@ -608,50 +619,6 @@ export function CheckoutPage() {
         </button>
         <h1 className="text-xl font-black text-gray-900 uppercase tracking-tight">Finalizar Pedido</h1>
       </header>
-
-      <section className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100">
-        <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Resumo</h2>
-        <div className="space-y-2">
-          {items.map((item, idx) => (
-            <div key={idx} className="flex justify-between text-sm">
-              <span className="text-gray-600">{item.quantity}x {item.snapshot.productName}</span>
-              <span className="font-medium text-gray-900">
-                {Number(item.snapshot.lineSubtotal ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </span>
-            </div>
-          ))}
-          <div className="pt-3 border-t border-gray-200 mt-2 space-y-1">
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Subtotal</span>
-              <span>{subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-            </div>
-            {fulfillmentType === 'delivery' && (
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Taxa de entrega</span>
-                <span className={deliveryFee === 0 && !isValidating ? 'text-green-600 font-bold' : ''}>
-                  {isValidating ? 'Calculando...' : deliveryFee === 0 ? 'Grátis' : deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-              </div>
-            )}
-            {fulfillmentType === 'delivery' && deliveryEstimatedMinutes != null && (
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Entrega estimada</span>
-                <span>{deliveryEstimatedMinutes} min</span>
-              </div>
-            )}
-            {discountTotal > 0 && (
-              <div className="flex justify-between text-xs text-green-600 font-semibold">
-                <span>Descontos</span>
-                <span>- {discountTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-black text-gray-900 pt-1">
-              <span>Total</span>
-              <span>{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section className="mb-6">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Cupom e Cashback</h2>
@@ -955,6 +922,22 @@ export function CheckoutPage() {
         <textarea placeholder="Ex: Tirar cebola, campainha estragada..." value={notes} onChange={e => setNotes(e.target.value)}
           className="input-premium min-h-[100px] resize-none" />
       </section>
+
+      <CheckoutFinalSummary
+        items={items}
+        subtotal={subtotal}
+        deliveryFee={deliveryFee}
+        deliveryEstimatedMinutes={deliveryEstimatedMinutes}
+        discountTotal={discountTotal}
+        cashbackUsed={validatedCashbackUsed}
+        couponCode={appliedCoupon}
+        total={total}
+        fulfillmentType={fulfillmentType}
+        payment={payment}
+        addressSummary={addressSummary}
+        notes={notes}
+        isValidating={isValidating}
+      />
 
       {submitError && (
         <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-2 text-red-600 animate-in shake duration-500">
