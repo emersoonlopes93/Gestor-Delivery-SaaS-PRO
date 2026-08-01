@@ -78,6 +78,7 @@ export type {
 export {
   FULFILLMENT_TYPE_LABELS,
   formatFulfillmentTypeLabel,
+  canonicalizeOrderSubmission,
 } from './order';
 
 export { 

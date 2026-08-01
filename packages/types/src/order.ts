@@ -222,6 +222,43 @@ export class CreateOrderDTO {
   @IsNumber() @IsOptional() estimatedDuration?: number;
 }
 
+function normalizeIdempotencyValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeIdempotencyValue);
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const normalized: Record<string, unknown> = {};
+
+    for (const key of Object.keys(record).sort()) {
+      if (record[key] !== undefined) {
+        normalized[key] = normalizeIdempotencyValue(record[key]);
+      }
+    }
+
+    return normalized;
+  }
+
+  return value;
+}
+
+/**
+ * Produces the cross-runtime canonical request used by the checkout
+ * idempotency fingerprint. The key itself is deliberately excluded.
+ */
+export function canonicalizeOrderSubmission(dto: CreateOrderDTO): string {
+  const materialPayload: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(dto)) {
+    if (key !== 'idempotencyKey' && value !== undefined) {
+      materialPayload[key] = value;
+    }
+  }
+
+  return JSON.stringify(normalizeIdempotencyValue(materialPayload));
+}
+
 export class EditOrderOperationDTO {
   @IsString() @IsNotEmpty() type!: 'add_item' | 'remove_item' | 'update_quantity' | 'update_item_notes' | 'update_order_notes';
   
