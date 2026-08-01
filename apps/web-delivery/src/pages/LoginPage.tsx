@@ -1,27 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Lock, Phone, Globe } from 'lucide-react';
+import { Package, Lock, Phone, Store, ArrowLeft } from 'lucide-react';
+import type { DriverLoginResponse, DriverLoginResult, DriverTenantSelectionRequired } from '@gestor/types';
 import { api } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+
+type ApiEnvelope<T> = { success: true; data: T };
+
+function unwrapResponse<T>(value: T | ApiEnvelope<T>): T {
+  if (value && typeof value === 'object' && 'success' in value && 'data' in value) {
+    return value.data;
+  }
+  return value;
+}
+
+function requiresTenantSelection(result: DriverLoginResult): result is DriverTenantSelectionRequired {
+  return 'requiresTenantSelection' in result && result.requiresTenantSelection;
+}
 
 export function LoginPage() {
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
-  const [tenantSlug, setTenantSlug] = useState('');
+  const [tenantSelection, setTenantSelection] = useState<DriverTenantSelectionRequired | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  // Auto-detect tenant slug from subdomain if present
-  useEffect(() => {
-    const hostname = window.location.hostname;
-    const parts = hostname.split('.');
-    if (parts.length > 2 && parts[0] !== 'www') {
-      setTenantSlug(parts[0]);
-    }
-  }, []);
+  const completeLogin = (result: DriverLoginResponse) => {
+    setAuth(result.accessToken, result.refreshToken, result.driver);
+    navigate('/');
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,19 +39,36 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/driver/login', { 
-        phone, 
+      const response = await api.post<ApiEnvelope<DriverLoginResult> | DriverLoginResult>('/auth/driver/login', {
+        phone,
         pin,
-        tenantSlug 
       });
-      // TransformInterceptor na API envelopa tudo em { success: true, data: { ... } }
-      const responseData = response.data.success ? response.data.data : response.data;
-      const { accessToken, refreshToken, driver } = responseData;
-      
-      setAuth(accessToken, refreshToken, driver);
-      navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao fazer login. Verifique suas credenciais.');
+      const result = unwrapResponse(response.data);
+      if (requiresTenantSelection(result)) {
+        setTenantSelection(result);
+      } else {
+        completeLogin(result);
+      }
+    } catch {
+      setError('Não foi possível entrar. Verifique suas credenciais e tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTenantSelection = async (driverId: string) => {
+    if (!tenantSelection) return;
+    setError('');
+    setIsLoading(true);
+    try {
+      const response = await api.post<ApiEnvelope<DriverLoginResponse> | DriverLoginResponse>(
+        '/auth/driver/select-tenant',
+        { selectionToken: tenantSelection.selectionToken, driverId },
+      );
+      completeLogin(unwrapResponse(response.data));
+    } catch {
+      setTenantSelection(null);
+      setError('Não foi possível entrar. Verifique suas credenciais e tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -62,29 +89,45 @@ export function LoginPage() {
           Acesso do Entregador
         </p>
 
+        {tenantSelection ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+              <p className="text-sm font-bold text-slate-900">Escolha onde você vai trabalhar</p>
+              <p className="mt-1 text-xs text-slate-500">Seu acesso foi confirmado. Selecione uma das lojas vinculadas.</p>
+            </div>
+            <div className="space-y-2" role="list" aria-label="Lojas disponíveis">
+              {tenantSelection.tenants.map((option) => (
+                <button
+                  key={option.driverId}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleTenantSelection(option.driverId)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left font-bold text-slate-800 transition-all hover:border-orange-400 hover:bg-orange-50 disabled:opacity-50"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                    <Store className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{option.tenant.name}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setTenantSelection(null)}
+              className="flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleLogin} className="space-y-4">
           {error && (
             <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm font-medium border border-red-100">
               {error}
             </div>
           )}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Identificador da Loja (Slug)</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Globe className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                required
-                className="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                placeholder="ex: pizzaria-do-joao"
-                value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value)}
-              />
-            </div>
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
@@ -128,6 +171,7 @@ export function LoginPage() {
             {isLoading ? 'Entrando...' : 'Acessar'}
           </button>
         </form>
+        )}
 
       </div>
     </div>

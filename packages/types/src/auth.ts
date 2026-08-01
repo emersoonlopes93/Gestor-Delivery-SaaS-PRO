@@ -161,10 +161,31 @@ export interface CustomerLoginResponse {
 export interface DriverLoginRequest {
   phone: string;
   pin: string; // Senha ou PIN de 4/6 dígitos usado por entregadores
-  tenantSlug: string; // Necessário para multi-tenant aware login
+  tenantSlug?: string; // Compatibilidade temporária com clientes antigos
 }
 
 /** Driver Login Response */
 export interface DriverLoginResponse extends AuthTokens {
   driver: DriverUserSession;
 }
+
+export interface DriverTenantSelectionOption {
+  driverId: string;
+  tenant: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface DriverTenantSelectionRequired {
+  requiresTenantSelection: true;
+  selectionToken: string;
+  tenants: DriverTenantSelectionOption[];
+}
+
+export interface DriverTenantSelectionRequest {
+  selectionToken: string;
+  driverId: string;
+}
+
+export type DriverLoginResult = DriverLoginResponse | DriverTenantSelectionRequired;

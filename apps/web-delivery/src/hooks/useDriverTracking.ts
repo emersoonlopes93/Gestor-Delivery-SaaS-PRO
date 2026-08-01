@@ -15,7 +15,7 @@ const WS_URL = configuredWsUrl || 'http://localhost:3333/delivery';
 const HTTP_LOCATION_INTERVAL_MS = 15_000;
 
 export function useDriverTracking() {
-  const { user } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
   const socketRef = useRef<Socket | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastHttpSentRef = useRef<number>(0);
@@ -31,6 +31,7 @@ export function useDriverTracking() {
     // Connect to WebSockets
     const socket = io(WS_URL, {
       transports: ['websocket'],
+      auth: { token: accessToken },
     });
 
     socket.on('connect', () => {
@@ -42,7 +43,7 @@ export function useDriverTracking() {
     return () => {
       socket.disconnect();
     };
-  }, [user]);
+  }, [accessToken, user]);
 
   /**
    * BUG 5 FIX: Send location via HTTP REST to ensure DB persistence.
@@ -84,8 +85,6 @@ export function useDriverTracking() {
         // Emit to server via WebSocket (real-time tenant map)
         if (socketRef.current && socketRef.current.connected) {
           socketRef.current.emit('updateDriverLocation', {
-            driverId: user.driverId,
-            tenantId: user.tenantId,
             lat: latitude,
             lng: longitude,
           });

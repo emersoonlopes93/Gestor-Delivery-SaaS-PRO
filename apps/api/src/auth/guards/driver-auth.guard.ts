@@ -4,15 +4,13 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { DriverAuthService } from '../driver-auth.service';
 
 @Injectable()
 export class DriverAuthGuard implements CanActivate {
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly driverAuthService: DriverAuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -24,14 +22,7 @@ export class DriverAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('JWT_SECRET') || 'dev-secret',
-      });
-
-      // Verify the payload is specifically for a driver
-      if (payload.type !== 'driver') {
-        throw new UnauthorizedException('Invalid token type');
-      }
+      const payload = await this.driverAuthService.validateAccessToken(token);
 
       // Assigning payload to request.user so controllers can access it
       const req = request as Request & { user: { sub: string; id: string; tenantId: string; type: string }; tenantId: string };
