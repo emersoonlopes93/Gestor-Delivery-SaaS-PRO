@@ -1,6 +1,6 @@
 # AUDIT R5 — Preview administrativo e storefront público
 
-Data: 2026-08-01  
+Data: 2026-08-01
 Base: `7b9d89c6a0b7f79f79c2a168080a85fec4d44657`
 
 ## Inventário
