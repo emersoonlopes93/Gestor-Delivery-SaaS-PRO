@@ -1,3 +1,33 @@
+## R3 — login do entregador sem slug visível
+
+Data: 2026-08-01
+
+- Branch `feat/go-live-r3-driver-login-no-slug`, criada em worktree isolada no
+  merge da PR #39 em `origin/main-copy` (`c386a13d`). Checkout principal,
+  worktrees anteriores e `stash@{0}` permanecem preservados.
+- A auditoria prévia está em `docs/audits/r3-driver-login-no-slug-audit.md`.
+  O modelo permite o mesmo telefone em vários tenants e não possui identidade
+  global compartilhada; por isso foi adotado o fluxo B, sem migration.
+- O login agora recebe telefone + PIN. Um único vínculo autenticado cria a
+  sessão tenant-bound existente; múltiplos vínculos autenticados recebem um
+  seletor pós-auth limitado por capability JWT de cinco minutos. Nenhum
+  `tenantId` arbitrário é aceito e o `tenantSlug` ficou apenas como entrada
+  opcional compatível para clientes antigos.
+- Falhas pré-auth retornam a mesma mensagem e os logs não registram telefone,
+  slug ou token. O rate limit do login e da seleção é 5 por 60 segundos usando
+  o `ThrottlerGuard` já existente.
+- O guard do entregador valida JWT, `AuthSession`, subject, tenant, expiração,
+  driver ativo e tenant ativo/trial. Refresh rotation e logout continuam no
+  mecanismo canônico. O WebSocket do entregador envia o access token no
+  handshake e deriva `driverId`/`tenantId` dos claims verificados.
+- Gates locais: install frozen, lint, typecheck, `check:no-any`,
+  `check:features`, build API, build web-delivery e `git diff --check` PASS.
+  Testes focados: 5 suites/19 testes API PASS e 1 suite/1 teste frontend PASS.
+- Prisma/schema, migrations, seed, dependências, lockfile, provider, secrets,
+  E0-OPS, banco remoto, produção e deploy não foram alterados.
+
+---
+
 ## R2.5 — vitrine inteligente configurável
 
 Data: 2026-08-01
