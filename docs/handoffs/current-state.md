@@ -1,3 +1,42 @@
+## R2.5 — vitrine inteligente configurável
+
+Data: 2026-08-01
+
+- Branch `feat/go-live-r2-5-smart-storefront-showcase`, criada em worktree isolada
+  no merge da R2 em `origin/main-copy` (`8d7acb4a`). Checkout principal,
+  worktrees R0/R1/R2/E0 e `stash@{0}` permanecem preservados.
+- A auditoria obrigatória anterior à implementação está em
+  `docs/audits/r2-5-smart-storefront-showcase-audit.md`. A decisão foi `YES`:
+  o JSON `TenantSettings.storefrontLayoutJson`, o payload público, o filtro
+  canônico de disponibilidade, o ranking BI e o cache existentes são suficientes.
+- O layout normalizado agora possui uma vitrine opcional com título, modo manual,
+  automático ou híbrido, máximo entre 1 e 12 e IDs manuais ordenados/deduplicados.
+  Configurações antigas e presets recebem a vitrine desligada por padrão.
+- O backend valida que todos os IDs configurados pertencem ao tenant autenticado.
+  A seleção ocorre apenas sobre produtos já ativos, publicáveis e disponíveis no
+  canal pelo `AvailabilityService`; lista vazia omite o bloco.
+- `BEST_SELLING` reutiliza a soma de quantidades de pedidos `completed`, tenant-scoped,
+  na janela existente de 30 dias, com desempate determinístico. `PROMOTIONS`
+  reutiliza o badge canônico. `MOST_ORDERED` e `COMBOS` não são anunciados porque
+  os contratos existentes não sustentam essas semânticas sem agregação ou renderer novo.
+- Manual vence automático no modo híbrido; duplicados e IDs inelegíveis são removidos,
+  e menos itens que o máximo é aceito sem preenchimento aleatório.
+- O storefront renderiza uma faixa mobile-first com overflow/scroll-snap no topo do
+  menu e reutiliza `ProductRenderer` e o fluxo atual de seleção/modal. A navegação
+  horizontal existente continua usando `CategoryNavigation` e categorias canônicas.
+- O painel configura a vitrine no local já existente de personalização e mostra a
+  seleção manual no preview existente. Ranking automático completo no preview e
+  convergência de renderers permanecem no escopo futuro da R5.
+- O payload público continua no cache `storefront:<slug>:<fulfillmentType>`; o PATCH
+  existente já invalida delivery/pickup. Não há N+1, chamada por card ou cache novo.
+- Testes focados: backend 3 suites/7 testes e storefront 1 suite/2 testes, todos PASS.
+  Builds de theme, types, API, web-storefront e web-tenant passaram. O Prisma Client
+  foi apenas regenerado localmente para refletir o schema já existente.
+- Nenhum Prisma/schema, migration, seed, provider, credencial, dependência, lockfile,
+  feature flag, E0-OPS, banco remoto, deploy ou produção foi alterado.
+
+---
+
 ## R2 - checkout guided steps and progressive address
 
 Data: 2026-08-01
