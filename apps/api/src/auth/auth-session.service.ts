@@ -249,6 +249,31 @@ export class AuthSessionService {
     return { revoked: result.count };
   }
 
+  async revokeAllActiveSessions(reason: string) {
+    const activeBefore = await this.prisma.authSession.count({
+      where: { status: AuthSessionStatus.active },
+    });
+    const result = await this.prisma.authSession.updateMany({
+      where: { status: AuthSessionStatus.active },
+      data: {
+        status: AuthSessionStatus.revoked,
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    });
+    const activeAfter = await this.prisma.authSession.count({
+      where: { status: AuthSessionStatus.active },
+    });
+    this.logger.warn({
+      message: 'auth_global_sessions_revoked',
+      activeBefore,
+      revoked: result.count,
+      activeAfter,
+      reason,
+    });
+    return { activeBefore, revoked: result.count, activeAfter };
+  }
+
   async listActiveSessions(subjectType: AuthSubjectType, subjectId: string) {
     return this.prisma.authSession.findMany({
       where: {

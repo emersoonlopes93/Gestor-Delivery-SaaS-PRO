@@ -12,6 +12,7 @@ describe('AuthSessionService', () => {
       update: jest.Mock;
       updateMany: jest.Mock;
       findMany: jest.Mock;
+      count: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -25,6 +26,7 @@ describe('AuthSessionService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
         findMany: jest.fn(),
+        count: jest.fn(),
       },
       $transaction: jest.fn((callback: (tx: typeof mockPrismaService) => unknown) => callback(mockPrismaService)),
     };
@@ -109,6 +111,26 @@ describe('AuthSessionService', () => {
       data: expect.objectContaining({
         status: AuthSessionStatus.compromised,
         revokedReason: 'refresh_reuse_detected',
+      }),
+    });
+  });
+
+  it('revokes all active sessions and reports aggregate counts only', async () => {
+    mockPrismaService.authSession.count
+      .mockResolvedValueOnce(7)
+      .mockResolvedValueOnce(0);
+    mockPrismaService.authSession.updateMany.mockResolvedValueOnce({ count: 7 });
+
+    await expect(service.revokeAllActiveSessions('security_jwt_secret_rotation')).resolves.toEqual({
+      activeBefore: 7,
+      revoked: 7,
+      activeAfter: 0,
+    });
+    expect(mockPrismaService.authSession.updateMany).toHaveBeenCalledWith({
+      where: { status: AuthSessionStatus.active },
+      data: expect.objectContaining({
+        status: AuthSessionStatus.revoked,
+        revokedReason: 'security_jwt_secret_rotation',
       }),
     });
   });

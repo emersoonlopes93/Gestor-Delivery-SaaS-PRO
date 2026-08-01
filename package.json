@@ -34,6 +34,7 @@
     "check:theme:write-baseline": "node scripts/check-theme-hardcoded-classes.js --report --write-baseline",
     "check:theme": "pnpm check:theme:critical",
     "check:features": "node scripts/check-stub-features.js",
+    "test:secret-scanner-negative": "node scripts/test-secret-scanner-negative.js",
     "smoke:p1": "pnpm -C apps/api smoke:p1",
     "smoke:media": "pnpm -C apps/api smoke:media",
     "analytics:rollup-backfill": "pnpm -C apps/api analytics:rollup-backfill",
