@@ -40,6 +40,7 @@ import {
 import type { StorefrontProductLayout, StorefrontLayoutSettings } from '@gestor/theme';
 import { useAnalytics } from '../features/analytics';
 import { useStorefrontConsent } from '../features/consent';
+import { SmartShowcase } from '../components/SmartShowcase';
 
 type CustomerHomePayload = {
   profile: { name: string; totalOrders: number };
@@ -408,6 +409,18 @@ export function StorefrontPage() {
           </div>
         </div>
       )}
+
+      <SmartShowcase
+        showcase={data.showcase}
+        productLayout={effectiveProductLayout}
+        imageMode={layoutSettings.productImageMode}
+        showDescription={layoutSettings.showProductDescription}
+        showBadges={layoutSettings.showBadges}
+        onSelectProduct={(product) => {
+          setSelectedProduct(product);
+          setSelectedProductCategory(productCategoryIndex.get(product.id) ?? null);
+        }}
+      />
 
       {/* Categories Navigation */}
       <CategoryNavigation

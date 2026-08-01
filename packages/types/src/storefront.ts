@@ -206,12 +206,18 @@ export interface StorefrontCustomizationPayload {
   layout: Record<string, unknown>;
 }
 
+export interface StorefrontShowcasePayload {
+  title: string;
+  products: StorefrontProductPayload[];
+}
+
 export interface StorefrontPayload {
   tenant: StorefrontTenantInfo;
   categories: StorefrontCategoryPayload[];
   combos: StorefrontComboPayload[];
   upsells: StorefrontUpsellPayload[];
   customization?: StorefrontCustomizationPayload;
+  showcase?: StorefrontShowcasePayload;
 }
 
 export interface StorefrontUpsellItemPayload {

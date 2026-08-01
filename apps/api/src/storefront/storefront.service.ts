@@ -23,6 +23,7 @@ import { MediaLibraryService } from '../upload/media-library.service';
 
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { BusinessIntelligenceService } from '../analytics/business-intelligence.service';
+import { resolveStorefrontShowcase } from './storefront-showcase';
 
 @Injectable()
 export class StorefrontService {
@@ -503,7 +504,15 @@ export class StorefrontService {
       },
     };
 
-    const bestSellerIds = await this.biService.getStorefrontBestSellers(tenant.id);
+    const layoutSettings = normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson);
+    const needsBestSellingRanking = layoutSettings.showcase.enabled
+      && layoutSettings.showcase.mode !== 'manual'
+      && layoutSettings.showcase.automaticStrategy === 'best_selling';
+    const bestSellerIds = await this.biService.getStorefrontBestSellers(
+      tenant.id,
+      30,
+      needsBestSellingRanking ? Math.max(6, layoutSettings.showcase.maxItems) : 6,
+    );
 
     // Build virtual sections
     const virtualSections: StorefrontCategoryPayload[] = [];
@@ -516,6 +525,7 @@ export class StorefrontService {
 
     // 0. Best Sellers (Mais Pedidos)
     const bestSellerProducts = bestSellerIds
+      .slice(0, 6)
       .map(id => uniqueProductsMap.get(id))
       .filter((p): p is StorefrontProductPayload => p !== undefined && p.isAvailable);
 
@@ -581,6 +591,12 @@ export class StorefrontService {
 
     const finalCategories = [...virtualSections, ...categories];
 
+    const showcaseProducts = resolveStorefrontShowcase({
+      settings: layoutSettings.showcase,
+      eligibleProducts: uniqueProductsMap,
+      bestSellingProductIds: bestSellerIds,
+    });
+
     // 4. Global Upsells
     const globalUpsellRows = await this.prisma.upsell.findMany({
       where: {
@@ -624,7 +640,7 @@ export class StorefrontService {
     // 5. Storefront Customization (Fully Normalized & Hardened for Public consumption)
     const customization: StorefrontCustomizationPayload = {
       theme: normalizedTheme,
-      layout: normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson),
+      layout: layoutSettings,
     };
 
     const payload: StorefrontPayload = {
@@ -633,6 +649,9 @@ export class StorefrontService {
       combos,
       upsells: globalUpsells,
       customization,
+      showcase: showcaseProducts.length > 0
+        ? { title: layoutSettings.showcase.title, products: showcaseProducts }
+        : undefined,
     };
 
     await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
