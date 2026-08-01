@@ -6,9 +6,8 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
-import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload, StorefrontPreviewRequest } from '@gestor/types';
+import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 import { FeatureControlService } from '../feature-control/feature-control.service';
-import { StorefrontService } from '../storefront/storefront.service';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -18,7 +17,6 @@ export class TenantController {
     private readonly onboardingService: OnboardingService,
     private readonly readinessScoreService: ReadinessScoreService,
     private readonly featureControlService: FeatureControlService,
-    private readonly storefrontService: StorefrontService,
   ) {}
 
   /**
@@ -159,19 +157,6 @@ export class TenantController {
   @RequirePermissions('settings.manage')
   async getStorefrontCustomization(@CurrentTenant() tenantId: string) {
     return this.tenantService.getStorefrontCustomization(tenantId);
-  }
-
-  @Post('storefront-preview')
-  @RequirePermissions('settings.manage')
-  async getStorefrontPreview(
-    @CurrentTenant() tenantId: string,
-    @Body() body: StorefrontPreviewRequest,
-  ) {
-    return this.storefrontService.getStorefrontPreviewPayload(
-      tenantId,
-      body.customization,
-      body.fulfillmentType,
-    );
   }
 
   /**
