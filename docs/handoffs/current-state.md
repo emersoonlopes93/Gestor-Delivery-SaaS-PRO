@@ -896,3 +896,60 @@ Verificado nas 8 capturas, zoom 100%, sidebar visível, sem skeleton/toasts cobr
 - Screenshots reais confirmam o alinhamento estrutural pretendido em 2 resoluções desktop.
 - Nenhum push, PR, merge, deploy, stash apply/drop ou commit foi realizado até aqui.
 - Próximo passo: commit somente de `SettingsPage.tsx` + `docs/handoffs/current-state.md` (o arquivo `scripts/screenshot-settings.ts` e o diretório `tmp/` permanecem fora do commit, conforme protocolo).
+
+---
+
+## R0 Go-Live readiness - retomada funcional documental
+
+Data: 2026-08-01
+
+- Worktree `Gestor-Delivery-SaaS-PRO-go-live-audit`, branch
+  `docs/go-live-readiness-audit`, iniciou limpa no SHA `0ecfe5df` (base E0
+  `efbfefa3`). Checkout principal e `stash@{0}` foram preservados.
+- CI pos-merge da E0: CI `30678152290` e Secret scanning `30678152243` PASS.
+  O remoto `main-copy` avancou para `6e5acfa3`; nao houve merge dessa deriva na
+  PR R0 documental.
+- Auditoria estatica R1-R10 concluida em `docs/go-live/`. Nenhum novo P0 foi
+  encontrado no preset estavel. `NotImplementedException` de split payment e
+  feature beta, portanto fica fora do V1.
+- R1/R2/R3/R4/R9 sao P1 de prova e ajuste limitado; R5-R8 sao P2; Google login
+  esta fora do V1 sem decisao comercial. Nenhuma mudanca funcional, Prisma,
+  migration, seed, dependencia, feature flag, producao, Dokploy ou banco remoto
+  foi realizada.
+- Decisao: P1 pode iniciar por R1, mas Go-Live definitivo continua bloqueado
+  exclusivamente por E0-OPS (redeploy, revogacao global de `AuthSession` e
+  smokes de nova sessao). E0H permanece follow-up sem reescrita.
+
+---
+
+## R0 Go-Live Readiness — interrompida por P0 de segurança
+
+Data: 2026-07-31
+
+Branch: `docs/go-live-readiness-audit`
+
+Base: `origin/main-copy` / `6ed4c043e693bac98cb21509e87590f080d599f2`
+
+- O checkout principal e `stash@{0}` foram preservados; a auditoria ocorreu em
+  worktree isolada.
+- PR #33 foi confirmada integrada no SHA-base. PR #34 permanece aberta, Draft e
+  fora de `main-copy`.
+- `.env.docker` está versionado e contém valores concretos para os dois secrets
+  JWT. Os valores não foram copiados para o handoff.
+- O arquivo está no histórico Git. O compose de produção atual lê `.env`, não
+  `.env.docker`; o uso efetivo dos valores na VPS não foi verificado porque
+  acesso à produção é proibido.
+- O achado foi classificado P0 de segurança e acionou a stop-rule do briefing.
+  A auditoria consolidada, o escopo do Go-Live, R1-R10 e os checklists não foram
+  concluídos.
+- Foram criados localmente apenas `docs/go-live/README.md`,
+  `docs/go-live/readiness-audit-2026-07-31.md` e
+  `docs/go-live/issue-matrix.md` para registrar o bloqueador.
+- Baselines: `pnpm lint` exit 1 por `eslint` ausente; `pnpm typecheck` exit 1 por
+  `tsc` ausente. Nenhuma dependência foi instalada.
+- Nenhum código funcional, Prisma, migration, dependência, lockfile, feature
+  flag, banco, produção ou deploy foi alterado.
+- Nenhum commit, push, PR, merge ou deploy foi realizado.
+- Próximo passo obrigatório: E0 emergencial para rotação dos secrets, invalidação
+  de sessões, saneamento do arquivo/histórico e gate de secret scanning. Retomar
+  a R0 somente após evidência da contenção.
