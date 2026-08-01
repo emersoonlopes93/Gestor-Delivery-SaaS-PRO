@@ -65,6 +65,24 @@ Nenhuma alteração em itens, quantidades ou pagamento deve ocorrer.
 5. Entregador assume/Operador despacha → `out_for_delivery`
 6. Entregador finaliza → `completed`
 
+## 4.1 Idempotência do checkout público
+
+`POST /orders/public-checkout/:slug` usa `Order.idempotencyKey` com unicidade por
+`(tenantId, idempotencyKey)` como proteção durável. O storefront gera uma chave
+versionada por tentativa lógica com fingerprint do payload material:
+
+- retry do mesmo payload reutiliza a mesma chave;
+- alteração material do pedido gera outra chave;
+- chave versionada incompatível com o payload responde conflito;
+- corrida concorrente na constraint retorna o pedido já confirmado, sem repetir
+  os efeitos pós-criação;
+- chaves legadas continuam aceitas durante a compatibilidade, mas não possuem a
+  verificação de fingerprint do contrato versionado.
+
+O estado visual do botão não é a única proteção: o cliente possui guard síncrono
+contra reentrada e o banco continua sendo a barreira autoritativa contra pedidos
+duplicados. Não usar lock somente em memória como substituto da constraint.
+
 ## 5. WebSockets e UI Reactiva
 
 O painel administrativo e o storefront reagem a mudanças através do WebSocket (namespace principal).

@@ -50,6 +50,10 @@ import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept
 import { canAutoAcceptOrder } from './order-auto-accept.policy';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { AuthoritativeOrderAnalyticsService } from '../analytics/authoritative-order-analytics.service';
+import {
+  assertOrderIdempotencyPayload,
+  isPrismaUniqueConstraintError,
+} from './order-idempotency.util';
 
 @Injectable()
 export class OrdersService {
@@ -180,6 +184,8 @@ export class OrdersService {
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
+    assertOrderIdempotencyPayload(dto);
+
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug },
       include: { settings: true },
@@ -255,9 +261,11 @@ export class OrdersService {
     // 4. Transactional order creation
     const finalTotal = total; 
 
-    const order = await runSerializableTransactionWithRetry(
-      this.prisma,
-      async (tx) => {
+    let order: Prisma.OrderGetPayload<Record<string, never>>;
+    try {
+      order = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx) => {
         // Atomic increment of order sequence
         const updatedTenant = await tx.tenant.update({
           where: { id: tenantId },
@@ -416,15 +424,28 @@ export class OrdersService {
         }
 
         return newOrder;
-      },
-      {
-        timeout: 20_000,
-        maxWait: 5_000,
-        onRetry: (attempt, delayMs) => this.logger.warn(
-          `Retrying public checkout transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
-        ),
-      },
-    );
+        },
+        {
+          timeout: 20_000,
+          maxWait: 5_000,
+          onRetry: (attempt, delayMs) => this.logger.warn(
+            `Retrying public checkout transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+          ),
+        },
+      );
+    } catch (error: unknown) {
+      if (isPrismaUniqueConstraintError(error)) {
+        const concurrentOrder = await this.prisma.order.findUnique({
+          where: {
+            tenantId_idempotencyKey: { tenantId, idempotencyKey: dto.idempotencyKey },
+          },
+        });
+        if (concurrentOrder) {
+          return this.getOrderDetail(concurrentOrder.id, tenantId);
+        }
+      }
+      throw error;
+    }
 
     let orderDetail = await this.getOrderDetail(order.id, tenantId);
 

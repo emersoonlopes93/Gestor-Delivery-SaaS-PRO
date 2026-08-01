@@ -899,6 +899,36 @@ Verificado nas 8 capturas, zoom 100%, sidebar visível, sem skeleton/toasts cobr
 
 ---
 
+## R1 - checkout summary and submit safety
+
+Data: 2026-08-01
+
+- Branch `feat/go-live-r1-checkout-submit-safety`, baseada no merge da PR #36 em
+  `origin/main-copy` (`2da1d750`). Checkout principal, worktrees R0/E0 e
+  `stash@{0}` preservados.
+- Frontend submit path: `CheckoutPage.tsx` monta `CreateOrderDTO` a partir do
+  carrinho/formulário e chama `POST /orders/public-checkout/:slug` por
+  `api-client.ts`.
+- API route: `OrdersController.checkout`; server create path:
+  `OrdersService.createOrder`; transaction boundary:
+  `runSerializableTransactionWithRetry` cobrindo pedido, itens, endereço,
+  timeline, mesa, estoque, cashback e cupom. Efeitos externos continuam depois
+  do commit.
+- Existing idempotency mechanism: **YES, completed in R1**. `Order` já possuía
+  `idempotencyKey` e `@@unique([tenantId, idempotencyKey])`; R1 adiciona
+  fingerprint versionado, rejeição de payload incompatível, recuperação da
+  corrida `P2002` e guard síncrono no cliente.
+- O resumo final usa o mesmo carrinho e estados que montam o payload e cobre
+  itens, quantidades, opções, slots, observações, totais, descontos/cashback,
+  entrega/retirada, endereço, pagamento e troco quando aplicáveis.
+- Retry de erro de rede/timeout preserva a chave enquanto o payload não muda;
+  erro HTTP definitivo libera nova tentativa; sucesso fecha o guard e navega
+  uma única vez. Mudança material de payload altera automaticamente a chave.
+- Nenhum Prisma/schema, migration, seed, dependência, lockfile, feature flag,
+  E0-OPS, Dokploy, banco remoto ou deploy foi alterado.
+
+---
+
 ## R0 Go-Live readiness - retomada funcional documental
 
 Data: 2026-08-01
