@@ -1,3 +1,31 @@
+## R2 - checkout guided steps and progressive address
+
+Data: 2026-08-01
+
+- Branch `feat/go-live-r2-checkout-steps-address`, criada em worktree isolada a
+  partir do merge da R1 em `origin/main-copy` (`23b67f68`). Checkout principal,
+  worktrees R0/R1/E0 e `stash@{0}` permanecem preservados.
+- O checkout do storefront foi dividido em etapas móveis e progressivas para
+  identificação, recebimento, endereço quando aplicável, pagamento e revisão.
+  Voltar preserva o estado existente; retirada pula endereço; a revisão reutiliza
+  o resumo final da R1.
+- Endereços salvos, autocomplete Google já configurado e consulta ViaCEP existente
+  continuam sendo as únicas fontes automáticas. O fallback manual é explícito;
+  número, complemento e referência permanecem sob controle do cliente.
+- Respostas tardias de CEP são descartadas quando o CEP ou um campo material foi
+  editado. Autofill não sobrescreve campos já editados e falha de busca revela o
+  formulário manual sem apagar dados.
+- Mudança material do endereço invalida imediatamente taxa/cobertura anteriores.
+  O avanço exige nova validação autoritativa da API; erro mantém o formulário e
+  permite correção.
+- O guard síncrono, fingerprint e tentativa lógica da R1 não foram alterados.
+  Navegação entre etapas mantém a mesma tentativa; retry ambíguo do mesmo payload
+  continua reutilizando a chave, sem duplicar pedido.
+- Nenhum contrato amplo de API, Prisma/schema, migration, seed, provider, SDK,
+  dependência, lockfile, feature flag, E0-OPS, banco remoto ou deploy foi alterado.
+
+---
+
 ## E0 — JWT secret containment
 
 Data: 2026-07-31

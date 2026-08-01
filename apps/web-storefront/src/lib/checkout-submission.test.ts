@@ -5,6 +5,7 @@ import {
   createCheckoutIdempotencyKey,
   isAmbiguousCheckoutError,
 } from './checkout-submission';
+import { getAdjacentCheckoutStep, getCheckoutSteps } from './checkout-flow';
 
 function createPayload(overrides: Partial<CreateOrderDTO> = {}): CreateOrderDTO {
   return {
@@ -64,6 +65,18 @@ describe('checkout submission safety', () => {
     expect(changed).not.toBe(first);
     expect(newOrder).not.toBe(first);
     expect(first.length).toBeLessThanOrEqual(100);
+  });
+
+  it('keeps the same attempt key while navigating checkout steps', async () => {
+    const attemptId = '00000000-0000-4000-8000-000000000003';
+    const steps = getCheckoutSteps('delivery', false);
+    const beforeNavigation = await createCheckoutIdempotencyKey(attemptId, createPayload());
+
+    expect(getAdjacentCheckoutStep(steps, 'address', 'next')).toBe('payment');
+    expect(getAdjacentCheckoutStep(steps, 'payment', 'back')).toBe('address');
+
+    const afterNavigation = await createCheckoutIdempotencyKey(attemptId, createPayload());
+    expect(afterNavigation).toBe(beforeNavigation);
   });
 
   it('distinguishes ambiguous network failures from definitive HTTP errors', () => {
