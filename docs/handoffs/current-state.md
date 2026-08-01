@@ -899,6 +899,29 @@ Verificado nas 8 capturas, zoom 100%, sidebar visível, sem skeleton/toasts cobr
 
 ---
 
+## R0 Go-Live readiness - retomada funcional documental
+
+Data: 2026-08-01
+
+- Worktree `Gestor-Delivery-SaaS-PRO-go-live-audit`, branch
+  `docs/go-live-readiness-audit`, iniciou limpa no SHA `0ecfe5df` (base E0
+  `efbfefa3`). Checkout principal e `stash@{0}` foram preservados.
+- CI pos-merge da E0: CI `30678152290` e Secret scanning `30678152243` PASS.
+  O remoto `main-copy` avancou para `6e5acfa3`; nao houve merge dessa deriva na
+  PR R0 documental.
+- Auditoria estatica R1-R10 concluida em `docs/go-live/`. Nenhum novo P0 foi
+  encontrado no preset estavel. `NotImplementedException` de split payment e
+  feature beta, portanto fica fora do V1.
+- R1/R2/R3/R4/R9 sao P1 de prova e ajuste limitado; R5-R8 sao P2; Google login
+  esta fora do V1 sem decisao comercial. Nenhuma mudanca funcional, Prisma,
+  migration, seed, dependencia, feature flag, producao, Dokploy ou banco remoto
+  foi realizada.
+- Decisao: P1 pode iniciar por R1, mas Go-Live definitivo continua bloqueado
+  exclusivamente por E0-OPS (redeploy, revogacao global de `AuthSession` e
+  smokes de nova sessao). E0H permanece follow-up sem reescrita.
+
+---
+
 ## R0 Go-Live Readiness — interrompida por P0 de segurança
 
 Data: 2026-07-31
