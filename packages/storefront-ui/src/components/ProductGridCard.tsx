@@ -36,6 +36,8 @@ export function ProductGridCard({
           <img 
             src={product.imageUrl!} 
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className={cn(
               'w-full h-full transition-transform group-hover:scale-105',
               imageMode === 'cover' ? 'object-cover' : 'object-contain'

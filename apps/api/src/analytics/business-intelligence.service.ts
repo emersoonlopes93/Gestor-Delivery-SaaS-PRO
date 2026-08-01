@@ -364,7 +364,7 @@ export class BusinessIntelligenceService {
 
         const profitability = await this.getProductProfitability(tenantId, range);
         return profitability
-          .sort((a, b) => b.quantity - a.quantity)
+          .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue || a.id.localeCompare(b.id))
           .slice(0, limit)
           .map((item) => item.id);
       },

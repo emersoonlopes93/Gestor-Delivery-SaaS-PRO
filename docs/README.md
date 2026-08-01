@@ -121,6 +121,7 @@
 | Documento | Descrição |
 |-----------|-----------|
 | [Marketing, Analytics e Desempenho do Cardápio](./audits/marketing-analytics-cardapio-audit.md) | Estado atual, lacunas, riscos e plano incremental |
+| [R2.5 — Vitrine inteligente](./audits/r2-5-smart-storefront-showcase-audit.md) | Auditoria de contratos, ranking, disponibilidade, cache e arquitetura mínima da vitrine |
 | [Inventário documental](./audits/documentation-inventory.md) | Todos os docs com estado e ação |
 | [Relatório de auditoria](./audits/documentation-audit.md) | Análise de consistência código vs docs |
 | [Contradições](./audits/contradictions.md) | Divergências documentadas |
