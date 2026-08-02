@@ -1,7 +1,7 @@
 import { equal, ok } from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { chromium, type BrowserContext, type Page } from '@playwright/test';
+import { chromium, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 type LoginResponse = { accessToken?: string; data?: { accessToken?: string; user?: { tenantId?: string } }; user?: { tenantId?: string } };
 type StorefrontProduct = { id?: string; type?: string; isAvailable?: boolean; basePrice?: number };
@@ -123,6 +123,18 @@ async function activateSounds(page: Page): Promise<void> {
   const activationButton = page.getByRole('alert')
     .getByRole('button', { name: /Permitir notificacoes e ativar som|Tentar novamente/ });
   await activationButton.click();
+  await assertSoundsActive(page, activationButton);
+}
+
+async function activateSoundsAfterSharedConfirmation(page: Page): Promise<void> {
+  const activationButton = page.getByRole('alert')
+    .getByRole('button', { name: /Permitir notificacoes e ativar som|Tentar novamente/ });
+  await activationButton.waitFor({ state: 'hidden', timeout: 5_000 });
+  await page.getByRole('button', { name: 'Ativar notificacoes sonoras' }).click();
+  await assertSoundsActive(page, activationButton);
+}
+
+async function assertSoundsActive(page: Page, activationButton: Locator): Promise<void> {
   await page.waitForFunction(() => {
     const audit = (window as unknown as { __notificationAudioAudit?: AudioAudit }).__notificationAudioAudit;
     return audit?.audioContextState === 'running';
@@ -250,7 +262,8 @@ async function main(): Promise<void> {
       assertNoHorizontalOverflow(leader, 'desktop blocked activation'),
       assertNoHorizontalOverflow(secondary, 'mobile blocked activation'),
     ]);
-    await Promise.all([activateSounds(leader), activateSounds(secondary)]);
+    await activateSounds(leader);
+    await activateSoundsAfterSharedConfirmation(secondary);
     await Promise.all([
       leader.screenshot({ path: join(artifactDir, 'sound-activation-desktop-active.png'), fullPage: true }),
       secondary.screenshot({ path: join(artifactDir, 'sound-activation-mobile-active.png'), fullPage: true }),
