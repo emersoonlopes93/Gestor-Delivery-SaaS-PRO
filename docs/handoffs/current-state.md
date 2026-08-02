@@ -23,6 +23,9 @@ Data: 2026-08-02
   uma segunda espera instantânea: o teste consultava `Testar som` antes do commit
   de render do React. A asserção agora aguarda explicitamente o CTA ficar oculto
   e o controle canônico ficar visível, sem sleep ou force click.
+- A execução seguinte expôs um seletor não exato: `Ativar notificacoes sonoras`
+  também casava o toggle `Desativar notificacoes sonoras`. O fallback agora usa
+  o nome acessível exato, preservando strict mode do Playwright.
 - Gates locais: build da API e web-tenant, lint, typecheck, `check:no-any`,
   `check:features` e `git diff --check` passaram. O E2E completo permanece como
   prova no ambiente efêmero da CI; nenhuma migration, seed, produção ou deploy

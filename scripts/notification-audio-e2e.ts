@@ -130,7 +130,7 @@ async function activateSoundsAfterSharedConfirmation(page: Page): Promise<void> 
   const activationButton = page.getByRole('alert')
     .getByRole('button', { name: /Permitir notificacoes e ativar som|Tentar novamente/ });
   await activationButton.waitFor({ state: 'hidden', timeout: 5_000 });
-  await page.getByRole('button', { name: 'Ativar notificacoes sonoras' }).click();
+  await page.getByRole('button', { name: 'Ativar notificacoes sonoras', exact: true }).click();
   await assertSoundsActive(page, activationButton);
 }
 
