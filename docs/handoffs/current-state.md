@@ -19,6 +19,10 @@ Data: 2026-08-02
   precisam provar `AudioContext` em `running`, CTA ausente e `Testar som`
   disponível antes de validar eventos, dedupe, silêncio de conectividade e
   troca de liderança.
+- A primeira execução da PR confirmou a ativação do `AudioContext`, mas revelou
+  uma segunda espera instantânea: o teste consultava `Testar som` antes do commit
+  de render do React. A asserção agora aguarda explicitamente o CTA ficar oculto
+  e o controle canônico ficar visível, sem sleep ou force click.
 - Gates locais: build da API e web-tenant, lint, typecheck, `check:no-any`,
   `check:features` e `git diff --check` passaram. O E2E completo permanece como
   prova no ambiente efêmero da CI; nenhuma migration, seed, produção ou deploy

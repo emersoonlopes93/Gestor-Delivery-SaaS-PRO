@@ -139,8 +139,8 @@ async function assertSoundsActive(page: Page, activationButton: Locator): Promis
     const audit = (window as unknown as { __notificationAudioAudit?: AudioAudit }).__notificationAudioAudit;
     return audit?.audioContextState === 'running';
   }, { timeout: 5_000 });
-  equal(await activationButton.count(), 0, 'activation banner remained visible after AudioContext became running');
-  equal(await page.getByRole('button', { name: 'Testar som' }).count() > 0, true, 'test sound control was not available after activation');
+  await activationButton.waitFor({ state: 'hidden', timeout: 5_000 });
+  await page.getByRole('button', { name: 'Testar som' }).waitFor({ state: 'visible', timeout: 5_000 });
 }
 
 async function waitForLeader(pages: Page[]): Promise<Page> {
