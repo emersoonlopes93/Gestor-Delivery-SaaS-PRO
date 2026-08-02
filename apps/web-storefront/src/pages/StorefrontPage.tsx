@@ -35,7 +35,8 @@ import {
   ProductRenderer,
   CategoryNavigation,
   StorefrontEmptyState,
-  cn
+  cn,
+  toStorefrontProduct,
 } from '@gestor/storefront-ui';
 import type { StorefrontProductLayout, StorefrontLayoutSettings } from '@gestor/theme';
 import { useAnalytics } from '../features/analytics';
@@ -545,16 +546,7 @@ export function StorefrontPage() {
                 {category.products.map((product) => (
                   <ProductRenderer
                     key={product.id}
-                    product={{
-                      id: product.id,
-                      name: product.name,
-                      description: product.shortDescription,
-                      imageUrl: product.image,
-                      price: product.basePrice,
-                      compareAtPrice: product.compareAtPrice,
-                      isAvailable: product.isAvailable,
-                      badges: product.badges,
-                    }}
+                    product={toStorefrontProduct(product)}
                     layout={effectiveProductLayout}
                     imageMode={layoutSettings.productImageMode}
                     showDescription={layoutSettings.showProductDescription}

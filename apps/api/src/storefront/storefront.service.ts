@@ -67,18 +67,29 @@ export class StorefrontService {
   async getStorefrontPayload(
     slug: string,
     fulfillmentType: 'delivery' | 'pickup' = 'delivery',
+    options?: {
+      tenantId?: string;
+      customization?: Partial<StorefrontCustomizationPayload>;
+      bypassCache?: boolean;
+    },
   ): Promise<StorefrontPayload> {
     const channel: SalesChannel =
       fulfillmentType === 'pickup' ? 'storefront_pickup' : 'storefront_delivery';
 
-    const cachedPayload = await this.storefrontCache.getPayload(slug, fulfillmentType);
-    if (cachedPayload) {
-      return cachedPayload;
+    if (!options?.bypassCache) {
+      const cachedPayload = await this.storefrontCache.getPayload(slug, fulfillmentType);
+      if (cachedPayload) {
+        return cachedPayload;
+      }
     }
 
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
-      where: { slug, status: 'active' }, // only active tenants
+      where: {
+        slug,
+        status: 'active',
+        ...(options?.tenantId ? { id: options.tenantId } : {}),
+      }, // only active tenants; authenticated preview is additionally tenant-scoped
       include: { settings: true, schedulingSettings: true, deliveryCoverageConfig: true },
     });
 
@@ -440,7 +451,9 @@ export class StorefrontService {
       tenant.settings?.orderWhatsappNumber || tenant.settings?.businessPhone || null,
     );
 
-    const normalizedTheme = normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson);
+    const normalizedTheme = normalizeStorefrontTheme(
+      options?.customization?.theme ?? tenant.settings?.storefrontThemeJson,
+    );
 
     const deliveryEnabled = Boolean(
       tenant.deliveryCoverageConfig?.isDeliveryEnabled &&
@@ -504,7 +517,9 @@ export class StorefrontService {
       },
     };
 
-    const layoutSettings = normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson);
+    const layoutSettings = normalizeStorefrontLayout(
+      options?.customization?.layout ?? tenant.settings?.storefrontLayoutJson,
+    );
     const needsBestSellingRanking = layoutSettings.showcase.enabled
       && layoutSettings.showcase.mode !== 'manual'
       && layoutSettings.showcase.automaticStrategy === 'best_selling';
@@ -654,9 +669,32 @@ export class StorefrontService {
         : undefined,
     };
 
-    await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
+    if (!options?.bypassCache) {
+      await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
+    }
 
     return payload;
+  }
+
+  async getStorefrontPreviewPayload(
+    tenantId: string,
+    customization: StorefrontCustomizationPayload,
+    fulfillmentType: 'delivery' | 'pickup',
+  ): Promise<StorefrontPayload> {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, status: 'active' },
+      select: { slug: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Loja ativa não encontrada para o preview.');
+    }
+
+    return this.getStorefrontPayload(tenant.slug, fulfillmentType, {
+      tenantId,
+      customization,
+      bypassCache: true,
+    });
   }
 
   async getAvailableSlots(slug: string, date?: Date | string) {

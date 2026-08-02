@@ -591,6 +591,9 @@ importers:
       '@gestor/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gestor/storefront-ui':
+        specifier: workspace:*
+        version: link:../../packages/storefront-ui
       '@gestor/types':
         specifier: workspace:*
         version: link:../../packages/types

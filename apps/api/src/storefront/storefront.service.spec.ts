@@ -118,4 +118,24 @@ describe('StorefrontService', () => {
 
     expect(schedulingServiceMock.getAvailableTimeSlots).toHaveBeenCalledWith(expectedDate, 'tenant-1');
   });
+
+  it('resolves authenticated preview through the public payload path without cache and scoped to the current tenant', async () => {
+    prismaMock.tenant.findFirst.mockResolvedValue({ slug: 'tenant-slug' });
+    const customization = { theme: { primaryColor: '#123456' }, layout: { productLayout: 'grid' } };
+    const payload = { tenant: { id: 'tenant-1' }, categories: [], combos: [], upsells: [] };
+    const payloadSpy = jest.spyOn(service, 'getStorefrontPayload').mockResolvedValue(payload as never);
+
+    await expect(service.getStorefrontPreviewPayload('tenant-1', customization, 'pickup'))
+      .resolves.toBe(payload);
+
+    expect(prismaMock.tenant.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tenant-1', status: 'active' },
+      select: { slug: true },
+    });
+    expect(payloadSpy).toHaveBeenCalledWith('tenant-slug', 'pickup', {
+      tenantId: 'tenant-1',
+      customization,
+      bypassCache: true,
+    });
+  });
 });

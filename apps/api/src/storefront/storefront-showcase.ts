@@ -17,7 +17,7 @@ export function resolveStorefrontShowcase({
   const selected: StorefrontProductPayload[] = [];
   const selectedIds = new Set<string>();
   const append = (product: StorefrontProductPayload | undefined) => {
-    if (!product || selectedIds.has(product.id) || selected.length >= settings.maxItems) return;
+    if (!product?.isAvailable || selectedIds.has(product.id) || selected.length >= settings.maxItems) return;
     selectedIds.add(product.id);
     selected.push(product);
   };

@@ -65,6 +65,26 @@ describe('resolveStorefrontShowcase', () => {
     expect(resolveStorefrontShowcase({ settings, eligibleProducts, bestSellingProductIds: [] }).map(({ id }) => id))
       .toEqual(['c']);
   });
+
+  it('removes products rejected by canonical availability in every selection path', () => {
+    const unavailable = { ...product('unavailable'), isAvailable: false };
+    const productsWithUnavailable = new Map(eligibleProducts);
+    productsWithUnavailable.set(unavailable.id, unavailable);
+    const settings = {
+      ...getDefaultStorefrontLayoutSettings().showcase,
+      enabled: true,
+      mode: 'hybrid' as const,
+      maxItems: 3,
+      manualProductIds: ['unavailable', 'a'],
+      automaticStrategy: 'best_selling' as const,
+    };
+
+    expect(resolveStorefrontShowcase({
+      settings,
+      eligibleProducts: productsWithUnavailable,
+      bestSellingProductIds: ['unavailable', 'b'],
+    }).map(({ id }) => id)).toEqual(['a', 'b']);
+  });
 });
 
 describe('normalizeStorefrontLayout showcase', () => {

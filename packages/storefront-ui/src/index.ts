@@ -9,6 +9,7 @@ export * from './components/StorefrontBadge';
 export * from './components/StorefrontEmptyState';
 export * from './components/CategoryNavigation';
 export * from './components/ProductRenderer';
+export * from './components/SmartShowcase';
 
 // Individual layouts (exported if needed for direct use)
 export * from './components/ProductGridCard';

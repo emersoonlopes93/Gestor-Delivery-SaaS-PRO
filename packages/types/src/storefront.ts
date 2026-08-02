@@ -206,6 +206,11 @@ export interface StorefrontCustomizationPayload {
   layout: Record<string, unknown>;
 }
 
+export interface StorefrontPreviewRequest {
+  customization: StorefrontCustomizationPayload;
+  fulfillmentType: 'delivery' | 'pickup';
+}
+
 export interface StorefrontShowcasePayload {
   title: string;
   products: StorefrontProductPayload[];
