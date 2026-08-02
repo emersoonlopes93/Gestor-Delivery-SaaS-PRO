@@ -1,3 +1,39 @@
+## Recuperação do E2E de áudio de notificações
+
+Data: 2026-08-02
+
+- Branch `fix/notification-audio-e2e-race`, criada em worktree isolada a partir
+  de `origin/main-copy` no merge da PR #42 (`b1492d5e`). Checkout principal,
+  alterações Android preexistentes, R5 e `stash@{0}` permanecem preservados.
+- O run pós-merge `30733764157`, job `91458946872`, falhou porque as duas abas
+  tentavam clicar simultaneamente no CTA. A primeira confirmação de áudio era
+  sincronizada por `localStorage`, removendo legitimamente o CTA da outra aba
+  durante o hit-test do Playwright. Os artefatos mostraram uma aba `running` e
+  a outra `not-created`, sem erro de página, console ou rede.
+- Não havia overlay funcional bloqueando o usuário. A página mantinha o controle
+  canônico `Ativar notificacoes sonoras` visível e acionável após a transição.
+  Portanto, a causa foi classificada como race do E2E durante uma transição de
+  estado legítima; nenhum código de produto foi alterado.
+- O E2E agora ativa a primeira aba pelo CTA e, depois da confirmação
+  compartilhada, ativa a segunda pelo controle canônico da página. Ambas ainda
+  precisam provar `AudioContext` em `running`, CTA ausente e `Testar som`
+  disponível antes de validar eventos, dedupe, silêncio de conectividade e
+  troca de liderança.
+- A primeira execução da PR confirmou a ativação do `AudioContext`, mas revelou
+  uma segunda espera instantânea: o teste consultava `Testar som` antes do commit
+  de render do React. A asserção agora aguarda explicitamente o CTA ficar oculto
+  e o controle canônico ficar visível, sem sleep ou force click.
+- A execução seguinte expôs um seletor não exato: `Ativar notificacoes sonoras`
+  também casava o toggle `Desativar notificacoes sonoras`. O fallback agora usa
+  o nome acessível exato, preservando strict mode do Playwright.
+- Gates locais: build da API e web-tenant, lint, typecheck, `check:no-any`,
+  `check:features` e `git diff --check` passaram. O E2E completo permanece como
+  prova no ambiente efêmero da CI; nenhuma migration, seed, produção ou deploy
+  foi executado. A R6 não foi iniciada e só pode ser liberada após CI verde da
+  PR de correção e do merge em `main-copy`.
+
+---
+
 ## R3 — login do entregador sem slug visível
 
 Data: 2026-08-01
