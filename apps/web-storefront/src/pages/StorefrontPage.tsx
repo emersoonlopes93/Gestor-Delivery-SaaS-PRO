@@ -413,6 +413,7 @@ export function StorefrontPage() {
 
       <SmartShowcase
         showcase={data.showcase}
+        businessSegment={data.tenant.businessSegment}
         productLayout={effectiveProductLayout}
         imageMode={layoutSettings.productImageMode}
         showDescription={layoutSettings.showProductDescription}
@@ -551,6 +552,7 @@ export function StorefrontPage() {
                     imageMode={layoutSettings.productImageMode}
                     showDescription={layoutSettings.showProductDescription}
                     showBadges={layoutSettings.showBadges}
+                    businessSegment={data.tenant.businessSegment}
                     onSelectProduct={() => {
                       setSelectedProduct(product);
                       setSelectedProductCategory(productCategoryIndex.get(product.id) ?? category ?? null);

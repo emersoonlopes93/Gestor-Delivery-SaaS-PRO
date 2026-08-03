@@ -5,6 +5,7 @@ import { ProductListItem } from './ProductListItem';
 import { ProductCompactCard } from './ProductCompactCard';
 import { ProductSquareCard } from './ProductSquareCard';
 import { ProductPremiumCard } from './ProductPremiumCard';
+import { resolveProductImage, type ProductFallbackSegment } from '../product-image';
 
 import { ProductCardProps } from './ProductGridCard';
 
@@ -16,6 +17,7 @@ interface ProductRendererProps {
   showBadges?: boolean;
   onSelectProduct?: (product: StorefrontProduct) => void;
   currencyFormatter?: (value: number) => string;
+  businessSegment?: ProductFallbackSegment | null;
 }
 
 /**
@@ -29,10 +31,14 @@ export function ProductRenderer({
   showDescription = true,
   showBadges = true,
   onSelectProduct,
-  currencyFormatter
+  currencyFormatter,
+  businessSegment,
 }: ProductRendererProps) {
+  const image = resolveProductImage({ productImage: product.imageUrl, businessSegment });
+  const resolvedProduct = { ...product, imageUrl: image.src };
   const commonProps: ProductCardProps = {
-    product,
+    product: resolvedProduct,
+    fallbackImageUrl: image.fallbackSrc,
     onClick: onSelectProduct,
     currencyFormatter,
     showDescription,

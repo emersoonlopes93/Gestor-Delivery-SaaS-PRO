@@ -77,6 +77,7 @@ export function StorefrontPreview({ payload }: StorefrontPreviewProps) {
             imageMode={layout.productImageMode}
             showDescription={layout.showProductDescription}
             showBadges={layout.showBadges}
+            businessSegment={payload.tenant.businessSegment}
             compact
           />
         ) : null}
@@ -95,6 +96,7 @@ export function StorefrontPreview({ payload }: StorefrontPreviewProps) {
                   imageMode={layout.productImageMode}
                   showDescription={layout.showProductDescription}
                   showBadges={layout.showBadges}
+                  businessSegment={payload.tenant.businessSegment}
                 />
               ))}
             </div>

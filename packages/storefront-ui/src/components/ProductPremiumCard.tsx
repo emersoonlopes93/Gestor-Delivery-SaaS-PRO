@@ -3,6 +3,7 @@ import { StorefrontButton } from './StorefrontButton';
 import { StorefrontBadge } from './StorefrontBadge';
 import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
+import { ResilientProductImage } from '../product-image';
 
 export function ProductPremiumCard({
   product,
@@ -10,7 +11,8 @@ export function ProductPremiumCard({
   currencyFormatter = (v) => `R$ ${v.toFixed(2)}`,
   showDescription = true,
   showBadges = true,
-  imageMode = 'cover'
+  imageMode = 'cover',
+  fallbackImageUrl,
 }: ProductCardProps) {
   const hasImage = !!product.imageUrl && imageMode !== 'hidden';
 
@@ -24,9 +26,12 @@ export function ProductPremiumCard({
     >
       {hasImage ? (
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--storefront-muted)]">
-          <img 
+          <ResilientProductImage
             src={product.imageUrl!} 
+            fallbackSrc={fallbackImageUrl ?? product.imageUrl!}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className={cn(
               'w-full h-full transition-transform duration-700 group-hover:scale-110',
               imageMode === 'cover' ? 'object-cover' : 'object-contain'

@@ -1,5 +1,6 @@
 export * from './cn';
 export * from './types';
+export * from './product-image';
 
 // Components
 export * from './components/StorefrontThemeProvider';
