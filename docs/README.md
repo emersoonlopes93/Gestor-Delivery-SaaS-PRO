@@ -125,6 +125,7 @@
 | [R3 — Login do entregador sem slug](./audits/r3-driver-login-no-slug-audit.md) | Auditoria de identidade, ambiguidade, sessão, enumeração e WebSocket do entregador |
 | [R4 — Segurança da criação de filiais](./audits/r4-branch-creation-safety-audit.md) | Modelo de identidade, causa do conflito, atomicidade, idempotência e bloqueio temporário da criação |
 | [R5 — Paridade preview/storefront](./audits/r5-storefront-preview-parity-audit.md) | Fontes, renderers, availability, fulfillment, showcase e arquitetura mínima compartilhada |
+| [R6 — Safe area, viewport e tema mobile](./audits/r6-mobile-safe-area-theme-audit.md) | Drawer no APK, fixed actions, viewport dinâmico, portals e consistência light/dark |
 | [Inventário documental](./audits/documentation-inventory.md) | Todos os docs com estado e ação |
 | [Relatório de auditoria](./audits/documentation-audit.md) | Análise de consistência código vs docs |
 | [Contradições](./audits/contradictions.md) | Divergências documentadas |
