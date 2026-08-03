@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   ChefHat,
@@ -12,7 +12,6 @@ import {
   Clock,
 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
-import { templateSegmentToBusinessSegment } from '../business-segment';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,7 +37,7 @@ interface ImportResult {
   errors: string[];
 }
 
-type ImportPhase = 'choosing' | 'segment-select' | 'importing' | 'success' | 'error';
+type ImportPhase = 'choosing' | 'segment-select' | 'confirm' | 'importing' | 'success' | 'error';
 
 interface Step5ImportMenuProps {
   onImportComplete: () => void;
@@ -56,6 +55,7 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [animatedCount, setAnimatedCount] = useState({ categories: 0, products: 0, images: 0 });
+  const importInFlightRef = useRef(false);
 
   useEffect(() => {
     loadTemplates();
@@ -76,20 +76,19 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
     }
   };
 
-  const handleStartImport = async (templateId: string) => {
+  const handleSelectTemplate = (templateId: string) => {
     setSelectedTemplateId(templateId);
+    setPhase('confirm');
+  };
+
+  const handleStartImport = async () => {
+    if (!selectedTemplateId || importInFlightRef.current) return;
+    importInFlightRef.current = true;
     setPhase('importing');
 
     try {
-      const selectedTemplate = templates.find((template) => template.id === templateId);
-      const businessSegment = selectedTemplate
-        ? templateSegmentToBusinessSegment(selectedTemplate.businessSegment)
-        : null;
-      if (businessSegment) {
-        await api.patch('/tenant/settings', { businessSegment });
-      }
       const res = await api.post<ImportResult>('/catalog/menu-import/execute', {
-        templateId,
+        templateId: selectedTemplateId,
         skipExisting: true,
       });
 
@@ -102,6 +101,7 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
         setPhase('error');
       }
     } catch {
+      importInFlightRef.current = false;
       setPhase('error');
     }
   };
@@ -150,7 +150,7 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
           <button
             onClick={() => {
               if (recommended) {
-                handleStartImport(recommended.id);
+                handleSelectTemplate(recommended.id);
               } else {
                 setPhase('segment-select');
               }
@@ -251,7 +251,7 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
             {templates.map((t) => (
               <button
                 key={t.id}
-                onClick={() => handleStartImport(t.id)}
+                onClick={() => handleSelectTemplate(t.id)}
                 className="group p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-all text-left"
               >
                 <div className="text-3xl mb-2">{t.emoji}</div>
@@ -275,6 +275,29 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
   }
 
   // ── Phase: Importing ─────────────────────────────────────────────────────────
+
+  if (phase === 'confirm') {
+    const template = templates.find((item) => item.id === selectedTemplateId) ?? recommended;
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="text-center">
+          <div className="text-4xl mb-3">{template?.emoji ?? '🍽️'}</div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Confirmar importacao</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+            {template?.name ?? 'Cardapio base'} criara {template?.totalCategories ?? 0} categorias e {template?.totalProducts ?? 0} produtos.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => setPhase('choosing')} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black rounded-2xl">
+            Voltar
+          </button>
+          <button type="button" onClick={() => void handleStartImport()} className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl">
+            Importar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === 'importing') {
     const template = templates.find((t) => t.id === selectedTemplateId);
@@ -437,7 +460,10 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
             Criar manualmente
           </button>
           <button
-            onClick={() => setPhase('choosing')}
+            onClick={() => {
+              importInFlightRef.current = false;
+              setPhase('choosing');
+            }}
             className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-indigo-500/20 text-sm"
           >
             Tentar novamente
