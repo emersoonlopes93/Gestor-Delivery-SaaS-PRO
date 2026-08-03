@@ -27,6 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 import { CurrencyInput } from '@gestor/ui';
 import { Button } from '../../components/ui/Button';
+import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
 
 interface BackendGeocodeResponse {
   provider?: string | null;
@@ -40,6 +41,8 @@ const DAY_NAMES = [
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const { capabilities } = useTenantCapabilities();
+  const baseMenuImportEnabled = capabilities?.actions?.['baseMenu.import']?.enabled === true;
   const [activeTab, setActiveTab] = useState<'overview' | 'address' | 'finance' | 'hours'>('overview');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -457,7 +460,7 @@ export function SettingsPage() {
       </nav>
 
       <div className={`w-full min-w-0 space-y-6 ${isOverviewTab ? '' : 'hidden'}`}>
-        <div className="w-full min-w-0 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 sm:p-6 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.55)]">
+        {baseMenuImportEnabled && <div className="w-full min-w-0 rounded-2xl border border-primary/20 bg-primary/[0.045] p-5 sm:p-6 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.55)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="flex items-start gap-3 sm:gap-4">
               <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm shrink-0">
@@ -478,7 +481,7 @@ export function SettingsPage() {
               Importar cardápio
             </Button>
           </div>
-        </div>
+        </div>}
 
         {businessGroup && (
           <div className="w-full min-w-0 bg-indigo-600 rounded-2xl shadow-lg p-5 sm:p-6 text-white">

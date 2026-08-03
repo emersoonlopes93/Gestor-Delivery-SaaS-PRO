@@ -1,3 +1,18 @@
+## R8 - importacao opcional e duravel de cardapio base
+
+Data: 2026-08-03
+
+- Branch `feat/go-live-r8-optional-base-menu-import`, baseada no merge da PR #45 em `origin/main-copy` (`7222f947`). Checkout principal, alteracoes Android preexistentes, `stash@{0}` e worktrees anteriores foram preservados.
+- Auditoria canonica: `docs/audits/r8-optional-base-menu-import-audit.md`.
+- A action capability server-side `baseMenu.import` fica OFF por default no Go-Live e pode ser reativada por `BASE_MENU_IMPORT_ENABLED=true`. A API bloqueia o POST antes do service; onboarding/settings/produtos escondem a UX e evitam fetch de templates quando OFF.
+- `BaseMenuImportLog.operationKey` nullable/unique identifica novas operacoes por tenant + versao do template. Logs historicos permanecem NULL, sem backfill ou reinterpretacao.
+- Novas importacoes usam uma unica transacao Serializable e nao retornam `partial`. Retry/requisicao concorrente recupera somente a operacao equivalente concluida; outros P2002 continuam erro real.
+- Catalogo nao vazio bloqueia nova importacao com `BASE_MENU_IMPORT_REQUIRES_EMPTY_CATALOG`; nao existe merge, overwrite ou deduplicacao por nome humano.
+- Selecionar template apenas abre confirmacao explicita; importacao nao grava nem sobrescreve `businessSegment`. O caminho de cardapio vazio e o fallback visual R7 permanecem independentes.
+- Migration estritamente aditiva. Nenhuma migration de producao, seed, deploy, E0-OPS, E0H ou acesso remoto foi executado.
+
+---
+
 ## Recuperação do E2E de áudio de notificações
 
 Data: 2026-08-02

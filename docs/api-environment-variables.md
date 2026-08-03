@@ -18,6 +18,7 @@ This document summarizes the API environment variables that must stay aligned wi
 - `CORS_ORIGINS`
 - `FRONTEND_URL`
 - `STOREFRONT_CACHE_TTL`
+- `BASE_MENU_IMPORT_ENABLED` (default `false`; set to `true` to reactivate the existing `baseMenu.import` server capability)
 
 ## Database and Prisma
 

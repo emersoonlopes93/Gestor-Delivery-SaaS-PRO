@@ -139,7 +139,16 @@ export class FeatureControlService {
   ) {}
 
   getTenantActionCapability(actionKey: TenantActionCapabilityKey) {
-    return TENANT_ACTION_CAPABILITIES[actionKey];
+    const capability = TENANT_ACTION_CAPABILITIES[actionKey];
+    if (actionKey === 'baseMenu.import' && process.env.BASE_MENU_IMPORT_ENABLED?.trim().toLowerCase() === 'true') {
+      return {
+        ...capability,
+        enabled: true,
+        reason: 'enabled',
+        source: 'BASE_MENU_IMPORT_ENABLED',
+      } as const;
+    }
+    return capability;
   }
 
   async resolveTenantFeature(input: ResolveTenantFeatureInput): Promise<TenantCapabilityDecision> {
@@ -196,7 +205,10 @@ export class FeatureControlService {
     return {
       features: Object.fromEntries(featureEntries),
       modules: Object.fromEntries(moduleEntries),
-      actions: TENANT_ACTION_CAPABILITIES,
+      actions: Object.fromEntries(
+        (Object.keys(TENANT_ACTION_CAPABILITIES) as TenantActionCapabilityKey[])
+          .map((actionKey) => [actionKey, this.getTenantActionCapability(actionKey)]),
+      ) as TenantCapabilitiesResponse['actions'],
       plan: {
         id: context.billingState.plan?.id ?? null,
         name: context.billingState.plan?.name ?? null,

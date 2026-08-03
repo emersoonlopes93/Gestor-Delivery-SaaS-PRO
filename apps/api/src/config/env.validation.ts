@@ -95,6 +95,7 @@ const baseEnvSchema = z.object({
   // Feature Flags
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
   CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
+  BASE_MENU_IMPORT_ENABLED: z.enum(['true', 'false']).default('false'),
   PUSH_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false'),
   BILLING_DB_PREFLIGHT: z.enum(['strict', 'warn', 'off']).optional(),
 });

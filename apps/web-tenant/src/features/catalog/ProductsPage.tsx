@@ -5,6 +5,7 @@ import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, PauseCircle, Pencil, Trash2, FileText, Search, ChevronDown, Copy, Plus, ChefHat, X } from 'lucide-react';
+import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
 
 
 
@@ -45,6 +46,8 @@ export function ProductsPage() {
   const [recipeTarget, setRecipeTarget] = useState<{ id: string, name: string } | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const { capabilities } = useTenantCapabilities();
+  const baseMenuImportEnabled = capabilities?.actions?.['baseMenu.import']?.enabled === true;
   const [viewMode, setViewMode] = useState<ProductsViewMode>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('all');
@@ -608,14 +611,14 @@ export function ProductsPage() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
-            <button
+            {baseMenuImportEnabled && <button
               onClick={() => navigate('/settings/menu-import')}
               className="flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md shadow-indigo-500/25 flex items-center justify-center gap-2"
               type="button"
             >
               <ChefHat className="w-4 h-4" />
               <span>Importar Cardápio Pronto</span>
-            </button>
+            </button>}
             <button
               onClick={() => navigate('/catalog/products/new/v2')}
               className="flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider bg-card hover:bg-muted text-foreground border border-border rounded-xl transition-all flex items-center justify-center gap-2"
