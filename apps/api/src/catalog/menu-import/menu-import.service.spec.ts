@@ -1,179 +1,173 @@
 import { Prisma } from '@prisma/client';
 import { MenuImportService } from './menu-import.service';
 
-describe('MenuImportService option groups import', () => {
+describe('MenuImportService durable transactional import', () => {
   const makeService = () => {
     const prisma = {
-      baseMenuTemplate: {
-        findMany: jest.fn(),
-        findFirst: jest.fn(),
-      },
+      baseMenuTemplate: { findFirst: jest.fn() },
       baseMenuImportLog: {
+        findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
-      mediaAsset: {
-        findMany: jest.fn(),
+      productCategory: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({ id: 'category-1', name: 'Acais' }),
       },
-      mediaCategory: {
-        findFirst: jest.fn(),
-        create: jest.fn(),
+      product: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({ id: 'product-1' }),
       },
-      tenantClient: {
-        productCategory: {
-          findFirst: jest.fn(),
-        },
-        product: {
-          findFirst: jest.fn(),
-        },
-        optionGroup: {
-          findMany: jest.fn(),
-          create: jest.fn(),
-        },
-        optionItem: {
-          findMany: jest.fn(),
-          create: jest.fn(),
-        },
-        productOptionGroupLink: {
-          findUnique: jest.fn(),
-          create: jest.fn(),
-        },
-      },
+      catalogPublication: { create: jest.fn() },
+      mediaAsset: { findMany: jest.fn().mockResolvedValue([]) },
+      optionGroup: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+      optionItem: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+      productOptionGroupLink: { create: jest.fn() },
+      productOptionItemPrice: { create: jest.fn() },
+      $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(async (operation: (tx: typeof prisma) => Promise<unknown>) => operation(prisma));
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(publishedTemplate());
+    prisma.baseMenuImportLog.findUnique.mockResolvedValue(null);
 
-    const tenantContext = { getTenantId: jest.fn().mockReturnValue('tenant-1') };
-    const productsService = { create: jest.fn().mockResolvedValue({ id: 'product-1' }) };
-    const categoriesService = { create: jest.fn().mockResolvedValue({ id: 'category-1', name: 'Acais' }) };
-    const mediaLibrary = {};
+    const productsService = { invalidateStorefrontCacheForTenant: jest.fn() };
     const service = new MenuImportService(
       prisma as never,
-      tenantContext as never,
+      { getTenantId: jest.fn().mockReturnValue('tenant-1') } as never,
       productsService as never,
-      categoriesService as never,
-      mediaLibrary as never,
     );
-
-    return { service, prisma, productsService, categoriesService };
+    return { service, prisma, productsService };
   };
 
-  it('creates real tenant option groups, items and product links from base product metadata', async () => {
-    const { service, prisma } = makeService();
-    prisma.baseMenuTemplate.findFirst.mockResolvedValue({
-      id: 'template-db-1',
-      slug: 'acai',
-      name: 'Acai',
-      description: 'Acai',
-      segment: 'acai',
-      icon: 'A',
-      metadataJson: {},
-      currentPublishedVersion: publishedVersion(),
-      versions: [],
-    });
-    prisma.mediaAsset.findMany.mockResolvedValue([]);
-    prisma.mediaCategory.findFirst.mockResolvedValue({ id: 'media-category' });
-    prisma.tenantClient.productCategory.findFirst.mockResolvedValue(null);
-    prisma.tenantClient.product.findFirst.mockResolvedValue(null);
-    prisma.tenantClient.optionGroup.findMany.mockResolvedValue([]);
-    prisma.tenantClient.optionGroup.create.mockResolvedValue({ id: 'group-1' });
-    prisma.tenantClient.optionItem.findMany.mockResolvedValue([]);
-    prisma.tenantClient.optionItem.create.mockResolvedValue({ id: 'item-1' });
-    prisma.tenantClient.productOptionGroupLink.findUnique.mockResolvedValue(null);
-    prisma.tenantClient.productOptionGroupLink.create.mockResolvedValue({ id: 'link-1' });
+  it('claims tenant plus template version and commits one all-or-nothing result', async () => {
+    const { service, prisma, productsService } = makeService();
 
     const result = await service.importTemplate('acai');
 
-    expect(result.success).toBe(true);
-    expect(result.optionGroupsCreated).toBe(1);
-    expect(result.optionItemsCreated).toBe(1);
-    expect(result.productOptionLinksCreated).toBe(1);
-    expect(prisma.tenantClient.optionGroup.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        tenantId: 'tenant-1',
-        name: 'Coberturas',
-        selectionType: 'multiple',
-      }),
+    expect(result).toEqual(expect.objectContaining({ success: true, categoriesCreated: 1, productsCreated: 1 }));
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     }));
-    expect(prisma.tenantClient.optionItem.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        tenantId: 'tenant-1',
-        optionGroupId: 'group-1',
-        priceImpactValue: new Prisma.Decimal(1.5),
-      }),
-    }));
-    expect(prisma.baseMenuImportLog.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        metadataJson: expect.objectContaining({
-          optionGroupsCreated: 1,
-          optionItemsCreated: 1,
-          productOptionLinksCreated: 1,
-        }),
-      }),
-    }));
+    expect(prisma.baseMenuImportLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ operationKey: 'tenant-1:version-1', status: 'failed' }),
+    });
+    expect(prisma.baseMenuImportLog.update).toHaveBeenCalledWith({
+      where: { operationKey: 'tenant-1:version-1' },
+      data: expect.objectContaining({ status: 'success', categoriesCreated: 1, productsCreated: 1 }),
+    });
+    expect(productsService.invalidateStorefrontCacheForTenant).toHaveBeenCalledWith('tenant-1');
   });
 
-  it('does not import options when skipExisting skips the product', async () => {
+  it('returns the canonical completed operation without any new writes', async () => {
     const { service, prisma } = makeService();
-    prisma.baseMenuTemplate.findFirst.mockResolvedValue({
-      id: 'template-db-1',
-      slug: 'acai',
-      name: 'Acai',
-      description: 'Acai',
-      segment: 'acai',
-      icon: 'A',
-      metadataJson: {},
-      currentPublishedVersion: publishedVersion(),
-      versions: [],
+    prisma.baseMenuImportLog.findUnique.mockResolvedValue(completedLog());
+
+    const result = await service.importTemplate('acai');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, categoriesCreated: 1, productsCreated: 1 }));
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.product.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-empty catalog before creating catalog items', async () => {
+    const { service, prisma } = makeService();
+    prisma.product.count.mockResolvedValue(1);
+
+    await expect(service.importTemplate('acai')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'BASE_MENU_IMPORT_REQUIRES_EMPTY_CATALOG' }),
     });
-    prisma.mediaAsset.findMany.mockResolvedValue([]);
-    prisma.mediaCategory.findFirst.mockResolvedValue({ id: 'media-category' });
-    prisma.tenantClient.productCategory.findFirst.mockResolvedValue({ id: 'category-1', name: 'Acais' });
-    prisma.tenantClient.product.findFirst.mockResolvedValue({ id: 'product-1' });
+    expect(prisma.productCategory.create).not.toHaveBeenCalled();
+    expect(prisma.product.create).not.toHaveBeenCalled();
+    expect(prisma.baseMenuImportLog.update).not.toHaveBeenCalled();
+  });
 
-    const result = await service.importTemplate('acai', { skipExisting: true });
+  it('propagates an item failure so the enclosing transaction can roll back every write', async () => {
+    const { service, prisma } = makeService();
+    prisma.product.create.mockRejectedValue(new Error('synthetic product failure'));
 
-    expect(result.productsSkipped).toBe(1);
-    expect(prisma.tenantClient.optionGroup.create).not.toHaveBeenCalled();
-    expect(prisma.tenantClient.productOptionGroupLink.create).not.toHaveBeenCalled();
+    await expect(service.importTemplate('acai')).rejects.toThrow('synthetic product failure');
+    expect(prisma.baseMenuImportLog.update).not.toHaveBeenCalled();
+  });
+
+  it('recovers only the equivalent operationKey P2002 as the canonical result', async () => {
+    const { service, prisma } = makeService();
+    prisma.baseMenuImportLog.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedLog());
+    prisma.$transaction.mockRejectedValue(operationKeyConflict());
+
+    const result = await service.importTemplate('acai');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, productsCreated: 1 }));
+  });
+
+  it('does not swallow a different P2002 constraint', async () => {
+    const { service, prisma } = makeService();
+    const conflict = new Prisma.PrismaClientKnownRequestError('different unique conflict', {
+      code: 'P2002',
+      clientVersion: '5.22.0',
+      meta: { target: ['tenant_id', 'slug'] },
+    });
+    prisma.$transaction.mockRejectedValue(conflict);
+
+    await expect(service.importTemplate('acai')).rejects.toBe(conflict);
   });
 });
 
-function publishedVersion() {
+function operationKeyConflict() {
+  return new Prisma.PrismaClientKnownRequestError('operation key conflict', {
+    code: 'P2002',
+    clientVersion: '5.22.0',
+    meta: { target: ['operation_key'] },
+  });
+}
+
+function completedLog() {
   return {
-    id: 'version-1',
-    status: 'published',
-    versionNumber: 1,
-    categories: [
-      {
+    status: 'success',
+    categoriesCreated: 1,
+    productsCreated: 1,
+    categoriesSkipped: 0,
+    productsSkipped: 0,
+    metadataJson: {
+      result: {
+        categoriesCreated: 1,
+        productsCreated: 1,
+        imagesLinked: 0,
+        durationMs: 10,
+      },
+    },
+  };
+}
+
+function publishedTemplate() {
+  return {
+    id: 'template-db-1',
+    slug: 'acai',
+    name: 'Acai',
+    description: 'Acai',
+    segment: 'acai',
+    icon: 'A',
+    metadataJson: {},
+    currentPublishedVersion: {
+      id: 'version-1',
+      status: 'published',
+      versionNumber: 1,
+      categories: [{
         name: 'Acais',
         sortOrder: 1,
-        products: [
-          {
-            name: 'Acai 300ml',
-            description: 'Copo pequeno',
-            basePrice: new Prisma.Decimal(16.9),
-            searchTagsJson: [],
-            mediaLookupKey: null,
-            sortOrder: 1,
-            metadataJson: {
-              optionGroups: [
-                {
-                  slug: 'coberturas',
-                  name: 'Coberturas',
-                  selectionType: 'multiple',
-                  maxSelect: 5,
-                  items: [
-                    {
-                      slug: 'granola',
-                      name: 'Granola',
-                      priceImpactType: 'fixed',
-                      priceImpactValue: 1.5,
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-    ],
+        metadataJson: {},
+        products: [{
+          name: 'Acai 300ml',
+          description: 'Copo pequeno',
+          basePrice: new Prisma.Decimal(16.9),
+          searchTagsJson: [],
+          mediaLookupKey: null,
+          sortOrder: 1,
+          metadataJson: {},
+        }],
+      }],
+    },
+    versions: [],
   };
 }

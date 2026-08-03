@@ -196,6 +196,35 @@ describe('FeatureControlService', () => {
     });
   });
 
+  it('publishes base menu import as disabled by the initial go-live policy', () => {
+    const { service } = makeService();
+
+    expect(service.getTenantActionCapability('baseMenu.import')).toEqual({
+      enabled: false,
+      reason: 'release_disabled',
+      source: 'initial_go_live_release_policy',
+      code: 'BASE_MENU_IMPORT_DISABLED',
+      message: 'A importacao de cardapio base esta temporariamente indisponivel.',
+    });
+  });
+
+  it('reactivates the same baseMenu.import contract through server configuration', () => {
+    const previous = process.env.BASE_MENU_IMPORT_ENABLED;
+    process.env.BASE_MENU_IMPORT_ENABLED = 'true';
+    try {
+      const { service } = makeService();
+      expect(service.getTenantActionCapability('baseMenu.import')).toEqual(expect.objectContaining({
+        enabled: true,
+        reason: 'enabled',
+        source: 'BASE_MENU_IMPORT_ENABLED',
+        code: 'BASE_MENU_IMPORT_DISABLED',
+      }));
+    } finally {
+      if (previous === undefined) delete process.env.BASE_MENU_IMPORT_ENABLED;
+      else process.env.BASE_MENU_IMPORT_ENABLED = previous;
+    }
+  });
+
   it('returns essential for mandatory core features', async () => {
     const { service } = makeService();
 
