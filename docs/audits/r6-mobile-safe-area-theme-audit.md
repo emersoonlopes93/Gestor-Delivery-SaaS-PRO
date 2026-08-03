@@ -1,6 +1,6 @@
 # R6 - auditoria de safe area, viewport mobile e tema
 
-Data: 2026-08-03  
+Data: 2026-08-03
 Base: `main-copy` / `012795d37aeacdff1f345b24a49aa30f23baadf5`
 
 ## AUDIT R6
@@ -70,3 +70,17 @@ Base: `main-copy` / `012795d37aeacdff1f345b24a49aa30f23baadf5`
 
 Não houve alteração de `applicationId`, branding Android, API, Prisma, migration,
 seed, dependência, feature flag, produção ou deploy.
+
+## Evidência local
+
+- Lint monorepo: PASS, com 17 warnings preexistentes no storefront e zero erros.
+- Typecheck de API, admin, tenant, delivery e storefront: PASS.
+- Testes tenant: 65/65 PASS; testes storefront: 58/58 PASS.
+- Testes focados R6: 10/10 PASS.
+- Builds `web-tenant`, `web-delivery` e `web-storefront`: PASS.
+- `check:no-any`, `check:features` e `git diff --check`: PASS.
+- Android `assembleDebug`: não executável localmente; Gradle requer toolchain
+  JetBrains JDK 21, indisponível no host que expõe Java 26. Nenhuma configuração
+  Android foi alterada para contornar o ambiente.
+- Visual smoke automatizado: indisponível porque o CLI `agent-browser` não está
+  instalado; nenhuma dependência global foi adicionada.
