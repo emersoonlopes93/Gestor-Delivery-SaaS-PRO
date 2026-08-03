@@ -842,6 +842,7 @@ model BaseMenuProduct {
 
 model BaseMenuImportLog {
   id                String                  @id @default(uuid())
+  operationKey      String?                 @unique @map("operation_key") @db.VarChar(200)
   tenantId          String                  @map("tenant_id")
   templateId        String                  @map("template_id")
   versionId         String                  @map("version_id")

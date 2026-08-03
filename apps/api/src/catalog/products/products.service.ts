@@ -47,6 +47,10 @@ export class ProductsService {
     ]);
   }
 
+  async invalidateStorefrontCacheForTenant(tenantId: string): Promise<void> {
+    await this.invalidateStorefrontCache(tenantId);
+  }
+
   calculateComboBundleFinalPrice(
     subtotal: number,
     pricingType: 'fixed_price' | 'discount_percent' | 'discount_amount',
