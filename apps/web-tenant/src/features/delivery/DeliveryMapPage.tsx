@@ -401,7 +401,7 @@ export function DeliveryMapPage() {
           <div
             className={
               `lg:block ${isPanelOpen ? 'block' : 'hidden'} ` +
-              'lg:static fixed left-0 right-0 bottom-0 lg:bottom-auto lg:right-auto lg:left-auto z-40'
+              'safe-sheet lg:static fixed left-0 right-0 bottom-0 lg:bottom-auto lg:right-auto lg:left-auto z-40'
             }
           >
             <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">

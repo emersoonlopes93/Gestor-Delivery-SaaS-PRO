@@ -198,7 +198,7 @@ export default function WaiterPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-64px)] bg-background text-foreground overflow-hidden">
       
       {/* Top Header Mobile */}
       <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-lg">

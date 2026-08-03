@@ -102,21 +102,21 @@ export function ActiveDeliveryPage() {
   const showPushBanner = permissionState !== 'unsupported' && permissionState !== 'denied' && !isSubscribed;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto relative overflow-hidden font-sans">
-      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm relative z-10">
+    <div className="delivery-shell flex flex-col max-w-md mx-auto relative overflow-hidden font-sans">
+      <header className="bg-[var(--delivery-card)] border-b border-[var(--delivery-border)] px-4 py-3 flex items-center justify-between shadow-sm relative z-10">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
             <Package className="w-5 h-5 text-orange-600" />
           </div>
           <div>
-            <h1 className="font-bold text-slate-900 leading-tight tracking-tight">Motoboy</h1>
-            <p className="text-[10px] text-slate-500 font-medium leading-none">{user?.name}</p>
+            <h1 className="font-bold text-[var(--delivery-foreground)] leading-tight tracking-tight">Motoboy</h1>
+            <p className="text-[10px] text-[var(--delivery-muted-foreground)] font-medium leading-none">{user?.name}</p>
           </div>
         </div>
 
         <button
           onClick={handleLogout}
-          className="p-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+          className="p-2 flex items-center justify-center rounded-lg text-[var(--delivery-muted-foreground)] hover:text-red-500 hover:bg-red-50 transition-colors"
         >
           <Power className="w-5 h-5" />
         </button>
@@ -145,7 +145,7 @@ export function ActiveDeliveryPage() {
         <div className="mx-3 mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
           <Bell className="w-4 h-4 text-emerald-600" />
           <p className="text-xs font-medium text-emerald-700 flex-1">Alertas de entrega ativos</p>
-          <button onClick={unsubscribePush} className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+          <button onClick={unsubscribePush} className="text-xs text-[var(--delivery-muted-foreground)] hover:text-red-500 transition-colors">
             <BellOff className="w-4 h-4" />
           </button>
         </div>
@@ -153,25 +153,25 @@ export function ActiveDeliveryPage() {
       <main className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6">
 
         {/* GPS Status Card */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
+        <div className="bg-[var(--delivery-card)] p-5 rounded-2xl shadow-sm border border-[var(--delivery-border)] flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-[var(--delivery-foreground)] flex items-center gap-2">
               <Navigation className="w-4 h-4 text-blue-500" />
               Rastreamento Automático
             </h2>
-            <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${isTracking ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${isTracking ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--delivery-muted)] text-[var(--delivery-muted-foreground)]'}`}>
               {isTracking ? 'ATIVO' : 'PAUSADO'}
             </div>
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <p className="text-xs text-[var(--delivery-muted-foreground)] leading-relaxed">
             Mantenha o rastreamento ativo durante a sua jornada para que a loja e os clientes possam acompanhar as entregas em tempo real.
           </p>
 
           {isTracking && lastLocation && (
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex items-center gap-3">
+            <div className="bg-[var(--delivery-muted)] rounded-lg p-3 border border-[var(--delivery-border)] flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-[11px] text-slate-500 font-mono">
+              <p className="text-[11px] text-[var(--delivery-muted-foreground)] font-mono">
                 Lat: {lastLocation.lat.toFixed(6)} | Lng: {lastLocation.lng.toFixed(6)}
               </p>
             </div>
@@ -193,8 +193,8 @@ export function ActiveDeliveryPage() {
 
         {/* Pending (ready_for_delivery) - BUG 3 FIX: now shows these */}
         {pendingRuns.length > 0 && (
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-amber-100">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+          <div className="bg-[var(--delivery-card)] p-5 rounded-2xl shadow-sm border border-amber-200/60">
+            <h2 className="text-sm font-bold text-[var(--delivery-foreground)] flex items-center gap-2 mb-4">
               <Clock className="w-4 h-4 text-amber-500" />
               Aguardando Saída ({pendingRuns.length})
             </h2>
@@ -203,14 +203,14 @@ export function ActiveDeliveryPage() {
                 <div key={run.id} className="border border-amber-100 bg-amber-50/50 rounded-xl p-4 flex flex-col gap-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-sm">#{run.orderNumber}</h3>
-                      <p className="text-xs text-slate-500 font-medium">{run.customerName}</p>
+                      <h3 className="font-bold text-[var(--delivery-foreground)] text-sm">#{run.orderNumber}</h3>
+                      <p className="text-xs text-[var(--delivery-muted-foreground)] font-medium">{run.customerName}</p>
                     </div>
                     <RunStatusBadge status={run.status} />
                   </div>
                   {run.deliveryAddress && (
-                    <div className="bg-white p-3 rounded-lg border border-amber-100">
-                      <p className="text-xs text-slate-600 flex items-start gap-1">
+                    <div className="bg-[var(--delivery-card)] p-3 rounded-lg border border-amber-200/60">
+                      <p className="text-xs text-[var(--delivery-muted-foreground)] flex items-start gap-1">
                         <MapPin className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
                         <span>
                           {run.deliveryAddress.street}, {run.deliveryAddress.number}
@@ -229,9 +229,9 @@ export function ActiveDeliveryPage() {
         )}
 
         {/* Active deliveries (out_for_delivery) */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-8">
+        <div className="bg-[var(--delivery-card)] p-5 rounded-2xl shadow-sm border border-[var(--delivery-border)] mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-[var(--delivery-foreground)] flex items-center gap-2">
               <MapPin className="w-4 h-4 text-orange-500" />
               Entregas em Rota {activeRuns.length > 0 ? `(${activeRuns.length})` : ''}
             </h2>
@@ -242,11 +242,11 @@ export function ActiveDeliveryPage() {
 
           {loadingRuns ? (
             <div className="text-center py-6">
-              <p className="text-sm text-slate-400">Carregando...</p>
+              <p className="text-sm text-[var(--delivery-muted-foreground)]">Carregando...</p>
             </div>
           ) : activeRuns.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-[var(--delivery-muted-foreground)]">
                 {pendingRuns.length > 0
                   ? 'Aguardando despacho das entregas acima.'
                   : 'Nenhuma entrega atribuída a você no momento.'}
@@ -255,18 +255,18 @@ export function ActiveDeliveryPage() {
           ) : (
             <div className="space-y-4">
               {activeRuns.map((run) => (
-                <div key={run.id} className="border border-slate-100 rounded-xl p-4 flex flex-col gap-3">
+                <div key={run.id} className="border border-[var(--delivery-border)] rounded-xl p-4 flex flex-col gap-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-sm">#{run.orderNumber}</h3>
-                      <p className="text-xs text-slate-500 font-medium">{run.customerName}</p>
+                      <h3 className="font-bold text-[var(--delivery-foreground)] text-sm">#{run.orderNumber}</h3>
+                      <p className="text-xs text-[var(--delivery-muted-foreground)] font-medium">{run.customerName}</p>
                     </div>
                     <RunStatusBadge status={run.status} />
                   </div>
 
                   {run.deliveryAddress && (
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                      <p className="text-xs text-slate-600 flex items-start gap-1">
+                    <div className="bg-[var(--delivery-muted)] p-3 rounded-lg border border-[var(--delivery-border)]">
+                      <p className="text-xs text-[var(--delivery-muted-foreground)] flex items-start gap-1">
                         <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
                         <span>
                           {run.deliveryAddress.street}, {run.deliveryAddress.number}
@@ -289,7 +289,7 @@ export function ActiveDeliveryPage() {
                     {run.customerPhone && (
                       <button
                         onClick={() => handleCallCustomer(run.customerPhone)}
-                        className="flex-1 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
+                        className="flex-1 py-2 rounded-lg text-xs font-bold bg-[var(--delivery-muted)] text-[var(--delivery-foreground)] hover:opacity-80 border border-[var(--delivery-border)] transition-colors"
                       >
                         Ligar
                       </button>

@@ -75,25 +75,25 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto relative overflow-hidden font-sans">
+    <div className="delivery-shell flex flex-col max-w-md mx-auto relative overflow-hidden font-sans">
       <div className="flex-1 flex flex-col justify-center px-6 py-12">
         
         <div className="mx-auto w-16 h-16 bg-orange-500 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-orange-500/30">
           <Package className="w-8 h-8" />
         </div>
 
-        <h1 className="text-2xl font-black text-slate-900 text-center mb-2 tracking-tight">
+        <h1 className="text-2xl font-black text-[var(--delivery-foreground)] text-center mb-2 tracking-tight">
           Gestor Delivery
         </h1>
-        <p className="text-sm text-slate-500 text-center mb-10">
+        <p className="text-sm text-[var(--delivery-muted-foreground)] text-center mb-10">
           Acesso do Entregador
         </p>
 
         {tenantSelection ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
-              <p className="text-sm font-bold text-slate-900">Escolha onde você vai trabalhar</p>
-              <p className="mt-1 text-xs text-slate-500">Seu acesso foi confirmado. Selecione uma das lojas vinculadas.</p>
+            <div className="rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 shadow-sm">
+              <p className="text-sm font-bold text-[var(--delivery-foreground)]">Escolha onde você vai trabalhar</p>
+              <p className="mt-1 text-xs text-[var(--delivery-muted-foreground)]">Seu acesso foi confirmado. Selecione uma das lojas vinculadas.</p>
             </div>
             <div className="space-y-2" role="list" aria-label="Lojas disponíveis">
               {tenantSelection.tenants.map((option) => (
@@ -102,7 +102,7 @@ export function LoginPage() {
                   type="button"
                   disabled={isLoading}
                   onClick={() => handleTenantSelection(option.driverId)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left font-bold text-slate-800 transition-all hover:border-orange-400 hover:bg-orange-50 disabled:opacity-50"
+                  className="flex w-full items-center gap-3 rounded-xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 text-left font-bold text-[var(--delivery-foreground)] transition-all hover:border-orange-400 hover:bg-orange-50 hover:text-slate-900 disabled:opacity-50"
                 >
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
                     <Store className="h-5 w-5" />
@@ -115,7 +115,7 @@ export function LoginPage() {
               type="button"
               disabled={isLoading}
               onClick={() => setTenantSelection(null)}
-              className="flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-[var(--delivery-muted-foreground)] hover:text-[var(--delivery-foreground)] disabled:opacity-50"
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
@@ -130,15 +130,15 @@ export function LoginPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+            <label className="block text-sm font-medium text-[var(--delivery-foreground)] mb-1">Telefone</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Phone className="h-5 w-5 text-slate-400" />
+                <Phone className="h-5 w-5 text-[var(--delivery-muted-foreground)]" />
               </div>
               <input
                 type="tel"
                 required
-                className="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-3 py-3 rounded-xl border border-[var(--delivery-border)] bg-[var(--delivery-input)] text-[var(--delivery-foreground)] placeholder:text-[var(--delivery-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                 placeholder="(00) 00000-0000"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -147,15 +147,15 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">PIN / Código de Acesso</label>
+            <label className="block text-sm font-medium text-[var(--delivery-foreground)] mb-1">PIN / Código de Acesso</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-slate-400" />
+                <Lock className="h-5 w-5 text-[var(--delivery-muted-foreground)]" />
               </div>
               <input
                 type="password"
                 required
-                className="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-3 py-3 rounded-xl border border-[var(--delivery-border)] bg-[var(--delivery-input)] text-[var(--delivery-foreground)] placeholder:text-[var(--delivery-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                 placeholder="Seu código de acesso"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}

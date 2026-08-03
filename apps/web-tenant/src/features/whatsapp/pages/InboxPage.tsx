@@ -161,7 +161,7 @@ export function InboxPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col md:flex-row bg-background dark:bg-background overflow-hidden">
+    <div className="h-[calc(100dvh-theme(spacing.16))] flex flex-col md:flex-row bg-background overflow-hidden">
       {/* Sidebar de conversas */}
       <div className={`w-full md:w-80 lg:w-96 border-r border-border bg-card/50 flex flex-col ${selectedSession ? 'hidden md:flex' : 'flex'}`}>
         {/* Header e Filtros */}

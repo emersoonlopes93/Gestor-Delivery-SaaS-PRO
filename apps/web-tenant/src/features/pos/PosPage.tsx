@@ -656,10 +656,10 @@ export default function PosPage() {
     });
   };
 
-  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-background dark:bg-muted950 text-muted-foreground500 dark:text-muted-foreground400 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
+  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-muted-foreground italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-background dark:bg-muted950 text-foreground overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-[calc(100dvh-64px)] bg-background text-foreground overflow-hidden font-sans">
       
       {/* ========== LEFT: NAVIGATION ========== */}
       <div className="hidden lg:flex w-16 flex-col bg-card dark:bg-muted900 border-r border-border200 dark:border-border800 py-4 gap-4 items-center">
