@@ -36,7 +36,7 @@ export function StorefrontLayout() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background text-foreground">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
       </div>
     );
@@ -53,14 +53,14 @@ export function StorefrontLayout() {
   };
 
   return (
-    <StorefrontShell settings={effectiveTheme} className="flex flex-col w-full min-h-screen">
+    <StorefrontShell settings={effectiveTheme} className="flex min-h-[100dvh] w-full flex-col">
       {data?.tenant.id ? (
         <StorefrontConsentProvider
           key={data.tenant.id}
           tenantKey={data.tenant.id}
         >
           <AnalyticsProvider tenantSlug={tenantSlug ?? data.tenant.id}>
-            <div className="flex min-h-screen w-full flex-col">
+            <div className="flex min-h-[100dvh] w-full flex-col">
               <ConsentBanner />
               <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
                 <Outlet />

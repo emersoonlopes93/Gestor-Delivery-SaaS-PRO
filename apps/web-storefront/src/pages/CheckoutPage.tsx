@@ -1186,13 +1186,13 @@ export function CheckoutPage() {
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-lg gap-3 border-t border-gray-100 bg-white/90 p-4 backdrop-blur-md">
+      <div className="storefront-safe-action fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-lg gap-3 border-t border-border bg-card/90 p-4 text-card-foreground backdrop-blur-md">
         {currentStepIndex > 0 && (
           <button
             type="button"
             onClick={handleBackStep}
             disabled={isSubmitting}
-            className="flex items-center justify-center gap-1 rounded-2xl border border-gray-200 px-4 py-4 text-xs font-black uppercase tracking-wider text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center justify-center gap-1 rounded-2xl border border-border px-4 py-4 text-xs font-black uppercase tracking-wider text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
             <ChevronLeft className="h-4 w-4" /> Voltar
           </button>

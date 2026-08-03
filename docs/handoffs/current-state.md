@@ -1191,3 +1191,30 @@ Data: 2026-08-01
 - Testes focados de API, showcase público e preview administrativo passam. Não
   existe fixture Playwright econômica para este editor; a validação visual
   pesada não foi criada.
+
+---
+
+## R6 - safe area, viewport mobile e consistência light/dark
+
+Data: 2026-08-03
+
+- Branch `fix/go-live-r6-mobile-safe-area-theme`, worktree isolada, baseada em
+  `origin/main-copy` (`012795d3`). Checkout principal, alterações Android
+  preexistentes, `stash@{0}` e worktrees anteriores foram preservados.
+- Auditoria canônica: `docs/audits/r6-mobile-safe-area-theme-audit.md`.
+- A causa do drawer no APK era estrutural: o drawer mobile é fixed e não herda
+  o safe-left do app shell. O inset lateral agora pertence ao root do drawer
+  somente abaixo do breakpoint desktop; header, footer e nav scrollável foram
+  preservados.
+- Bottom sheet, painel móvel do mapa, CTA do checkout e banner PWA usam os
+  primitives safe-bottom existentes. Layouts mobile full-height confirmados
+  usam `100dvh`; não houve substituição global de viewport.
+- Tooltip portal, superfícies do delivery e CTA do checkout passaram a usar os
+  tokens semânticos existentes. Preferência `system` do tenant/storefront agora
+  acompanha mudanças do sistema sem perder persistência do usuário.
+- Dez testes focados cobrem drawer, desktop, fixed actions, modal/portal,
+  light/dark, persistência, tokens, checkout, delivery e `StorefrontShell`.
+- Não houve API, Prisma/schema/migration/seed, dependência/lockfile, plugin
+  Capacitor, branding/applicationId, E0-OPS, produção ou deploy.
+- R1-R5 permanecem como contratos de regressão; a R6 deve permanecer Draft e
+  não deve ser integrada nesta sessão.

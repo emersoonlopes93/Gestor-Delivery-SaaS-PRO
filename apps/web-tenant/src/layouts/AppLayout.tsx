@@ -716,16 +716,10 @@ export function AppLayout() {
   }, [breadcrumb.label, systemName]);
 
   return (
-    <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
+    <div className="app-shell min-h-screen flex transition-colors safe-x" style={{ backgroundColor: 'var(--surface-page)' }}>
       <NotificationCenter />
       <Toaster
         position="top-right"
-        containerClassName="safe-x"
-        containerStyle={{
-          top: 'calc(12px + var(--safe-area-top) + var(--mobile-header-height))',
-          right: 'calc(12px + var(--safe-area-right))',
-          left: 'calc(12px + var(--safe-area-left))',
-        }}
         toastOptions={{
           className: 'font-bold text-sm',
           success: {
@@ -739,11 +733,11 @@ export function AppLayout() {
         }}
       />
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden safe-inset" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`tenant-sidebar fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${collapsed ? 'w-[72px]' : 'w-64'
+        className={`tenant-sidebar safe-top safe-bottom safe-drawer-left fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${collapsed ? 'w-[72px]' : 'w-64'
           } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
@@ -938,7 +932,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+        <header className="mobile-header safe-top md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="px-4 flex items-center justify-between w-full h-full gap-4">
             <div className="flex items-center gap-2 min-w-0">
               <button

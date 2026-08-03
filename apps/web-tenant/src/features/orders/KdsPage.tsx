@@ -271,7 +271,7 @@ export function KdsPage() {
   };
 
   return (
-    <div className="p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col bg-background overflow-y-auto">
+    <div className="p-6 h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col bg-background overflow-y-auto">
       <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
         <div>
           <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">

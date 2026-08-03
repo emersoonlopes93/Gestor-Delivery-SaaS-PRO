@@ -113,6 +113,7 @@
     --status-pending: #f59e0b;       /* pendente/aguardando - amarelo */
     --status-disabled: #9ca3af;      /* desabilitado - cinza */
     --status-success: #10b981;
+    --status-success-foreground: #ffffff;
     --status-warning: #f59e0b;
     --status-info: #0c93e9;
     --status-danger: #ef4444;
@@ -319,21 +320,6 @@
   .is-capacitor .app-shell {
     min-height: 100vh;
     min-height: 100dvh;
-    padding-left: var(--safe-area-left);
-    padding-right: var(--safe-area-right);
-  }
-
-  .is-capacitor .mobile-header,
-  .is-capacitor .tenant-sidebar {
-    padding-top: var(--safe-area-top);
-  }
-
-  .is-capacitor .app-main {
-    padding-bottom: var(--safe-area-bottom);
-  }
-
-  .is-capacitor .tenant-sidebar {
-    padding-bottom: var(--safe-area-bottom);
   }
 
   .is-capacitor .safe-top {
@@ -365,6 +351,13 @@
 
   .is-capacitor .safe-sheet {
     padding-bottom: var(--safe-area-bottom);
+  }
+
+  /* Fixed drawers do not inherit the app shell's horizontal safe area. */
+  @media (max-width: 767px) {
+    .is-capacitor .safe-drawer-left {
+      padding-left: var(--safe-area-left);
+    }
   }
 
   .is-capacitor .safe-sticky-top {

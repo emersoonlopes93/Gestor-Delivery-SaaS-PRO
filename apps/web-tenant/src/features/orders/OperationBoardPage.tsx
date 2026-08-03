@@ -393,7 +393,7 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
+    <div className="p-4 md:p-6 h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
       {/* ── Toolbar / Header Premium ── */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
         <div className="flex items-center justify-between sm:block">
