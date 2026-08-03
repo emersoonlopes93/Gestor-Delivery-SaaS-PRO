@@ -2,13 +2,15 @@ import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
 import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
+import { ResilientProductImage } from '../product-image';
 
 export function ProductCompactCard({
   product,
   onClick,
   currencyFormatter = (v) => `R$ ${v.toFixed(2)}`,
   showBadges = true,
-  imageMode = 'cover'
+  imageMode = 'cover',
+  fallbackImageUrl,
 }: ProductCardProps) {
   const hasImage = !!product.imageUrl && imageMode !== 'hidden';
 
@@ -22,9 +24,12 @@ export function ProductCompactCard({
     >
       {hasImage ? (
         <div className="w-12 h-12 flex-shrink-0 rounded-[calc(var(--storefront-radius)-4px)] overflow-hidden bg-[var(--storefront-muted)]">
-          <img 
+          <ResilientProductImage
             src={product.imageUrl!} 
+            fallbackSrc={fallbackImageUrl ?? product.imageUrl!}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         </div>

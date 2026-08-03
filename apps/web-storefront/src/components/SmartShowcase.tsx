@@ -1,4 +1,4 @@
-import type { StorefrontProductPayload, StorefrontShowcasePayload } from '@gestor/types';
+import type { BusinessSegment, StorefrontProductPayload, StorefrontShowcasePayload } from '@gestor/types';
 import type { StorefrontImageMode, StorefrontProductLayout } from '@gestor/theme';
 import { SmartShowcase as SharedSmartShowcase, toStorefrontProduct } from '@gestor/storefront-ui';
 
@@ -9,6 +9,7 @@ type SmartShowcaseProps = {
   showDescription?: boolean;
   showBadges?: boolean;
   onSelectProduct: (product: StorefrontProductPayload) => void;
+  businessSegment: BusinessSegment;
 };
 
 export function SmartShowcase({
@@ -18,6 +19,7 @@ export function SmartShowcase({
   showDescription,
   showBadges,
   onSelectProduct,
+  businessSegment,
 }: SmartShowcaseProps) {
   if (!showcase?.products.length) return null;
 
@@ -33,6 +35,7 @@ export function SmartShowcase({
         const source = showcase.products.find((item) => item.id === product.id);
         if (source) onSelectProduct(source);
       }}
+      businessSegment={businessSegment}
     />
   );
 }

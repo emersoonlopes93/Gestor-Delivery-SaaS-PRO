@@ -1,5 +1,6 @@
 import type { StorefrontImageMode, StorefrontProductLayout } from '@gestor/theme';
 import type { StorefrontProduct } from '../types';
+import type { ProductFallbackSegment } from '../product-image';
 import { ProductRenderer } from './ProductRenderer';
 
 interface SmartShowcaseProps {
@@ -11,6 +12,7 @@ interface SmartShowcaseProps {
   showBadges?: boolean;
   onSelectProduct?: (product: StorefrontProduct) => void;
   compact?: boolean;
+  businessSegment?: ProductFallbackSegment | null;
 }
 
 export function SmartShowcase({
@@ -22,6 +24,7 @@ export function SmartShowcase({
   showBadges,
   onSelectProduct,
   compact = false,
+  businessSegment,
 }: SmartShowcaseProps) {
   if (products.length === 0) return null;
 
@@ -58,6 +61,7 @@ export function SmartShowcase({
               showDescription={showDescription}
               showBadges={showBadges}
               onSelectProduct={onSelectProduct}
+              businessSegment={businessSegment}
             />
           </div>
         ))}

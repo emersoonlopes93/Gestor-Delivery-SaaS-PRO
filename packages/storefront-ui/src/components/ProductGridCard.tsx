@@ -3,6 +3,7 @@ import { StorefrontButton } from './StorefrontButton';
 import { ImageOff } from 'lucide-react';
 import { StorefrontBadge } from './StorefrontBadge';
 import { cn } from '../cn';
+import { ResilientProductImage } from '../product-image';
 
 export interface ProductCardProps {
   product: StorefrontProduct;
@@ -11,6 +12,7 @@ export interface ProductCardProps {
   showDescription?: boolean;
   showBadges?: boolean;
   imageMode?: 'cover' | 'contain' | 'hidden';
+  fallbackImageUrl?: string;
 }
 
 export function ProductGridCard({
@@ -19,7 +21,8 @@ export function ProductGridCard({
   currencyFormatter = (v) => `R$ ${v.toFixed(2)}`,
   showDescription = true,
   showBadges = true,
-  imageMode = 'cover'
+  imageMode = 'cover',
+  fallbackImageUrl,
 }: ProductCardProps) {
   const hasImage = !!product.imageUrl && imageMode !== 'hidden';
 
@@ -33,8 +36,9 @@ export function ProductGridCard({
     >
       {hasImage ? (
         <div className="aspect-video w-full overflow-hidden bg-[var(--storefront-muted)]">
-          <img 
+          <ResilientProductImage
             src={product.imageUrl!} 
+            fallbackSrc={fallbackImageUrl ?? product.imageUrl!}
             alt={product.name}
             loading="lazy"
             decoding="async"

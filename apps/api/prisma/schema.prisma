@@ -476,6 +476,7 @@ model TenantSettings {
   currency                     String                 @default("BRL") @db.VarChar(10)
   language                     String                 @default("pt-BR") @db.VarChar(10)
   businessPhone                String?                @map("business_phone") @db.VarChar(20)
+  businessSegment              BusinessSegment?      @map("business_segment")
   businessEmail                String?                @map("business_email") @db.VarChar(255)
   address                      String?
   logoUrl                      String?                @map("logo_url") @db.VarChar(500)
@@ -3216,6 +3217,16 @@ enum TenantStatus {
   inactive
   suspended
   trial
+}
+
+enum BusinessSegment {
+  PIZZARIA
+  HAMBURGUERIA
+  RESTAURANTE
+  MERCADO
+  ACAI
+  PADARIA
+  OTHER
 }
 
 enum BusinessGroupTenantRole {

@@ -2,6 +2,7 @@ import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
 import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
+import { ResilientProductImage } from '../product-image';
 
 export function ProductListItem({
   product,
@@ -9,7 +10,8 @@ export function ProductListItem({
   currencyFormatter = (v) => `R$ ${v.toFixed(2)}`,
   showDescription = true,
   showBadges = true,
-  imageMode = 'cover'
+  imageMode = 'cover',
+  fallbackImageUrl,
 }: ProductCardProps) {
   const hasImage = !!product.imageUrl && imageMode !== 'hidden';
 
@@ -60,9 +62,12 @@ export function ProductListItem({
 
       {hasImage ? (
         <div className="w-24 h-24 flex-shrink-0 rounded-[var(--storefront-radius)] overflow-hidden bg-[var(--storefront-muted)]">
-          <img 
+          <ResilientProductImage
             src={product.imageUrl!} 
+            fallbackSrc={fallbackImageUrl ?? product.imageUrl!}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className={cn(
               'w-full h-full',
               imageMode === 'cover' ? 'object-cover' : 'object-contain'

@@ -2,13 +2,15 @@ import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
 import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
+import { ResilientProductImage } from '../product-image';
 
 export function ProductSquareCard({
   product,
   onClick,
   currencyFormatter = (v) => `R$ ${v.toFixed(2)}`,
   showBadges = true,
-  imageMode = 'cover'
+  imageMode = 'cover',
+  fallbackImageUrl,
 }: ProductCardProps) {
   const hasImage = !!product.imageUrl && imageMode !== 'hidden';
 
@@ -21,9 +23,12 @@ export function ProductSquareCard({
       )}
     >
       {hasImage ? (
-        <img 
+        <ResilientProductImage
           src={product.imageUrl!} 
+          fallbackSrc={fallbackImageUrl ?? product.imageUrl!}
           alt={product.name}
+          loading="lazy"
+          decoding="async"
           className={cn(
             'w-full h-full transition-transform group-hover:scale-105',
             imageMode === 'cover' ? 'object-cover' : 'object-contain'

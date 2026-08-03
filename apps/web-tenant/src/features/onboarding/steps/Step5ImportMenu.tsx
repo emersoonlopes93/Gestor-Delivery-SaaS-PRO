@@ -12,6 +12,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
+import { templateSegmentToBusinessSegment } from '../business-segment';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,13 @@ export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: 
     setPhase('importing');
 
     try {
+      const selectedTemplate = templates.find((template) => template.id === templateId);
+      const businessSegment = selectedTemplate
+        ? templateSegmentToBusinessSegment(selectedTemplate.businessSegment)
+        : null;
+      if (businessSegment) {
+        await api.patch('/tenant/settings', { businessSegment });
+      }
       const res = await api.post<ImportResult>('/catalog/menu-import/execute', {
         templateId,
         skipExisting: true,

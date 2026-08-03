@@ -1,6 +1,11 @@
-import { IsString, IsOptional, IsEmail, MaxLength, Matches, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, Matches, IsNumber, IsArray, IsBoolean, IsEnum } from 'class-validator';
+import { BusinessSegment } from '@prisma/client';
 
 export class UpdateTenantSettingsDto {
+  @IsOptional()
+  @IsEnum(BusinessSegment)
+  businessSegment?: BusinessSegment | null;
+
   @IsOptional()
   @IsString()
   @MaxLength(50)
