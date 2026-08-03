@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { StorefrontCacheService } from './services/storefront-cache.service';
 import { FeatureControlService } from '../feature-control/feature-control.service';
+import { normalizeBusinessSegmentForStorefront } from './storefront-business-segment';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { 
@@ -474,6 +475,7 @@ export class StorefrontService {
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
+      businessSegment: normalizeBusinessSegmentForStorefront(tenant.settings?.businessSegment),
       logo: tenant.settings?.logoUrl || null,
       banner: normalizedTheme.heroImageUrl || null,
       isOpen: storeStatus.isOpen,

@@ -1,3 +1,5 @@
+import type { BusinessSegment } from './tenant';
+
 export interface StorefrontTenantInfo {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface StorefrontTenantInfo {
   description?: string | null;
   logo?: string | null;
   banner?: string | null;
+  businessSegment: BusinessSegment;
   isOpen: boolean; 
   statusMessage?: string | null;
   nextOpenAt?: string | null;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { BusinessGroupContext, Tenant, TenantSettings } from '@gestor/types';
+import { BUSINESS_SEGMENTS, BUSINESS_SEGMENT_LABELS, BusinessGroupContext, Tenant, TenantSettings } from '@gestor/types';
 
 
 
@@ -49,6 +49,7 @@ export function SettingsPage() {
     currency: 'BRL',
     language: 'pt-BR',
     businessPhone: '',
+    businessSegment: null,
     orderWhatsappNumber: '',
     businessEmail: '',
     address: '',
@@ -193,6 +194,7 @@ export function SettingsPage() {
         currency: settings.currency || undefined,
         language: settings.language || undefined,
         businessPhone: unmask(settings.businessPhone) || undefined,
+        businessSegment: settings.businessSegment ?? null,
         orderWhatsappNumber: unmask(settings.orderWhatsappNumber) || undefined,
         businessEmail: settings.businessEmail?.trim() || undefined,
         address: derivedAddress,
@@ -580,6 +582,26 @@ export function SettingsPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+                <div>
+                  <label htmlFor="business-segment" className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Segmento do negócio</label>
+                  <select
+                    id="business-segment"
+                    value={settings.businessSegment || ''}
+                    onChange={(event) => setSettings({
+                      ...settings,
+                      businessSegment: event.target.value
+                        ? event.target.value as TenantSettings['businessSegment']
+                        : null,
+                    })}
+                    className="input-premium"
+                  >
+                    <option value="">Não informado</option>
+                    {BUSINESS_SEGMENTS.map((segment) => (
+                      <option key={segment} value={segment}>{BUSINESS_SEGMENT_LABELS[segment]}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">Usado apenas para escolher imagens neutras quando um produto não possui foto.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Telefone Comercial</label>

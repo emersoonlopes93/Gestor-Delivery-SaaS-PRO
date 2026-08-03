@@ -161,7 +161,7 @@ export class MenuImportService {
 
   /**
    * Detecta o template recomendado para o tenant atual
-   * com base em tenant.settings.businessCategory.
+   * com base em tenant.settings.businessSegment.
    */
   async detectRecommendedTemplate(): Promise<MenuTemplateSummary | null> {
     const tenantId = this.tenantContext.getTenantId();
@@ -959,6 +959,8 @@ function asRecordOrNull(value: unknown): Record<string, unknown> | null {
 
 function extractBusinessCategory(settings: unknown): string | undefined {
   if (!settings || typeof settings !== 'object') return undefined;
-  const candidate = (settings as Record<string, unknown>).businessCategory;
-  return typeof candidate === 'string' && candidate.trim() ? candidate : undefined;
+  const candidate = (settings as Record<string, unknown>).businessSegment;
+  return typeof candidate === 'string' && candidate.trim()
+    ? candidate.trim().toLowerCase()
+    : undefined;
 }
