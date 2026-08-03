@@ -34,6 +34,7 @@ describe('StorefrontPreview', () => {
         slug: 'loja-teste',
         logo: null,
         banner: null,
+        businessSegment: 'PIZZARIA',
         isOpen: true,
         statusMessage: 'Aberto agora',
         paymentMethods: [],

@@ -1218,3 +1218,32 @@ Data: 2026-08-03
   Capacitor, branding/applicationId, E0-OPS, produção ou deploy.
 - R1-R5 permanecem como contratos de regressão; a R6 deve permanecer Draft e
   não deve ser integrada nesta sessão.
+
+---
+
+## R7 - segmento canônico, uploads de branding e fallback de produto
+
+Data: 2026-08-03
+
+- Branch `feat/go-live-r7-branding-uploads-niche-fallback`, worktree isolada,
+  baseada no merge da PR #44 em `origin/main-copy` (`0a434924`). Checkout
+  principal, alterações Android preexistentes, `stash@{0}` e worktrees
+  anteriores foram preservados.
+- A decisão de escopo autorizou uma migration aditiva: enum
+  `BusinessSegment` e `TenantSettings.businessSegment` nullable. Não existe
+  default, backfill, `UPDATE`, drop ou rename; tenants existentes continuam
+  `NULL` e o payload visual os normaliza para `OTHER`.
+- O onboarding persiste apenas escolhas explícitas. Pular mantém `NULL`; não há
+  inferência por nome, slug, produtos ou logs de importação. Settings permite
+  editar o segmento sem alterar cardápio ou template.
+- Logo e banner do onboarding agora usam os endpoints existentes de upload
+  direto, com preview, substituição, remoção, estado de erro e os formatos já
+  permitidos. A biblioteca permanece no cadastro e editor de produtos.
+- `@gestor/storefront-ui` concentra a cadeia produto -> segmento -> genérico e
+  a recuperação de URL quebrada. Storefront público, preview e SmartShowcase
+  passam o mesmo `businessSegment`; fallback de categoria permanece desativado
+  até certificação do campo legado.
+- Assets neutros são WebPs gerados para o projeto e versionados, sem hotlink,
+  dependência, provider, CDN ou credencial nova.
+- Nenhuma migration remota/produção, seed, E0-OPS, Dokploy ou deploy foi
+  executado. A R7 deve permanecer Draft e não deve ser integrada nesta sessão.
