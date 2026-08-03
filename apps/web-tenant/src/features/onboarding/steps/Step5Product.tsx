@@ -5,6 +5,7 @@ import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import { Step5ImportMenu } from './Step5ImportMenu';
 
 import { CurrencyInput } from '@gestor/ui';
+import { useTenantCapabilities } from '../../../hooks/useTenantCapabilities';
 
 interface ProductCategory {
   id: string;
@@ -48,6 +49,8 @@ const EMPTY_DRAFT: ProductDraft = {
 type ImportMode = 'choose' | 'manual';
 
 export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
+  const { capabilities, isLoading: capabilitiesLoading } = useTenantCapabilities();
+  const baseMenuImportEnabled = capabilities?.actions?.['baseMenu.import']?.enabled === true;
   const [products, setProducts] = useState<MinProduct[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
@@ -158,7 +161,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
     onNext(async () => { /* skip without creating */ });
   };
 
-  if (loading) {
+  if (loading || capabilitiesLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
@@ -167,7 +170,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
   }
 
   // ── Modo: Importação ──────────────────────────────────────────────────────
-  if (importMode === 'choose') {
+  if (importMode === 'choose' && baseMenuImportEnabled) {
     return (
       <Step5ImportMenu
         onImportComplete={async () => {

@@ -22,7 +22,7 @@ export type TenantCapabilityDecision = {
   source?: string;
 };
 
-export type TenantActionCapabilityKey = 'branches.create';
+export type TenantActionCapabilityKey = 'baseMenu.import' | 'branches.create';
 
 export type TenantActionCapabilityDecision = TenantCapabilityDecision & {
   code: string;
