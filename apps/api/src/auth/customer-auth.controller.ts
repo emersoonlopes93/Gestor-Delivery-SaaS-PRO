@@ -2,7 +2,13 @@ import { Controller, Post, Body, Param, HttpCode, HttpStatus } from '@nestjs/com
 import { Throttle } from '@nestjs/throttler';
 import { CustomerAuthService } from './customer-auth.service';
 import { Public } from '../common/decorators';
-import { SendOtpRequest, ValidateOtpRequest, CustomerLoginResponse } from '@gestor/types';
+import {
+  CustomerGoogleLinkRequest,
+  CustomerGoogleSignInRequest,
+  CustomerGoogleSignInResponse,
+  CustomerLoginResponse,
+  SendOtpRequest,
+} from '@gestor/types';
 
 @Public()
 @Controller('public/auth/:tenantSlug/otp')
@@ -24,8 +30,18 @@ export class CustomerAuthController {
   @HttpCode(HttpStatus.OK)
   async validateOtp(
     @Param('tenantSlug') tenantSlug: string,
-    @Body() body: ValidateOtpRequest,
+    @Body() body: CustomerGoogleLinkRequest,
   ): Promise<CustomerLoginResponse> {
-    return this.authService.validateOtp(body.phone, body.code, tenantSlug);
+    return this.authService.validateOtp(body.phone, body.code, tenantSlug, body.googleLinkCapability);
+  }
+
+  @Throttle({ auth: { limit: 5, ttl: 60 } })
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async googleSignIn(
+    @Param('tenantSlug') tenantSlug: string,
+    @Body() body: CustomerGoogleSignInRequest,
+  ): Promise<CustomerGoogleSignInResponse> {
+    return this.authService.signInWithGoogle(body.credential, tenantSlug);
   }
 }
