@@ -1,3 +1,13 @@
+## R10 - Google Sign-In de cliente com linking explícito
+
+- Branch `feat/go-live-r10-customer-google-auth`, baseada no merge da PR #47 (`7f0f9dea`).
+- A identidade Google é persistida somente por tenant, provider e `sub`; e-mail nunca faz auto-link e tokens Google não são persistidos.
+- O primeiro login Google exige OTP de WhatsApp já existente; a capability tem audience própria, expira em cinco minutos e não serve como JWT customer. Logins posteriores da mesma identidade tenant-scoped autenticam sem novo OTP.
+- A sessão customer existente foi preservada: JWT de 30 dias, sem `AuthSession`, refresh ou logout server-side. **CUSTOMER SESSION HARDENING FOLLOW-UP** permanece obrigatório antes do Go-Live definitivo.
+- Guest checkout, carrinho, fulfillment, cupom, endereço draft e estado de checkout permanecem independentes do login opcional Google. Nenhum deploy, produção, migration remota, Google Cloud ou E0-OPS foi tocado.
+
+---
+
 ## R9 - disponibilidade por categoria e controles em lote
 
 - Branch `feat/go-live-r9-category-product-availability`, baseada no merge da PR #46 (`785aad14`).

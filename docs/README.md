@@ -41,6 +41,7 @@
 |----------|-----------|
 | [API REST](./contracts/api.md) | Prefixo, versionamento, envelopes, erros |
 | [Autenticação](./contracts/authentication.md) | JWT, sessões, refresh, identidades |
+| [Google para clientes](./contracts/customer-google-auth.md) | Google Sign-In tenant-scoped com linking por OTP |
 | [Autorização / RBAC](./contracts/authorization-rbac.md) | Permissões, papéis, guards |
 | [Isolamento de tenant](./contracts/tenant-isolation.md) | Como o tenant é propagado e protegido |
 | [Consentimento do storefront](./contracts/storefront-consent.md) | Categorias, default deny, persistência local e isolamento por tenant |
