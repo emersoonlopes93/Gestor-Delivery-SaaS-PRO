@@ -9,10 +9,7 @@ export type VerifiedGoogleCustomerIdentity = {
 
 @Injectable()
 export class CustomerGoogleVerifierService {
-  constructor(
-    private readonly config: ConfigService,
-    private readonly client: Pick<OAuth2Client, 'verifyIdToken'> = new OAuth2Client(),
-  ) {}
+  constructor(private readonly config: ConfigService) {}
 
   async verifyCredential(credential: string): Promise<VerifiedGoogleCustomerIdentity> {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim();
@@ -24,7 +21,7 @@ export class CustomerGoogleVerifierService {
     }
 
     try {
-      const ticket = await this.client.verifyIdToken({ idToken: credential, audience: clientId });
+      const ticket = await new OAuth2Client().verifyIdToken({ idToken: credential, audience: clientId });
       const payload = ticket.getPayload();
       const issuer = payload?.iss;
       if (issuer !== 'accounts.google.com' && issuer !== 'https://accounts.google.com') {
