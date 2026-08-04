@@ -872,6 +872,7 @@ model ProductCategory {
   description           String?
   image                 String?
   isActive              Boolean                @default(true) @map("is_active")
+  activeDays            CategoryActiveDay[]    @default([]) @map("active_days")
   isFeatured            Boolean                @default(false) @map("is_featured")
   order                 Int                    @default(0)
   createdAt             DateTime               @default(now()) @map("created_at")
@@ -3263,6 +3264,16 @@ enum WebhookEventStatus {
 enum CategoryTemplateType {
   none
   pizza
+}
+
+enum CategoryActiveDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
 }
 
 enum CatalogProductType {

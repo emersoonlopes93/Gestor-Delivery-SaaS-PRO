@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export type CategoryTemplateType = 'none' | 'pizza' | 'combo';
+export type CategoryActiveDay = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
 
 export interface ProductCategory {
   id: string;
@@ -12,6 +13,7 @@ export interface ProductCategory {
   templateType: CategoryTemplateType;
   templateConfig?: Record<string, unknown> | null;
   isActive: boolean;
+  activeDays?: CategoryActiveDay[];
   isFeatured: boolean;
   order: number;
   createdAt: Date | string;
@@ -57,6 +59,7 @@ export interface CreateCategoryDto {
   description?: string;
   image?: string;
   isActive?: boolean;
+  activeDays?: CategoryActiveDay[];
   isFeatured?: boolean;
   order?: number;
 }

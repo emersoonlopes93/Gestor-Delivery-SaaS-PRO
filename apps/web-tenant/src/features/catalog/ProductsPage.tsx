@@ -57,6 +57,8 @@ export function ProductsPage() {
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
   
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [bannerStats, setBannerStats] = useState({ categories: 0, products: 0, skipped: 0 });
@@ -253,6 +255,21 @@ export function ProductsPage() {
     return updateProductStatus(product, { isActive: true, isAvailable: false });
   };
 
+  const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const bulkSetActive = async (isActive: boolean) => {
+    if (selectedIds.length === 0 || bulkSaving) return;
+    setBulkSaving(true);
+    try {
+      await api.patch('/catalog/products/bulk-active', { ids: selectedIds, isActive });
+      setSelectedIds([]);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao atualizar produtos selecionados:', error);
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const toggleGroupExpanded = (key: string) => {
     setExpandedGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
   };
@@ -273,6 +290,7 @@ export function ProductsPage() {
       const businessStatus = getBusinessStatus(product);
       return (
         <tr key={product.id} className="border-b border-border last:border-b-0 bg-card text-card-foreground transition-colors duration-150 hover:bg-muted/60">
+          <td className="px-4 py-4"><input aria-label={`Selecionar ${product.name}`} type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelected(product.id)} /></td>
           <td className="px-6 py-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-lg bg-muted dark:bg-muted/80 border border-border overflow-hidden shrink-0">
@@ -392,6 +410,7 @@ export function ProductsPage() {
       return (
         <div key={product.id} className="card-premium p-3 md:p-4 hover:shadow-md transition-all">
           <div className="flex items-start justify-between gap-3">
+            <input aria-label={`Selecionar ${product.name}`} type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelected(product.id)} />
             <div className="flex gap-3 min-w-0 flex-1">
                <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted dark:bg-muted/80 border border-border overflow-hidden shrink-0 shadow-sm">
                 {product.image ? (
@@ -711,6 +730,14 @@ export function ProductsPage() {
             </div>
           </div>
 
+          {selectedIds.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted p-3 text-sm">
+              <span className="font-bold text-foreground">{selectedIds.length} selecionado(s)</span>
+              <button type="button" disabled={bulkSaving} onClick={() => bulkSetActive(true)} className="rounded-lg bg-status-success px-3 py-1.5 font-bold text-white disabled:opacity-60">Ativar selecionados</button>
+              <button type="button" disabled={bulkSaving} onClick={() => bulkSetActive(false)} className="rounded-lg bg-status-warning px-3 py-1.5 font-bold text-white disabled:opacity-60">Desativar selecionados</button>
+            </div>
+          )}
+
           {viewMode === 'all' ? (
             <>
               <div className="space-y-3 md:hidden">
@@ -729,6 +756,7 @@ export function ProductsPage() {
                   <table className="w-full min-w-full border-separate border-spacing-0">
                     <thead className="bg-muted border-b border-border">
                       <tr>
+                        <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Selecionar</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Produto</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell text-left">Categoria</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Preço</th>
@@ -739,7 +767,7 @@ export function ProductsPage() {
                     <tbody>
                       {filteredProducts.length > 0 && virtualAll.topSpacer > 0 && (
                         <tr>
-                          <td colSpan={5} style={{ height: virtualAll.topSpacer }} className="p-0 border-0" />
+                          <td colSpan={6} style={{ height: virtualAll.topSpacer }} className="p-0 border-0" />
                         </tr>
                       )}
 
@@ -747,12 +775,12 @@ export function ProductsPage() {
 
                       {filteredProducts.length > 0 && virtualAll.bottomSpacer > 0 && (
                         <tr>
-                          <td colSpan={5} style={{ height: virtualAll.bottomSpacer }} className="p-0 border-0" />
+                          <td colSpan={6} style={{ height: virtualAll.bottomSpacer }} className="p-0 border-0" />
                         </tr>
                       )}
                       {filteredProducts.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium italic">
+                          <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground font-medium italic">
                             {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || Boolean(selectedCategoryId)
                               ? 'Nenhum resultado para os filtros atuais.'
                               : 'Nenhum produto cadastrado ainda no cardápio.'}
@@ -799,6 +827,7 @@ export function ProductsPage() {
                           <table className="w-full text-left border-collapse">
                             <thead className="bg-card border-b border-border sticky top-0 z-10">
                               <tr>
+                                <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Selecionar</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Produto</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell">Categoria</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Preço</th>

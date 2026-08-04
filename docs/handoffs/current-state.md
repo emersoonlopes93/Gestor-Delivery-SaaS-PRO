@@ -1,3 +1,13 @@
+## R9 - disponibilidade por categoria e controles em lote
+
+- Branch `feat/go-live-r9-category-product-availability`, baseada no merge da PR #46 (`785aad14`).
+- `activeDays` é persistido em `ProductCategory` por migration estritamente aditiva; `[]` preserva categorias existentes como disponíveis todos os dias.
+- O `AvailabilityService` agora considera `Product.isActive`, `Product.isAvailable`, categoria ativa e dias ativos no timezone do tenant.
+- Bulk de produtos e categorias opera somente em `isActive`, valida todos os IDs tenant-scoped em uma transação e invalida o cache do storefront uma vez. Não há cascade para produtos filhos.
+- Nenhum deploy, produção, migration remota, E0-OPS ou E0H foi tocado.
+
+---
+
 ## R8 - importacao opcional e duravel de cardapio base
 
 Data: 2026-08-03
