@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
@@ -10,6 +10,7 @@ import { CatalogTemplatesService } from '../catalog-templates.service';
 import { AvailabilityService, SalesChannel } from '../publication/availability.service';
 import type { Upsell } from '@gestor/types';
 import { MediaLibraryService } from '../../upload/media-library.service';
+import { BulkSetProductActiveDto } from './dto/bulk-set-product-active.dto';
 
 @Injectable()
 export class ProductsService {
@@ -425,6 +426,25 @@ export class ProductsService {
     await this.invalidateStorefrontCache(this.getRequiredTenantId());
 
     return product;
+  }
+
+  async bulkSetActive(dto: BulkSetProductActiveDto) {
+    const tenantId = this.getRequiredTenantId();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { tenantId, id: { in: dto.ids }, deletedAt: null },
+        select: { id: true },
+      });
+      if (products.length !== dto.ids.length) {
+        throw new BadRequestException('Um ou mais produtos não pertencem a esta loja ou não estão disponíveis.');
+      }
+      return tx.product.updateMany({
+        where: { tenantId, id: { in: dto.ids }, deletedAt: null },
+        data: { isActive: dto.isActive },
+      });
+    });
+    await this.invalidateStorefrontCache(tenantId);
+    return { updated: updated.count, isActive: dto.isActive };
   }
 
   async remove(id: string) {

@@ -5,6 +5,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
+import { BulkSetProductActiveDto } from './dto/bulk-set-product-active.dto';
 
 @Controller('catalog/products')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -21,6 +22,12 @@ export class ProductsController {
   @RequirePermissions('catalog.read')
   findAll(@Query('search') search?: string, @Query('limit') limit?: string) {
     return this.productsService.findAll(search, limit ? parseInt(limit) : undefined);
+  }
+
+  @Patch('bulk-active')
+  @RequirePermissions('catalog.update')
+  bulkSetActive(@Body() dto: BulkSetProductActiveDto) {
+    return this.productsService.bulkSetActive(dto);
   }
 
   @Get(':id')
