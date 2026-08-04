@@ -176,11 +176,39 @@ export class AvailabilityService {
     // 2. Check Product existence
     const product = await this.prisma.product.findFirst({
       where: { id: input.productId, tenantId: input.tenantId, deletedAt: null },
-      select: { id: true },
+      select: {
+        id: true,
+        isActive: true,
+        isAvailable: true,
+        category: { select: { isActive: true, activeDays: true } },
+      },
     });
 
     if (!product) {
       return { canSell: false, reason: 'NOT_FOUND', effectiveStatus: null };
+    }
+
+    if (!product.isActive) {
+      return { canSell: false, reason: 'PRODUCT_INACTIVE', effectiveStatus: null };
+    }
+
+    if (!product.isAvailable) {
+      return { canSell: false, reason: 'PRODUCT_UNAVAILABLE', effectiveStatus: null };
+    }
+
+    const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
+      where: { tenantId: input.tenantId },
+      select: { timezone: true },
+    });
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
+    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
+
+    if (!this.isCategoryAvailableNow(product.category, dayOfWeek)) {
+      return {
+        canSell: false,
+        reason: product.category?.isActive === false ? 'CATEGORY_INACTIVE' : 'CATEGORY_OUT_OF_SCHEDULE',
+        effectiveStatus: null,
+      };
     }
 
     // 3. Product Rules (Publication and Availability Rules)
@@ -212,13 +240,6 @@ export class AvailabilityService {
     }
 
     // Re-check timezone and time for product rules
-    const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
-      where: { tenantId: input.tenantId },
-      select: { timezone: true },
-    });
-    const timezone = settings?.timezone || 'America/Sao_Paulo';
-    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
-
     const rules = await this.prisma.catalogAvailabilityRule.findMany({
       where: { tenantId: input.tenantId, publicationId: publication.id, isActive: true, channel: input.channel },
       select: { daysOfWeek: true, startTime: true, endTime: true },
@@ -261,11 +282,23 @@ export class AvailabilityService {
       return results;
     }
 
-    const publications = await this.prisma.catalogPublication.findMany({
+    const [products, publications] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { tenantId: input.tenantId, id: { in: input.productIds }, deletedAt: null },
+        select: {
+          id: true,
+          isActive: true,
+          isAvailable: true,
+          category: { select: { isActive: true, activeDays: true } },
+        },
+      }),
+      this.prisma.catalogPublication.findMany({
       where: { tenantId: input.tenantId, productId: { in: input.productIds } },
       include: { rules: { where: { isActive: true, channel: input.channel } } }
-    });
+      }),
+    ]);
 
+    const productMap = new Map(products.map((product) => [product.id, product]));
     const pubMap = new Map<string, typeof publications[number]>(publications.map(p => [p.productId, p]));
 
     const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
@@ -278,6 +311,27 @@ export class AvailabilityService {
     const isStorefront = input.channel.startsWith('storefront_');
 
     for (const productId of input.productIds) {
+      const product = productMap.get(productId);
+      if (!product) {
+        results.set(productId, { canSell: false, reason: 'NOT_FOUND', effectiveStatus: null });
+        continue;
+      }
+      if (!product.isActive) {
+        results.set(productId, { canSell: false, reason: 'PRODUCT_INACTIVE', effectiveStatus: null });
+        continue;
+      }
+      if (!product.isAvailable) {
+        results.set(productId, { canSell: false, reason: 'PRODUCT_UNAVAILABLE', effectiveStatus: null });
+        continue;
+      }
+      if (!this.isCategoryAvailableNow(product.category, dayOfWeek)) {
+        results.set(productId, {
+          canSell: false,
+          reason: product.category?.isActive === false ? 'CATEGORY_INACTIVE' : 'CATEGORY_OUT_OF_SCHEDULE',
+          effectiveStatus: null,
+        });
+        continue;
+      }
       const pub = pubMap.get(productId);
       if (!pub) {
         results.set(productId, { canSell: true, reason: null, effectiveStatus: null });
@@ -369,6 +423,17 @@ export class AvailabilityService {
       sat: 6,
     };
     return map[v] ?? 0;
+  }
+
+  private isCategoryAvailableNow(
+    category: { isActive: boolean; activeDays: string[] } | null,
+    dayOfWeek: number,
+  ): boolean {
+    if (!category) return true;
+    if (!category.isActive) return false;
+    if (category.activeDays.length === 0) return true;
+    const activeDay = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][dayOfWeek];
+    return category.activeDays.includes(activeDay);
   }
 
   private isTimeInRange(timeHHmm: string, startHHmm: string, endHHmm: string): boolean {
