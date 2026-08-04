@@ -7,6 +7,7 @@ import { DatabaseModule } from '../database/database.module';
 import { CrmModule } from '../crm/crm.module';
 import { WhatsAppCloudService } from './whatsapp-cloud.service';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
+import { CustomerGoogleVerifierService } from './customer-google-verifier.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.modu
     JwtModule.register({}),
   ],
   controllers: [CustomerAuthController],
-  providers: [CustomerAuthService, WhatsAppCloudService],
+  providers: [CustomerAuthService, CustomerGoogleVerifierService, WhatsAppCloudService],
   exports: [CustomerAuthService],
 })
 export class CustomerAuthModule {}
