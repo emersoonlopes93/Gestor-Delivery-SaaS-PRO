@@ -27,6 +27,7 @@
     "start:web-admin": "pnpm --filter @gestor/web-admin preview",
     "start:web-storefront": "pnpm --filter @gestor/web-storefront preview",
     "check:no-any": "node scripts/check-no-any.js",
+    "check:android-tenant-branding": "node scripts/check-android-tenant-branding.js",
     "check:theme:critical": "node scripts/check-theme-hardcoded-classes.js --critical",
     "check:theme:report": "node scripts/check-theme-hardcoded-classes.js --report",
     "check:theme:baseline": "node scripts/check-theme-hardcoded-classes.js --baseline",
