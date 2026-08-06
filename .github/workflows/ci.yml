@@ -83,6 +83,9 @@ jobs:
       - name: Check No Any (Type Safety)
         run: pnpm check:no-any
 
+      - name: Check Android tenant branding
+        run: pnpm check:android-tenant-branding
+
       - name: Generate Prisma Client
         run: pnpm db:generate
 
