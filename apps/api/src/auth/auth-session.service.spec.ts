@@ -18,6 +18,10 @@ describe('AuthSessionService', () => {
   };
   let service: AuthSessionService;
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     mockPrismaService = {
       authSession: {
@@ -30,6 +34,7 @@ describe('AuthSessionService', () => {
       },
       $transaction: jest.fn((callback: (tx: typeof mockPrismaService) => unknown) => callback(mockPrismaService)),
     };
+    mockPrismaService.authSession.updateMany.mockResolvedValue({ count: 1 });
     const mockConfig = new ConfigService({
       JWT_REFRESH_SECRET: 'test-refresh-secret',
       JWT_REFRESH_EXPIRES_IN: '7d',
@@ -81,11 +86,62 @@ describe('AuthSessionService', () => {
 
     expect(rotated.refreshToken).toEqual(expect.any(String));
     expect(rotated.refreshToken).not.toBe(created.refreshToken);
-    expect(mockPrismaService.authSession.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: sessionData.id },
+    expect(mockPrismaService.authSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: sessionData.id, status: AuthSessionStatus.active }),
       data: expect.objectContaining({ status: AuthSessionStatus.rotated }),
     }));
     expect(mockPrismaService.authSession.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the original absolute expiry when requested', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-08T12:00:00.000Z'));
+    const created = await service.createSession({
+      subjectType: AuthSubjectType.customer,
+      subjectId: 'customer-1',
+      tenantId: 'tenant-1',
+      payload: { sub: 'customer-1', tenantId: 'tenant-1', type: 'customer' },
+    });
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
+      ...sessionData,
+      status: AuthSessionStatus.active,
+      metadata: null,
+    });
+    jest.setSystemTime(new Date('2026-08-09T12:00:00.000Z'));
+
+    await service.rotateSession({
+      refreshToken: created.refreshToken,
+      expectedSubjectType: AuthSubjectType.customer,
+      expectedTenantId: 'tenant-1',
+      preserveAbsoluteExpiry: true,
+    });
+
+    const rotatedData = mockPrismaService.authSession.create.mock.calls[1][0].data;
+    expect(rotatedData.expiresAt).toEqual(sessionData.expiresAt);
+  });
+
+  it('rejects a concurrent rotation that cannot atomically consume the active token', async () => {
+    const created = await service.createSession({
+      subjectType: AuthSubjectType.customer,
+      subjectId: 'customer-1',
+      tenantId: 'tenant-1',
+      payload: { sub: 'customer-1', tenantId: 'tenant-1', type: 'customer' },
+    });
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
+      ...sessionData,
+      status: AuthSessionStatus.active,
+      metadata: null,
+    });
+    mockPrismaService.authSession.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(service.rotateSession({
+      refreshToken: created.refreshToken,
+      expectedSubjectType: AuthSubjectType.customer,
+      expectedTenantId: 'tenant-1',
+      preserveAbsoluteExpiry: true,
+    })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(mockPrismaService.authSession.create).toHaveBeenCalledTimes(1);
   });
 
   it('marks the token family compromised when a rotated token is reused', async () => {
@@ -113,6 +169,94 @@ describe('AuthSessionService', () => {
         revokedReason: 'refresh_reuse_detected',
       }),
     });
+  });
+
+  it('rejects and marks an expired customer session', async () => {
+    const created = await service.createSession({
+      subjectType: AuthSubjectType.customer,
+      subjectId: 'customer-1',
+      tenantId: 'tenant-1',
+      payload: { sub: 'customer-1', tenantId: 'tenant-1', type: 'customer' },
+    });
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
+      ...sessionData,
+      status: AuthSessionStatus.active,
+      expiresAt: new Date(Date.now() - 1),
+    });
+
+    await expect(service.rotateSession({
+      refreshToken: created.refreshToken,
+      expectedSubjectType: AuthSubjectType.customer,
+      expectedTenantId: 'tenant-1',
+    })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(mockPrismaService.authSession.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: AuthSessionStatus.expired }),
+    }));
+  });
+
+  it('rejects a revoked customer session and refresh after logout', async () => {
+    const created = await service.createSession({
+      subjectType: AuthSubjectType.customer,
+      subjectId: 'customer-1',
+      tenantId: 'tenant-1',
+      payload: { sub: 'customer-1', tenantId: 'tenant-1', type: 'customer' },
+    });
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
+      ...sessionData,
+      status: AuthSessionStatus.revoked,
+    });
+
+    await expect(service.rotateSession({
+      refreshToken: created.refreshToken,
+      expectedSubjectType: AuthSubjectType.customer,
+      expectedTenantId: 'tenant-1',
+    })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(mockPrismaService.authSession.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects tenant mismatch before consuming the refresh token', async () => {
+    const created = await service.createSession({
+      subjectType: AuthSubjectType.customer,
+      subjectId: 'customer-1',
+      tenantId: 'tenant-1',
+      payload: { sub: 'customer-1', tenantId: 'tenant-1', type: 'customer' },
+    });
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
+      ...sessionData,
+      status: AuthSessionStatus.active,
+    });
+
+    await expect(service.rotateSession({
+      refreshToken: created.refreshToken,
+      expectedSubjectType: AuthSubjectType.customer,
+      expectedTenantId: 'tenant-2',
+    })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(mockPrismaService.authSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects customer mismatch between refresh claims and persisted session', async () => {
+    const created = await service.createSession({
+      subjectType: AuthSubjectType.customer,
+      subjectId: 'customer-1',
+      tenantId: 'tenant-1',
+      payload: { sub: 'customer-1', tenantId: 'tenant-1', type: 'customer' },
+    });
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
+      ...sessionData,
+      subjectId: 'customer-other',
+      status: AuthSessionStatus.active,
+    });
+
+    await expect(service.rotateSession({
+      refreshToken: created.refreshToken,
+      expectedSubjectType: AuthSubjectType.customer,
+      expectedTenantId: 'tenant-1',
+    })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(mockPrismaService.authSession.updateMany).not.toHaveBeenCalled();
   });
 
   it('revokes all active sessions and reports aggregate counts only', async () => {

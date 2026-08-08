@@ -16,6 +16,7 @@ describe('CustomerAuthService Google linking', () => {
   const customers = { syncCustomerOnOrderUpsert: jest.fn() };
   const whatsappSender = { sendText: jest.fn() };
   const googleVerifier = { verifyCredential: jest.fn() };
+  const customerSessions = { issue: jest.fn() };
   const config = { get: jest.fn() };
   const jwt = new JwtService({ secret: 'customer-test-secret' });
   let service: CustomerAuthService;
@@ -23,8 +24,14 @@ describe('CustomerAuthService Google linking', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     config.get.mockImplementation((key: string, fallback?: string) => key === 'JWT_SECRET' ? 'customer-test-secret' : fallback);
+    customerSessions.issue.mockResolvedValue({
+      accessToken: jwt.sign({ sub: customerA.id, tenantId: tenantA.id, type: 'customer', sid: 'session-a' }, { expiresIn: '15m' }),
+      refreshToken: 'refresh-a',
+      customer: customerA,
+    });
     service = new CustomerAuthService(
       prisma as never, jwt, config as never, customers as never, whatsappSender as never, googleVerifier as never,
+      customerSessions as never,
     );
   });
 
@@ -36,6 +43,7 @@ describe('CustomerAuthService Google linking', () => {
     const result = await service.signInWithGoogle('credential', tenantA.slug);
 
     expect(result).toEqual(expect.objectContaining({ status: 'AUTHENTICATED', customer: expect.objectContaining({ id: customerA.id }) }));
+    expect(customerSessions.issue).toHaveBeenCalledWith(customerA, undefined);
     expect(customers.syncCustomerOnOrderUpsert).not.toHaveBeenCalled();
   });
 
@@ -80,8 +88,22 @@ describe('CustomerAuthService Google linking', () => {
       tenantId: tenantA.id, customerId: customerA.id, provider: CustomerIdentityProvider.GOOGLE, providerSubject: 'google-sub',
     }) });
     expect(jwt.verify(result.accessToken)).toEqual(expect.objectContaining({
-      sub: customerA.id, tenantId: tenantA.id, type: 'customer',
+      sub: customerA.id, tenantId: tenantA.id, type: 'customer', sid: 'session-a',
     }));
+    expect(result.refreshToken).toBe('refresh-a');
+    expect(customerSessions.issue).toHaveBeenCalledWith(customerA, undefined);
+  });
+
+  it('issues a regular OTP login through the same customer session service', async () => {
+    prisma.tenant.findUnique.mockResolvedValue(tenantA);
+    prisma.customerOTP.findFirst.mockResolvedValue({ id: 'otp-a', code: '123456' });
+    customers.syncCustomerOnOrderUpsert.mockResolvedValue(customerA);
+
+    const result = await service.validateOtp(customerA.phone, '123456', tenantA.slug);
+
+    expect(result.refreshToken).toBe('refresh-a');
+    expect(customerSessions.issue).toHaveBeenCalledWith(customerA, undefined);
+    expect(prisma.customerExternalIdentity.create).not.toHaveBeenCalled();
   });
 
   it('rejects a link capability from another tenant', async () => {
