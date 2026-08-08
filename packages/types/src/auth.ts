@@ -157,6 +157,18 @@ export interface CustomerLoginResponse {
   };
 }
 
+export interface CustomerGoogleSignInRequest {
+  credential: string;
+}
+
+export interface CustomerGoogleLinkRequest extends ValidateOtpRequest {
+  googleLinkCapability: string;
+}
+
+export type CustomerGoogleSignInResponse =
+  | ({ status: 'AUTHENTICATED' } & CustomerLoginResponse)
+  | { status: 'PHONE_LINK_REQUIRED'; googleLinkCapability: string };
+
 /** Driver Login Request */
 export interface DriverLoginRequest {
   phone: string;

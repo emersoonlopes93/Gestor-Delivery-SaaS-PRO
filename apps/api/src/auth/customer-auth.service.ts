@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -9,7 +10,9 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { CustomerService } from '../crm/customer.service';
 import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
-import type { CustomerJwtPayload } from '@gestor/types';
+import { CustomerIdentityProvider, Prisma } from '@prisma/client';
+import type { CustomerGoogleSignInResponse, CustomerJwtPayload, CustomerLoginResponse } from '@gestor/types';
+import { CustomerGoogleVerifierService } from './customer-google-verifier.service';
 
 @Injectable()
 export class CustomerAuthService {
@@ -21,6 +24,7 @@ export class CustomerAuthService {
     private readonly config: ConfigService,
     private readonly customerService: CustomerService,
     private readonly whatsappSender: WhatsAppSenderService,
+    private readonly googleVerifier: CustomerGoogleVerifierService,
   ) {}
 
   /**
@@ -85,7 +89,12 @@ export class CustomerAuthService {
   /**
    * Validates OTP and returns access token.
    */
-  async validateOtp(phone: string, code: string, tenantSlug: string) {
+  async validateOtp(
+    phone: string,
+    code: string,
+    tenantSlug: string,
+    googleLinkCapability?: string,
+  ): Promise<CustomerLoginResponse> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: tenantSlug },
     });
@@ -139,10 +148,51 @@ export class CustomerAuthService {
        throw new UnauthorizedException('Erro ao vincular cliente');
     }
 
-    // Generate Token
+    if (googleLinkCapability) {
+      await this.linkGoogleIdentityFromCapability(googleLinkCapability, tenant.id, customer.id);
+    }
+
+    return this.createCustomerLogin(customer);
+  }
+
+  async signInWithGoogle(credential: string, tenantSlug: string): Promise<CustomerGoogleSignInResponse> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new BadRequestException('Loja não encontrada');
+    }
+
+    const google = await this.googleVerifier.verifyCredential(credential);
+    const identity = await this.prisma.customerExternalIdentity.findUnique({
+      where: {
+        tenantId_provider_providerSubject: {
+          tenantId: tenant.id,
+          provider: CustomerIdentityProvider.GOOGLE,
+          providerSubject: google.subject,
+        },
+      },
+      include: { customer: true },
+    });
+
+    if (identity) {
+      if (identity.customer.tenantId !== tenant.id) {
+        throw new UnauthorizedException('Invalid Google identity');
+      }
+      return { status: 'AUTHENTICATED', ...this.createCustomerLogin(identity.customer) };
+    }
+
+    return {
+      status: 'PHONE_LINK_REQUIRED',
+      googleLinkCapability: this.createGoogleLinkCapability(tenant.id, google.subject),
+    };
+  }
+
+  private createCustomerLogin(customer: { id: string; tenantId: string; name: string; phone: string }): CustomerLoginResponse {
     const payload: CustomerJwtPayload = {
       sub: customer.id,
-      tenantId: tenant.id,
+      tenantId: customer.tenantId,
       type: 'customer',
       phone: customer.phone,
       name: customer.name,
@@ -161,6 +211,114 @@ export class CustomerAuthService {
         phone: customer.phone,
       },
     };
+  }
+
+  private createGoogleLinkCapability(tenantId: string, providerSubject: string): string {
+    return this.jwtService.sign(
+      {
+        type: 'customer_google_link',
+        tenantId,
+        provider: CustomerIdentityProvider.GOOGLE,
+        providerSubject,
+      },
+      {
+        secret: this.config.get<string>('JWT_SECRET', 'dev-secret'),
+        audience: 'customer-google-link',
+        expiresIn: '5m',
+      },
+    );
+  }
+
+  private async linkGoogleIdentityFromCapability(
+    capability: string,
+    tenantId: string,
+    customerId: string,
+  ): Promise<void> {
+    const payload = this.verifyGoogleLinkCapability(capability);
+    if (payload.tenantId !== tenantId) {
+      throw new UnauthorizedException('Invalid Google link capability');
+    }
+
+    const existing = await this.prisma.customerExternalIdentity.findUnique({
+      where: {
+        tenantId_provider_providerSubject: {
+          tenantId,
+          provider: CustomerIdentityProvider.GOOGLE,
+          providerSubject: payload.providerSubject,
+        },
+      },
+    });
+    if (existing) {
+      if (existing.customerId === customerId) return;
+      throw new ConflictException({ code: 'GOOGLE_IDENTITY_ALREADY_LINKED' });
+    }
+
+    const customerProviderIdentity = await this.prisma.customerExternalIdentity.findUnique({
+      where: {
+        customerId_provider: { customerId, provider: CustomerIdentityProvider.GOOGLE },
+      },
+    });
+    if (customerProviderIdentity) {
+      throw new ConflictException({ code: 'GOOGLE_IDENTITY_ALREADY_LINKED' });
+    }
+
+    try {
+      await this.prisma.customerExternalIdentity.create({
+        data: {
+          tenantId,
+          customerId,
+          provider: CustomerIdentityProvider.GOOGLE,
+          providerSubject: payload.providerSubject,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const racedIdentity = await this.prisma.customerExternalIdentity.findUnique({
+          where: {
+            tenantId_provider_providerSubject: {
+              tenantId,
+              provider: CustomerIdentityProvider.GOOGLE,
+              providerSubject: payload.providerSubject,
+            },
+          },
+        });
+        if (racedIdentity?.customerId === customerId) return;
+        throw new ConflictException({ code: 'GOOGLE_IDENTITY_ALREADY_LINKED' });
+      }
+      throw error;
+    }
+  }
+
+  private verifyGoogleLinkCapability(capability: string): {
+    type: 'customer_google_link';
+    tenantId: string;
+    provider: 'GOOGLE';
+    providerSubject: string;
+  } {
+    try {
+      const payload = this.jwtService.verify<Record<string, unknown>>(capability, {
+        secret: this.config.get<string>('JWT_SECRET', 'dev-secret'),
+        audience: 'customer-google-link',
+      });
+      if (
+        payload.type !== 'customer_google_link'
+        || typeof payload.tenantId !== 'string'
+        || payload.provider !== CustomerIdentityProvider.GOOGLE
+        || typeof payload.providerSubject !== 'string'
+        || !payload.providerSubject
+      ) {
+        throw new UnauthorizedException('Invalid Google link capability');
+      }
+      return {
+        type: 'customer_google_link',
+        tenantId: payload.tenantId,
+        provider: CustomerIdentityProvider.GOOGLE,
+        providerSubject: payload.providerSubject,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Invalid Google link capability');
+    }
   }
 
   private normalizeBrazilPhone(cleanPhoneDigits: string): string {

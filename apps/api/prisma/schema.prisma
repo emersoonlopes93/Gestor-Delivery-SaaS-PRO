@@ -59,6 +59,7 @@ model Tenant {
   crmPipelineEntries             CrmPipelineEntry[]
   crmTasks                       CrmTask[]
   customerAddresses              CustomerAddress[]
+  customerExternalIdentities     CustomerExternalIdentity[]
   customerLoyaltyTransactions    CustomerLoyaltyTransaction[]
   customerOptOuts                CustomerOptOut[]
   customerOtps                   CustomerOTP[]
@@ -1929,6 +1930,7 @@ model Customer {
   crmPipelineEntries      CrmPipelineEntry[]
   crmTasks                CrmTask[]
   addresses               CustomerAddress[]
+  externalIdentities      CustomerExternalIdentity[]
   loyaltyHistory          CustomerLoyaltyTransaction[]
   optOuts                 CustomerOptOut[]
   walletHistory           CustomerWalletTransaction[]
@@ -1940,6 +1942,23 @@ model Customer {
   @@unique([tenantId, phone])
   @@index([tenantId])
   @@map("customers")
+}
+
+model CustomerExternalIdentity {
+  id              String                   @id @default(uuid())
+  tenantId        String                   @map("tenant_id")
+  customerId      String                   @map("customer_id")
+  provider        CustomerIdentityProvider
+  providerSubject String                   @map("provider_subject") @db.VarChar(255)
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, providerSubject])
+  @@unique([customerId, provider])
+  @@index([tenantId, customerId])
+  @@map("customer_external_identities")
 }
 
 model CustomerAddress {
@@ -3249,6 +3268,10 @@ enum AuthSessionStatus {
   revoked
   expired
   compromised
+}
+
+enum CustomerIdentityProvider {
+  GOOGLE
 }
 
 enum WebhookEventStatus {

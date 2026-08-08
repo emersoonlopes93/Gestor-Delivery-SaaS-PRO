@@ -35,6 +35,9 @@ const baseEnvSchema = z.object({
   WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {CODE}'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(''),
 
+  // Google Identity Services (customer ID-token verification; no client secret).
+  GOOGLE_CLIENT_ID: z.string().default(''),
+
   // Web Push (VAPID)
   VAPID_PUBLIC_KEY: z.string().default(''),
   VAPID_PRIVATE_KEY: z.string().default(''),
