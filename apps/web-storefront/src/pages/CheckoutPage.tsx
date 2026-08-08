@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store, CreditCard, Banknote, QrCode, PencilLine } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
-import { api } from '../lib/api-client';
+import { api, switchCustomerTenant } from '../lib/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { 
   CreateOrderDTO, 
@@ -68,7 +68,7 @@ export function CheckoutPage() {
   const setCartTenantSlug = useCartStore(s => s.setTenantSlug);
   const analytics = useAnalytics();
 
-  const { customer, isLoggedIn, setTenantSlug } = useCustomerStore();
+  const { customer, isLoggedIn } = useCustomerStore();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const cartTenantSlug = useCartStore(s => s.tenantSlug);
 
@@ -200,9 +200,9 @@ export function CheckoutPage() {
 
   useEffect(() => {
     if (!tenantSlug) return;
-    setTenantSlug(tenantSlug);
+    void switchCustomerTenant(tenantSlug);
     setCartTenantSlug(tenantSlug);
-  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
+  }, [tenantSlug, setCartTenantSlug]);
 
   useEffect(() => {
     async function loadTenant() {

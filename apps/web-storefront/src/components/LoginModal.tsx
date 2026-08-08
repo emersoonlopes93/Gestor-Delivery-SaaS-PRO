@@ -28,11 +28,11 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
     setIsLoading(true);
     try {
       const result = await api.post<
-        | { status: 'AUTHENTICATED'; customer: CustomerDTO; accessToken: string }
+        | { status: 'AUTHENTICATED'; customer: CustomerDTO; accessToken: string; refreshToken: string }
         | { status: 'PHONE_LINK_REQUIRED'; googleLinkCapability: string }
       >(`/public/auth/${tenantSlug}/otp/google`, { credential: response.credential });
       if (result.data.status === 'AUTHENTICATED') {
-        setCustomer(result.data.customer, result.data.accessToken, tenantSlug);
+        setCustomer(result.data.customer, result.data.accessToken, result.data.refreshToken, tenantSlug);
         showToast({ title: 'Bem-vindo!', type: 'success' });
         onClose();
         return;
@@ -102,13 +102,13 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
 
     setIsLoading(true);
     try {
-      const response = await api.post<{ customer: CustomerDTO, accessToken: string }>(`/public/auth/${tenantSlug}/otp/validate`, { 
+      const response = await api.post<{ customer: CustomerDTO; accessToken: string; refreshToken: string }>(`/public/auth/${tenantSlug}/otp/validate`, {
         phone, 
         code: otp,
         ...(googleLinkCapability ? { googleLinkCapability } : {}),
       });
       
-      setCustomer(response.data.customer, response.data.accessToken, tenantSlug);
+      setCustomer(response.data.customer, response.data.accessToken, response.data.refreshToken, tenantSlug);
       showToast({ title: 'Bem-vindo!', type: 'success' });
       onClose();
     } catch (error: unknown) {
