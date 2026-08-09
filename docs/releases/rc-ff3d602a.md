@@ -1,7 +1,9 @@
 # Release Candidate `ff3d602a`
 
-Data da auditoria: 2026-08-09  
-SHA imutável: `ff3d602aa8d5aee238abb3b0574d447ac000b6f8`  
+Data da auditoria: 2026-08-09
+
+SHA imutável: `ff3d602aa8d5aee238abb3b0574d447ac000b6f8`
+
 Decisão: **RC APROVADO** para a etapa operacional. **Go-Live ainda bloqueado**.
 
 Este documento consolida somente evidências versionadas, CI e validações locais. Nenhum acesso a produção, deploy, migration remota, rotação de secret, revogação global, E0-OPS ou alteração no Google Cloud foi executado.
