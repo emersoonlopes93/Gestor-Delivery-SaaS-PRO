@@ -129,8 +129,7 @@ export interface CustomerJwtPayload {
   sub: string;        // customerId
   tenantId: string;
   type: 'customer';
-  phone: string;
-  name: string;
+  sid: string;
   iat?: number;
   exp?: number;
 }
@@ -149,6 +148,7 @@ export interface ValidateOtpRequest {
 /** Customer Login Response */
 export interface CustomerLoginResponse {
   accessToken: string;
+  refreshToken: string;
   customer: {
     id: string;
     tenantId: string;
@@ -162,8 +162,14 @@ export interface CustomerGoogleSignInRequest {
 }
 
 export interface CustomerGoogleLinkRequest extends ValidateOtpRequest {
-  googleLinkCapability: string;
+  googleLinkCapability?: string;
 }
+
+export interface CustomerRefreshTokenRequest {
+  refreshToken: string;
+}
+
+export type CustomerRefreshResponse = CustomerLoginResponse;
 
 export type CustomerGoogleSignInResponse =
   | ({ status: 'AUTHENTICATED' } & CustomerLoginResponse)

@@ -8,6 +8,8 @@ import { CrmModule } from '../crm/crm.module';
 import { WhatsAppCloudService } from './whatsapp-cloud.service';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
 import { CustomerGoogleVerifierService } from './customer-google-verifier.service';
+import { CustomerSessionService } from './customer-session.service';
+import { CustomerAuthGuard } from './guards/customer-auth.guard';
 
 @Module({
   imports: [
@@ -18,7 +20,13 @@ import { CustomerGoogleVerifierService } from './customer-google-verifier.servic
     JwtModule.register({}),
   ],
   controllers: [CustomerAuthController],
-  providers: [CustomerAuthService, CustomerGoogleVerifierService, WhatsAppCloudService],
+  providers: [
+    CustomerAuthService,
+    CustomerSessionService,
+    CustomerGoogleVerifierService,
+    CustomerAuthGuard,
+    WhatsAppCloudService,
+  ],
   exports: [CustomerAuthService],
 })
 export class CustomerAuthModule {}

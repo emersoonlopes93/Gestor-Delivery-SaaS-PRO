@@ -24,6 +24,20 @@ Configure the same public OAuth client ID in `GOOGLE_CLIENT_ID` for the API and 
 
 ## Session and checkout boundary
 
-R10 intentionally preserves the customer session contract: a 30-day access JWT in the existing browser storage, without `AuthSession`, refresh token, or server-side logout. This is tracked as **CUSTOMER SESSION HARDENING FOLLOW-UP** before definitive Go-Live.
+OTP login, an already-linked Google identity, and Google first-link completion after OTP all issue credentials through the same `CustomerSessionService` and persisted `AuthSession` contract.
+
+- Customer access JWTs contain only `sub` (customer ID), `tenantId`, `type=customer`, `sid`, `iat`, and `exp`. The canonical access TTL is 15 minutes.
+- Refresh tokens use the existing project transport (response body plus the tenant-scoped storefront store), are stored only as SHA-256 hashes in `AuthSession`, rotate once, and are bound to the persisted customer and tenant.
+- The canonical refresh/session absolute TTL is `JWT_REFRESH_EXPIRES_IN`, defaulting to 7 days. Customer rotation preserves the original absolute expiry; a new login starts a new horizon.
+- Refresh consumption is atomic. The previous token becomes invalid immediately, and existing family reuse detection remains active.
+- Customer logout revokes the current `AuthSession`. The existing JWT strategy checks `AuthSession` for every `sid`, so protected customer requests reject a revoked session immediately.
+- Protected customer routes reject legacy customer JWTs without `sid`; they also validate the persisted subject and tenant binding.
+- The existing global `AuthSession` revocation script includes customer sessions because it revokes every active subject type. It must not be run from application deploys.
+- The storefront bootstraps the persisted session, performs one single-flight refresh for concurrent 401 responses, retries each request at most once, and clears local credentials after definitive failure.
+- Changing tenant slug revokes the previous customer session before clearing it. Sessions from tenant A cannot refresh or authorize data in tenant B.
+
+**DEPLOY IMPACT:** existing authenticated customers will need to sign in again because legacy customer JWTs do not contain `sid` or a refresh token.
 
 Guest checkout remains available. The Google linking flow only changes customer authentication; it does not clear the cart, fulfillment selection, coupon, checkout step, or address draft. Tenant changes continue to clear customer auth state.
+
+Customers currently have no blocked, deleted, or archived state in the Prisma model, so an additional customer-state login/refresh rule is not applicable.

@@ -1,9 +1,26 @@
+## Customer session hardening - access curto, rotation e revogacao
+
+Data: 2026-08-08
+
+- Branch `fix/go-live-customer-session-hardening`, criada em worktree isolada no merge da PR #48 em `origin/main-copy` (`f74db71f`). Checkout principal com alteracoes Android, `stash@{0}`, worktree R10 e branches remotas foram preservados.
+- PR #49 ja estava integrada por `2b943b7b`; CI pos-merge `30981998283` e branding guard passaram. PR #48 foi integrada por merge commit `f74db71f`; CI pos-merge `31245025516` e secret scanning passaram, incluindo branding guard e notification audio.
+- `AuthSession` ja possuia `AuthSubjectType.customer` e `subjectId`; nenhuma mudanca Prisma ou migration foi necessaria. O script global existente de revogacao alcanca customer porque opera sobre todas as sessoes `active`.
+- `CustomerSessionService` e o issuer unico para OTP, Google ja vinculado e conclusao do primeiro link Google por OTP. O access JWT possui apenas customer ID, tenant ID, marker customer, `sid`, `iat` e `exp`; TTL canonico de 15 minutos, sem telefone/nome no token.
+- Refresh reutiliza o contrato existente: JWT em body/storage, SHA-256 persistido, family/reuse detection e TTL canonico `JWT_REFRESH_EXPIRES_IN` (default 7 dias). Customer rotation preserva o expiry absoluto original e consome o hash atual atomicamente, impedindo duas rotacoes validas concorrentes.
+- Logout customer revoga a sessao atual. Guards exigem `sid` e validam status, expiry, subject/customer e tenant; JWT customer legado sem `sid` recebe 401. Impacto de deploy: clientes autenticados existentes precisam entrar novamente.
+- Storefront faz bootstrap, refresh single-flight, no maximo um retry por 401, logout local em falha definitiva e revogacao antes da troca de tenant. Login/refresh nao limpam carrinho nem address draft.
+- Guest checkout continua sem `AuthSession`; R1/R2 e R10 permanecem preservados. Nao ha estados blocked/deleted/archived em `Customer`, portanto essa regra e NOT APPLICABLE.
+- Testes focados: API 4 suites/25 testes PASS; storefront 1 arquivo/5 testes PASS. Regressao completa: API 88 suites/370 testes PASS (4 suites/9 testes skipped); storefront 12 arquivos/63 testes PASS.
+- Prisma/schema/migrations, Android `applicationId`, E0-OPS, provider real, banco remoto, producao e deploy nao foram alterados. O applicationId canonico permanece `com.getcapacitor.app`.
+
+---
+
 ## R10 - Google Sign-In de cliente com linking explícito
 
 - Branch `feat/go-live-r10-customer-google-auth`, baseada no merge da PR #47 (`7f0f9dea`).
 - A identidade Google é persistida somente por tenant, provider e `sub`; e-mail nunca faz auto-link e tokens Google não são persistidos.
 - O primeiro login Google exige OTP de WhatsApp já existente; a capability tem audience própria, expira em cinco minutos e não serve como JWT customer. Logins posteriores da mesma identidade tenant-scoped autenticam sem novo OTP.
-- A sessão customer existente foi preservada: JWT de 30 dias, sem `AuthSession`, refresh ou logout server-side. **CUSTOMER SESSION HARDENING FOLLOW-UP** permanece obrigatório antes do Go-Live definitivo.
+- O débito de sessão originalmente deixado pela R10 foi encerrado nesta branch: OTP/Google convergem em `CustomerSessionService`, com access curto, `sid`, `AuthSession`, refresh rotativo e logout server-side. O histórico da R10 continua válido para identidade/linking.
 - Guest checkout, carrinho, fulfillment, cupom, endereço draft e estado de checkout permanecem independentes do login opcional Google. Nenhum deploy, produção, migration remota, Google Cloud ou E0-OPS foi tocado.
 
 ---

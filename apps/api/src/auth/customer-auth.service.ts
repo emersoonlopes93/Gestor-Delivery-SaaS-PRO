@@ -11,8 +11,10 @@ import { PrismaService } from '../database/prisma.service';
 import { CustomerService } from '../crm/customer.service';
 import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
 import { CustomerIdentityProvider, Prisma } from '@prisma/client';
-import type { CustomerGoogleSignInResponse, CustomerJwtPayload, CustomerLoginResponse } from '@gestor/types';
+import type { CustomerGoogleSignInResponse, CustomerLoginResponse } from '@gestor/types';
 import { CustomerGoogleVerifierService } from './customer-google-verifier.service';
+import { CustomerSessionService } from './customer-session.service';
+import type { SessionContext } from './auth-session.service';
 
 @Injectable()
 export class CustomerAuthService {
@@ -25,7 +27,17 @@ export class CustomerAuthService {
     private readonly customerService: CustomerService,
     private readonly whatsappSender: WhatsAppSenderService,
     private readonly googleVerifier: CustomerGoogleVerifierService,
+    private readonly customerSessionService: CustomerSessionService,
   ) {}
+
+  async resolveTenantId(tenantSlug: string): Promise<string> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true },
+    });
+    if (!tenant) throw new BadRequestException('Loja nÃ£o encontrada');
+    return tenant.id;
+  }
 
   /**
    * Generates a 6-digit OTP and "sends" it.
@@ -94,6 +106,7 @@ export class CustomerAuthService {
     code: string,
     tenantSlug: string,
     googleLinkCapability?: string,
+    context?: SessionContext,
   ): Promise<CustomerLoginResponse> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: tenantSlug },
@@ -152,10 +165,14 @@ export class CustomerAuthService {
       await this.linkGoogleIdentityFromCapability(googleLinkCapability, tenant.id, customer.id);
     }
 
-    return this.createCustomerLogin(customer);
+    return this.customerSessionService.issue(customer, context);
   }
 
-  async signInWithGoogle(credential: string, tenantSlug: string): Promise<CustomerGoogleSignInResponse> {
+  async signInWithGoogle(
+    credential: string,
+    tenantSlug: string,
+    context?: SessionContext,
+  ): Promise<CustomerGoogleSignInResponse> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: tenantSlug },
       select: { id: true },
@@ -180,36 +197,15 @@ export class CustomerAuthService {
       if (identity.customer.tenantId !== tenant.id) {
         throw new UnauthorizedException('Invalid Google identity');
       }
-      return { status: 'AUTHENTICATED', ...this.createCustomerLogin(identity.customer) };
+      return {
+        status: 'AUTHENTICATED',
+        ...await this.customerSessionService.issue(identity.customer, context),
+      };
     }
 
     return {
       status: 'PHONE_LINK_REQUIRED',
       googleLinkCapability: this.createGoogleLinkCapability(tenant.id, google.subject),
-    };
-  }
-
-  private createCustomerLogin(customer: { id: string; tenantId: string; name: string; phone: string }): CustomerLoginResponse {
-    const payload: CustomerJwtPayload = {
-      sub: customer.id,
-      tenantId: customer.tenantId,
-      type: 'customer',
-      phone: customer.phone,
-      name: customer.name,
-    };
-
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '30d', // Long lived session for customers
-    });
-
-    return {
-      accessToken,
-      customer: {
-        id: customer.id,
-        tenantId: customer.tenantId,
-        name: customer.name,
-        phone: customer.phone,
-      },
     };
   }
 

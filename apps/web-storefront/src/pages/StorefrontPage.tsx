@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../lib/api-client';
+import { api, logoutCustomerSession, switchCustomerTenant } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload, StorefrontCategoryPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -105,16 +105,16 @@ export function StorefrontPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
-  const { customer, logout, isLoggedIn, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
+  const { customer, isLoggedIn, tenantSlug: customerTenantSlug } = useCustomerStore();
   const analytics = useAnalytics();
   const { canUseAnalytics } = useStorefrontConsent();
   const menuTracked = useRef(false);
 
   useEffect(() => {
     if (!tenantSlug) return;
-    setTenantSlug(tenantSlug);
+    void switchCustomerTenant(tenantSlug);
     setCartTenantSlug(tenantSlug);
-  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
+  }, [tenantSlug, setCartTenantSlug]);
 
   // Demo state for layout testing
   const [productLayout, setProductLayout] = useState<StorefrontProductLayout>('grid');
@@ -314,7 +314,7 @@ export function StorefrontPage() {
                 <p className="text-sm font-bold text-[var(--storefront-foreground)]">{displayCustomerName || 'Cliente'}</p>
               </div>
               <button
-                onClick={logout}
+                onClick={() => { void logoutCustomerSession(); }}
                 className="p-2 text-[var(--storefront-muted-foreground)] hover:text-red-500 transition-colors"
                 title="Sair"
               >
