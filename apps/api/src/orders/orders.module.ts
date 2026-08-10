@@ -20,6 +20,7 @@ import { BillingDomainModule } from '../billing/billing-domain.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
 import { FeatureControlModule } from '../feature-control/feature-control.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { PrintingModule } from '../printing/printing.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
     forwardRef(() => MarketplaceModule),
     FeatureControlModule,
     AnalyticsModule,
+    PrintingModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway],

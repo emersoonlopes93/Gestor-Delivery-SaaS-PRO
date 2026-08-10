@@ -1353,3 +1353,54 @@ Data: 2026-08-10
   deploy foi alterado.
 
 ---
+
+## Printing - experiência adaptativa e hardening do spooler
+
+Data: 2026-08-10
+
+- Branch `fix/printing-platform-ux`, worktree isolada, baseada em
+  `origin/main-copy` (`681b2d1547e4bb14091c19860ac5b6ba6afb7009`). O checkout principal dirty e
+  `stash@{0}` foram preservados.
+- A UI de `/pos/printers` agora diferencia Android Capacitor, mobile web e
+  desktop web sem usar viewport como capability. Android expõe somente
+  Bluetooth pareado; mobile web somente impressão do navegador; desktop web
+  oferece navegador e impressora térmica integrada via QZ. Bridge, USB direto e
+  rede/IP direta não são exibidos.
+- O assistente acessível usa diálogo modal, foco inicial/trap/restauração,
+  Escape, radio groups, `aria-live`, loading e single-flight. O card principal
+  lê somente o dispositivo persistido; seleção draft fica no diálogo.
+- O spooler inicia automaticamente apenas para device ativo, configurado,
+  auto-print habilitado e adapter compatível. Uma única instância executa por
+  montagem, respeita 3000 ms, faz cleanup e limita feedback de erro de polling a
+  uma atualização por 30 segundos.
+- O claim de `PrintJob` é condicional e transacional, mantém stale-lock recovery
+  de cinco minutos e garante um vencedor. Create/update validam `stationId` no
+  tenant; claim/ACK/fail validam device e job no tenant e o dono do lock.
+- Pedidos confirmados criam o recibo `MAIN` pelo serviço existente quando há
+  impressora principal elegível. A chave
+  `auto_print_<order>_<type>_<station>` preserva idempotência e não duplica os
+  tickets KDS.
+- Test print recebe `requestId` UUID por ação e usa single-flight no cliente;
+  cliques posteriores podem criar novos jobs, enquanto o mesmo request continua
+  idempotente.
+- Gates: web-tenant lint/build PASS e 93/93 testes PASS; API lint/build PASS e
+  384/384 testes executados PASS (9 testes condicionais skipped). Após o ajuste
+  final que preserva o papel da impressora principal ao alterar preferências, o
+  teste focado passou 16/16 e lint, `tsc` e Nest build passaram novamente; o
+  rerun integral adicional foi encerrado pelo host com OOM nativo, sem falha de
+  asserção. Typecheck, check:no-any, check:features e diff-check PASS.
+  `check:boundaries` mantém exit 1 somente nas duas violações preexistentes de
+  storefront preview; diff contra o SHA-base nesses arquivos teve exit 0.
+- Contrato detalhado: `docs/printing-platform-experience.md`.
+- QA visual autenticado e screenshots não foram produzidos: `agent-browser`
+  0.33.2 encontrou o Chrome, mas o launch encerrou antes de criar
+  `DevToolsActivePort`; a tentativa recomendada com `--no-sandbox` também
+  falhou no host. Matriz, responsividade/safe-area e estados permanecem cobertos
+  por testes de componente/contrato e build, mas hardware/visual real continua
+  pendente.
+- Não houve migration/schema, dependência/lockfile, plugin Capacitor, provider,
+  credencial, produção, banco remoto, Dokploy ou deploy.
+- Dívida remanescente: consolidar futuramente `/printing/spooler/*` e
+  `/kds/spooler/*`; validar impressora Android real e QZ Tray real.
+
+---

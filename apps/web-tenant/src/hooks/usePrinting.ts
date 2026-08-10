@@ -85,7 +85,7 @@ export const useUpdateDevice = () => {
 
 export const useTestPrint = () => {
   return useMutation({
-    mutationFn: async (payload: { stationSlug: string; deviceName: string }) => {
+    mutationFn: async (payload: { stationSlug: string; deviceName: string; requestId: string }) => {
       const { data } = await api.post('/printing/test', payload);
       return data;
     },

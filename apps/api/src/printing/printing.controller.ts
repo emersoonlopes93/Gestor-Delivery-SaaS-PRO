@@ -13,7 +13,13 @@ import { PrintingService } from './printing.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
-import { CreatePrinterDeviceDto, UpdatePrinterDeviceDto, AckSpoolerJobDto, FailSpoolerJobDto } from './dto/printing.dto';
+import {
+  CreatePrinterDeviceDto,
+  UpdatePrinterDeviceDto,
+  AckSpoolerJobDto,
+  FailSpoolerJobDto,
+  CreateTestPrintDto,
+} from './dto/printing.dto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -66,9 +72,14 @@ export class PrintingController {
   @RequirePermissions('settings.manage')
   async createTestJob(
     @Request() req: TenantRequest,
-    @Body() body: { stationSlug: string; deviceName: string },
+    @Body() body: CreateTestPrintDto,
   ) {
-    return this.printingService.createTestJob(req.user.tenantId, body.stationSlug, body.deviceName);
+    return this.printingService.createTestJob(
+      req.user.tenantId,
+      body.stationSlug,
+      body.deviceName,
+      body.requestId,
+    );
   }
 
   // Spooler Endpoints (Used by the Android App)

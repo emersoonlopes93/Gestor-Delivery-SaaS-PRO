@@ -60,6 +60,7 @@ describe('OrdersService public checkout atomicity', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(service.createOrder('loja', {
