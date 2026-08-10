@@ -3,6 +3,8 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma, PrintJobStatus, PrintType } from '@prisma/client';
 import { PrinterService as LegacyPrinterService } from '../pos/printer.service';
 import { slugify } from '@gestor/utils';
+import type { OrderResponseDTO } from '@gestor/types';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class PrintingService {
@@ -12,6 +14,30 @@ export class PrintingService {
     private readonly db: PrismaService,
     private readonly legacyPrinter: LegacyPrinterService,
   ) {}
+
+  private async assertStationBelongsToTenant(tenantId: string, stationId?: string | null) {
+    if (!stationId) return;
+
+    const station = await this.db.printStation.findFirst({
+      where: { id: stationId, tenantId },
+      select: { id: true },
+    });
+
+    if (!station) {
+      throw new BadRequestException('Print station does not belong to the active tenant');
+    }
+  }
+
+  private async assertDeviceBelongsToTenant(tenantId: string, deviceId: string) {
+    const device = await this.db.printerDevice.findFirst({
+      where: { id: deviceId, tenantId },
+      select: { id: true },
+    });
+
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+  }
 
   private async createOrReusePrintJob(data: Prisma.PrintJobUncheckedCreateInput & { idempotencyKey?: string | null }) {
     if (!data.idempotencyKey) {
@@ -167,6 +193,8 @@ export class PrintingService {
     autoPrintEnabled?: boolean;
     isActive?: boolean;
   }) {
+    await this.assertStationBelongsToTenant(tenantId, data.stationId);
+
     const current = await this.db.printerDevice.findFirst({
       where: { id: deviceId, tenantId },
       select: { id: true, isPrimary: true },
@@ -179,7 +207,7 @@ export class PrintingService {
     const nextIsPrimary = data.isPrimary ?? current.isPrimary;
     if (nextIsPrimary) {
       await this.db.printerDevice.updateMany({
-        where: { tenantId, isPrimary: true, isActive: true },
+        where: { tenantId, id: { not: deviceId }, isPrimary: true, isActive: true },
         data: { isPrimary: false, isDefault: false, role: 'station' },
       });
     }
@@ -218,6 +246,8 @@ export class PrintingService {
     purpose?: string;
     autoPrintEnabled?: boolean;
   }) {
+    await this.assertStationBelongsToTenant(tenantId, data.stationId);
+
     const isPrimary = data.isPrimary === true || data.role === 'primary_order';
     const role = isPrimary ? 'primary_order' : (data.role || 'station');
     const purpose = isPrimary ? 'main_receipt' : (data.purpose || 'production_ticket');
@@ -302,45 +332,49 @@ export class PrintingService {
 
     const staleLockCutoff = new Date(Date.now() - 5 * 60 * 1000);
 
-    // Find next pending job, or recover a stale lock left by a crashed/interrupted app.
-    const job = await this.db.printJob.findFirst({
-      where: {
-        tenantId,
-        station: { in: stationKeys },
-        OR: [
-          {
-            status: PrintJobStatus.pending,
-            lockedAt: null,
-          },
-          {
-            status: PrintJobStatus.printing,
-            lockedAt: { lt: staleLockCutoff },
-          },
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const claimableWhere: Prisma.PrintJobWhereInput = {
+      tenantId,
+      station: { in: stationKeys },
+      OR: [
+        { status: PrintJobStatus.pending, lockedAt: null },
+        { status: PrintJobStatus.printing, lockedAt: { lt: staleLockCutoff } },
+      ],
+    };
 
-    if (!job) {
-      return null;
-    }
+    return this.db.$transaction(async (tx) => {
+      const candidate = await tx.printJob.findFirst({
+        where: claimableWhere,
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
 
-    // Lock the job
-    return this.db.printJob.update({
-      where: { id: job.id },
-      data: {
-        status: PrintJobStatus.printing,
-        lockedAt: new Date(),
-        lockedBy: deviceId,
-        printerDeviceId: deviceId,
-        tries: { increment: 1 },
-        attempts: { increment: 1 },
-        lastTriedAt: new Date(),
-      },
+      if (!candidate) return null;
+
+      const claimedAt = new Date();
+      const claimed = await tx.printJob.updateMany({
+        where: { id: candidate.id, ...claimableWhere },
+        data: {
+          status: PrintJobStatus.printing,
+          lockedAt: claimedAt,
+          lockedBy: deviceId,
+          printerDeviceId: deviceId,
+          tries: { increment: 1 },
+          attempts: { increment: 1 },
+          lastTriedAt: claimedAt,
+        },
+      });
+
+      if (claimed.count !== 1) return null;
+
+      return tx.printJob.findFirst({
+        where: { id: candidate.id, tenantId, lockedBy: deviceId },
+      });
     });
   }
 
   async ackSpoolerJob(tenantId: string, jobId: string, deviceId: string) {
+    await this.assertDeviceBelongsToTenant(tenantId, deviceId);
+
     const job = await this.db.printJob.findUnique({
       where: { id: jobId, tenantId },
     });
@@ -360,11 +394,14 @@ export class PrintingService {
   }
 
   async failSpoolerJob(tenantId: string, jobId: string, deviceId: string, errorMessage: string) {
+    await this.assertDeviceBelongsToTenant(tenantId, deviceId);
+
     const job = await this.db.printJob.findUnique({
       where: { id: jobId, tenantId },
     });
 
     if (!job) throw new NotFoundException('Job not found');
+    if (job.lockedBy !== deviceId) throw new BadRequestException('Job locked by another device');
 
     const hasReachedMax = job.attempts >= job.maxAttempts;
 
@@ -394,7 +431,7 @@ export class PrintingService {
     });
   }
 
-  async createMainReceiptJobForOrder(tenantId: string, orderId: string, content: string) {
+  async createMainReceiptJobForOrder(tenantId: string, orderId: string, order: OrderResponseDTO) {
     const hasPrimaryPrinter = await this.db.printerDevice.findFirst({
       where: {
         tenantId,
@@ -407,10 +444,11 @@ export class PrintingService {
 
     if (!hasPrimaryPrinter) return null;
 
+    const content = await this.legacyPrinter.formatTicket(order, 'customer');
     return this.createPrintJobForOrder(tenantId, orderId, 'MAIN', PrintType.customer, content);
   }
 
-  async createTestJob(tenantId: string, stationSlug: string, deviceName: string) {
+  async createTestJob(tenantId: string, stationSlug: string, deviceName: string, requestId?: string) {
     const latestOrder = await this.db.order.findFirst({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -431,7 +469,7 @@ Data: ${new Date().toLocaleString('pt-BR')}
 Bluetooth OK
 --- FIM DO TESTE ---`;
 
-    const idempotencyKey = `test_print_${tenantId}_${latestOrder.id}_${stationSlug}_${deviceName}`;
+    const idempotencyKey = `test_print_${tenantId}_${requestId ?? randomUUID()}`;
 
     return this.createOrReusePrintJob({
       tenantId,

@@ -43,6 +43,7 @@ import type { FulfillmentType } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
+import { PrintingService } from '../printing/printing.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
 import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
 import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
@@ -176,6 +177,7 @@ export class OrdersService {
     private readonly whatsappService: WhatsappService,
     private readonly ordersGateway: OrdersGateway,
     private readonly kdsService: KdsService,
+    private readonly printingService: PrintingService,
     private readonly revenueLedgerService: RevenueLedgerService,
     @Inject(forwardRef(() => MarketplaceStatusSyncService))
     private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
@@ -1255,6 +1257,9 @@ export class OrdersService {
           this.logger.error(`No active production jobs found for order ${orderId} after status ${nextStatus}`);
         }
       }
+
+      const orderDetail = await this.getOrderDetail(orderId, tenantId);
+      await this.printingService.createMainReceiptJobForOrder(tenantId, orderId, orderDetail);
     }
 
     if (nextStatus === 'completed') {
@@ -1345,6 +1350,9 @@ export class OrdersService {
         this.logger.error(`No active production jobs found for order ${orderId} after status confirmed`);
       }
     }
+
+    const orderDetail = await this.getOrderDetail(orderId, tenantId);
+    await this.printingService.createMainReceiptJobForOrder(tenantId, orderId, orderDetail);
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (order.customerPhone && tenant) {

@@ -144,6 +144,7 @@ describe('POS PostgreSQL concurrent atomicity', () => {
       { notifyOrderStatus: async () => undefined } as never,
       { emitOrderStatusUpdated: () => undefined } as never,
       { createProductionJobs: async () => [] } as never,
+      { createMainReceiptJobForOrder: async () => null } as never,
       revenueLedgerService,
       {} as never,
       {} as never,
