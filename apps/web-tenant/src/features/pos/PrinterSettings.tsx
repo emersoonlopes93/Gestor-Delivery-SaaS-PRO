@@ -15,7 +15,7 @@ import {
   type CreateDevicePayload,
   type PrinterDevice,
 } from '../../hooks/usePrinting';
-import { getPrintingCapabilities } from './printing-capabilities';
+import { getPrintingCapabilities, isPrinterDeviceCompatible, selectCurrentPlatformPrinter } from './printing-capabilities';
 import { PrinterOverviewCard } from './PrinterOverviewCard';
 import { PrinterSetupDialog } from './PrinterSetupDialog';
 import { PrintingPoller, selectSpoolerDevice, type SpoolerState } from './printing-spooler';
@@ -73,15 +73,13 @@ export function PrinterSettings() {
   const testPrintGuardRef = useRef(new SingleFlight());
 
   const mainPrinter = useMemo(
-    () => devices.find((device) => device.isPrimary && device.isActive !== false)
-      ?? devices.find((device) => device.isPrimary)
-      ?? null,
-    [devices],
+    () => selectCurrentPlatformPrinter(devices, capabilities),
+    [capabilities, devices],
   );
   const sectorDevices = useMemo(() => stations.map((station) => ({
     station,
-    device: devices.find((device) => device.stationId === station.id && !device.isPrimary) ?? null,
-  })), [devices, stations]);
+    device: devices.find((device) => device.stationId === station.id && !device.isPrimary && isPrinterDeviceCompatible(device, capabilities)) ?? null,
+  })), [capabilities, devices, stations]);
   const spoolerDevice = useMemo(
     () => selectSpoolerDevice(devices, capabilities),
     [capabilities, devices],

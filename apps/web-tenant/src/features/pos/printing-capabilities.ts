@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import type { PrinterDevice } from '../../hooks/usePrinting';
 
 export type PrintingPlatform = 'android-capacitor' | 'mobile-web' | 'desktop-web';
 
@@ -43,4 +44,18 @@ export function getPrintingCapabilities(): PrintingCapabilities {
     mobileUserAgent: typeof navigator !== 'undefined' && isMobileBrowser(navigator.userAgent),
   });
   return resolvePrintingCapabilities(platform);
+}
+
+export function isPrinterDeviceCompatible(device: PrinterDevice, capabilities: PrintingCapabilities) {
+  return (device.connectionType === 'BLUETOOTH_SPP' && capabilities.bluetooth)
+    || (device.connectionType === 'QZ_TRAY' && capabilities.qz);
+}
+
+export function selectCurrentPlatformPrinter(devices: PrinterDevice[], capabilities: PrintingCapabilities) {
+  const compatible = devices.filter((device) => isPrinterDeviceCompatible(device, capabilities));
+  return compatible.find((device) => device.isPrimary && device.isActive !== false)
+    ?? compatible.find((device) => device.isPrimary)
+    ?? compatible.find((device) => device.isActive !== false)
+    ?? compatible[0]
+    ?? null;
 }
