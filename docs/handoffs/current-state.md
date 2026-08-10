@@ -1328,3 +1328,28 @@ Data: 2026-08-03
   dependência, provider, CDN ou credencial nova.
 - Nenhuma migration remota/produção, seed, E0-OPS, Dokploy ou deploy foi
   executado. A R7 deve permanecer Draft e não deve ser integrada nesta sessão.
+
+---
+
+# Campaign BullMQ custom job ID compatibility
+
+Data: 2026-08-10
+
+- Branch `fix/campaign-bullmq-job-id`, baseada em `origin/main-copy` (`a2b35f15`).
+- Corrigidos os IDs customizados de enqueue e reagendamento de campanhas para
+  não usarem `:`, caractere rejeitado pelo BullMQ 5.76.5 nos IDs compostos.
+- A semântica determinística, a idempotência, o `tenantId`, as três tentativas e
+  o backoff exponencial de 5 segundos foram preservados.
+- Testes unitários cobrem dispatch inicial, status e reagendamento, incluindo a
+  ausência de `:` nos IDs enviados à fila.
+- Validações locais: testes focados 3/3 PASS; domínio campaigns 16/16 PASS com
+  2 integrações condicionais sem PostgreSQL/Redis ignoradas; lint global,
+  typecheck global, lint/typecheck da API, `check:no-any` e `git diff --check`
+  com exit 0.
+- `check:boundaries` continua com exit 1 por duas importações preexistentes de
+  `@gestor/storefront-ui` no preview de settings do web-tenant, já presentes no
+  SHA-base e fora deste patch.
+- Nenhum Prisma/schema/migration, feature flag, credencial, produção, Dokploy ou
+  deploy foi alterado.
+
+---

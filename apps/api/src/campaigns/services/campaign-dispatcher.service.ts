@@ -37,7 +37,7 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
     await this.assertAvailable();
     if (!data.campaignId || !data.dispatchId) throw new Error('Cannot reschedule campaign job without campaign and dispatch ids.');
     await this.campaignQueue.add('dispatch-job', data, {
-      jobId: `campaign:${data.campaignId}:dispatch:${data.dispatchId}:at:${nextAttemptAt.getTime()}`,
+      jobId: `campaign-${data.campaignId}-dispatch-${data.dispatchId}-at-${nextAttemptAt.getTime()}`,
       delay: Math.max(0, nextAttemptAt.getTime() - Date.now()),
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
@@ -54,7 +54,7 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
     for (const campaign of campaigns) {
       if (campaign.type === 'whatsapp_status') {
         await this.campaignQueue.add('status-job', { ...campaign, isStatus: true }, {
-          jobId: `campaign:${campaign.id}:status`, attempts: 3, backoff: { type: 'exponential', delay: 5000 },
+          jobId: `campaign-${campaign.id}-status`, attempts: 3, backoff: { type: 'exponential', delay: 5000 },
         });
         continue;
       }
@@ -75,7 +75,7 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
         };
         try {
           await this.campaignQueue.add('dispatch-job', data, {
-            jobId: `campaign:${campaign.id}:dispatch:${dispatch.id}:at:${now.getTime()}`,
+            jobId: `campaign-${campaign.id}-dispatch-${dispatch.id}-at-${now.getTime()}`,
             attempts: 3, backoff: { type: 'exponential', delay: 5000 },
           });
         } catch (error: unknown) {
