@@ -1,3 +1,16 @@
+## Production preflight read-only do RC `ff3d602a`
+
+Data: 2026-08-09
+
+- Freeze reconfirmado: `origin/main-copy` continua em `ff3d602aa8d5aee238abb3b0574d447ac000b6f8`; PR #51 segue Draft, OPEN, MERGEABLE/CLEAN e verde, sem merge.
+- API pública respondeu HTTP 200, TLS válido e `status=ok`, mas não expõe SHA/imagem. Não havia sessão Dokploy, alvo SSH, PostgreSQL read-only ou backup system acessível; imagem implantada, `_prisma_migrations`, drift, env/config, Redis/storage e rotação de secrets permanecem `UNKNOWN`.
+- Backup/restore continua `BLOCKED`: a política está documentada, porém último backup, retenção, restore point e restore real não foram comprovados.
+- O tooling E0 está presente no RC construível: `apps/api/Dockerfile` copia o script de revogação e dependências. O comando alcança toda `AuthSession active`, inclusive customer, é idempotente e retorna contagens agregadas; não possui dry-run. Como o runner não copia os manifests do workspace, a execução do comando versionado com `pnpm --filter` precisa ser provada dentro da imagem; presença na imagem atualmente implantada também permanece desconhecida.
+- Decisão: **PARTIAL**. Nenhuma escrita de produção foi executada. O próximo passo é acesso/evidência operacional estritamente read-only para concluir backup, imagem/SHA, migrations, schema e configuração; qualquer E0-OPS/deploy/migration continua exigindo autorização posterior separada.
+- Evidência detalhada e checkpoints: `docs/releases/rc-ff3d602a.md`, seção `Production preflight — read only`.
+
+---
+
 ## Release Candidate consolidado - `ff3d602a`
 
 Data: 2026-08-09

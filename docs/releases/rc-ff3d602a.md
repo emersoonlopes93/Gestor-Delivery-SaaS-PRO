@@ -8,6 +8,86 @@ Decisão: **RC APROVADO** para a etapa operacional. **Go-Live ainda bloqueado**.
 
 Este documento consolida somente evidências versionadas, CI e validações locais. Nenhum acesso a produção, deploy, migration remota, rotação de secret, revogação global, E0-OPS ou alteração no Google Cloud foi executado.
 
+## Production preflight — read only
+
+Data: 2026-08-09
+
+Decisão do preflight: **PARTIAL — acesso operacional insuficiente para provar gates críticos. Nenhuma escrita de produção foi executada.**
+
+### Freeze e acesso
+
+- `origin/main-copy` e o RC permanecem em `ff3d602aa8d5aee238abb3b0574d447ac000b6f8`.
+- A PR #51 permanece Draft, OPEN, MERGEABLE e CLEAN, com checks verdes; não foi mergeada.
+- Não há conector/CLI autenticado do Dokploy, alvo SSH conhecido, credencial PostgreSQL ou sistema de backup acessível nesta execução.
+- O cliente Docker existe, mas o daemon local `desktop-linux` está indisponível e não representa produção.
+- O endpoint versionado `GET https://api.kigula.dpdns.org/api/v1/health` respondeu HTTP 200, TLS válido e `status=ok`; a resposta não expõe SHA, imagem ou ambiente.
+
+| Gate | Estado | Evidência/limite |
+|---|---|---|
+| RC SHA | READY | RC e `origin/main-copy` idênticos |
+| PR #51/CI | READY | Draft sem merge; CI, Gitleaks, branding e smokes verdes |
+| Dokploy/host/container de produção | UNKNOWN | sem endpoint/sessão autenticada ou alvo SSH conhecido |
+| Imagem/SHA atualmente implantado | UNKNOWN | health não expõe versão e não há leitura do Dokploy |
+| Backup/restore | BLOCKED | mecanismo/política documentados, mas último backup, retenção e restore real não comprovados |
+| `_prisma_migrations` | UNKNOWN | sem conexão read-only ao PostgreSQL de produção |
+| Schema drift | UNKNOWN | catálogos de produção não acessíveis |
+| Env/config real | UNKNOWN | presença no ambiente local não representa o secret manager do Dokploy |
+| JWT/session TTL real | UNKNOWN | valores implantados não acessíveis |
+| Google backend/frontend | UNKNOWN | configuração real não acessível; Google Cloud não consultado |
+| CORS/URLs/WebSocket | UNKNOWN | API pública saudável, configuração implantada não acessível |
+| Redis/storage | UNKNOWN | sem leitura de serviços/volumes/credentials de produção |
+| E0 secret rotation | UNKNOWN | nenhuma evidência operacional de rotação |
+| Revocation tooling no RC construível | WARNING | script e dependências são copiados, mas o comando exato não foi executado no runner |
+| Revocation tooling na imagem implantada | UNKNOWN | digest/SHA atual não comprovado |
+| Current API health | READY | HTTP 200, TLS válido, `status=ok` |
+| Rollback plan | READY | runbooks versionados; execução depende de artefato anterior e backup comprovados |
+
+### Migrations e schema
+
+- O RC contém 55 migrations. Sem `_prisma_migrations`, contagens de produção, applied/pending/failed/rolled-back e drift permanecem `UNKNOWN`.
+- Permanecem sob revisão obrigatória se não forem comprovadas como aplicadas com sucesso: `20260608000000_drop_legacy_catalog_v2` e `20260722120000_campaign_status_and_opt_out_compatibility`.
+- As seis migrations recentes — analytics event/aggregates, `businessSegment`, `operationKey`, `activeDays` e `CustomerExternalIdentity` — são aditivas no source, mas seu estado de produção é desconhecido.
+- `PENDING_SAFE_ADDITIVE`, `PENDING_REQUIRES_REVIEW`, `FAILED/PARTIAL` e `DRIFT` não podem ser preenchidas sem a consulta read-only ao banco correto.
+- Migration preflight: **BLOCKED** até backup confirmado, consulta de `_prisma_migrations` e verificação de catálogo/schema.
+
+### E0 revocation preflight
+
+- Script: `apps/api/scripts/revoke-all-active-sessions.ts`.
+- Comando: `NODE_ENV=production CONFIRM_GLOBAL_SESSION_REVOCATION=true pnpm --filter @gestor/api sessions:revoke-all-production`.
+- O compose usa `apps/api/Dockerfile`, que copia explicitamente o script e os `node_modules`; `ts-node`/`tsconfig-paths` são instalados durante o build.
+- Runtime execution: **UNKNOWN**. O runner usa `WORKDIR=/app/apps/api`, mas não copia `pnpm-workspace.yaml`/package raiz; portanto, o comando versionado com `pnpm --filter @gestor/api` precisa de uma prova não destrutiva dentro da imagem antes da janela E0. Não assumir silenciosamente o comando direto do package.
+- Scope: todas as linhas `AuthSession` com `status=active`, abrangendo os subject types admin, tenant, driver e customer.
+- A operação é idempotente por filtrar apenas sessões ativas e observa somente contagens agregadas antes/revogadas/depois.
+- Dry-run: **não existe**. Expected row impact: **UNKNOWN** sem consulta ao banco.
+- A execução exige os dois guardrails e continua proibida nesta fase. Não usar SQL manual como substituto.
+
+### Checkpoints para futura autorização
+
+1. **A — prerequisites:** sessão read-only no projeto/ambiente Dokploy correto; imagem/SHA/digest; backup recente não vazio e restore testado; presença de envs; `_prisma_migrations`; catálogo/schema; Redis/storage.
+2. **B — E0-OPS:** somente após nova autorização, garantir runtime com tooling, rotacionar secrets aprovados sem reintroduzir credencial comprometida, não rotacionar `DB_PASSWORD` sem consumidores mapeados, revogar sessões e validar novas sessões.
+3. **C — migration/deploy:** backup → migrations aprovadas pelo `api-migrate` → validar status → ativar exatamente a imagem do RC. Não iniciar runtime novo contra schema antigo.
+4. **D — smoke:** health, tenant, storefront, OTP/refresh/logout, Google se configurado, checkouts, availability, WebSocket, driver, analytics/dashboard e Android/API.
+
+### Fail-safe
+
+- Falha antes de migration: manter/reimplantar o artefato anterior sem alterar banco.
+- Falha de migration: não ativar o RC; preservar logs e usar recuperação Prisma aprovada, sem SQL improvisado.
+- Falha após migration aditiva: preferir rollback da aplicação mantendo schema novo.
+- Falha após rotação: gerar/corrigir secrets novos; nunca restaurar secret comprometido.
+- Revogação bem-sucedida com login falhando: manter sessões antigas revogadas, retirar tráfego se necessário e corrigir configuração/runtime sem reintroduzir secret antigo.
+- WebSocket falhando: reverter aplicação/proxy preservando secrets novos e schema aditivo.
+- Google ausente: decisão humana entre bloquear lançamento ou manter Google desabilitado com OTP preservado.
+
+### Blockers do preflight
+
+1. Backup recente/restore point não comprovado.
+2. Sem acesso read-only ao PostgreSQL: migrations e drift desconhecidos.
+3. Imagem/SHA/digest atualmente implantado não comprovado.
+4. Env/config, JWT TTL, CORS/URLs, Redis/storage e rotação E0 desconhecidos.
+5. Tooling existe no RC, mas a execução do comando exato no runner e sua presença na imagem atualmente implantada são desconhecidas.
+
+Próxima etapa proposta: fornecer uma sessão operacional autenticada e estritamente read-only ao Dokploy/host/PostgreSQL/backup, ou evidências exportadas equivalentes, para concluir os gates. Mesmo se todos ficarem verdes, parar em `READY FOR WRITE AUTHORIZATION` e aguardar nova autorização explícita.
+
 ## 1. Freeze e integridade
 
 | Evidência | Resultado |
