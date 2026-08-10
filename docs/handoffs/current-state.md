@@ -1,3 +1,32 @@
+## Production preflight read-only do RC `ff3d602a`
+
+Data: 2026-08-09
+
+- Freeze reconfirmado: `origin/main-copy` continua em `ff3d602aa8d5aee238abb3b0574d447ac000b6f8`; PR #51 segue Draft, OPEN, MERGEABLE/CLEAN e verde, sem merge.
+- API pública respondeu HTTP 200, TLS válido e `status=ok`, mas não expõe SHA/imagem. Não havia sessão Dokploy, alvo SSH, PostgreSQL read-only ou backup system acessível; imagem implantada, `_prisma_migrations`, drift, env/config, Redis/storage e rotação de secrets permanecem `UNKNOWN`.
+- Backup/restore continua `BLOCKED`: a política está documentada, porém último backup, retenção, restore point e restore real não foram comprovados.
+- O tooling E0 está presente no RC construível: `apps/api/Dockerfile` copia o script de revogação e dependências. O comando alcança toda `AuthSession active`, inclusive customer, é idempotente e retorna contagens agregadas; não possui dry-run. Como o runner não copia os manifests do workspace, a execução do comando versionado com `pnpm --filter` precisa ser provada dentro da imagem; presença na imagem atualmente implantada também permanece desconhecida.
+- Decisão: **PARTIAL**. Nenhuma escrita de produção foi executada. O próximo passo é acesso/evidência operacional estritamente read-only para concluir backup, imagem/SHA, migrations, schema e configuração; qualquer E0-OPS/deploy/migration continua exigindo autorização posterior separada.
+- Evidência detalhada e checkpoints: `docs/releases/rc-ff3d602a.md`, seção `Production preflight — read only`.
+
+---
+
+## Release Candidate consolidado - `ff3d602a`
+
+Data: 2026-08-09
+
+- Branch documental `docs/release-candidate-ff3d602a`, criada em worktree isolada no SHA exato `ff3d602aa8d5aee238abb3b0574d447ac000b6f8`; checkout principal, alterações Android preexistentes, `stash@{0}` e demais worktrees foram preservados.
+- A cadeia #33–#50 está integralmente `MERGED` e todos os merge commits são ancestrais do RC. R1–R10, Customer Session Hardening e Android branding guard foram classificados como `PRESENT`.
+- CI do RC verde: run `31300824997`, Secret scanning `31300824990`/`31300823609`; prova PostgreSQL pré-merge `31246727716`; PR tree e merge tree idênticos em `d4cf7960322101440176f771c6bae2f3d1e0b3fc`.
+- Gates locais verdes para install, Prisma generate, validação canônica do schema, lint, typecheck, no-any, features, branding, testes focados/completos dos frontends e builds API/web. O PostgreSQL efêmero local ficou bloqueado pela ausência do daemon Docker, com cobertura equivalente na CI.
+- As 55 migrations foram inventariadas. O status atual de produção é `UNKNOWN — MUST VERIFY IN PRODUCTION`; nenhuma foi classificada como aplicada ou pendente sem evidência remota. As seis mais recentes são aditivas; migrations históricas destrutivas/backfill exigem revisão se aparecerem pendentes.
+- `RISK-RC-01` aceito: refresh token do customer persiste em Zustand/localStorage; mitigado por rotation single-use, TTL, `sid`, `AuthSession`, revogação e isolamento tenant/customer. Follow-up HttpOnly deve tratar CORS/CSRF/transporte em iniciativa separada.
+- Dívidas não bloqueantes: `CI-DEBT-01` (actions Node 20) e `RC-DEBT-02` (wrapper raiz de `prisma:validate`; comando canônico passou).
+- Documento operacional completo: `docs/releases/rc-ff3d602a.md`. Ordem segura documentada: E0-OPS autorizado → staging da imagem → migrations aprovadas → ativação do deploy → smoke.
+- Decisão: **RC APROVADO**. Go-Live permanece bloqueado por E0-OPS, backup/status de migrations/config real, deploy e smoke de produção. Nenhuma operação de produção foi executada.
+
+---
+
 ## Customer session hardening - access curto, rotation e revogacao
 
 Data: 2026-08-08
