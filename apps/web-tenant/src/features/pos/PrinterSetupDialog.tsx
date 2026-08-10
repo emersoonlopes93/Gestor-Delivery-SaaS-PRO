@@ -12,20 +12,21 @@ type PrinterChoice = { name: string; address: string };
 interface PrinterSetupDialogProps {
   capabilities: PrintingCapabilities;
   stations: PrintStation[];
+  initialStationId?: string;
   onClose: () => void;
   onSave: (payload: CreateDevicePayload) => Promise<void>;
   onTest: (method: Exclude<SetupMethod, 'browser'>, printer: PrinterChoice) => Promise<void>;
   onBrowserPrint: () => void;
 }
 
-export function PrinterSetupDialog({ capabilities, stations, onClose, onSave, onTest, onBrowserPrint }: PrinterSetupDialogProps) {
+export function PrinterSetupDialog({ capabilities, stations, initialStationId, onClose, onSave, onTest, onBrowserPrint }: PrinterSetupDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const actionGuardRef = useRef(new SingleFlight());
   const [method, setMethod] = useState<SetupMethod>(capabilities.bluetooth ? 'bluetooth' : 'qz');
-  const [role, setRole] = useState<'primary' | 'station'>('primary');
-  const [stationId, setStationId] = useState(stations[0]?.id ?? '');
+  const [role, setRole] = useState<'primary' | 'station'>(initialStationId ? 'station' : 'primary');
+  const [stationId, setStationId] = useState(initialStationId ?? stations[0]?.id ?? '');
   const [printers, setPrinters] = useState<PrinterChoice[]>([]);
   const [selected, setSelected] = useState<PrinterChoice | null>(null);
   const [busy, setBusy] = useState<'search' | 'test' | 'save' | null>(null);
@@ -57,6 +58,15 @@ export function PrinterSetupDialog({ capabilities, stations, onClose, onSave, on
     };
   }, [onClose]);
 
+  useEffect(() => {
+    setRole(initialStationId ? 'station' : 'primary');
+    setStationId(initialStationId ?? stations[0]?.id ?? '');
+    setPrinters([]);
+    setSelected(null);
+    setFeedback('');
+    setTechnicalDetail('');
+  }, [initialStationId, stations]);
+
   const searchPrinters = async () => {
     setBusy('search');
     setFeedback(method === 'bluetooth' ? 'Procurando impressoras pareadas…' : 'Procurando impressoras instaladas…');
@@ -72,7 +82,7 @@ export function PrinterSetupDialog({ capabilities, stations, onClose, onSave, on
         ? `${found.length} ${found.length === 1 ? 'impressora encontrada' : 'impressoras encontradas'}.`
         : method === 'bluetooth'
           ? 'Nenhuma impressora pareada. Pareie a impressora nas configurações de Bluetooth do Android e volte aqui.'
-          : 'Nenhuma impressora instalada foi encontrada.');
+          : 'Impressora térmica indisponível neste computador. Para impressão automática, instale e abra o serviço de impressão compatível. Você ainda pode imprimir manualmente pelo navegador.');
     } catch (error) {
       setFeedback(humanizePrintingError(error));
       setTechnicalDetail(error instanceof Error ? error.message : String(error));

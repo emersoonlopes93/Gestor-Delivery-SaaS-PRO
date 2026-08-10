@@ -1,3 +1,17 @@
+## Correção das ações de configuração de impressão
+
+Data: 2026-08-10
+Branch: `fix/printing-setup-actions`
+Base: `main-copy` / `5b17e5ff`
+
+- A abertura do setup agora registra imediatamente um feedback visível e carrega o destino explícito: impressora principal ou `PrintStation` selecionada em Alterar.
+- O diálogo é remontado por destino e pré-seleciona o setor solicitado; não há fallback silencioso para a impressora principal.
+- Sem QZ/dispositivo encontrado, a configuração continua aberta e explica como habilitar impressão automática, preservando o browser print como alternativa manual.
+- Mobile web responde que apenas browser print está disponível; Android mantém o fluxo Bluetooth.
+- Testes focados: 4 arquivos / 15 testes PASS; lint PASS. Suite completa, build e typecheck locais bloqueados por duas resoluções preexistentes de `@gestor/storefront-ui` nesta worktree. Nenhuma API, Prisma, migration, dependência, banco remoto ou deploy foi alterado.
+
+---
+
 ## Correção de dispositivo de impressão por plataforma
 
 Data: 2026-08-10
