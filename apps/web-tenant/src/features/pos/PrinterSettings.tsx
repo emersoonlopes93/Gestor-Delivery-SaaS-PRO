@@ -64,6 +64,7 @@ export function PrinterSettings() {
   const updateDevice = useUpdateDevice();
   const testPrint = useTestPrint();
   const [setupOpen, setSetupOpen] = useState(false);
+  const [setupStationId, setSetupStationId] = useState<string | undefined>();
   const [testingDeviceId, setTestingDeviceId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const [technicalDetail, setTechnicalDetail] = useState('');
@@ -142,14 +143,19 @@ export function PrinterSettings() {
     };
   }, [printWithAdapter, spoolerDevice, user?.tenant?.id]);
 
-  const closeSetup = useCallback(() => setSetupOpen(false), []);
+  const closeSetup = useCallback(() => {
+    setSetupOpen(false);
+    setSetupStationId(undefined);
+  }, []);
 
-  const openSetup = () => {
+  const openSetup = (stationId?: string) => {
     setTechnicalDetail('');
     if (capabilities.platform === 'mobile-web') {
-      setFeedback('Neste dispositivo, use a impressão do navegador.');
+      setFeedback('Neste dispositivo, apenas a impressão pelo navegador está disponível.');
       return;
     }
+    setSetupStationId(stationId);
+    setFeedback(stationId ? 'Abrindo a configuração da impressora do setor.' : 'Abrindo a configuração da impressora.');
     setSetupOpen(true);
   };
 
@@ -249,7 +255,7 @@ export function PrinterSettings() {
             <div className="grid gap-3">{sectorDevices.map(({ station, device }) => (
               <article key={station.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0"><h3 className="font-black text-foreground">{station.name}</h3><p className="mt-1 truncate text-sm text-muted-foreground">{device ? `${device.name} · Configurada` : 'Não configurada'}</p></div>
-                <div className="flex flex-wrap gap-2"><button type="button" onClick={openSetup} className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground">Alterar</button>{device ? <button type="button" onClick={() => void testDevice(device)} disabled={testingDeviceId !== null} className="min-h-11 rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">{testingDeviceId === device.id ? 'Imprimindo…' : 'Imprimir teste'}</button> : null}</div>
+                <div className="flex flex-wrap gap-2"><button type="button" onClick={() => openSetup(station.id)} className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground">Alterar</button>{device ? <button type="button" onClick={() => void testDevice(device)} disabled={testingDeviceId !== null} className="min-h-11 rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">{testingDeviceId === device.id ? 'Imprimindo…' : 'Imprimir teste'}</button> : null}</div>
               </article>
             ))}</div>
           </section>
@@ -272,7 +278,7 @@ export function PrinterSettings() {
         {technicalDetail ? <details className="rounded-2xl border border-border bg-card p-4 text-sm"><summary className="cursor-pointer font-bold text-foreground">Ver detalhes técnicos do último erro</summary><p className="mt-2 break-words text-muted-foreground">{technicalDetail}</p></details> : null}
       </div>
 
-      {setupOpen ? <PrinterSetupDialog capabilities={capabilities} stations={stations} onClose={closeSetup} onSave={savePrinter} onTest={testDraftPrinter} onBrowserPrint={browserPrint} /> : null}
+      {setupOpen ? <PrinterSetupDialog key={setupStationId ?? 'primary'} capabilities={capabilities} stations={stations} initialStationId={setupStationId} onClose={closeSetup} onSave={savePrinter} onTest={testDraftPrinter} onBrowserPrint={browserPrint} /> : null}
     </main>
   );
 }
