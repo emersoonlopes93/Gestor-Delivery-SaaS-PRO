@@ -1,13 +1,12 @@
 import type { PrinterDevice } from '../../hooks/usePrinting';
-import type { PrintingCapabilities } from './printing-capabilities';
+import { isPrinterDeviceCompatible, type PrintingCapabilities } from './printing-capabilities';
 
 export type SpoolerState = 'stopped' | 'running' | 'printing' | 'attention';
 
 export function selectSpoolerDevice(devices: PrinterDevice[], capabilities: PrintingCapabilities) {
   const compatible = (device: PrinterDevice) =>
     device.isActive !== false && device.autoPrintEnabled === true && Boolean(device.address)
-    && ((capabilities.bluetooth && device.connectionType === 'BLUETOOTH_SPP')
-      || (capabilities.qz && device.connectionType === 'QZ_TRAY'));
+    && isPrinterDeviceCompatible(device, capabilities);
   return devices.find((device) => device.isPrimary && compatible(device))
     ?? devices.find(compatible)
     ?? null;

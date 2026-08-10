@@ -1,3 +1,17 @@
+## Correção de dispositivo de impressão por plataforma
+
+Data: 2026-08-10
+Branch: `fix/printing-current-device-filter`
+Base: `main-copy` / `a27d0b1`
+
+- A lista de `PrinterDevice` continua tenant-global, mas a impressora apresentada como atual passa a ser selecionada exclusivamente entre os dispositivos compatíveis com a plataforma local.
+- A matriz canônica da tela é reutilizada: Android Capacitor aceita Bluetooth SPP; desktop aceita QZ Tray; mobile web não promove hardware persistido. Browser/system print permanece independente.
+- Overview, impressoras por setor e spooler compartilham a mesma verificação de compatibilidade. Registros incompatíveis não são desativados ou removidos do servidor.
+- Testes focados: 3 arquivos / 12 testes PASS. A execução completa local encontrou duas falhas preexistentes de resolução de `@gestor/storefront-ui`; build/typecheck local também ficou impedido por dependências compartilhadas ausentes nesta worktree. A CI da PR é o gate definitivo.
+- Nenhuma API, Prisma, migration, dependência, banco remoto ou deploy foi alterado.
+
+---
+
 ## Production preflight read-only do RC `ff3d602a`
 
 Data: 2026-08-09
