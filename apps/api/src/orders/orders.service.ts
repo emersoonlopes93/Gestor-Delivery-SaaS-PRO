@@ -37,6 +37,7 @@ import type {
   CreateOrderItemComboSlotSelectionDTO,
   PizzaCompositionDTO,
   OrderAutoAcceptSettings,
+  DriverDeliveryEvent,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import type { FulfillmentType } from '@gestor/types';
@@ -51,6 +52,7 @@ import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept
 import { canAutoAcceptOrder } from './order-auto-accept.policy';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { AuthoritativeOrderAnalyticsService } from '../analytics/authoritative-order-analytics.service';
+import { DeliveryTrackingGateway } from '../delivery/delivery-tracking.gateway';
 import {
   assertOrderIdempotencyPayload,
   isPrismaUniqueConstraintError,
@@ -183,6 +185,8 @@ export class OrdersService {
     private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
     private readonly pushService: PushService,
     @Optional() private readonly authoritativeOrderAnalyticsService?: AuthoritativeOrderAnalyticsService,
+    @Optional() @Inject(forwardRef(() => DeliveryTrackingGateway))
+    private readonly deliveryTrackingGateway?: DeliveryTrackingGateway,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -1268,6 +1272,22 @@ export class OrdersService {
         this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
       ]);
     }
+    if (order.deliveryDriverId) {
+      const event = this.createDriverDeliveryEvent(
+        nextStatus === 'cancelled' ? 'delivery.cancelled' : 'delivery.updated',
+        orderId,
+        order.orderNumber,
+        nextStatus,
+        updated.updatedAt,
+      );
+      this.deliveryTrackingGateway?.emitDriverDeliveryEvent(tenantId, order.deliveryDriverId, event);
+      if (nextStatus === 'cancelled') {
+        this.enqueueDriverDeliveryPush(tenantId, order.deliveryDriverId, event, {
+          title: 'Entrega cancelada',
+          body: `O pedido #${order.orderNumber} foi cancelado.`,
+        });
+      }
+    }
 
     return updated;
   }
@@ -1592,7 +1612,7 @@ export class OrdersService {
     }, { timeout: 20000 });
 
     // Notify sockets
-    this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderUpdated', { 
+    this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderUpdated', {
       orderId: order.id, 
       orderNumber: order.orderNumber 
     });
@@ -1804,19 +1824,69 @@ export class OrdersService {
       orderNumber: refreshed.orderNumber,
     });
 
-    if (driverId) {
-      this.pushService.enqueueDriverNotification(tenantId, driverId, {
+    const eventType = driverId && previousDriverId !== driverId
+      ? 'delivery.assigned'
+      : 'delivery.updated';
+    const driverEvent = this.createDriverDeliveryEvent(
+      eventType,
+      orderId,
+      refreshed.orderNumber,
+      refreshed.status,
+      refreshed.updatedAt,
+    );
+
+    if (driverId && eventType === 'delivery.assigned') {
+      this.deliveryTrackingGateway?.emitDriverDeliveryEvent(tenantId, driverId, driverEvent);
+    }
+    if (previousDriverId && previousDriverId !== driverId) {
+      const removedEvent = { ...driverEvent, type: 'delivery.updated' as const };
+      this.deliveryTrackingGateway?.emitDriverDeliveryEvent(tenantId, previousDriverId, removedEvent);
+      this.enqueueDriverDeliveryPush(tenantId, previousDriverId, removedEvent, {
+        title: 'Entrega removida',
+        body: `O pedido #${refreshed.orderNumber} não está mais atribuído a você.`,
+      });
+    }
+
+    if (driverId && eventType === 'delivery.assigned') {
+      this.enqueueDriverDeliveryPush(tenantId, driverId, driverEvent, {
         title: 'Nova Entrega Atribuída!',
         body: `Você foi designado para o pedido #${refreshed.orderNumber}.`,
-      }).catch(err => this.logger.error('Error enqueueing push', err));
-    } else if (previousDriverId) {
-      this.pushService.enqueueDriverNotification(tenantId, previousDriverId, {
-        title: 'Entrega Removida',
-        body: `Você foi removido do pedido #${refreshed.orderNumber}.`,
-      }).catch(err => this.logger.error('Error enqueueing push', err));
+      });
     }
 
     return this.mapOrderToDispatchItem(refreshed);
+  }
+
+  private createDriverDeliveryEvent(
+    type: DriverDeliveryEvent['type'],
+    orderId: string,
+    orderNumber: string,
+    status: OrderStatus,
+    occurredAt: Date,
+  ): DriverDeliveryEvent {
+    const timestamp = occurredAt.toISOString();
+    return {
+      eventId: `${type}:${orderId}:${timestamp}`,
+      type,
+      orderId,
+      orderNumber,
+      status,
+      occurredAt: timestamp,
+    };
+  }
+
+  private enqueueDriverDeliveryPush(
+    tenantId: string,
+    driverId: string,
+    event: DriverDeliveryEvent,
+    message: { title: string; body: string },
+  ) {
+    this.pushService.enqueueDriverNotification(tenantId, driverId, {
+      ...message,
+      tag: `delivery-${event.orderId}`,
+      url: '/',
+      data: { ...event, url: '/' },
+    }).catch((error: unknown) => this.logger.error('Error enqueueing driver push', error));
   }
 
   async logPrint(orderId: string, tenantId: string, actorId?: string) {

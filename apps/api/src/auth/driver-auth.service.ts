@@ -6,7 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AuthSessionStatus, AuthSubjectType } from '@prisma/client';
-import type { DriverJwtPayload, DriverLoginResponse, DriverLoginResult } from '@gestor/types';
+import { DriverStatus, type DriverJwtPayload, type DriverLoginResponse, type DriverLoginResult } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { AuthSessionService } from './auth-session.service';
 
@@ -22,6 +22,7 @@ type DriverCandidate = {
   phone: string;
   pin: string | null;
   isActive: boolean;
+  status: import('@prisma/client').DriverStatus;
   tenant: {
     id: string;
     name: string;
@@ -204,6 +205,7 @@ export class DriverAuthService {
         name: driver.name,
         phone: driver.phone,
         isActive: driver.isActive,
+        status: driver.status as DriverStatus,
         tenant: {
           id: driver.tenant.id,
           name: driver.tenant.name,

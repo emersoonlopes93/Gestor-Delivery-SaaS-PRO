@@ -15,6 +15,20 @@ export interface DriverLocationUpdatedEvent {
   lastLocationAt: string;
 }
 
+export type DriverDeliveryEventType =
+  | 'delivery.assigned'
+  | 'delivery.updated'
+  | 'delivery.cancelled';
+
+export interface DriverDeliveryEvent {
+  eventId: string;
+  type: DriverDeliveryEventType;
+  orderId: string;
+  orderNumber: string;
+  status: OrderStatus;
+  occurredAt: string;
+}
+
 export interface OrderStatusUpdatedEvent {
   orderId: string;
   orderNumber: string;

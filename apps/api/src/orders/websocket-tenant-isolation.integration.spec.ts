@@ -84,7 +84,16 @@ describe('WebSocket tenant isolation with real Socket.IO clients', () => {
     isValidToken: jest.fn(async (token: string) => ['order-a-token', 'order-b-token'].includes(token)),
   };
   const driverAuthService = {
-    validateAccessToken: jest.fn(async () => {
+    validateAccessToken: jest.fn(async (token: string) => {
+      if (token === 'driver-a-token') {
+        return { type: 'driver', sub: 'driver-a', tenantId: 'tenant-a', sid: 'driver-sid-a' } as const;
+      }
+      if (token === 'driver-b-token') {
+        return { type: 'driver', sub: 'driver-b', tenantId: 'tenant-a', sid: 'driver-sid-b' } as const;
+      }
+      if (token === 'driver-cross-token') {
+        return { type: 'driver', sub: 'driver-a', tenantId: 'tenant-b', sid: 'driver-sid-cross' } as const;
+      }
       throw new Error('not a driver token');
     }),
   };
@@ -257,6 +266,27 @@ describe('WebSocket tenant isolation with real Socket.IO clients', () => {
     await Promise.all([joinedConcurrentOrder, rejectedConcurrentOrder]);
     await expectNoEvent(concurrentPublic, 'locationUpdate', () => {
       ioServer.of('/delivery').to('order:order-b-token').emit('locationUpdate', { order: 'b' });
+    });
+  });
+
+  it('/delivery sends a private assignment only to the authenticated driver in its tenant', async () => {
+    const driverA = await connect('delivery', 'driver-a-token');
+    const driverB = await connect('delivery', 'driver-b-token');
+    const crossTenantDriver = await connect('delivery', 'driver-cross-token');
+    const assignment = { eventId: 'assignment-a', orderId: 'order-a' };
+
+    const receivedByA = waitForEvent(driverA, 'driverDeliveryEvent');
+    await expectNoEvent(driverB, 'driverDeliveryEvent', () => {
+      ioServer.of('/delivery')
+        .to('driver:tenant-a:driver-a')
+        .emit('driverDeliveryEvent', assignment);
+    });
+    await expect(receivedByA).resolves.toEqual([assignment]);
+
+    await expectNoEvent(crossTenantDriver, 'driverDeliveryEvent', () => {
+      ioServer.of('/delivery')
+        .to('driver:tenant-a:driver-a')
+        .emit('driverDeliveryEvent', assignment);
     });
   });
 

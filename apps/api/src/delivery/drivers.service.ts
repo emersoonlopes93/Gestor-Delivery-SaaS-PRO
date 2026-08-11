@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
+import { CreateDriverDTO, DriverStatus, UpdateDriverDTO } from '@gestor/types';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 import { Prisma } from '@prisma/client';
@@ -168,6 +168,7 @@ export class DriversService {
     // Broadcast location to active orders being delivered by this driver
     const activeOrders = await this.prisma.order.findMany({
       where: {
+        tenantId,
         deliveryDriverId: driver.id,
         status: 'out_for_delivery',
       },
@@ -192,6 +193,37 @@ export class DriversService {
       currentLng: data.lng,
       lastLocationAt: now.toISOString(),
     };
+  }
+
+  async updateOperationalStatus(
+    tenantId: string,
+    id: string,
+    status: DriverStatus.available | DriverStatus.offline,
+  ) {
+    const driver = await this.getDriver(tenantId, id);
+    const activeDeliveries = await this.prisma.order.count({
+      where: {
+        tenantId,
+        deliveryDriverId: driver.id,
+        status: { in: ['ready_for_delivery', 'out_for_delivery'] },
+      },
+    });
+
+    if (activeDeliveries > 0) {
+      if (driver.status !== DriverStatus.busy) {
+        await this.prisma.deliveryDriver.update({
+          where: { id: driver.id },
+          data: { status: DriverStatus.busy },
+        });
+      }
+      throw new BadRequestException('Conclua a entrega ativa antes de alterar sua disponibilidade.');
+    }
+
+    return this.prisma.deliveryDriver.update({
+      where: { id: driver.id },
+      data: { status },
+      select: { id: true, status: true },
+    });
   }
 
   async deleteDriver(tenantId: string, id: string) {

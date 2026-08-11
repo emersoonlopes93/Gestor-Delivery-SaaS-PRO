@@ -117,6 +117,7 @@ export interface DriverUserSession {
   name: string;
   phone: string;
   isActive: boolean;
+  status: import('./enums').DriverStatus;
   tenant?: {
     id: string;
     name: string;

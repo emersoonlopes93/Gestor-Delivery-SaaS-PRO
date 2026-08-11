@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../lib/api';
+import type { DriverDeliveryEvent } from '@gestor/types';
+import { playAssignmentSound, processDriverDeliveryEvent } from '../lib/driverDeliveryEvents';
 
 const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
 
@@ -24,6 +26,7 @@ export function useDriverTracking() {
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastLocation, setLastLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [lastDeliveryEvent, setLastDeliveryEvent] = useState<DriverDeliveryEvent | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -38,9 +41,31 @@ export function useDriverTracking() {
       console.log('Driver connected to tracking socket:', socket.id);
     });
 
+    const handleDeliveryEvent = (event: DriverDeliveryEvent) => {
+      processDriverDeliveryEvent(event, {
+        onEvent: setLastDeliveryEvent,
+        onAssignment: () => {
+          try {
+            playAssignmentSound();
+          } catch {
+            // Visual feedback remains available when autoplay is blocked.
+          }
+        },
+      });
+    };
+    socket.on('driverDeliveryEvent', handleDeliveryEvent);
+
+    const handleServiceWorkerMessage = (message: MessageEvent) => {
+      if (message.data?.type === 'DRIVER_DELIVERY_PUSH') {
+        handleDeliveryEvent(message.data.payload as DriverDeliveryEvent);
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
+
     socketRef.current = socket;
 
     return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
       socket.disconnect();
     };
   }, [accessToken, user]);
@@ -129,5 +154,6 @@ export function useDriverTracking() {
     stopTracking,
     error,
     lastLocation,
+    lastDeliveryEvent,
   };
 }

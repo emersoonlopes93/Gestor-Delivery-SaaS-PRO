@@ -86,13 +86,21 @@ self.addEventListener('push', (event) => {
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
     vibrate: [300, 100, 300, 100, 300],
-    data: payload.data || {},
+    data: { ...(payload.data || {}), url: payload.url || payload.data?.url || '/' },
     requireInteraction: true,
     tag: payload.tag || 'delivery-alert',
     renotify: true,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const visibleClient = clients.find((client) => client.visibilityState === 'visible');
+    if (visibleClient && payload.data?.eventId) {
+      visibleClient.postMessage({ type: 'DRIVER_DELIVERY_PUSH', payload: payload.data });
+      return;
+    }
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 // ─── Notification Click ───────────────────────────────────────────────────────

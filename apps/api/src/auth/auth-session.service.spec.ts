@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthSessionStatus, AuthSubjectType } from '@prisma/client';
 import { AuthSessionService } from './auth-session.service';
+import { AUTH_SESSION_REVOKED_EVENT } from './auth-session.events';
 
 describe('AuthSessionService', () => {
   let mockPrismaService: {
@@ -235,6 +236,31 @@ describe('AuthSessionService', () => {
       expectedTenantId: 'tenant-2',
     })).rejects.toBeInstanceOf(UnauthorizedException);
     expect(mockPrismaService.authSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('publishes only the revoked session id for websocket cleanup', async () => {
+    const emitter = { emit: jest.fn() };
+    const config = new ConfigService({ JWT_REFRESH_SECRET: 'test-refresh-secret' });
+    const serviceWithEvents = new AuthSessionService(
+      mockPrismaService as never,
+      new JwtService(),
+      config,
+      emitter as never,
+    );
+    mockPrismaService.authSession.findUnique.mockResolvedValue({
+      id: 'sid-x',
+      status: AuthSessionStatus.active,
+      subjectType: AuthSubjectType.driver,
+      subjectId: 'driver-a',
+      tenantId: 'tenant-a',
+    });
+
+    await serviceWithEvents.revokeSession('sid-x', 'driver_logout');
+
+    expect(emitter.emit).toHaveBeenCalledWith(
+      AUTH_SESSION_REVOKED_EVENT,
+      { sessionId: 'sid-x' },
+    );
   });
 
   it('rejects customer mismatch between refresh claims and persisted session', async () => {

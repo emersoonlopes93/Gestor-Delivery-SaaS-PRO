@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { DriverStatus, DriverVehicleType } from './enums';
 
@@ -46,6 +46,11 @@ export class UpdateDriverDTO {
   @IsString()
   @IsOptional()
   notes?: string;
+}
+
+export class UpdateDriverOperationalStatusDTO {
+  @IsIn([DriverStatus.available, DriverStatus.offline])
+  status!: DriverStatus.available | DriverStatus.offline;
 }
 
 export interface DriverDTO {
