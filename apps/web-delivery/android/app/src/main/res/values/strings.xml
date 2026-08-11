@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PedeHub Entregador</string>
+    <string name="title_activity_main">PedeHub Entregador</string>
+    <string name="package_name">com.pedehub.driver</string>
+    <string name="custom_url_scheme">com.pedehub.driver</string>
+</resources>

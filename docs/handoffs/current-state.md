@@ -1563,3 +1563,40 @@ Base: `origin/main-copy` / `2cc7d18f`
   idênticos ao SHA-base (diff exit 0).
 - Nenhum Prisma/schema/migration, dependência/lockfile, feature flag, provider,
   credencial, banco remoto, produção, Dokploy ou deploy foi alterado.
+
+---
+
+## R11 PR C — Capacitor/Android do entregador
+
+Data: 2026-08-11
+Branch: `feat/r11-driver-capacitor`
+Base: `origin/main-copy` / `b704020e` (merge da PR #61)
+
+- Foi criado um projeto Capacitor Android próprio do `web-delivery`, com nome
+  `PedeHub Entregador` e identidade exclusiva `com.pedehub.driver` em todos os
+  pontos nativos. Launchers e splash usam o asset PedeHub da PWA e o small icon
+  de notificação é monocromático.
+- O tracking usa `@capacitor/geolocation` no runtime nativo, pede permissão
+  foreground por ação humana e preserva `navigator.geolocation` na web/PWA.
+  Não foi adicionada permissão de background, foreground service ou plugin de
+  background location.
+- Local Notifications podem sinalizar um assignment já deduplicado quando o
+  app está ativo e autorizado. PushNotifications foi apenas sincronizado:
+  FCM/`google-services.json`, token de dispositivo e backend não existem nesta
+  entrega, então a UI reporta push nativo como não configurado e não registra.
+- Safe areas usam as primitives CSS existentes, ajuste edge-to-edge do Capacitor
+  e `adjustResize` para teclado. Smoke real em Chromium passou em 390x844 light
+  e 430x932 dark, sem overflow ou sobreposição de header/conteúdo.
+- Testes do driver: 8 arquivos/18 testes PASS. Lint, TypeScript e build web
+  passaram. `cap sync android` encontrou Geolocation, LocalNotifications e
+  PushNotifications. `assembleDebug` passou com JBR 21 do Android Studio; o Java
+  global 26 é incompatível com Gradle 8.11 e não foi usado no rerun.
+- APK debug local: `apps/web-delivery/android/app/build/outputs/apk/debug/app-debug.apk`.
+  O AAPT confirmou package `com.pedehub.driver`, label `PedeHub Entregador`,
+  compile/target SDK 35, min SDK 23 e ausência de background location.
+- O APK final tem 5.386.460 bytes e SHA-256
+  `247EE35425296A3D77E02F4501D924B2F9272D122E115B5706B8BBCEF12E1117`.
+  Não havia device/emulador conectado ao ADB; permissão e GPS nativos foram
+  validados por adapter tests e build, mas o smoke em hardware permanece pendente.
+- Nenhuma API, schema Prisma, migration, credencial, banco remoto, produção,
+  Dokploy, deploy, release signing ou publicação de APK foi realizada.

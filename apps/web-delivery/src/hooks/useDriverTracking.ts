@@ -1,27 +1,31 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { io, type Socket } from 'socket.io-client';
+import type { DriverDeliveryEvent } from '@gestor/types';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../lib/api';
-import type { DriverDeliveryEvent } from '@gestor/types';
 import { playAssignmentSound, processDriverDeliveryEvent } from '../lib/driverDeliveryEvents';
+import {
+  ForegroundGeolocationError,
+  startForegroundGeolocation,
+  type StopForegroundGeolocation,
+} from '../lib/foregroundGeolocation';
+import { showNativeAssignmentNotification } from '../lib/nativeDriverNotifications';
 
 const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
 
 if (import.meta.env.PROD && !configuredWsUrl) {
-  throw new Error('VITE_WS_URL precisa estar configurado para o app entregador em produÃ§Ã£o.');
+  throw new Error('VITE_WS_URL precisa estar configurado para o app entregador em produção.');
 }
 
 const WS_URL = configuredWsUrl || 'http://localhost:3333/delivery';
-
-// How often to send location via HTTP REST (to ensure DB persistence)
 const HTTP_LOCATION_INTERVAL_MS = 15_000;
 
 export function useDriverTracking() {
   const { user, accessToken } = useAuthStore();
   const socketRef = useRef<Socket | null>(null);
-  const watchIdRef = useRef<number | null>(null);
-  const lastHttpSentRef = useRef<number>(0);
-  const lastLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  const stopGeolocationRef = useRef<StopForegroundGeolocation | null>(null);
+  const trackingGenerationRef = useRef(0);
+  const lastHttpSentRef = useRef(0);
 
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +35,6 @@ export function useDriverTracking() {
   useEffect(() => {
     if (!user) return;
 
-    // Connect to WebSockets
     const socket = io(WS_URL, {
       transports: ['websocket'],
       auth: { token: accessToken },
@@ -50,6 +53,7 @@ export function useDriverTracking() {
           } catch {
             // Visual feedback remains available when autoplay is blocked.
           }
+          void showNativeAssignmentNotification(event).catch(() => undefined);
         },
       });
     };
@@ -61,7 +65,6 @@ export function useDriverTracking() {
       }
     };
     navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
-
     socketRef.current = socket;
 
     return () => {
@@ -70,83 +73,68 @@ export function useDriverTracking() {
     };
   }, [accessToken, user]);
 
-  /**
-   * BUG 5 FIX: Send location via HTTP REST to ensure DB persistence.
-   * The WebSocket event alone does not update the DB — only the REST endpoint does.
-   * We throttle HTTP calls to once every HTTP_LOCATION_INTERVAL_MS.
-   */
-  const sendLocationHttp = useCallback(
-    async (lat: number, lng: number) => {
-      if (!user?.driverId) return;
-      const now = Date.now();
-      if (now - lastHttpSentRef.current < HTTP_LOCATION_INTERVAL_MS) return;
-      lastHttpSentRef.current = now;
+  const sendLocationHttp = useCallback(async (lat: number, lng: number) => {
+    if (!user?.driverId) return;
+    const now = Date.now();
+    if (now - lastHttpSentRef.current < HTTP_LOCATION_INTERVAL_MS) return;
+    lastHttpSentRef.current = now;
 
-      try {
-        await api.post('/delivery/driver/location', { lat, lng });
-      } catch (err) {
-        console.warn('Failed to send location via HTTP:', err);
-      }
-    },
-    [user],
-  );
-
-  const startTracking = () => {
-    if (!navigator.geolocation) {
-      setError('Geolocalização não é suportada neste dispositivo.');
-      return;
+    try {
+      await api.post('/delivery/driver/location', { lat, lng });
+    } catch (sendError) {
+      console.warn('Failed to send location via HTTP:', sendError);
     }
+  }, [user]);
 
+  const stopTracking = useCallback(() => {
+    trackingGenerationRef.current += 1;
+    const stop = stopGeolocationRef.current;
+    stopGeolocationRef.current = null;
+    void stop?.().catch(() => undefined);
+    setIsTracking(false);
+  }, []);
+
+  const startTracking = useCallback(async () => {
     if (!user) return;
     setError(null);
+    const generation = trackingGenerationRef.current + 1;
+    trackingGenerationRef.current = generation;
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const loc = { lat: latitude, lng: longitude };
-        setLastLocation(loc);
-        lastLocationRef.current = loc;
+    try {
+      const stop = await startForegroundGeolocation(
+        ({ latitude, longitude }) => {
+          if (generation !== trackingGenerationRef.current) return;
+          const location = { lat: latitude, lng: longitude };
+          setLastLocation(location);
 
-        // Emit to server via WebSocket (real-time tenant map)
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit('updateDriverLocation', {
-            lat: latitude,
-            lng: longitude,
-          });
-        }
+          if (socketRef.current?.connected) {
+            socketRef.current.emit('updateDriverLocation', location);
+          }
+          void sendLocationHttp(latitude, longitude);
+        },
+        (message) => {
+          if (generation !== trackingGenerationRef.current) return;
+          setError(message);
+          stopTracking();
+        },
+      );
 
-        // Also persist via HTTP REST so polling-based map always has fresh coords
-        sendLocationHttp(latitude, longitude);
-      },
-      (err) => {
-        console.error('Error getting location:', err);
-        setError(err.message);
-        setIsTracking(false);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 5000,
-      },
-    );
-
-    setIsTracking(true);
-  };
-
-  const stopTracking = () => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
+      if (generation !== trackingGenerationRef.current) {
+        await stop();
+        return;
+      }
+      stopGeolocationRef.current = stop;
+      setIsTracking(true);
+    } catch (trackingError) {
+      if (generation !== trackingGenerationRef.current) return;
+      setError(trackingError instanceof ForegroundGeolocationError
+        ? trackingError.message
+        : 'Não foi possível iniciar a localização.');
+      setIsTracking(false);
     }
-    setIsTracking(false);
-  };
+  }, [sendLocationHttp, stopTracking, user]);
 
-  // Stop tracking on unmount
-  useEffect(() => {
-    return () => {
-      stopTracking();
-    };
-  }, []);
+  useEffect(() => stopTracking, [stopTracking]);
 
   return {
     isTracking,

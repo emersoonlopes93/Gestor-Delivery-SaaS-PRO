@@ -334,6 +334,18 @@ importers:
 
   apps/web-delivery:
     dependencies:
+      '@capacitor/core':
+        specifier: ^7.4.4
+        version: 7.6.6
+      '@capacitor/geolocation':
+        specifier: ^7.1.5
+        version: 7.1.8(@capacitor/core@7.6.6)
+      '@capacitor/local-notifications':
+        specifier: ^7.0.6
+        version: 7.0.6(@capacitor/core@7.6.6)
+      '@capacitor/push-notifications':
+        specifier: ^7.0.3
+        version: 7.0.6(@capacitor/core@7.6.6)
       '@gestor/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -377,6 +389,12 @@ importers:
         specifier: ^5.0.0
         version: 5.0.12(@types/react@18.3.28)(immer@11.1.4)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
     devDependencies:
+      '@capacitor/android':
+        specifier: ^7.4.4
+        version: 7.6.6(@capacitor/core@7.6.6)
+      '@capacitor/cli':
+        specifier: ^7.4.4
+        version: 7.6.6
       '@eslint/js':
         specifier: ^8.57.0
         version: 8.57.1
