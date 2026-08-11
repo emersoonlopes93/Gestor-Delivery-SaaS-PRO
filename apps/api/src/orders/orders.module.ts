@@ -21,6 +21,7 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
 import { FeatureControlModule } from '../feature-control/feature-control.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PrintingModule } from '../printing/printing.module';
+import { PublicOrderTrackingAccessService } from './public-order-tracking-access.service';
 
 @Module({
   imports: [
@@ -43,7 +44,7 @@ import { PrintingModule } from '../printing/printing.module';
     PrintingModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
-  providers: [OrdersService, CheckoutValidatorService, OrdersGateway],
-  exports: [OrdersService, CheckoutValidatorService, OrdersGateway],
+  providers: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService],
+  exports: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService],
 })
 export class OrdersModule {}

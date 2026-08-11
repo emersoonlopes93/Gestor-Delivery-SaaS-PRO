@@ -6,6 +6,7 @@ import {
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
@@ -16,6 +17,8 @@ import {
   type NotificationDomainEvent,
   type TenantNotificationEventPayload,
 } from '@gestor/types';
+import { TenantWebSocketAuthService } from '../auth/tenant-websocket-auth.service';
+import { PublicOrderTrackingAccessService } from './public-order-tracking-access.service';
 
 @WebSocketGateway({
   cors: true,
@@ -28,11 +31,29 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
-  constructor() {
+  constructor(
+    private readonly tenantSocketAuth: TenantWebSocketAuthService,
+    private readonly publicTrackingAccess: PublicOrderTrackingAccessService,
+  ) {
     OrdersGateway.instance = this;
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
+    const token = client.handshake.auth?.token;
+    if (typeof token === 'string' && token.length > 0) {
+      try {
+        const payload = await this.tenantSocketAuth.validateAccessToken(token);
+        client.data.tenantAccess = {
+          token,
+          userId: payload.sub,
+          tenantId: payload.tenantId,
+        };
+      } catch {
+        this.logger.warn(`Rejected invalid orders socket credential: ${client.id}`);
+        client.disconnect(true);
+        return;
+      }
+    }
     this.logger.debug(`Client connected to orders namespace: ${client.id}`);
   }
 
@@ -41,25 +62,60 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('joinOrder')
-  handleJoinOrder(
+  async handleJoinOrder(
     @MessageBody() data: { token: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (!data.token) return { event: 'error', data: 'Token missing' };
+    const boundToken = client.data.publicOrderToken;
+    if (
+      typeof data.token !== 'string'
+      || data.token.length === 0
+      || (typeof boundToken === 'string' && boundToken !== data.token)
+    ) {
+      throw new WsException('Não autorizado para este canal.');
+    }
+    client.data.publicOrderToken = data.token;
+    if (!(await this.publicTrackingAccess.isValidToken(data.token))) {
+      if (client.data.publicOrderToken === data.token) {
+        delete client.data.publicOrderToken;
+      }
+      throw new WsException('Não autorizado para este canal.');
+    }
     client.join(`order:${data.token}`);
-    this.logger.log(`Client ${client.id} joined tracking for order token: ${data.token}`);
+    this.logger.log(`Client ${client.id} joined authorized public order tracking`);
     return { event: 'joined', data: { token: data.token } };
   }
 
   @SubscribeMessage('joinTenant')
-  handleJoinTenant(
+  async handleJoinTenant(
     @MessageBody() data: { tenantId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (!data.tenantId) return { event: 'error', data: 'TenantId missing' };
-    client.join(`tenant:${data.tenantId}`);
-    this.logger.log(`Client ${client.id} joined updates for tenant: ${data.tenantId}`);
-    return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
+    const tenantAccess = client.data.tenantAccess as {
+      token: string;
+      userId: string;
+      tenantId: string;
+    } | undefined;
+    if (!tenantAccess) {
+      throw new WsException('Não autorizado para este canal.');
+    }
+
+    try {
+      const payload = await this.tenantSocketAuth.validateAccessToken(tenantAccess.token);
+      if (
+        payload.sub !== tenantAccess.userId
+        || payload.tenantId !== tenantAccess.tenantId
+        || (data.tenantId && data.tenantId !== payload.tenantId)
+      ) {
+        throw new Error('socket identity changed');
+      }
+      client.join(`tenant:${payload.tenantId}`);
+      this.logger.log(`Client ${client.id} joined its authorized tenant updates`);
+      return { event: 'joinedTenant', data: { tenantId: payload.tenantId } };
+    } catch {
+      this.logger.warn(`Rejected unauthorized orders tenant room join: ${client.id}`);
+      throw new WsException('Não autorizado para este canal.');
+    }
   }
 
   emitOrderStatusUpdated(token: string, orderNumber: string, status: OrderStatus, note?: string) {

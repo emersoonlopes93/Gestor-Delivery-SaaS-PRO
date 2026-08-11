@@ -1484,3 +1484,51 @@ Base: `origin/main-copy` / `37df7257` (merge da PR #57)
 - A suíte completa do web-tenant passou com 26 arquivos/107 testes. Lint/build do web-tenant, `pnpm typecheck`, `pnpm check:no-any`, `pnpm check:features` e `git diff --check` passaram com exit code 0.
 - `pnpm check:boundaries` manteve exit code 1 somente nas duas importações preexistentes de `@gestor/storefront-ui` em `StorefrontPreview.tsx` e `product-image-fallback.test.ts`; nenhum desses arquivos foi alterado.
 - Docker Desktop não estava disponível localmente; nenhum banco remoto, provider externo, produção ou deploy foi acessado.
+
+---
+
+## P0 - isolamento de tenant nos WebSockets de pedidos e entrega
+
+Data: 2026-08-11
+Branch: `fix/websocket-tenant-isolation`
+Base: `origin/main-copy` / `2cc7d18f`
+
+- As rooms operacionais `tenant:<id>` dos namespaces `/orders` e `/delivery`
+  agora exigem credencial tenant validada pelo JWT e pelo `AuthSession` canônicos.
+  O `tenantId` da room vem das claims; o valor opcional do payload é somente uma
+  checagem de compatibilidade e mismatch é rejeitado com erro genérico.
+- O web-tenant envia o access token atual no handshake de suas duas conexões de
+  `/orders`. Tracking público e storefront continuam conectando sem JWT.
+- `joinOrder` e `joinTracking` validam a existência do `publicTrackingToken` e
+  vinculam cada socket público a um único pedido, inclusive contra dois joins
+  concorrentes. Esse socket não adquire identidade tenant e não pode ingressar
+  em room operacional.
+- O namespace `/delivery` distingue identidade tenant, identidade de entregador
+  e consumidor público. A credencial do entregador continua derivando
+  `driverId`/`tenantId` das claims e agora é revalidada antes de cada update de
+  localização.
+- Sessões tenant são revalidadas antes dos joins sensíveis e sessões de
+  entregador antes de updates. Revogação depois que um socket tenant já entrou
+  numa room ainda não o remove imediatamente; isso exige um mecanismo central
+  de disconnect/revoke e permanece follow-up P1, sem ampliar esta correção P0.
+- O fluxo explícito e curto de impersonação administrativa foi preservado; JWT
+  tenant legado sem `sid` e sem marcador de impersonação é rejeitado.
+- Testes com clientes Socket.IO reais provam que tenant A recebe eventos de A,
+  tentativas A -> B são rejeitadas e não recebem o evento emitido para B,
+  socket sem autenticação não entra em room tenant, token público A recebe A
+  mas não B, e token público não escala para tenant-global.
+
+### Validação
+
+- Testes focados: 3 arquivos/9 testes PASS, incluindo vazamento real, corrida de
+  joins públicos e revalidação de sessão no join.
+- API: lint e build PASS; suíte integral PASS com 92 suítes/391 testes executados
+  e 4 suítes/9 testes condicionais ignorados.
+- Web-tenant: lint/build PASS; 26 arquivos/107 testes PASS.
+- `pnpm typecheck`, `pnpm check:no-any`, `pnpm check:features` e
+  `git diff --check`: PASS.
+- `pnpm check:boundaries`: exit 1 somente pelas duas violações preexistentes em
+  `StorefrontPreview.tsx` e `product-image-fallback.test.ts`; ambos permanecem
+  idênticos ao SHA-base (diff exit 0).
+- Nenhum Prisma/schema/migration, dependência/lockfile, feature flag, provider,
+  credencial, banco remoto, produção, Dokploy ou deploy foi alterado.
