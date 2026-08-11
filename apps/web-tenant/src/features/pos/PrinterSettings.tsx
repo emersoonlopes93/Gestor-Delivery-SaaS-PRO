@@ -16,6 +16,7 @@ import {
   type PrinterDevice,
 } from '../../hooks/usePrinting';
 import { getPrintingCapabilities, isPrinterDeviceCompatible, selectCurrentPlatformPrinter } from './printing-capabilities';
+import { formatThermalContent, getPaperWidth, type PaperWidthMm } from './printing-paper-width';
 import { PrinterOverviewCard } from './PrinterOverviewCard';
 import { PrinterSetupDialog } from './PrinterSetupDialog';
 import { PrintingPoller, selectSpoolerDevice, type SpoolerState } from './printing-spooler';
@@ -65,6 +66,7 @@ export function PrinterSettings() {
   const testPrint = useTestPrint();
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupStationId, setSetupStationId] = useState<string | undefined>();
+  const [setupPaperWidth, setSetupPaperWidth] = useState<PaperWidthMm>(58);
   const [testingDeviceId, setTestingDeviceId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const [technicalDetail, setTechnicalDetail] = useState('');
@@ -88,12 +90,13 @@ export function PrinterSettings() {
 
   const printWithAdapter = useCallback(async (device: PrinterDevice, content: string) => {
     if (!device.address) throw new Error('Endereço da impressora ausente.');
+    const formattedContent = formatThermalContent(content, getPaperWidth(device));
     if (device.connectionType === 'BLUETOOTH_SPP' && capabilities.bluetooth) {
-      await printTicketViaBluetooth(device.address, toBluetoothPayload(content));
+      await printTicketViaBluetooth(device.address, toBluetoothPayload(formattedContent));
       return;
     }
     if (device.connectionType === 'QZ_TRAY' && capabilities.qz) {
-      await printTextViaQz(device.address, content);
+      await printTextViaQz(device.address, formattedContent);
       setQzAvailable(true);
       return;
     }
@@ -146,21 +149,23 @@ export function PrinterSettings() {
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
     setSetupStationId(undefined);
+    setSetupPaperWidth(58);
   }, []);
 
-  const openSetup = (stationId?: string) => {
+  const openSetup = (stationId?: string, paperWidth: PaperWidthMm = 58) => {
     setTechnicalDetail('');
     if (capabilities.platform === 'mobile-web') {
       setFeedback('Neste dispositivo, apenas a impressão pelo navegador está disponível.');
       return;
     }
     setSetupStationId(stationId);
+    setSetupPaperWidth(paperWidth);
     setFeedback(stationId ? 'Abrindo a configuração da impressora do setor.' : 'Abrindo a configuração da impressora.');
     setSetupOpen(true);
   };
 
   const browserPrint = () => {
-    const opened = printThermalText(buildTestContent(user?.tenant?.name ?? 'Loja'), { title: 'Teste de impressão' });
+    const opened = printThermalText(buildTestContent(user?.tenant?.name ?? 'Loja'), { title: 'Teste de impressão', paperWidthMm: getPaperWidth(mainPrinter) });
     setFeedback(opened ? 'Tela de impressão aberta.' : 'Não foi possível abrir a tela de impressão. Permita pop-ups e tente novamente.');
   };
 
@@ -169,8 +174,8 @@ export function PrinterSettings() {
     setFeedback('Impressora configurada.');
   };
 
-  const testDraftPrinter = async (method: 'bluetooth' | 'qz', printer: { name: string; address: string }) => {
-    const content = buildTestContent(printer.name);
+  const testDraftPrinter = async (method: 'bluetooth' | 'qz', printer: { name: string; address: string }, paperWidth: PaperWidthMm) => {
+    const content = formatThermalContent(buildTestContent(printer.name), paperWidth);
     if (method === 'bluetooth') {
       await printTicketViaBluetooth(printer.address, toBluetoothPayload(content));
     } else {
@@ -216,6 +221,17 @@ export function PrinterSettings() {
     }
   };
 
+  const updatePaperWidth = async (paperWidth: PaperWidthMm) => {
+    if (!mainPrinter || mainPrinter.paperWidth === paperWidth) return;
+    try {
+      await updateDevice.mutateAsync({ id: mainPrinter.id, payload: { paperWidth } });
+      setFeedback(`Largura atualizada para ${paperWidth} mm.`);
+    } catch (error) {
+      setFeedback(humanizePrintingError(error));
+      setTechnicalDetail(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const mainRuntime = spoolerState === 'printing'
     ? 'printing'
     : spoolerState === 'attention'
@@ -237,7 +253,7 @@ export function PrinterSettings() {
           device={mainPrinter}
           status={getPrinterUiStatus(mainPrinter, mainRuntime)}
           testing={testingDeviceId === mainPrinter?.id}
-          onConfigure={openSetup}
+          onConfigure={() => openSetup(undefined, getPaperWidth(mainPrinter))}
           onTest={() => mainPrinter && void testDevice(mainPrinter)}
           onToggleAutoPrint={() => mainPrinter && void toggleAutoPrint(mainPrinter)}
         />
@@ -255,7 +271,7 @@ export function PrinterSettings() {
             <div className="grid gap-3">{sectorDevices.map(({ station, device }) => (
               <article key={station.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0"><h3 className="font-black text-foreground">{station.name}</h3><p className="mt-1 truncate text-sm text-muted-foreground">{device ? `${device.name} · Configurada` : 'Não configurada'}</p></div>
-                <div className="flex flex-wrap gap-2"><button type="button" onClick={() => openSetup(station.id)} className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground">Alterar</button>{device ? <button type="button" onClick={() => void testDevice(device)} disabled={testingDeviceId !== null} className="min-h-11 rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">{testingDeviceId === device.id ? 'Imprimindo…' : 'Imprimir teste'}</button> : null}</div>
+                <div className="flex flex-wrap gap-2"><button type="button" onClick={() => openSetup(station.id, getPaperWidth(device))} className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground">Alterar</button>{device ? <button type="button" onClick={() => void testDevice(device)} disabled={testingDeviceId !== null} className="min-h-11 rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">{testingDeviceId === device.id ? 'Imprimindo…' : 'Imprimir teste'}</button> : null}</div>
               </article>
             ))}</div>
           </section>
@@ -265,7 +281,7 @@ export function PrinterSettings() {
           <summary className="min-h-14 cursor-pointer list-none px-5 py-4 font-black text-foreground sm:px-6">Configurações avançadas</summary>
           <div className="space-y-4 border-t border-border px-5 py-5 sm:px-6">
             <dl className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-muted/20 p-4"><dt className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Papel</dt><dd className="mt-1 text-sm font-bold text-foreground">{mainPrinter?.paperWidth ? `${mainPrinter.paperWidth} mm` : '58 mm'}</dd></div>
+              {mainPrinter ? <div className="rounded-2xl bg-muted/20 p-4"><dt className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Largura do papel</dt><dd className="mt-2 flex flex-wrap gap-2">{([58, 80] as const).map((width) => <label key={width} className="flex min-h-9 items-center gap-2 text-sm font-bold text-foreground"><input type="radio" name="configured-paper-width" checked={getPaperWidth(mainPrinter) === width} onChange={() => void updatePaperWidth(width)} disabled={updateDevice.isPending} className="accent-primary" />{width} mm</label>)}</dd></div> : <div className="rounded-2xl bg-muted/20 p-4"><dt className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Largura do papel</dt><dd className="mt-1 text-sm font-bold text-foreground">Definida ao configurar a impressora</dd></div>}
               <div className="rounded-2xl bg-muted/20 p-4"><dt className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Tecnologia</dt><dd className="mt-1 text-sm font-bold text-foreground">{mainPrinter?.connectionType === 'QZ_TRAY' ? 'Serviço de impressão do computador' : mainPrinter?.connectionType === 'BLUETOOTH_SPP' ? 'Bluetooth' : 'Não configurada'}</dd></div>
               <div className="rounded-2xl bg-muted/20 p-4"><dt className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Impressão automática</dt><dd className="mt-1 text-sm font-bold text-foreground">{spoolerDevice ? `${spoolerState === 'attention' ? 'Requer atenção' : 'Em execução'} · ${POLLING_INTERVAL_MS} ms` : 'Parada'}</dd></div>
               {capabilities.qz ? <div className="rounded-2xl bg-muted/20 p-4"><dt className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Ajuda técnica</dt><dd className="mt-1 text-sm font-bold text-foreground">Requer o QZ Tray instalado e aberto neste computador.</dd></div> : null}
@@ -278,7 +294,7 @@ export function PrinterSettings() {
         {technicalDetail ? <details className="rounded-2xl border border-border bg-card p-4 text-sm"><summary className="cursor-pointer font-bold text-foreground">Ver detalhes técnicos do último erro</summary><p className="mt-2 break-words text-muted-foreground">{technicalDetail}</p></details> : null}
       </div>
 
-      {setupOpen ? <PrinterSetupDialog key={setupStationId ?? 'primary'} capabilities={capabilities} stations={stations} initialStationId={setupStationId} onClose={closeSetup} onSave={savePrinter} onTest={testDraftPrinter} onBrowserPrint={browserPrint} /> : null}
+      {setupOpen ? <PrinterSetupDialog key={`${setupStationId ?? 'primary'}-${setupPaperWidth}`} capabilities={capabilities} stations={stations} initialStationId={setupStationId} initialPaperWidth={setupPaperWidth} onClose={closeSetup} onSave={savePrinter} onTest={testDraftPrinter} onBrowserPrint={browserPrint} /> : null}
     </main>
   );
 }

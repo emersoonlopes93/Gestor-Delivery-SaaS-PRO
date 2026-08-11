@@ -37,4 +37,10 @@ describe('PrinterSetupDialog platform UI', () => {
     expect(html).toContain('Impressora de setor');
     expect(html).toContain('value="general" selected=""');
   });
+
+  it('shows the persisted paper width when altering a configured printer', () => {
+    const html = renderToStaticMarkup(<PrinterSetupDialog {...props} initialPaperWidth={80} capabilities={resolvePrintingCapabilities('desktop-web')} />);
+    expect(html).toContain('Largura do papel');
+    expect(html).toContain('checked="" value="80"');
+  });
 });

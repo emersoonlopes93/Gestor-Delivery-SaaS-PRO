@@ -4,6 +4,7 @@ import type { CreateDevicePayload, PrintStation } from '../../hooks/usePrinting'
 import { scanBluetoothDevices } from '../../lib/bluetooth';
 import { listQzPrinters } from '../../lib/qz-tray-client';
 import type { PrintingCapabilities } from './printing-capabilities';
+import type { PaperWidthMm } from './printing-paper-width';
 import { humanizePrintingError, SingleFlight } from './printing-ui';
 
 type SetupMethod = 'bluetooth' | 'qz' | 'browser';
@@ -13,13 +14,14 @@ interface PrinterSetupDialogProps {
   capabilities: PrintingCapabilities;
   stations: PrintStation[];
   initialStationId?: string;
+  initialPaperWidth?: PaperWidthMm;
   onClose: () => void;
   onSave: (payload: CreateDevicePayload) => Promise<void>;
-  onTest: (method: Exclude<SetupMethod, 'browser'>, printer: PrinterChoice) => Promise<void>;
+  onTest: (method: Exclude<SetupMethod, 'browser'>, printer: PrinterChoice, paperWidth: PaperWidthMm) => Promise<void>;
   onBrowserPrint: () => void;
 }
 
-export function PrinterSetupDialog({ capabilities, stations, initialStationId, onClose, onSave, onTest, onBrowserPrint }: PrinterSetupDialogProps) {
+export function PrinterSetupDialog({ capabilities, stations, initialStationId, initialPaperWidth = 58, onClose, onSave, onTest, onBrowserPrint }: PrinterSetupDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -27,6 +29,7 @@ export function PrinterSetupDialog({ capabilities, stations, initialStationId, o
   const [method, setMethod] = useState<SetupMethod>(capabilities.bluetooth ? 'bluetooth' : 'qz');
   const [role, setRole] = useState<'primary' | 'station'>(initialStationId ? 'station' : 'primary');
   const [stationId, setStationId] = useState(initialStationId ?? stations[0]?.id ?? '');
+  const [paperWidth, setPaperWidth] = useState<PaperWidthMm>(initialPaperWidth);
   const [printers, setPrinters] = useState<PrinterChoice[]>([]);
   const [selected, setSelected] = useState<PrinterChoice | null>(null);
   const [busy, setBusy] = useState<'search' | 'test' | 'save' | null>(null);
@@ -61,11 +64,12 @@ export function PrinterSetupDialog({ capabilities, stations, initialStationId, o
   useEffect(() => {
     setRole(initialStationId ? 'station' : 'primary');
     setStationId(initialStationId ?? stations[0]?.id ?? '');
+    setPaperWidth(initialPaperWidth);
     setPrinters([]);
     setSelected(null);
     setFeedback('');
     setTechnicalDetail('');
-  }, [initialStationId, stations]);
+  }, [initialPaperWidth, initialStationId, stations]);
 
   const searchPrinters = async () => {
     setBusy('search');
@@ -97,7 +101,7 @@ export function PrinterSetupDialog({ capabilities, stations, initialStationId, o
       setBusy('test');
       setFeedback('Impressão em andamento…');
       try {
-        await onTest(method, selected);
+        await onTest(method, selected, paperWidth);
         setFeedback('Teste concluído. Confira o papel impresso.');
       } catch (error) {
         setFeedback(`Falha no teste. ${humanizePrintingError(error)}`);
@@ -117,6 +121,7 @@ export function PrinterSetupDialog({ capabilities, stations, initialStationId, o
         await onSave({
           name: selected.name,
           address: selected.address,
+          paperWidth,
           connectionType: method === 'bluetooth' ? 'BLUETOOTH_SPP' : 'QZ_TRAY',
           stationId: role === 'station' ? stationId : null,
           isDefault: role === 'primary',
@@ -200,8 +205,19 @@ export function PrinterSetupDialog({ capabilities, stations, initialStationId, o
                 {role === 'station' ? <label className="block text-sm font-bold text-foreground">Setor<select value={stationId} onChange={(event) => setStationId(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground"><option value="">Selecione o setor</option>{stations.map((station) => <option key={station.id} value={station.id}>{station.name}</option>)}</select></label> : null}
               </fieldset>
 
+              <fieldset className="space-y-3">
+                <legend className="font-black text-foreground">3. Largura do papel</legend>
+                <p className="text-sm text-muted-foreground">Escolha o tamanho usado por esta impressora.</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {([58, 80] as const).map((width) => <label key={width} className={`min-h-14 cursor-pointer rounded-xl border p-3 ${paperWidth === width ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}>
+                    <input type="radio" name="paper-width" value={width} checked={paperWidth === width} onChange={() => setPaperWidth(width)} className="mr-2 accent-primary" />
+                    <strong className="text-sm text-foreground">{width} mm</strong>
+                  </label>)}
+                </div>
+              </fieldset>
+
               <section className="space-y-3">
-                <h3 className="font-black text-foreground">3. Teste</h3>
+                <h3 className="font-black text-foreground">4. Teste</h3>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => void testSelected()} disabled={!selected || busy !== null} className="min-h-11 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-black text-primary disabled:opacity-50">{busy === 'test' ? 'Imprimindo…' : 'Imprimir teste'}</button>
                   <button type="button" onClick={() => void saveSelected()} disabled={!selected || busy !== null || (role === 'station' && !stationId)} className="min-h-11 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground disabled:opacity-50">{busy === 'save' ? 'Salvando…' : 'Salvar impressora'}</button>

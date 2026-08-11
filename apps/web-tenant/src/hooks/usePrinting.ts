@@ -30,6 +30,7 @@ export interface CreateDevicePayload {
   name: string;
   connectionType: 'BLUETOOTH_SPP' | 'QZ_TRAY' | 'USB' | 'IP' | 'bluetooth_spp_android' | 'usb_bridge_future' | 'network_bridge_future' | 'web_serial_future';
   address?: string;
+  paperWidth?: 58 | 80;
   isDefault?: boolean;
   isPrimary?: boolean;
   role?: string;
