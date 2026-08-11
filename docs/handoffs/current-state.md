@@ -1,3 +1,17 @@
+## Configuração de largura de papel por impressora
+
+Data: 2026-08-10
+Branch: `fix/printing-paper-width`
+Base: `main-copy` / `9158d881`
+
+- A origem do valor histórico é `PrinterDevice.paperWidth`, cujo schema Prisma define `@default(58)`; a tela também usava fallback visual de 58 mm quando não havia impressora compatível.
+- O setup agora permite escolher 58 mm ou 80 mm e persiste o valor no campo existente do dispositivo. Alterar carrega a largura previamente persistida.
+- O ticket para Bluetooth e QZ é quebrado em 32 colunas para 58 mm e 48 para 80 mm; browser print da tela de impressoras recebe a largura do dispositivo. Não há autodetecção QZ ou Bluetooth.
+- Sem impressora compatível, a tela não apresenta 58 mm como configuração ativa: informa que a largura será definida ao configurar uma impressora.
+- Testes focados: 5 arquivos / 19 testes PASS; lint, `check:no-any`, `check:features` e diff check PASS. Suite completa e build/typecheck locais permanecem bloqueados pelas duas resoluções preexistentes de `@gestor/storefront-ui` nesta worktree. Nenhuma API, schema, migration, dependência, banco remoto ou deploy foi alterado.
+
+---
+
 ## Correção das ações de configuração de impressão
 
 Data: 2026-08-10
