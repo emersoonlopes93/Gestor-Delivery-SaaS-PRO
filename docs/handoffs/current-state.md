@@ -1465,3 +1465,22 @@ Base: `origin/main-copy` / `e7caf433`
 - O baseline global de `typecheck` inicialmente falhou porque o Prisma Client ainda não havia sido gerado na worktree limpa; após `pnpm db:generate`, passou com exit code 0.
 - `pnpm check:boundaries` continua com exit code 1 por duas violações preexistentes em `StorefrontPreview.tsx` e `product-image-fallback.test.ts`; ambos já importavam `@gestor/storefront-ui` em `origin/main-copy` e não foram modificados nesta branch.
 - A validação visual local depende de API e dados locais; nenhuma API, PostgreSQL ou Redis estava ouvindo nas portas do projeto durante esta sessão. Nenhum ambiente remoto foi acessado.
+## Quick fix — salvar upload na biblioteca de mídia
+
+Data: 2026-08-11
+Branch: `fix/media-library-save-upload`
+Base: `origin/main-copy` / `37df7257` (merge da PR #57)
+
+- A causa estava no cliente de autenticação do upload: requisições JSON renovavam a sessão e repetiam a chamada após HTTP 401, enquanto `api.upload` encerrava imediatamente com `ApiError`. Assim, uma sessão renovável podia navegar normalmente e falhar especificamente ao clicar em “Salvar na biblioteca”.
+- `api.upload` agora renova a sessão e repete o mesmo `FormData` uma única vez. O primeiro 401 é respondido pelo guard antes da persistência, portanto o retry autenticado produz um único save lógico.
+- O modal usa uma trava síncrona além do estado visual, impedindo dois saves por cliques imediatos. O botão mostra “Salvando imagem...” durante a operação.
+- Em sucesso, a resposta persistida entra imediatamente na biblioteca, aparece a confirmação “Imagem salva na biblioteca.” e o GET de refresh reconcilia a lista.
+- Em falha, o arquivo selecionado permanece disponível para retry, o modal não troca de aba e a UI mostra apenas mensagens humanas para tamanho, formato/imagem inválida ou falha genérica. Detalhes de bucket, provider e erro interno não são exibidos.
+- Tenant isolation, guards, endpoint, storage, Prisma/schema, migrations, feature flags e dependências não foram alterados.
+
+### Validação
+
+- Testes focados: 2 arquivos/5 testes, cobrindo 401 + refresh + retry do mesmo corpo, happy path, double click, preservação para retry e mensagens de validação/erro.
+- A suíte completa do web-tenant passou com 26 arquivos/107 testes. Lint/build do web-tenant, `pnpm typecheck`, `pnpm check:no-any`, `pnpm check:features` e `git diff --check` passaram com exit code 0.
+- `pnpm check:boundaries` manteve exit code 1 somente nas duas importações preexistentes de `@gestor/storefront-ui` em `StorefrontPreview.tsx` e `product-image-fallback.test.ts`; nenhum desses arquivos foi alterado.
+- Docker Desktop não estava disponível localmente; nenhum banco remoto, provider externo, produção ou deploy foi acessado.

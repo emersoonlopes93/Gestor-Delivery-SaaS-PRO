@@ -2,25 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ImagePlus, RefreshCw, Search, UploadCloud } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Modal } from './Modal';
+import {
+  type MediaUploadIssue,
+  type UploadMediaAsset,
+  tryAcquireUploadLock,
+  uploadMediaFiles,
+  validateMediaFile,
+} from './image-picker-upload';
 
-type MediaAsset = {
-  id: string;
-  title: string | null;
-  originalName: string | null;
-  publicUrl: string;
-  altText: string | null;
-  scope: string;
-  category?: string | null;
-  categoryId?: string | null;
-};
+type MediaAsset = UploadMediaAsset;
 
 type LibrarySourceFilter = 'all' | 'mine' | 'global';
 type PickerTab = 'upload' | 'library';
-type UploadIssue = {
-  fileName: string;
-  reason: string;
-  stage: 'prevalidacao' | 'upload';
-};
 
 interface ImagePickerModalProps {
   isOpen: boolean;
@@ -30,7 +23,6 @@ interface ImagePickerModalProps {
 }
 
 const ACCEPTED_FILE_TYPES = 'image/png,image/jpeg,image/webp';
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 export function ImagePickerModal({
   isOpen,
@@ -47,10 +39,12 @@ export function ImagePickerModal({
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadIssues, setUploadIssues] = useState<UploadIssue[]>([]);
+  const [uploadIssues, setUploadIssues] = useState<MediaUploadIssue[]>([]);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [justUploadedAssetIds, setJustUploadedAssetIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInFlightRef = useRef(false);
 
   const loadLibraryAssets = useCallback(async () => {
     setIsLoadingLibrary(true);
@@ -73,6 +67,7 @@ export function ImagePickerModal({
     setSearchQuery('');
     setSourceFilter('all');
     setUploadError(null);
+    setUploadSuccess(null);
     setUploadIssues([]);
     setDragActive(false);
     setUploadFiles([]);
@@ -109,16 +104,7 @@ export function ImagePickerModal({
   }, [libraryAssets, searchQuery, sourceFilter]);
 
   const getFileError = useCallback((file: File) => {
-    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    if (!allowedTypes.has(file.type)) {
-      return 'Formato invalido. Use JPG, PNG ou WEBP.';
-    }
-
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return 'A imagem deve ter no maximo 10 MB.';
-    }
-
-    return null;
+    return validateMediaFile(file);
   }, []);
 
   const handleChooseFiles = useCallback((files: FileList | File[] | null) => {
@@ -131,7 +117,7 @@ export function ImagePickerModal({
     }
 
     const accepted: File[] = [];
-    const rejected: UploadIssue[] = [];
+    const rejected: MediaUploadIssue[] = [];
 
     for (const file of incoming) {
       const error = getFileError(file);
@@ -144,7 +130,8 @@ export function ImagePickerModal({
 
     setUploadFiles(accepted);
     setUploadIssues(rejected);
-    setUploadError(rejected[0] ? 'Alguns arquivos foram rejeitados antes do envio.' : null);
+    setUploadError(rejected[0]?.reason ?? null);
+    setUploadSuccess(null);
 
     if (accepted.length > 0) {
       setUploadTitle((current) => current || accepted[0].name.replace(/\.[^.]+$/, '') || '');
@@ -152,68 +139,66 @@ export function ImagePickerModal({
   }, [getFileError]);
 
   const handleUpload = useCallback(async () => {
-    if (uploadFiles.length === 0) return;
+    if (uploadFiles.length === 0 || !tryAcquireUploadLock(uploadInFlightRef)) return;
 
     setIsUploadingFile(true);
+    setUploadError(null);
+    setUploadSuccess(null);
     try {
-      const uploadedIds: string[] = [];
-      const nextIssues: UploadIssue[] = [...uploadIssues];
-      const baseTitle = uploadTitle.trim();
-      const totalFiles = uploadFiles.length;
+      const result = await uploadMediaFiles(
+        uploadFiles,
+        uploadTitle.trim(),
+        async (formData) => (await api.upload<MediaAsset>('/media/upload', formData)).data,
+      );
+      const uploadedIds = result.uploadedAssets.map((asset) => asset.id);
 
-      for (const [index, file] of uploadFiles.entries()) {
-        const formData = new FormData();
-        formData.set('file', file);
-
-        const fallbackTitle = file.name.replace(/\.[^.]+$/, '');
-        const title = totalFiles === 1
-          ? baseTitle || fallbackTitle
-          : baseTitle
-            ? `${baseTitle} ${index + 1}`
-            : fallbackTitle;
-
-        formData.set('title', title);
-        formData.set('altText', title);
-
-        try {
-          const response = await api.upload<MediaAsset>('/media/upload', formData);
-          uploadedIds.push(response.data.id);
-        } catch (error) {
-          const reason = error instanceof Error ? error.message : 'Falha ao enviar a imagem.';
-          nextIssues.push({
-            fileName: file.name,
-            reason,
-            stage: 'upload',
-          });
-        }
-      }
-
-      setUploadFiles([]);
-      setUploadTitle('');
-      setUploadIssues(nextIssues);
-      setUploadError(nextIssues.length > 0 ? 'Algumas imagens nao puderam ser enviadas.' : null);
+      setUploadFiles(result.failedFiles);
+      setUploadIssues(result.issues);
+      setUploadError(result.issues[0]?.reason ?? null);
+      setUploadSuccess(uploadedIds.length > 0
+        ? uploadedIds.length === 1
+          ? 'Imagem salva na biblioteca.'
+          : `${uploadedIds.length} imagens salvas na biblioteca.`
+        : null);
       setSourceFilter('all');
       setSearchQuery('');
       setJustUploadedAssetIds(uploadedIds);
-      setActiveTab('library');
-      if (fileInputRef.current) {
+      setLibraryAssets((current) => [
+        ...result.uploadedAssets,
+        ...current.filter((asset) => !uploadedIds.includes(asset.id)),
+      ]);
+
+      if (result.failedFiles.length === 0) {
+        setUploadTitle('');
+        setActiveTab('library');
+      }
+      if (fileInputRef.current && result.failedFiles.length === 0) {
         fileInputRef.current.value = '';
       }
 
-      await loadLibraryAssets();
-    } catch (error) {
-      console.error('Erro ao enviar imagem para a biblioteca:', error);
-      setUploadError(error instanceof Error ? error.message : 'Falha ao enviar a imagem.');
+      if (uploadedIds.length > 0) {
+        try {
+          await loadLibraryAssets();
+        } catch {
+          // The persisted assets remain visible through the optimistic update above.
+        }
+      }
     } finally {
+      uploadInFlightRef.current = false;
       setIsUploadingFile(false);
     }
-  }, [loadLibraryAssets, uploadFiles, uploadTitle, uploadIssues]);
+  }, [loadLibraryAssets, uploadFiles, uploadTitle]);
 
   const isLibraryEmpty = filteredAssets.length === 0;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Adicionar foto" maxWidth="max-w-5xl">
       <div className="space-y-5">
+        {uploadSuccess && (
+          <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+            {uploadSuccess}
+          </div>
+        )}
         <div className="border-b border-border">
           <div className="flex items-center gap-6">
             {([
@@ -348,6 +333,7 @@ export function ImagePickerModal({
                     setUploadFiles([]);
                     setUploadTitle('');
                     setUploadError(null);
+                    setUploadSuccess(null);
                     if (fileInputRef.current) {
                       fileInputRef.current.value = '';
                     }
@@ -364,7 +350,7 @@ export function ImagePickerModal({
                 >
                   <UploadCloud className="h-4 w-4" />
                   {isUploadingFile
-                    ? 'Enviando...'
+                    ? 'Salvando imagem...'
                     : uploadFiles.length > 1
                       ? `Salvar ${uploadFiles.length} fotos na biblioteca`
                       : 'Salvar na biblioteca'}
