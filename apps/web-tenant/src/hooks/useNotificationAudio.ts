@@ -33,6 +33,7 @@ export function useNotificationAudio(
     const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
 
     const socket = io(socketPath, {
+      auth: (callback) => callback({ token: localStorage.getItem('accessToken') }),
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,

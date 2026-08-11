@@ -4,11 +4,20 @@ import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 describe('DeliveryTrackingGateway driver authentication', () => {
   const driversService = { updateDriverLocation: jest.fn() };
   const driverAuthService = { validateAccessToken: jest.fn() };
+  const tenantSocketAuth = { validateAccessToken: jest.fn() };
+  const publicTrackingAccess = { isValidToken: jest.fn() };
   let gateway: DeliveryTrackingGateway;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    gateway = new DeliveryTrackingGateway(driversService as never, driverAuthService as never);
+    tenantSocketAuth.validateAccessToken.mockRejectedValue(new Error('not a tenant token'));
+    publicTrackingAccess.isValidToken.mockResolvedValue(true);
+    gateway = new DeliveryTrackingGateway(
+      driversService as never,
+      driverAuthService as never,
+      tenantSocketAuth as never,
+      publicTrackingAccess as never,
+    );
     gateway.server = { to: jest.fn().mockReturnValue({ emit: jest.fn() }) } as never;
   });
 
@@ -24,6 +33,7 @@ describe('DeliveryTrackingGateway driver authentication', () => {
     await gateway.handleConnection(socket as never);
     await gateway.handleUpdateDriverLocation({ lat: -23.5, lng: -46.6 }, socket as never);
 
+    expect(driverAuthService.validateAccessToken).toHaveBeenCalledTimes(2);
     expect(driverAuthService.validateAccessToken).toHaveBeenCalledWith('access-token');
     expect(driversService.updateDriverLocation).toHaveBeenCalledWith(
       'tenant-a',
