@@ -1,6 +1,87 @@
-import { IsBoolean, IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 import { DriverStatus, DriverVehicleType } from './enums';
+
+export enum DriverShiftStatus {
+  ACTIVE = 'ACTIVE',
+  ENDED = 'ENDED',
+}
+
+export enum DeliveryRunStatus {
+  PENDING_ACCEPTANCE = 'PENDING_ACCEPTANCE',
+  ASSIGNED = 'ASSIGNED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  RETURNING = 'RETURNING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum DeliveryStopStatus {
+  PENDING = 'PENDING',
+  CURRENT = 'CURRENT',
+  ARRIVED = 'ARRIVED',
+  DELIVERED = 'DELIVERED',
+  FAILED_ATTEMPT = 'FAILED_ATTEMPT',
+  RETURN_TO_STORE = 'RETURN_TO_STORE',
+  RETURNED_TO_STORE = 'RETURNED_TO_STORE',
+  CANCELLED = 'CANCELLED',
+}
+
+export const ACTIVE_DELIVERY_RUN_STATUSES: readonly DeliveryRunStatus[] = [
+  DeliveryRunStatus.PENDING_ACCEPTANCE,
+  DeliveryRunStatus.ASSIGNED,
+  DeliveryRunStatus.IN_PROGRESS,
+  DeliveryRunStatus.RETURNING,
+];
+
+export const OPEN_DELIVERY_STOP_STATUSES: readonly DeliveryStopStatus[] = [
+  DeliveryStopStatus.PENDING,
+  DeliveryStopStatus.CURRENT,
+  DeliveryStopStatus.ARRIVED,
+  DeliveryStopStatus.FAILED_ATTEMPT,
+  DeliveryStopStatus.RETURN_TO_STORE,
+];
+
+export class CreateDeliveryRunDTO {
+  @IsString()
+  driverId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsString({ each: true })
+  orderIds!: string[];
+}
+
+export class ReorderDeliveryStopsDTO {
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsString({ each: true })
+  stopIds!: string[];
+}
+
+export class DeliveryRunReasonDTO {
+  @IsString()
+  @MaxLength(255)
+  reason!: string;
+}
 
 export class CreateDriverDTO {
   @IsString()

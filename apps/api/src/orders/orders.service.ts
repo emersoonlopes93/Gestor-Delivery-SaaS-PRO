@@ -53,6 +53,7 @@ import { canAutoAcceptOrder } from './order-auto-accept.policy';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { AuthoritativeOrderAnalyticsService } from '../analytics/authoritative-order-analytics.service';
 import { DeliveryTrackingGateway } from '../delivery/delivery-tracking.gateway';
+import { DeliveryRunsService } from '../delivery/delivery-runs.service';
 import {
   assertOrderIdempotencyPayload,
   isPrismaUniqueConstraintError,
@@ -187,6 +188,8 @@ export class OrdersService {
     @Optional() private readonly authoritativeOrderAnalyticsService?: AuthoritativeOrderAnalyticsService,
     @Optional() @Inject(forwardRef(() => DeliveryTrackingGateway))
     private readonly deliveryTrackingGateway?: DeliveryTrackingGateway,
+    @Optional() @Inject(forwardRef(() => DeliveryRunsService))
+    private readonly deliveryRunsService?: DeliveryRunsService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -1157,10 +1160,19 @@ export class OrdersService {
           data: { status: 'free', activeOrderId: null },
         });
         if (order.deliveryDriverId) {
-          await tx.deliveryDriver.update({
-            where: { id: order.deliveryDriverId },
-            data: { status: 'available' },
+          const activeRunCount = await tx.deliveryRun.count({
+            where: {
+              tenantId,
+              driverId: order.deliveryDriverId,
+              status: { in: ['PENDING_ACCEPTANCE', 'ASSIGNED', 'IN_PROGRESS', 'RETURNING'] },
+            },
           });
+          if (activeRunCount === 0) {
+            await tx.deliveryDriver.update({
+              where: { id: order.deliveryDriverId },
+              data: { status: 'available' },
+            });
+          }
         }
       }
 
@@ -1287,6 +1299,10 @@ export class OrdersService {
           body: `O pedido #${order.orderNumber} foi cancelado.`,
         });
       }
+    }
+
+    if (nextStatus === 'cancelled') {
+      await this.deliveryRunsService?.cancelStopFromOrderCancellation(tenantId, orderId, dto.note ?? 'Pedido cancelado');
     }
 
     return updated;

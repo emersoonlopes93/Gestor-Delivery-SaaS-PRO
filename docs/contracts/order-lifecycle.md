@@ -65,6 +65,11 @@ Nenhuma alteração em itens, quantidades ou pagamento deve ocorrer.
 5. Entregador assume/Operador despacha → `out_for_delivery`
 6. Entregador finaliza → `completed`
 
+Para logística multi-pedido, essas transições são coordenadas pelo agregado descrito em
+[`delivery-runs.md`](./delivery-runs.md): iniciar a rota despacha atomicamente seus pedidos,
+e concluir uma parada conclui somente o pedido correspondente. Falha de entrega cria retorno
+pendente e não transforma o pedido em `cancelled`.
+
 ## 4.1 Idempotência do checkout público
 
 `POST /orders/public-checkout/:slug` usa `Order.idempotencyKey` com unicidade por
