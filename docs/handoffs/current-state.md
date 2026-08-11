@@ -1446,3 +1446,22 @@ Data: 2026-08-10
   `/kds/spooler/*`; validar impressora Android real e QZ Tray real.
 
 ---
+## Quick fix — categoria ativa no scroll do storefront
+
+Data: 2026-08-11
+Branch: `fix/storefront-category-scrollspy`
+Base: `origin/main-copy` / `e7caf433`
+
+- A navegação de categorias agora recebe a categoria ativa de um scrollspy baseado em `IntersectionObserver`; antes, o storefront não mantinha nenhum estado ativo e o clique apenas executava `window.scrollTo`.
+- O clique seleciona a categoria imediatamente e mantém essa seleção durante o scroll suave, evitando flicker ao atravessar seções intermediárias. Após alcançar o destino, o observer volta a ser a fonte do estado.
+- O cálculo cobre a categoria inicial e força a última categoria no fim da página. A troca da lista desconecta o observer anterior e coleta somente as seções atuais.
+- O menu horizontal centraliza suavemente o item ativo quando ele sai da área visível. O item ativo também expõe `aria-current="true"`.
+- Alteração somente em frontend; API, schema, migration, storage, feature flags e contratos HTTP não foram alterados.
+
+### Validação
+
+- Testes focados cobrem scroll manual, categoria inicial, fim da página, lista re-renderizada, trava durante clique/scroll suave e visibilidade horizontal. A suíte completa do storefront passou com 14 arquivos/72 testes; a suíte do web-tenant passou com 24 arquivos/102 testes.
+- `web-storefront` lint/build, `web-tenant` lint/build, `pnpm typecheck`, `pnpm check:no-any`, `pnpm check:features` e `git diff --check` passaram com exit code 0.
+- O baseline global de `typecheck` inicialmente falhou porque o Prisma Client ainda não havia sido gerado na worktree limpa; após `pnpm db:generate`, passou com exit code 0.
+- `pnpm check:boundaries` continua com exit code 1 por duas violações preexistentes em `StorefrontPreview.tsx` e `product-image-fallback.test.ts`; ambos já importavam `@gestor/storefront-ui` em `origin/main-copy` e não foram modificados nesta branch.
+- A validação visual local depende de API e dados locais; nenhuma API, PostgreSQL ou Redis estava ouvindo nas portas do projeto durante esta sessão. Nenhum ambiente remoto foi acessado.

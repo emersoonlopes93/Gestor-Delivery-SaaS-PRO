@@ -42,6 +42,7 @@ import type { StorefrontProductLayout, StorefrontLayoutSettings } from '@gestor/
 import { useAnalytics } from '../features/analytics';
 import { useStorefrontConsent } from '../features/consent';
 import { SmartShowcase } from '../components/SmartShowcase';
+import { useCategoryScrollSpy } from '../hooks/useCategoryScrollSpy';
 
 type CustomerHomePayload = {
   profile: { name: string; totalOrders: number };
@@ -167,6 +168,8 @@ export function StorefrontPage() {
 
     return index;
   }, [data?.categories]);
+  const scrollSpyCategories = useMemo(() => data?.categories ?? [], [data?.categories]);
+  const { activeCategoryId, selectCategory } = useCategoryScrollSpy(scrollSpyCategories);
 
   useEffect(() => {
     if (data?.tenant) {
@@ -427,8 +430,11 @@ export function StorefrontPage() {
       {/* Categories Navigation */}
       <CategoryNavigation
         categories={categories}
+        activeCategoryId={activeCategoryId}
         layout={layoutSettings.categoryLayout || 'tabs'}
         onCategoryClick={(slug) => {
+          const category = categories.find((candidate) => candidate.slug === slug);
+          if (category) selectCategory(category.id);
           const el = document.getElementById(slug);
           if (el) {
             const offset = 80; // Adjust for sticky header
