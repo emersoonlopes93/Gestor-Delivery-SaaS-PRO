@@ -32,6 +32,7 @@ export function useLogisticsSocket(tenantId: string | undefined) {
     socket.on('driverAssigned', refresh);
     socket.on('orderUpdated', refresh);
     socket.on('statusUpdated', refresh);
+    socket.on('orderCancelled', refresh);
 
     return () => {
       socket.disconnect();

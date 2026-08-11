@@ -9,6 +9,7 @@ import {
   Request,
   ParseIntPipe,
   DefaultValuePipe,
+  Header,
 } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import { OrdersService } from './orders.service';
@@ -172,6 +173,8 @@ export class OrdersController {
   }
 
   @Post(':id/assign-driver')
+  @Header('Deprecation', 'true')
+  @Header('Link', '</api/v1/delivery/runs>; rel="successor-version"')
   @RequirePermissions('delivery.dispatch')
   async assignDriver(
     @Request() req: TenantRequest,

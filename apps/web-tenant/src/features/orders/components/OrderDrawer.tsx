@@ -1,6 +1,6 @@
 import { memo, useEffect, useState, useCallback } from 'react';
 import { X, RefreshCw } from 'lucide-react';
-import { SOURCE_CHANNEL_LABELS, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
+import { SOURCE_CHANNEL_LABELS, type DeliveryRunBuilderDataDTO, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
@@ -66,8 +66,8 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
 
   const fetchDrivers = async () => {
     try {
-      const res = await api.get<DriverDTO[]>('/delivery/drivers');
-      setDrivers(res.data || []);
+      const res = await api.get<DeliveryRunBuilderDataDTO>('/delivery/runs/builder');
+      setDrivers(res.data?.drivers || []);
     } catch (err) {
       console.error('[OrderDrawer] Erro ao buscar entregadores:', err);
     }
@@ -86,7 +86,11 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     setIsUpdating(true);
     try {
       if (driverId) {
-        await api.post(`/orders/${order.id}/assign-driver`, { driverId });
+        await api.post('/delivery/runs', { driverId, orderIds: [order.id] });
+        toast.success('Rota criada; o entregador deve aceitar e iniciar a entrega.');
+        await fetchDetail(true);
+        onUpdated();
+        return;
       }
 
       const body: UpdateOrderStatusDTO = { status: newStatus };

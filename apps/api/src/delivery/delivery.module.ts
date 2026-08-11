@@ -15,10 +15,17 @@ import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 import { GeocodingService } from './geocoding.service';
 import { LocationModule } from '../location/location.module';
 import { DeliveryRunsService } from './delivery-runs.service';
+import { DeliveryRunsController } from './delivery-runs.controller';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule, LocationModule, forwardRef(() => OrdersModule)],
-  controllers: [DriversController, DriverOperationsController, DeliveryRateController, DeliveryCoverageController],
+  controllers: [
+    DriversController,
+    DriverOperationsController,
+    DeliveryRunsController,
+    DeliveryRateController,
+    DeliveryCoverageController,
+  ],
   providers: [
     DriversService,
     DeliveryRunsService,

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
+import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
@@ -206,8 +206,8 @@ export function OperationBoardPage() {
 
   const fetchDrivers = useCallback(async () => {
     try {
-      const res = await api.get<DriverDTO[]>('/delivery/drivers');
-      setDrivers(res.data || []);
+      const res = await api.get<DeliveryRunBuilderDataDTO>('/delivery/runs/builder');
+      setDrivers(res.data?.drivers || []);
     } catch (err) {
       console.error('[OperationBoardPage] Erro ao buscar entregadores:', err);
     }
@@ -276,7 +276,14 @@ export function OperationBoardPage() {
     setUpdatingId(orderId);
     try {
       if (driverId) {
-        await api.post(`/orders/${orderId}/assign-driver`, { driverId });
+        await api.post('/delivery/runs', { driverId, orderIds: [orderId] });
+        await fetchBoard();
+        await fetchDrivers();
+        invalidateLogisticsQueries(queryClient);
+        setIsDriverModalOpen(false);
+        setOrderToDispatch(null);
+        toast.success('Rota criada; o entregador deve seguir o fluxo de aceite e início.', { duration: 4000 });
+        return;
       }
 
       const body: UpdateOrderStatusDTO = { status: newStatus };

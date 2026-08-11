@@ -26,10 +26,11 @@ const baseRun = (overrides: Record<string, unknown> = {}) => ({
 
 describe('DeliveryRunsService', () => {
   const tx = {
-    deliveryDriver: { findFirst: jest.fn(), update: jest.fn() },
+    deliveryDriver: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     driverShift: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
     deliveryRun: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -41,11 +42,16 @@ describe('DeliveryRunsService', () => {
       updateMany: jest.fn(),
       count: jest.fn(),
     },
-    tenantSettings: { findUnique: jest.fn() },
+    tenantSettings: { findUnique: jest.fn(), upsert: jest.fn() },
     order: { findMany: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn() },
     orderTimeline: { create: jest.fn(), createMany: jest.fn() },
+    auditLog: { create: jest.fn() },
   };
   const prisma = {
+    deliveryDriver: tx.deliveryDriver,
+    deliveryRun: tx.deliveryRun,
+    tenantSettings: tx.tenantSettings,
+    order: tx.order,
     $transaction: jest.fn((operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
   };
   const service = new DeliveryRunsService(prisma as never);
@@ -140,6 +146,83 @@ describe('DeliveryRunsService', () => {
     });
   });
 
+  it('returns only tenant-scoped free drivers and orders outside active routes', async () => {
+    tx.deliveryDriver.findMany.mockResolvedValue([{
+      id: 'driver-a', tenantId: 'tenant-a', name: 'Ana', phone: '11', pin: 'secret',
+      isActive: true, status: 'available', vehicleType: 'motorcycle', notes: null,
+      currentLat: null, currentLng: null, lastLocationAt: null,
+      createdAt: new Date(), updatedAt: new Date(),
+    }]);
+    tx.order.findMany.mockResolvedValue([{
+      id: 'order-a', orderNumber: '10', customerName: 'Cliente', customerPhone: '11',
+      createdAt: new Date('2026-08-11T12:00:00.000Z'),
+      deliveryAddress: { street: 'Rua A', number: '1', neighborhood: 'Centro' },
+    }]);
+
+    const result = await service.getBuilderData('tenant-a');
+    expect(tx.deliveryDriver.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ tenantId: 'tenant-a', status: 'available' }),
+    }));
+    expect(tx.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        tenantId: 'tenant-a',
+        status: 'ready_for_delivery',
+        deliveryStops: { none: { status: { in: ['PENDING', 'CURRENT', 'ARRIVED', 'FAILED_ATTEMPT', 'RETURN_TO_STORE'] } } },
+      }),
+    }));
+    expect(result.drivers[0]).not.toHaveProperty('pin');
+    expect(result.orders[0].address).toContain('Rua A');
+  });
+
+  it('creates and assigns the complete route in the same transaction', async () => {
+    tx.deliveryDriver.findFirst.mockResolvedValue({ id: 'driver-a' });
+    tx.driverShift.findFirst.mockResolvedValue({ id: 'shift-a' });
+    tx.tenantSettings.findUnique.mockResolvedValue({ deliveryRunRequiresAcceptance: true });
+    tx.order.findMany.mockResolvedValue([
+      { id: 'order-c', orderNumber: '3', customerName: 'C', customerPhone: '33', deliveryAddress: null },
+      { id: 'order-a', orderNumber: '1', customerName: 'A', customerPhone: '11', deliveryAddress: null },
+      { id: 'order-b', orderNumber: '2', customerName: 'B', customerPhone: '22', deliveryAddress: null },
+    ]);
+    tx.deliveryRun.create.mockResolvedValue(baseRun({ assignedAt: new Date() }));
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      assignedAt: new Date(),
+      driver: { name: 'Ana' },
+      stops: [],
+    }));
+    tx.order.updateMany.mockResolvedValue({ count: 3 });
+
+    await service.createAssignedRun(
+      'tenant-a',
+      'driver-a',
+      ['order-a', 'order-b', 'order-c'],
+      'user-a',
+    );
+    expect(tx.deliveryRun.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        assignedAt: expect.any(Date),
+        status: DeliveryRunStatus.PENDING_ACCEPTANCE,
+      }),
+    }));
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-a',
+        id: { in: ['order-a', 'order-b', 'order-c'] },
+        status: 'ready_for_delivery',
+      },
+      data: { deliveryDriverId: 'driver-a' },
+    });
+    const createCall = tx.deliveryRun.create.mock.calls[0][0];
+    expect(createCall.data.stops.create.map((stop: { orderId: string; sequence: number }) => ({
+      orderId: stop.orderId,
+      sequence: stop.sequence,
+    }))).toEqual([
+      { orderId: 'order-a', sequence: 1 },
+      { orderId: 'order-b', sequence: 2 },
+      { orderId: 'order-c', sequence: 3 },
+    ]);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
   it('starts all orders atomically and selects only the first stop as current', async () => {
     const stops = [
       { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.PENDING },
@@ -183,6 +266,55 @@ describe('DeliveryRunsService', () => {
 
     await expect(service.reorderStops('tenant-a', 'run-a', ['stop-b'], 2)).rejects.toBeInstanceOf(ConflictException);
     expect(tx.deliveryStop.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('reorders every pending stop before the route starts', async () => {
+    const stops = [
+      { id: 'stop-a', sequence: 1, status: DeliveryStopStatus.PENDING },
+      { id: 'stop-b', sequence: 2, status: DeliveryStopStatus.PENDING },
+      { id: 'stop-c', sequence: 3, status: DeliveryStopStatus.PENDING },
+    ];
+    tx.deliveryRun.findFirst
+      .mockResolvedValueOnce(baseRun({
+        status: DeliveryRunStatus.ASSIGNED,
+        version: 2,
+        stops,
+      }))
+      .mockResolvedValueOnce(baseRun({
+        status: DeliveryRunStatus.ASSIGNED,
+        version: 3,
+        stops: [stops[2], stops[0], stops[1]],
+      }));
+
+    await service.reorderStops(
+      'tenant-a',
+      'run-a',
+      ['stop-c', 'stop-a', 'stop-b'],
+      2,
+      'user-a',
+    );
+
+    expect(tx.deliveryStop.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        tenantId: 'tenant-a',
+        runId: 'run-a',
+        id: { in: ['stop-c', 'stop-a', 'stop-b'] },
+      },
+      data: { sequence: { increment: 1_000_000 } },
+    });
+    expect(tx.deliveryStop.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: 'stop-c',
+        tenantId: 'tenant-a',
+        runId: 'run-a',
+        status: DeliveryStopStatus.PENDING,
+      },
+      data: { sequence: 1 },
+    });
+    expect(tx.deliveryRun.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'run-a', tenantId: 'tenant-a', version: 2 },
+      data: expect.objectContaining({ version: { increment: 1 } }),
+    }));
   });
 
   it('turns a failed attempt into a durable return without cancelling the order', async () => {
