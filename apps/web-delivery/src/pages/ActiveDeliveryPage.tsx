@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { api } from '../lib/api';
-import { DriverStatus } from '@gestor/types';
 
 interface DeliveryRun {
   id: string;
@@ -112,9 +111,7 @@ export function ActiveDeliveryPage() {
 
   const handleOperationalStatus = async () => {
     if (!user) return;
-    const nextStatus = user.status === DriverStatus.available
-      ? DriverStatus.offline
-      : DriverStatus.available;
+    const nextStatus = user.status === 'available' ? 'offline' : 'available';
     setStatusLoading(true);
     try {
       const response = await api.patch('/delivery/driver/status', { status: nextStatus });
@@ -195,15 +192,15 @@ export function ActiveDeliveryPage() {
           <div>
             <h2 className="text-sm font-bold text-[var(--delivery-foreground)]">Disponibilidade</h2>
             <p className="text-xs text-[var(--delivery-muted-foreground)]">
-              {user?.status === DriverStatus.available ? 'Você está online para receber entregas.' : user?.status === DriverStatus.busy ? 'Você está ocupado com uma entrega.' : 'Você está offline.'}
+              {user?.status === 'available' ? 'Você está online para receber entregas.' : user?.status === 'busy' ? 'Você está ocupado com uma entrega.' : 'Você está offline.'}
             </p>
           </div>
           <button
             onClick={handleOperationalStatus}
-            disabled={statusLoading || user?.status === DriverStatus.busy}
+            disabled={statusLoading || user?.status === 'busy'}
             className="rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
           >
-            {user?.status === DriverStatus.available ? 'Ficar offline' : 'Ficar online'}
+            {user?.status === 'available' ? 'Ficar offline' : 'Ficar online'}
           </button>
         </div>
 

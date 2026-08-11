@@ -1,3 +1,18 @@
+## R11 PR B — PWA instalável e offline previsível
+
+Data: 2026-08-11
+Branch: `feat/r11-driver-pwa`
+Base: `main-copy` / `d74d49de`
+
+- O manifest agora tem `id`, `scope`, ícones PNG reais em todas as dimensões declaradas e variantes maskable 192/512 geradas da identidade SVG existente.
+- O service worker versiona o app shell, não intercepta API, usa navegação network-first e assets cache-first, e aguarda confirmação explícita antes de `skipWaiting`.
+- Um banner global comunica offline, oferece instalação somente após `beforeinstallprompt` e oferece atualização quando existe worker em espera.
+- O smoke Playwright serve o build real, valida manifest/MIME/dimensões, confirma worker ativo/controlador e recarrega `/login` offline.
+- Foi removido o import runtime do enum compartilhado na tela de entregas, evitando que decorators de DTO exijam `reflect-metadata` no browser.
+- Sem API, schema, migration, banco remoto, Dokploy ou deploy.
+
+---
+
 ## R11 PR A — confiabilidade em tempo real do entregador
 
 Data: 2026-08-11

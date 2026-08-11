@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { LoginPage } from './pages/LoginPage';
 import { ActiveDeliveryPage } from './pages/ActiveDeliveryPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { PwaStatusBanner } from './components/PwaStatusBanner';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         v7_relativeSplatPath: true,
       }}
     >
+      <PwaStatusBanner />
       <Routes>
         {/* Rota pública de login */}
         <Route path="/login" element={<LoginPage />} />
