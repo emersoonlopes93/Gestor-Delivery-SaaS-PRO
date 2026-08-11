@@ -24,5 +24,15 @@
 
 - React + Vite + TypeScript
 - TailwindCSS
-- PWA (manifest + service worker)
+- PWA instalável com manifest, ícones PNG/maskable, service worker, shell offline e atualização solicitada ao usuário
+
+### Validação PWA local
+
+Após gerar o build e servi-lo em `127.0.0.1:4175`, execute:
+
+```bash
+PWA_SMOKE_BASE_URL=http://127.0.0.1:4175 pnpm test:pwa-browser
+```
+
+O smoke abre Chromium real, valida os campos do manifest, o MIME e as dimensões declaradas de todos os ícones, espera o controle pelo service worker e recarrega a tela de login com a rede desativada.
 - Geolocation API

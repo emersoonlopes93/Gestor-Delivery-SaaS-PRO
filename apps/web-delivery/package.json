@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run --environment jsdom --globals",
+    "test:pwa-browser": "node scripts/pwa-browser-smoke.mjs",
     "clean": "rimraf dist"
   },
   "dependencies": {
