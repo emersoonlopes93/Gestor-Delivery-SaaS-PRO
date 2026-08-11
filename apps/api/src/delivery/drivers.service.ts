@@ -201,15 +201,24 @@ export class DriversService {
     status: DriverStatus.available | DriverStatus.offline,
   ) {
     const driver = await this.getDriver(tenantId, id);
-    const activeDeliveries = await this.prisma.order.count({
-      where: {
-        tenantId,
-        deliveryDriverId: driver.id,
-        status: { in: ['ready_for_delivery', 'out_for_delivery'] },
-      },
-    });
+    const [activeRuns, legacyActiveDeliveries] = await Promise.all([
+      this.prisma.deliveryRun.count({
+        where: {
+          tenantId,
+          driverId: driver.id,
+          status: { in: ['PENDING_ACCEPTANCE', 'ASSIGNED', 'IN_PROGRESS', 'RETURNING'] },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          deliveryDriverId: driver.id,
+          status: { in: ['ready_for_delivery', 'out_for_delivery'] },
+        },
+      }),
+    ]);
 
-    if (activeDeliveries > 0) {
+    if (activeRuns > 0 || legacyActiveDeliveries > 0) {
       if (driver.status !== DriverStatus.busy) {
         await this.prisma.deliveryDriver.update({
           where: { id: driver.id },
@@ -233,7 +242,7 @@ export class DriversService {
     // is to prevent delete if orders exist. Let's do that.
     
     const ordersCount = await this.prisma.order.count({
-      where: { deliveryDriverId: id },
+      where: { tenantId, deliveryDriverId: id },
     });
 
     if (ordersCount > 0) {

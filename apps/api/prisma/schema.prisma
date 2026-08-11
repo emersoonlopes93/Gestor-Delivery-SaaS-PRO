@@ -68,6 +68,9 @@ model Tenant {
   deliveryCoverageConfig         DeliveryCoverageConfig?
   deliveryDriverLocations        DeliveryDriverLocation[]
   deliveryDrivers                DeliveryDriver[]
+  driverShifts                   DriverShift[]
+  deliveryRuns                   DeliveryRun[]
+  deliveryStops                  DeliveryStop[]
   DeliveryRateDistanceTier       DeliveryRateDistanceTier[]
   deliveryRateRules              DeliveryRateRule[]
   dineInTables                   DineInTable[]
@@ -523,6 +526,7 @@ model TenantSettings {
   autoAcceptDelaySeconds       Int                    @default(0) @map("auto_accept_delay_seconds")
   autoAcceptDeliveryOrders     Boolean                @default(true) @map("auto_accept_delivery_orders")
   autoAcceptPickupOrders       Boolean                @default(true) @map("auto_accept_pickup_orders")
+  deliveryRunRequiresAcceptance Boolean                @default(true) @map("delivery_run_requires_acceptance")
   fractionalPricingRule        FractionalPricingRule? @map("fractional_pricing_rule")
   automationCooldownHours      Int                    @default(24) @map("automation_cooldown_hours")
   automationMaxMessagesPerDay  Int                    @default(1) @map("automation_max_messages_per_day")
@@ -1066,6 +1070,7 @@ model Order {
   coupon                 Coupon?                      @relation(fields: [couponId], references: [id])
   customer               Customer?                    @relation(fields: [customerId], references: [id])
   deliveryDriver         DeliveryDriver?              @relation(fields: [deliveryDriverId], references: [id])
+  deliveryStops          DeliveryStop[]
   tenant                 Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   waiter                 TenantUser?                  @relation("WaiterOrders", fields: [waiterId], references: [id])
   printJobs              PrintJob[]
@@ -1170,12 +1175,91 @@ model DeliveryDriver {
   currentLng     Float?                   @map("current_lng")
   lastLocationAt DateTime?                @map("last_location_at")
   locations      DeliveryDriverLocation[]
+  shifts         DriverShift[]
+  deliveryRuns   DeliveryRun[]
   tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders         Order[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
   @@map("delivery_drivers")
+}
+
+model DriverShift {
+  id        String            @id @default(uuid())
+  tenantId  String            @map("tenant_id")
+  driverId  String            @map("driver_id")
+  status    DriverShiftStatus @default(ACTIVE)
+  startedAt DateTime          @default(now()) @map("started_at")
+  endedAt   DateTime?         @map("ended_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driver    DeliveryDriver    @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  runs      DeliveryRun[]
+
+  @@index([tenantId, driverId, status])
+  @@map("driver_shifts")
+}
+
+model DeliveryRun {
+  id              String            @id @default(uuid())
+  tenantId        String            @map("tenant_id")
+  driverId        String            @map("driver_id")
+  shiftId         String            @map("shift_id")
+  status          DeliveryRunStatus @default(PENDING_ACCEPTANCE)
+  version         Int               @default(1)
+  history         Json              @default("[]")
+  assignedAt      DateTime?         @map("assigned_at")
+  acceptedAt      DateTime?         @map("accepted_at")
+  rejectedAt      DateTime?         @map("rejected_at")
+  rejectionReason String?           @map("rejection_reason") @db.VarChar(255)
+  startedAt       DateTime?         @map("started_at")
+  returningAt     DateTime?         @map("returning_at")
+  completedAt     DateTime?         @map("completed_at")
+  cancelledAt     DateTime?         @map("cancelled_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driver          DeliveryDriver    @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  shift           DriverShift       @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  stops           DeliveryStop[]
+
+  @@index([tenantId, driverId, status])
+  @@index([tenantId, shiftId])
+  @@map("delivery_runs")
+}
+
+model DeliveryStop {
+  id                    String             @id @default(uuid())
+  tenantId              String             @map("tenant_id")
+  runId                 String             @map("run_id")
+  orderId               String             @map("order_id")
+  sequence              Int
+  status                DeliveryStopStatus @default(PENDING)
+  attempts              Int                @default(0)
+  orderNumberSnapshot   String             @map("order_number_snapshot") @db.VarChar(20)
+  customerNameSnapshot  String             @map("customer_name_snapshot") @db.VarChar(150)
+  customerPhoneSnapshot String             @map("customer_phone_snapshot") @db.VarChar(30)
+  addressSnapshot       Json?              @map("address_snapshot")
+  arrivedAt             DateTime?          @map("arrived_at")
+  deliveredAt           DateTime?          @map("delivered_at")
+  failedAt              DateTime?          @map("failed_at")
+  failureReason         String?            @map("failure_reason") @db.VarChar(255)
+  returnRequiredAt      DateTime?          @map("return_required_at")
+  returnedAt            DateTime?          @map("returned_at")
+  cancelledAt           DateTime?          @map("cancelled_at")
+  cancellationReason    String?            @map("cancellation_reason") @db.VarChar(255)
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run                   DeliveryRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  order                 Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([runId, sequence])
+  @@index([tenantId, runId, status])
+  @@index([tenantId, orderId])
+  @@map("delivery_stops")
 }
 
 model DeliveryDriverLocation {
@@ -3410,6 +3494,31 @@ enum DriverStatus {
   available
   busy
   offline
+}
+
+enum DriverShiftStatus {
+  ACTIVE
+  ENDED
+}
+
+enum DeliveryRunStatus {
+  PENDING_ACCEPTANCE
+  ASSIGNED
+  IN_PROGRESS
+  RETURNING
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryStopStatus {
+  PENDING
+  CURRENT
+  ARRIVED
+  DELIVERED
+  FAILED_ATTEMPT
+  RETURN_TO_STORE
+  RETURNED_TO_STORE
+  CANCELLED
 }
 
 enum DriverVehicleType {

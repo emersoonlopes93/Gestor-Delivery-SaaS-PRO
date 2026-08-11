@@ -1480,6 +1480,34 @@ Data: 2026-08-10
 ## Quick fix — categoria ativa no scroll do storefront
 
 Data: 2026-08-11
+## R12 PR A — domínio de turnos e rotas multi-pedido
+
+Data: 2026-08-11
+Branch: `feat/r12-logistics-domain`
+Base: `origin/main-copy` / `404f0dcb`
+
+- Introduzidos, de forma aditiva, `DriverShift`, `DeliveryRun` e `DeliveryStop`, seus estados, relações tenant-scoped, snapshots e timestamps operacionais.
+- A migration não cria corridas históricas. Constraints parciais impedem turno/rota ativos duplicados, pedido em duas rotas ativas e duas paradas atuais na mesma rota.
+- `DeliveryRunsService` concentra as operações canônicas de turno, criação/atribuição/aceite/recusa/início/reordenação da rota, chegada/conclusão/falha/retorno/cancelamento das paradas e conclusão da rota.
+- Operações usam transações serializáveis com retry. Reordenação usa versão otimista e aceita somente o conjunto exato de paradas futuras.
+- `Order.status` permanece separado: início move pedidos prontos para `out_for_delivery`; entrega conclui apenas seu pedido; falha exige retorno e não cancela o pedido. Cancelamento de pedido cancela a parada associada, preservando histórico.
+- A liberação legada do entregador agora verifica rota canônica ativa, evitando `available` antes do último retorno. O status operacional também considera rota/retorno além dos pedidos legados.
+- Contratos afetados: schema/migration, `@gestor/types`, ciclo de pedido, isolamento tenant e novo contrato `docs/contracts/delivery-runs.md`. Nenhum endpoint/UI/realtime novo foi exposto neste PR.
+
+### Validação
+
+- Baseline antes das alterações: API lint e typecheck global passaram com exit 0.
+- Testes focados: 2 suites/12 testes passaram.
+- Suíte integral da API: 94 suites/407 testes passaram; 4 suites/9 testes condicionais ignorados.
+- API lint/build, Prisma validate com URLs locais sintéticas, `check:no-any`, `check:features` e `git diff --check` passaram.
+- Docker Desktop estava indisponível; a migration não pôde ser aplicada a PostgreSQL efêmero local. Nenhum banco remoto, produção, Dokploy ou deploy foi acessado.
+
+### Próximo passo
+
+- PR B deve expor contratos REST tenant-scoped e o construtor/monitor de rota no web-tenant, sem adicionar pedidos depois do início e sem dependência nova de drag-and-drop.
+
+---
+
 Branch: `fix/storefront-category-scrollspy`
 Base: `origin/main-copy` / `e7caf433`
 
