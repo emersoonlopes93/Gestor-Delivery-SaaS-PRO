@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { api } from '../lib/api';
+import { NativeNotificationBanner } from '../components/NativeNotificationBanner';
 
 interface DeliveryRun {
   id: string;
@@ -152,6 +153,8 @@ export function ActiveDeliveryPage() {
         </button>
       </header>
 
+      <NativeNotificationBanner />
+
       {/* Banner de push notifications */}
       {showPushBanner && (
         <div className="mx-3 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3">
@@ -232,7 +235,7 @@ export function ActiveDeliveryPage() {
           {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
 
           <button
-            onClick={isTracking ? stopTracking : startTracking}
+            onClick={isTracking ? stopTracking : () => void startTracking()}
             className={`w-full py-3 rounded-xl font-bold transition-all active:scale-[0.98] ${
               isTracking
                 ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-100'

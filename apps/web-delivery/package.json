@@ -10,9 +10,15 @@
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run --environment jsdom --globals",
     "test:pwa-browser": "node scripts/pwa-browser-smoke.mjs",
+    "test:mobile-layout": "node scripts/mobile-layout-smoke.mjs",
+    "cap:sync": "cap sync android",
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/geolocation": "^7.1.5",
+    "@capacitor/local-notifications": "^7.0.6",
+    "@capacitor/push-notifications": "^7.0.3",
     "@gestor/auth": "workspace:*",
     "@gestor/core": "workspace:*",
     "@gestor/types": "workspace:*",
@@ -29,6 +35,8 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
     "@eslint/js": "^8.57.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.12",

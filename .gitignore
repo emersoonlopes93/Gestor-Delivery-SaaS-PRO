@@ -36,6 +36,7 @@ pnpm-debug.log*
 
 # Coverage
 coverage/
+apps/web-delivery/artifacts/
 
 # Temp
 tmp/

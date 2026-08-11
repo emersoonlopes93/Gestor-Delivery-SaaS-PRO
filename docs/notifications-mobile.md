@@ -88,3 +88,30 @@ npx cap sync android
 Para build Android, configure JDK/`JAVA_HOME` e execute
 `apps/web-tenant/android/gradlew.bat assembleDebug`. Validação final exige
 emulador/dispositivo para pause/resume, lock, rede, permissão, som e safe area.
+
+## App do entregador
+
+O `web-delivery` possui projeto Capacitor independente em
+`apps/web-delivery/android`, com nome `PedeHub Entregador` e identidade
+`com.pedehub.driver` em config, namespace, package Java e applicationId.
+
+A localização nativa usa `@capacitor/geolocation` somente após o entregador
+tocar em "Permitir localização". O manifest declara apenas
+`ACCESS_COARSE_LOCATION` e `ACCESS_FINE_LOCATION`; não existe
+`ACCESS_BACKGROUND_LOCATION`, foreground service ou plugin de background. Na
+web/PWA, `navigator.geolocation` permanece como fallback.
+
+Assignments já deduplicados pelo pipeline realtime podem gerar uma Local
+Notification no canal `driver-deliveries-v1`, desde que a permissão tenha sido
+concedida por ação do usuário. Isso é feedback local do WebView ativo, não uma
+promessa de entrega remota em background.
+
+`@capacitor/push-notifications` está sincronizado como wiring, mas o cliente não
+chama `register()`. Sem FCM/`google-services.json`, registro de token e contrato
+backend, a UI informa "push remoto nativo ainda não configurado". Nenhuma credencial
+placeholder é aceita; o Web Push da PWA continua sendo o canal remoto existente.
+
+Safe areas usam `viewport-fit=cover`, `env(safe-area-inset-*)` e
+`android.adjustMarginsForEdgeToEdge: auto`. A activity usa `adjustResize` para o
+teclado. O smoke `test:mobile-layout` cobre 390x844 light e 430x932 dark com
+insets simulados, overflow horizontal, header e limite inferior do conteúdo.
