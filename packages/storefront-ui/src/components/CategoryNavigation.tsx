@@ -1,5 +1,12 @@
-import { StorefrontCategoryLayout } from '@gestor/theme';
+import { useEffect, useRef } from 'react';
+import type { StorefrontCategoryLayout } from '@gestor/theme';
 import { cn } from '../cn';
+
+type HorizontalBounds = Pick<DOMRect, 'left' | 'right'>;
+
+export function isOutsideHorizontalViewport(container: HorizontalBounds, item: HorizontalBounds) {
+  return item.left < container.left || item.right > container.right;
+}
 
 interface CategoryNavigationProps {
   categories: Array<{ id: string; name: string; slug: string }>;
@@ -20,6 +27,21 @@ export function CategoryNavigation({
   onCategoryClick,
   className
 }: CategoryNavigationProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  useEffect(() => {
+    if (!activeCategoryId || layout === 'sidebar') return;
+
+    const container = containerRef.current;
+    const activeItem = itemRefs.current.get(activeCategoryId);
+    if (!container || !activeItem) return;
+
+    if (isOutsideHorizontalViewport(container.getBoundingClientRect(), activeItem.getBoundingClientRect())) {
+      activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeCategoryId, categories, layout]);
+
   if (layout === 'sidebar') {
     // Stubbed sidebar as requested
     return (
@@ -29,6 +51,7 @@ export function CategoryNavigation({
             <button
               key={category.id}
               onClick={() => onCategoryClick(category.slug)}
+              aria-current={activeCategoryId === category.id ? 'true' : undefined}
               className={cn(
                 'w-full text-left px-4 py-2 rounded-[var(--storefront-radius)] text-sm font-medium transition-colors',
                 activeCategoryId === category.id
@@ -46,7 +69,7 @@ export function CategoryNavigation({
 
   // Default: Tabs / Horizontal Scroll
   return (
-    <div className={cn(
+    <div ref={containerRef} className={cn(
       'sticky top-0 z-10 bg-[var(--storefront-background)] border-b border-[var(--storefront-border)] overflow-x-auto scrollbar-hide',
       className
     )}>
@@ -54,7 +77,12 @@ export function CategoryNavigation({
         {categories.map((category) => (
           <button
             key={category.id}
+            ref={(element) => {
+              if (element) itemRefs.current.set(category.id, element);
+              else itemRefs.current.delete(category.id);
+            }}
             onClick={() => onCategoryClick(category.slug)}
+            aria-current={activeCategoryId === category.id ? 'true' : undefined}
             className={cn(
               'px-4 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap',
               activeCategoryId === category.id
