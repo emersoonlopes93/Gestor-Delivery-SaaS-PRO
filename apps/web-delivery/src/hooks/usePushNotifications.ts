@@ -10,6 +10,7 @@ interface UsePushNotificationsReturn {
   error: string | null;
   requestPermissionAndSubscribe: () => Promise<void>;
   unsubscribe: () => Promise<void>;
+  cleanupForLogout: () => Promise<void>;
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
@@ -30,6 +31,16 @@ async function getVapidPublicKey(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export async function cleanupDriverPushForLogout(
+  registration?: ServiceWorkerRegistration | null,
+): Promise<void> {
+  await api.post('/notifications/push/unsubscribe-all').catch(() => undefined);
+  if (!('serviceWorker' in navigator)) return;
+  const activeRegistration = registration ?? await navigator.serviceWorker.ready.catch(() => null);
+  const subscription = await activeRegistration?.pushManager.getSubscription().catch(() => null);
+  await subscription?.unsubscribe().catch(() => false);
 }
 
 export function usePushNotifications(): UsePushNotificationsReturn {
@@ -74,8 +85,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         }).catch(() => {/* silencioso */});
       }
     };
-    navigator.serviceWorker.addEventListener('message', handler);
-    return () => navigator.serviceWorker.removeEventListener('message', handler);
+    navigator.serviceWorker?.addEventListener('message', handler);
+    return () => navigator.serviceWorker?.removeEventListener('message', handler);
   }, []);
 
   const requestPermissionAndSubscribe = useCallback(async () => {
@@ -147,6 +158,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     }
   }, []);
 
+  const cleanupForLogout = useCallback(async () => {
+    await cleanupDriverPushForLogout(swRegistrationRef.current);
+    setIsSubscribed(false);
+  }, []);
+
   return {
     permissionState,
     isSubscribed,
@@ -154,5 +170,6 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     error,
     requestPermissionAndSubscribe,
     unsubscribe,
+    cleanupForLogout,
   };
 }

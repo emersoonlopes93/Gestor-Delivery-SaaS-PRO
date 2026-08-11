@@ -17,6 +17,7 @@ import { DriversService } from './drivers.service';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 import { OrdersService } from '../orders/orders.service';
+import { UpdateDriverOperationalStatusDTO } from '@gestor/types';
 
 @Controller('delivery/driver')
 @UseGuards(DriverAuthGuard)
@@ -75,6 +76,14 @@ export class DriverOperationsController {
   async updateMyLocation(@Req() req: AuthenticatedRequest, @Body() data: UpdateDriverLocationDTO) {
     const user = req.user;
     return this.driversService.updateDriverLocation(user.tenantId, user.id, data);
+  }
+
+  @Patch('status')
+  async updateMyStatus(
+    @Req() req: AuthenticatedRequest,
+    @Body() data: UpdateDriverOperationalStatusDTO,
+  ) {
+    return this.driversService.updateOperationalStatus(req.user.tenantId, req.user.id, data.status);
   }
 
   @Patch('runs/:id/complete')

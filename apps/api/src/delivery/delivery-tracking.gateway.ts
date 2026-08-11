@@ -10,11 +10,13 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger, Inject, forwardRef } from '@nestjs/common';
-import { DriverLocationUpdatedEvent } from '@gestor/types';
+import { DriverDeliveryEvent, DriverLocationUpdatedEvent } from '@gestor/types';
+import { OnEvent } from '@nestjs/event-emitter';
 import { DriversService } from './drivers.service';
 import { DriverAuthService } from '../auth/driver-auth.service';
 import { TenantWebSocketAuthService } from '../auth/tenant-websocket-auth.service';
 import { PublicOrderTrackingAccessService } from '../orders/public-order-tracking-access.service';
+import { AUTH_SESSION_REVOKED_EVENT, AuthSessionRevokedEvent } from '../auth/auth-session.events';
 
 @WebSocketGateway({
   cors: true,
@@ -47,6 +49,8 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
         try {
           const payload = await this.driverAuthService.validateAccessToken(token);
           client.data.driverAccess = { token, driverId: payload.sub, tenantId: payload.tenantId };
+          client.data.authSessionId = payload.sid;
+          await client.join(this.driverRoom(payload.tenantId, payload.sub));
         } catch {
           client.disconnect(true);
           return;
@@ -58,6 +62,23 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  @OnEvent(AUTH_SESSION_REVOKED_EVENT)
+  handleSessionRevoked(event: AuthSessionRevokedEvent) {
+    for (const socket of this.server?.sockets.sockets.values() ?? []) {
+      if (socket.data.authSessionId === event.sessionId) {
+        socket.disconnect(true);
+      }
+    }
+  }
+
+  emitDriverDeliveryEvent(tenantId: string, driverId: string, event: DriverDeliveryEvent) {
+    this.server?.to(this.driverRoom(tenantId, driverId)).emit('driverDeliveryEvent', event);
+  }
+
+  private driverRoom(tenantId: string, driverId: string) {
+    return `driver:${tenantId}:${driverId}`;
   }
 
   /**

@@ -1,9 +1,11 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthSessionStatus, AuthSubjectType, Prisma } from '@prisma/client';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
+import { AUTH_SESSION_REVOKED_EVENT, AuthSessionRevokedEvent } from './auth-session.events';
 
 export type SessionContext = {
   userAgent?: string;
@@ -39,6 +41,7 @@ export class AuthSessionService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    @Optional() private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   async createSession(input: CreateSessionInput) {
@@ -251,6 +254,7 @@ export class AuthSessionService {
       sessionId,
       reason,
     });
+    this.eventEmitter?.emit(AUTH_SESSION_REVOKED_EVENT, { sessionId } satisfies AuthSessionRevokedEvent);
     return { revoked: true };
   }
 

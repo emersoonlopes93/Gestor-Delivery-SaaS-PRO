@@ -1,3 +1,19 @@
+## R11 PR A — confiabilidade em tempo real do entregador
+
+Data: 2026-08-11
+Branch: `feat/r11-driver-realtime-reliability`
+Base: `main-copy` / `3114fd4b`
+
+- Atribuições, atualizações e cancelamentos chegam pelo namespace `/delivery` em sala privada derivada da sessão do entregador; não existe join controlado pelo cliente.
+- O app atualiza a lista imediatamente e mantém polling de 15 segundos como fallback. Atribuição toca um único alerta em foreground, com deduplicação pelo mesmo `eventId` usado no push.
+- Web Push recebeu tag, dados e deep link; em janela visível o service worker encaminha o evento ao app e evita notificação duplicada.
+- Logout tenta remover todas as subscriptions do destinatário no backend e a subscription do navegador sem bloquear a saída em caso de falha.
+- Login/sessão, disponibilidade operacional e GPS ficaram separados. O servidor impede `available`/`offline` durante entrega ativa e conserva `busy`.
+- Revogar uma sessão publica somente seu `sid`; o gateway desconecta apenas sockets dessa sessão.
+- Sem schema, migration, banco remoto, Dokploy ou deploy. `DeliveryRun`/`Stop`, múltiplos pedidos, ganhos e background tracking continuam fora do escopo.
+
+---
+
 ## Configuração de largura de papel por impressora
 
 Data: 2026-08-10

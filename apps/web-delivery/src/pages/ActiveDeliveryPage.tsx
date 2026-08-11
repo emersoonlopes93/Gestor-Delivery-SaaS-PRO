@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { api } from '../lib/api';
+import { DriverStatus } from '@gestor/types';
 
 interface DeliveryRun {
   id: string;
@@ -41,12 +42,15 @@ function RunStatusBadge({ status }: { status: DeliveryRun['status'] }) {
 export function ActiveDeliveryPage() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const updateUser = useAuthStore((state) => state.updateUser);
   const navigate = useNavigate();
 
-  const { isTracking, startTracking, stopTracking, error, lastLocation } = useDriverTracking();
+  const { isTracking, startTracking, stopTracking, error, lastLocation, lastDeliveryEvent } = useDriverTracking();
 
   const [runs, setRuns] = useState<DeliveryRun[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [realtimeNotice, setRealtimeNotice] = useState<string | null>(null);
 
   const fetchRuns = async () => {
     try {
@@ -66,6 +70,16 @@ export function ActiveDeliveryPage() {
     const interval = setInterval(fetchRuns, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!lastDeliveryEvent) return;
+    setRealtimeNotice(
+      lastDeliveryEvent.type === 'delivery.assigned'
+        ? `Nova entrega #${lastDeliveryEvent.orderNumber} atribuída a você.`
+        : `A entrega #${lastDeliveryEvent.orderNumber} foi atualizada.`,
+    );
+    void fetchRuns();
+  }, [lastDeliveryEvent]);
 
   const handleComplete = async (runId: string) => {
     try {
@@ -90,15 +104,34 @@ export function ActiveDeliveryPage() {
 
   const handleLogout = async () => {
     stopTracking();
+    await cleanupPushForLogout();
     await api.post('/auth/driver/logout').catch(() => undefined);
     logout();
     navigate('/login');
   };
 
+  const handleOperationalStatus = async () => {
+    if (!user) return;
+    const nextStatus = user.status === DriverStatus.available
+      ? DriverStatus.offline
+      : DriverStatus.available;
+    setStatusLoading(true);
+    try {
+      const response = await api.patch('/delivery/driver/status', { status: nextStatus });
+      const data = response.data.success ? response.data.data : response.data;
+      updateUser({ ...user, status: data.status });
+    } catch {
+      alert('Não foi possível alterar a disponibilidade. Conclua a entrega ativa primeiro.');
+      void fetchRuns();
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   const pendingRuns = runs.filter((r) => r.status === 'ready_for_delivery');
   const activeRuns = runs.filter((r) => r.status === 'out_for_delivery');
 
-  const { permissionState, isSubscribed, isLoading: pushLoading, requestPermissionAndSubscribe, unsubscribe: unsubscribePush } = usePushNotifications();
+  const { permissionState, isSubscribed, isLoading: pushLoading, requestPermissionAndSubscribe, unsubscribe: unsubscribePush, cleanupForLogout: cleanupPushForLogout } = usePushNotifications();
   const showPushBanner = permissionState !== 'unsupported' && permissionState !== 'denied' && !isSubscribed;
 
   return (
@@ -152,6 +185,28 @@ export function ActiveDeliveryPage() {
       )}
       <main className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6">
 
+        {realtimeNotice && (
+          <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">
+            {realtimeNotice}
+          </div>
+        )}
+
+        <div className="bg-[var(--delivery-card)] p-5 rounded-2xl shadow-sm border border-[var(--delivery-border)] flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-bold text-[var(--delivery-foreground)]">Disponibilidade</h2>
+            <p className="text-xs text-[var(--delivery-muted-foreground)]">
+              {user?.status === DriverStatus.available ? 'Você está online para receber entregas.' : user?.status === DriverStatus.busy ? 'Você está ocupado com uma entrega.' : 'Você está offline.'}
+            </p>
+          </div>
+          <button
+            onClick={handleOperationalStatus}
+            disabled={statusLoading || user?.status === DriverStatus.busy}
+            className="rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+          >
+            {user?.status === DriverStatus.available ? 'Ficar offline' : 'Ficar online'}
+          </button>
+        </div>
+
         {/* GPS Status Card */}
         <div className="bg-[var(--delivery-card)] p-5 rounded-2xl shadow-sm border border-[var(--delivery-border)] flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -187,7 +242,7 @@ export function ActiveDeliveryPage() {
                 : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:to-emerald-700 shadow-md shadow-emerald-500/20'
             }`}
           >
-            {isTracking ? 'Pausar GPS' : 'Iniciar GPS (Ficar Online)'}
+            {isTracking ? 'Parar localização' : 'Permitir localização'}
           </button>
         </div>
 

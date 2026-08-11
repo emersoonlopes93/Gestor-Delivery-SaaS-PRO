@@ -22,12 +22,13 @@ describe('DeliveryTrackingGateway driver authentication', () => {
   });
 
   it('binds a driver socket to verified JWT claims and ignores client identity input', async () => {
-    driverAuthService.validateAccessToken.mockResolvedValue({ sub: 'driver-a', tenantId: 'tenant-a' });
+    driverAuthService.validateAccessToken.mockResolvedValue({ sub: 'driver-a', tenantId: 'tenant-a', sid: 'sid-a' });
     const socket = {
       id: 'socket-a',
       handshake: { auth: { token: 'access-token' } },
       data: {},
       disconnect: jest.fn(),
+      join: jest.fn(),
     };
 
     await gateway.handleConnection(socket as never);
@@ -35,6 +36,7 @@ describe('DeliveryTrackingGateway driver authentication', () => {
 
     expect(driverAuthService.validateAccessToken).toHaveBeenCalledTimes(2);
     expect(driverAuthService.validateAccessToken).toHaveBeenCalledWith('access-token');
+    expect(socket.join).toHaveBeenCalledWith('driver:tenant-a:driver-a');
     expect(driversService.updateDriverLocation).toHaveBeenCalledWith(
       'tenant-a',
       'driver-a',
@@ -59,5 +61,40 @@ describe('DeliveryTrackingGateway driver authentication', () => {
     };
     await gateway.handleConnection(socket as never);
     expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('emits a private assignment only to the tenant-scoped driver room', () => {
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    gateway.server = { to } as never;
+    const event = {
+      eventId: 'delivery.assigned:order-a:1',
+      type: 'delivery.assigned',
+      orderId: 'order-a',
+      orderNumber: '101',
+      status: 'ready_for_delivery',
+      occurredAt: '2026-08-11T00:00:00.000Z',
+    } as const;
+
+    gateway.emitDriverDeliveryEvent('tenant-a', 'driver-a', event);
+
+    expect(to).toHaveBeenCalledTimes(1);
+    expect(to).toHaveBeenCalledWith('driver:tenant-a:driver-a');
+    expect(to).not.toHaveBeenCalledWith('driver:tenant-a:driver-b');
+    expect(to).not.toHaveBeenCalledWith('driver:tenant-b:driver-a');
+    expect(emit).toHaveBeenCalledWith('driverDeliveryEvent', event);
+  });
+
+  it('disconnects only sockets from the revoked session', () => {
+    const sessionX = { data: { authSessionId: 'sid-x' }, disconnect: jest.fn() };
+    const sessionY = { data: { authSessionId: 'sid-y' }, disconnect: jest.fn() };
+    gateway.server = {
+      sockets: { sockets: new Map([['x', sessionX], ['y', sessionY]]) },
+    } as never;
+
+    gateway.handleSessionRevoked({ sessionId: 'sid-x' });
+
+    expect(sessionX.disconnect).toHaveBeenCalledWith(true);
+    expect(sessionY.disconnect).not.toHaveBeenCalled();
   });
 });
