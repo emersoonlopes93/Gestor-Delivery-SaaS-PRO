@@ -2,7 +2,7 @@ import { DriverOperationsController } from './driver.controller';
 
 describe('DriverOperationsController canonical route contract', () => {
   const driversService = {
-    updateDriverLocation: jest.fn(),
+    ingestDriverLocations: jest.fn(),
     updateOperationalStatus: jest.fn(),
   };
   const runsService = {
@@ -41,6 +41,21 @@ describe('DriverOperationsController canonical route contract', () => {
     await controller.endShift(request as never);
     expect(runsService.startShiftForDriver).toHaveBeenCalledWith('tenant-a', 'driver-a');
     expect(runsService.endShiftForDriver).toHaveBeenCalledWith('tenant-a', 'driver-a');
+  });
+
+  it('derives location identity only from the authenticated driver session', async () => {
+    const point = {
+      eventKey: 'point-a', recordedAt: '2026-08-12T12:00:00.000Z',
+      lat: -23.5, lng: -46.6, source: 'foreground',
+    } as const;
+    await controller.updateMyLocation(request as never, point);
+    await controller.updateMyLocationBatch(request as never, { points: [point] });
+    expect(driversService.ingestDriverLocations).toHaveBeenNthCalledWith(
+      1, 'tenant-a', 'driver-a', [point],
+    );
+    expect(driversService.ingestDriverLocations).toHaveBeenNthCalledWith(
+      2, 'tenant-a', 'driver-a', [point],
+    );
   });
 
   it('cannot operate a run as a driver supplied by the request body', async () => {

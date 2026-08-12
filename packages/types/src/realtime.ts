@@ -10,6 +10,7 @@ export interface OrderBoardUpdatedEvent {
 export interface DriverLocationUpdatedEvent {
   tenantId: string;
   driverId: string;
+  runId?: string;
   lat: number;
   lng: number;
   lastLocationAt: string;

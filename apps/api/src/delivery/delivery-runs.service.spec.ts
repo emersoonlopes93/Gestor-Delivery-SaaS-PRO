@@ -49,7 +49,9 @@ describe('DeliveryRunsService', () => {
   };
   const prisma = {
     deliveryDriver: tx.deliveryDriver,
+    driverShift: tx.driverShift,
     deliveryRun: tx.deliveryRun,
+    deliveryDriverLocation: { findMany: jest.fn() },
     tenantSettings: tx.tenantSettings,
     order: tx.order,
     $transaction: jest.fn((operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
@@ -63,6 +65,78 @@ describe('DeliveryRunsService', () => {
     tx.deliveryRun.updateMany.mockResolvedValue({ count: 1 });
     tx.deliveryStop.updateMany.mockResolvedValue({ count: 1 });
     tx.deliveryStop.count.mockResolvedValue(0);
+  });
+
+  it('requires tracking only while an active shift has an in-progress or returning route', async () => {
+    tx.driverShift.findFirst.mockResolvedValue({
+      id: 'shift-a', status: 'ACTIVE', startedAt: new Date('2026-08-12T10:00:00.000Z'), endedAt: null,
+    });
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.IN_PROGRESS,
+      driver: { name: 'Ana' },
+      stops: [
+        { id: 'stop-done', status: DeliveryStopStatus.DELIVERED },
+        { id: 'stop-next', status: DeliveryStopStatus.CURRENT },
+      ],
+    }));
+    await expect(service.getDriverWorkState('tenant-a', 'driver-a'))
+      .resolves.toEqual(expect.objectContaining({ trackingRequired: true }));
+
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.ASSIGNED,
+      driver: { name: 'Ana' },
+    }));
+    await expect(service.getDriverWorkState('tenant-a', 'driver-a'))
+      .resolves.toEqual(expect.objectContaining({ trackingRequired: false }));
+
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.RETURNING,
+      driver: { name: 'Ana' },
+      stops: [{ id: 'stop-return', status: DeliveryStopStatus.RETURN_TO_STORE }],
+    }));
+    await expect(service.getDriverWorkState('tenant-a', 'driver-a'))
+      .resolves.toEqual(expect.objectContaining({ trackingRequired: true }));
+  });
+
+  it('returns tenant-scoped detailed run history inside the retention window', async () => {
+    tx.deliveryRun.findFirst.mockResolvedValue({
+      id: 'run-a', driverId: 'driver-a', shiftId: 'shift-a',
+      startedAt: new Date('2026-08-10T10:00:00.000Z'),
+      completedAt: new Date('2026-08-10T11:00:00.000Z'),
+    });
+    prisma.deliveryDriverLocation.findMany.mockResolvedValue([{
+      id: 'location-a', lat: -23.5, lng: -46.6,
+      recordedAt: new Date('2026-08-10T10:30:00.000Z'),
+      accuracy: 10, heading: null, speed: null, source: 'foreground',
+    }]);
+
+    const result = await service.getLocationHistory(
+      'tenant-a', 'run-a', new Date('2026-08-12T12:00:00.000Z'),
+    );
+    expect(tx.deliveryRun.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'run-a', tenantId: 'tenant-a' },
+    }));
+    expect(prisma.deliveryDriverLocation.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ tenantId: 'tenant-a', runId: 'run-a' }),
+    }));
+    expect(result).toEqual(expect.objectContaining({
+      runId: 'run-a', detailedAvailable: true,
+      points: [expect.objectContaining({ recordedAt: '2026-08-10T10:30:00.000Z' })],
+    }));
+  });
+
+  it('keeps the run summary but omits detailed history after 30 days', async () => {
+    tx.deliveryRun.findFirst.mockResolvedValue({
+      id: 'run-old', driverId: 'driver-a', shiftId: 'shift-a',
+      startedAt: new Date('2026-06-30T10:00:00.000Z'),
+      completedAt: new Date('2026-07-01T11:00:00.000Z'),
+    });
+    const result = await service.getLocationHistory(
+      'tenant-a', 'run-old', new Date('2026-08-12T12:00:00.000Z'),
+    );
+    expect(result.detailedAvailable).toBe(false);
+    expect(result.points).toEqual([]);
+    expect(prisma.deliveryDriverLocation.findMany).not.toHaveBeenCalled();
   });
 
   it('starts one tenant-scoped shift and treats a repeated start as idempotent', async () => {

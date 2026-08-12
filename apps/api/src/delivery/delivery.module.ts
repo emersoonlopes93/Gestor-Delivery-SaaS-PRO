@@ -17,6 +17,7 @@ import { LocationModule } from '../location/location.module';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryRunsController } from './delivery-runs.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { DeliveryLocationRetentionService } from './delivery-location-retention.service';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     DriversService,
     DeliveryRunsService,
     DeliveryTrackingGateway,
+    DeliveryLocationRetentionService,
     DeliveryCoverageService,
     {
       provide: DELIVERY_RATE_RULE_REPO,

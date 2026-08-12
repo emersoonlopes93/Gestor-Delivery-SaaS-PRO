@@ -13,6 +13,23 @@ Base: `main-copy` / `d74d49de`
 
 ---
 
+## R13 PR A - route tracking, history, and retention
+
+Date: 2026-08-12
+Branch: `feat/r13-tracking-history`
+Base: `origin/main-copy` / `c7eae324`
+
+- `trackingRequired` is active only for an active shift plus an `IN_PROGRESS` or `RETURNING` run; a delivered stop does not end capture while the run continues.
+- HTTP and WebSocket ingestion derives tenant and driver from the session, revalidates socket JWTs, validates plausibility, samples at about 10 seconds, and deduplicates the local event key.
+- The driver app creates one point for WS and HTTP, keeps a bounded 500-point FIFO buffer, and removes only acknowledged replay items in batches of 100.
+- `DeliveryDriverLocation` has nullable shift/run relations, a device timestamp, and optional quality/source metadata. The additive migration preserves prior history and adds tenant-scoped indexes.
+- `GET /delivery/runs/:id/locations` returns the operational summary and detailed path inside 30 days. Daily purge removes only old samples in bounded batches.
+- The shared freshness helper distinguishes current, stale, and unavailable positions. Map consumption remains in PR B.
+
+Validation: all 57 migrations, including the additive R13 migration, applied to an ephemeral PostgreSQL 16 database. Focused API coverage passed with 7 suites/42 tests; web-delivery passed with 10 files/29 tests. API/web-delivery lint and build, global typecheck, `check:no-any`, `check:features`, and `git diff --check` passed. The full API suite exceeded the 10-minute local command limit without producing a result; CI remains the authoritative full-suite gate. `check:boundaries` reports only the two known baseline imports from `@gestor/storefront-ui`, unchanged by this branch. No remote database, provider, production, Dokploy, or deploy was accessed.
+
+---
+
 ## R11 PR A — confiabilidade em tempo real do entregador
 
 Data: 2026-08-11

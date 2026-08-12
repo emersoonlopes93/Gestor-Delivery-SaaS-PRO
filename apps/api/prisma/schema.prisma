@@ -1197,6 +1197,7 @@ model DriverShift {
   tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   driver    DeliveryDriver    @relation(fields: [driverId], references: [id], onDelete: Restrict)
   runs      DeliveryRun[]
+  locations DeliveryDriverLocation[]
 
   @@index([tenantId, driverId, status])
   @@map("driver_shifts")
@@ -1224,6 +1225,7 @@ model DeliveryRun {
   driver          DeliveryDriver    @relation(fields: [driverId], references: [id], onDelete: Restrict)
   shift           DriverShift       @relation(fields: [shiftId], references: [id], onDelete: Restrict)
   stops           DeliveryStop[]
+  locations       DeliveryDriverLocation[]
 
   @@index([tenantId, driverId, status])
   @@index([tenantId, shiftId])
@@ -1263,17 +1265,30 @@ model DeliveryStop {
 }
 
 model DeliveryDriverLocation {
-  id        String         @id @default(uuid())
-  driverId  String         @map("driver_id")
-  tenantId  String         @map("tenant_id")
-  lat       Float
-  lng       Float
-  createdAt DateTime       @default(now()) @map("created_at")
-  driver    DeliveryDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id         String         @id @default(uuid())
+  driverId   String         @map("driver_id")
+  tenantId   String         @map("tenant_id")
+  shiftId    String?        @map("shift_id")
+  runId      String?        @map("run_id")
+  eventKey   String?        @map("event_key") @db.VarChar(128)
+  lat        Float
+  lng        Float
+  recordedAt DateTime       @default(now()) @map("recorded_at")
+  accuracy   Float?
+  heading    Float?
+  speed      Float?
+  source     String         @default("foreground") @db.VarChar(20)
+  createdAt  DateTime       @default(now()) @map("created_at")
+  driver     DeliveryDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shift      DriverShift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  run        DeliveryRun?   @relation(fields: [runId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
-  @@index([tenantId, driverId, createdAt])
+  @@index([tenantId, driverId, recordedAt])
+  @@index([tenantId, runId, recordedAt])
+  @@index([tenantId, shiftId, recordedAt])
+  @@unique([tenantId, driverId, eventKey])
   @@map("delivery_driver_locations")
 }
 

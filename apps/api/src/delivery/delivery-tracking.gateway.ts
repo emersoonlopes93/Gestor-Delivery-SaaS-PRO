@@ -14,6 +14,7 @@ import {
   DriverDeliveryEvent,
   DriverLocationUpdatedEvent,
   DriverRouteEvent,
+  DriverLocationPointDTO,
 } from '@gestor/types';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DriversService } from './drivers.service';
@@ -131,6 +132,10 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
     this.server.to(`order:${orderToken}`).emit('locationUpdate', event);
   }
 
+  emitDriverLocationUpdated(tenantId: string, event: DriverLocationUpdatedEvent) {
+    this.server?.to(`tenant:${tenantId}`).emit('driverLocationUpdated', event);
+  }
+
   /**
    * Tenant joining to track all its drivers.
    */
@@ -174,7 +179,7 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
    */
   @SubscribeMessage('updateDriverLocation')
   async handleUpdateDriverLocation(
-    @MessageBody() data: { lat: number; lng: number },
+    @MessageBody() data: DriverLocationPointDTO,
     @ConnectedSocket() client: Socket,
   ) {
     const driverAccess = client.data.driverAccess as {
@@ -182,7 +187,13 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
       driverId: string;
       tenantId: string;
     } | undefined;
-    if (!driverAccess || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) {
+    if (
+      !driverAccess
+      || !data.eventKey
+      || !data.recordedAt
+      || !Number.isFinite(data.lat)
+      || !Number.isFinite(data.lng)
+    ) {
       throw new WsException('Não autorizado para este canal.');
     }
 
@@ -199,25 +210,12 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
 
     // Persist to DB so polling-based map always has fresh coords
     try {
-      await this.driversService.updateDriverLocation(driver.tenantId, driver.driverId, {
-        lat: data.lat,
-        lng: data.lng,
-      });
+      await this.driversService.ingestDriverLocations(driver.tenantId, driver.driverId, [data]);
     } catch (err) {
       this.logger.warn(
         `Failed to persist authenticated driver location: ${(err as Error).message}`,
       );
     }
 
-    const event: DriverLocationUpdatedEvent = {
-      driverId: driver.driverId,
-      tenantId: driver.tenantId,
-      lat: data.lat,
-      lng: data.lng,
-      lastLocationAt: new Date().toISOString(),
-    };
-
-    // Fire to tenant tracking UI
-    this.server.to(`tenant:${driver.tenantId}`).emit('driverLocationUpdated', event);
   }
 }

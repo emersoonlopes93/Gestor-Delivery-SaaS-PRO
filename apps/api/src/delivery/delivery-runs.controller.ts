@@ -35,6 +35,15 @@ export class DeliveryRunsController {
     return this.deliveryRunsService.listActiveRuns(req.user.tenantId);
   }
 
+  @Get(':id/locations')
+  @RequirePermissions('delivery.read', 'delivery.dispatch')
+  getLocationHistory(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.deliveryRunsService.getLocationHistory(req.user.tenantId, id);
+  }
+
   @Get('settings')
   @RequirePermissions('delivery.read', 'delivery.dispatch')
   getSettings(@Request() req: AuthenticatedRequest) {

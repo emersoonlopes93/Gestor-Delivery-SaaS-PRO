@@ -4,6 +4,7 @@ describe('DeliveryRunsController tenant contract', () => {
   const service = {
     getBuilderData: jest.fn(),
     listActiveRuns: jest.fn(),
+    getLocationHistory: jest.fn(),
     getSettings: jest.fn(),
     updateSettings: jest.fn(),
     createAssignedRun: jest.fn(),
@@ -65,5 +66,10 @@ describe('DeliveryRunsController tenant contract', () => {
     service.updateSettings.mockResolvedValue({ requiresAcceptance: false });
     await controller.updateSettings(request as never, { requiresAcceptance: false });
     expect(service.updateSettings).toHaveBeenCalledWith('tenant-a', false, 'user-a');
+  });
+
+  it('derives the history tenant from the authenticated tenant request', async () => {
+    await controller.getLocationHistory(request as never, 'run-a');
+    expect(service.getLocationHistory).toHaveBeenCalledWith('tenant-a', 'run-a');
   });
 });

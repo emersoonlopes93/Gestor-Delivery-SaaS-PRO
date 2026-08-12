@@ -3,7 +3,7 @@ import axios from 'axios';
 import type { DriverWorkStateDTO } from '@gestor/types';
 import { api } from '../lib/api';
 
-const EMPTY_STATE: DriverWorkStateDTO = { shift: null, activeRun: null };
+const EMPTY_STATE: DriverWorkStateDTO = { shift: null, activeRun: null, trackingRequired: false };
 
 function unwrap<T>(payload: T | { success: boolean; data: T }): T {
   return payload && typeof payload === 'object' && 'success' in payload && 'data' in payload
