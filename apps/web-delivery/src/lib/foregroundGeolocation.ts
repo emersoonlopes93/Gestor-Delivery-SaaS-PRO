@@ -4,6 +4,9 @@ import { Geolocation } from '@capacitor/geolocation';
 export interface ForegroundPosition {
   latitude: number;
   longitude: number;
+  accuracy?: number;
+  heading?: number;
+  speed?: number;
 }
 
 export type StopForegroundGeolocation = () => Promise<void>;
@@ -47,6 +50,9 @@ export async function startForegroundGeolocation(
         onPosition({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          ...(position.coords.heading !== null ? { heading: position.coords.heading } : {}),
+          ...(position.coords.speed !== null ? { speed: position.coords.speed } : {}),
         });
       },
     );
@@ -62,6 +68,9 @@ export async function startForegroundGeolocation(
     (position) => onPosition({
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+      ...(position.coords.heading !== null ? { heading: position.coords.heading } : {}),
+      ...(position.coords.speed !== null ? { speed: position.coords.speed } : {}),
     }),
     (error) => onError(error.message),
     { enableHighAccuracy: true, maximumAge: 10_000, timeout: 5_000 },

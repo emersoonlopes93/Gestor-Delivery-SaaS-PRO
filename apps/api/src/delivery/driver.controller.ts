@@ -12,6 +12,8 @@ import {
 import type { Response } from 'express';
 import {
   DeliveryRunReasonDTO,
+  DriverLocationBatchDTO,
+  DriverLocationPointDTO,
   type DeliveryRunDTO,
   type DriverRouteEvent,
   UpdateDriverOperationalStatusDTO,
@@ -19,7 +21,6 @@ import {
 import { DriverAuthGuard } from '../auth/guards/driver-auth.guard';
 import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 import { DriversService } from './drivers.service';
-import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 
@@ -159,8 +160,13 @@ export class DriverOperationsController {
   }
 
   @Post('location')
-  updateMyLocation(@Req() req: AuthenticatedRequest, @Body() data: UpdateDriverLocationDTO) {
-    return this.driversService.updateDriverLocation(req.user.tenantId, req.user.id, data);
+  updateMyLocation(@Req() req: AuthenticatedRequest, @Body() data: DriverLocationPointDTO) {
+    return this.driversService.ingestDriverLocations(req.user.tenantId, req.user.id, [data]);
+  }
+
+  @Post('location/batch')
+  updateMyLocationBatch(@Req() req: AuthenticatedRequest, @Body() data: DriverLocationBatchDTO) {
+    return this.driversService.ingestDriverLocations(req.user.tenantId, req.user.id, data.points);
   }
 
   @Patch('status')

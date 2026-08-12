@@ -1,16 +1,24 @@
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
+  IsISO8601,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
   Min,
+  Max,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 import { DriverStatus, DriverVehicleType } from './enums';
 
@@ -133,6 +141,83 @@ export interface DriverShiftDTO {
 export interface DriverWorkStateDTO {
   shift: DriverShiftDTO | null;
   activeRun: DeliveryRunDTO | null;
+  trackingRequired: boolean;
+}
+
+export const DRIVER_LOCATION_SOURCES = ['foreground', 'background'] as const;
+export type DriverLocationSource = typeof DRIVER_LOCATION_SOURCES[number];
+
+export class DriverLocationPointDTO {
+  @IsString()
+  @MaxLength(128)
+  eventKey!: string;
+
+  @IsISO8601({ strict: true })
+  recordedAt!: string;
+
+  @IsLatitude()
+  lat!: number;
+
+  @IsLongitude()
+  lng!: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(10_000)
+  @IsOptional()
+  accuracy?: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(360)
+  @IsOptional()
+  heading?: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(150)
+  @IsOptional()
+  speed?: number;
+
+  @IsIn(DRIVER_LOCATION_SOURCES)
+  source!: DriverLocationSource;
+}
+
+export class DriverLocationBatchDTO {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => DriverLocationPointDTO)
+  points!: DriverLocationPointDTO[];
+}
+
+export interface DriverLocationIngestResultDTO {
+  acknowledgedEventKeys: string[];
+  persistedEventKeys: string[];
+  duplicateEventKeys: string[];
+  sampledOutEventKeys: string[];
+}
+
+export interface DeliveryRunLocationPointDTO {
+  lat: number;
+  lng: number;
+  recordedAt: string;
+  accuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  source: DriverLocationSource;
+}
+
+export interface DeliveryRunLocationHistoryDTO {
+  runId: string;
+  driverId: string;
+  shiftId: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  detailedAvailable: boolean;
+  retainedUntil: string | null;
+  points: DeliveryRunLocationPointDTO[];
 }
 
 export interface DeliveryRunSettingsDTO {

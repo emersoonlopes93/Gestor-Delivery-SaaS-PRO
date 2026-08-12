@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   Bell,
@@ -119,6 +119,7 @@ export function ActiveDeliveryPage() {
   const {
     shift,
     activeRun,
+    trackingRequired,
     isLoading,
     isMutating,
     error: routeError,
@@ -127,7 +128,7 @@ export function ActiveDeliveryPage() {
     endShift,
     acceptRun,
     rejectRun,
-    startRun,
+    startRun: mutateStartRun,
     markArrived,
     completeStop,
     markFailed,
@@ -160,6 +161,7 @@ export function ActiveDeliveryPage() {
   const [failureReason, setFailureReason] = useState('');
   const [customReason, setCustomReason] = useState('');
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const wasTrackingRequiredRef = useRef(false);
 
   const showPushBanner = permissionState !== 'unsupported' && permissionState !== 'denied' && !isSubscribed;
   const orderedStops = useMemo(
@@ -170,6 +172,15 @@ export function ActiveDeliveryPage() {
     stop.status === DeliveryStopStatus.CURRENT || stop.status === DeliveryStopStatus.ARRIVED,
   );
   const returns = orderedStops.filter((stop) => stop.status === DeliveryStopStatus.RETURN_TO_STORE);
+
+  useEffect(() => {
+    if (trackingRequired && !isTracking) {
+      void startTracking();
+    } else if (!trackingRequired && wasTrackingRequiredRef.current && isTracking) {
+      stopTracking();
+    }
+    wasTrackingRequiredRef.current = trackingRequired;
+  }, [isTracking, startTracking, stopTracking, trackingRequired]);
 
   useEffect(() => {
     if (!lastDeliveryEvent) return;
@@ -210,6 +221,14 @@ export function ActiveDeliveryPage() {
       return;
     }
     await runAction(endShift, 'Turno encerrado. Até a próxima!');
+  };
+
+  const startRun = async (runId: string) => {
+    if (!isTracking && !(await startTracking())) {
+      setBlockingMessage('Localizacao necessaria. Ative a localizacao para iniciar esta rota.');
+      return false;
+    }
+    return mutateStartRun(runId);
   };
 
   const handleLogout = async () => {

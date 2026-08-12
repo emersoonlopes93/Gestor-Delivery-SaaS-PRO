@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   markFailed: vi.fn(),
   confirmReturn: vi.fn(),
   completeRun: vi.fn(),
+  startTracking: vi.fn(),
   stopTracking: vi.fn(),
   cleanupPushForLogout: vi.fn(),
   routeState: {} as DriverWorkStateDTO & {
@@ -66,7 +67,7 @@ vi.mock('../hooks/useDriverRoute', () => ({
 vi.mock('../hooks/useDriverTracking', () => ({
   useDriverTracking: () => ({
     ...mocks.trackingState,
-    startTracking: vi.fn(),
+    startTracking: mocks.startTracking,
     stopTracking: mocks.stopTracking,
   }),
 }));
@@ -124,6 +125,10 @@ function setState(activeRun: DeliveryRunDTO | null, hasShift = true) {
       startedAt: '2026-08-11T11:00:00.000Z', endedAt: null,
     } : null,
     activeRun,
+    trackingRequired: Boolean(activeRun && [
+      DeliveryRunStatus.IN_PROGRESS,
+      DeliveryRunStatus.RETURNING,
+    ].includes(activeRun.status)),
     isLoading: false,
     isMutating: false,
     error: null,
@@ -136,7 +141,10 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     setState(null, false);
     mocks.trackingState.lastDeliveryEvent = null;
     mocks.trackingState.lastRouteEvent = null;
+    mocks.trackingState.isTracking = false;
     mocks.startShift.mockResolvedValue(true);
+    mocks.startTracking.mockResolvedValue(true);
+    mocks.startRun.mockResolvedValue(true);
     mocks.acceptRun.mockResolvedValue(true);
     mocks.markFailed.mockResolvedValue(true);
     mocks.confirmReturn.mockResolvedValue(true);
@@ -160,10 +168,13 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     expect(screen.getByRole('radio', { name: /Problema com veículo/ })).toBeTruthy();
   });
 
-  it('starts an auto-assigned route without asking for a second acceptance', () => {
+  it('requires location before starting an auto-assigned route', async () => {
     setState(run(DeliveryRunStatus.ASSIGNED));
     render(<ActiveDeliveryPage />);
-    expect(screen.getByRole('button', { name: 'Iniciar rota' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar rota' }));
+    await waitFor(() => expect(mocks.startTracking).toHaveBeenCalledOnce());
+    expect(mocks.startTracking.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.startRun.mock.invocationCallOrder[0]);
     expect(screen.queryByRole('button', { name: 'Aceitar rota' })).toBeNull();
   });
 
@@ -175,6 +186,17 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     expect(screen.getByRole('radio', { name: /Cliente não estava no local/ })).toBeTruthy();
     expect(screen.getByText('Pedido #102')).toBeTruthy();
     expect(screen.getByText('Depois')).toBeTruthy();
+  });
+
+  it('starts tracking for an in-progress route and stops it after the route ends', async () => {
+    setState(run(DeliveryRunStatus.IN_PROGRESS, DeliveryStopStatus.CURRENT));
+    const view = render(<ActiveDeliveryPage />);
+    await waitFor(() => expect(mocks.startTracking).toHaveBeenCalledOnce());
+
+    mocks.trackingState.isTracking = true;
+    setState(null, true);
+    view.rerender(<ActiveDeliveryPage />);
+    await waitFor(() => expect(mocks.stopTracking).toHaveBeenCalledOnce());
   });
 
   it('confirms physical returns before the route can finish', async () => {

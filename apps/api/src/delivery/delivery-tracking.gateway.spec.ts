@@ -2,7 +2,7 @@ import { WsException } from '@nestjs/websockets';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 
 describe('DeliveryTrackingGateway driver authentication', () => {
-  const driversService = { updateDriverLocation: jest.fn() };
+  const driversService = { ingestDriverLocations: jest.fn() };
   const driverAuthService = { validateAccessToken: jest.fn() };
   const tenantSocketAuth = { validateAccessToken: jest.fn() };
   const publicTrackingAccess = { isValidToken: jest.fn() };
@@ -32,23 +32,48 @@ describe('DeliveryTrackingGateway driver authentication', () => {
     };
 
     await gateway.handleConnection(socket as never);
-    await gateway.handleUpdateDriverLocation({ lat: -23.5, lng: -46.6 }, socket as never);
+    const point = {
+      eventKey: 'point-a',
+      recordedAt: '2026-08-12T12:00:00.000Z',
+      lat: -23.5,
+      lng: -46.6,
+      source: 'foreground',
+    } as const;
+    await gateway.handleUpdateDriverLocation(point, socket as never);
 
     expect(driverAuthService.validateAccessToken).toHaveBeenCalledTimes(2);
     expect(driverAuthService.validateAccessToken).toHaveBeenCalledWith('access-token');
     expect(socket.join).toHaveBeenCalledWith('driver:tenant-a:driver-a');
-    expect(driversService.updateDriverLocation).toHaveBeenCalledWith(
+    expect(driversService.ingestDriverLocations).toHaveBeenCalledWith(
       'tenant-a',
       'driver-a',
-      { lat: -23.5, lng: -46.6 },
+      [point],
     );
   });
 
   it('rejects location updates from a public or unauthenticated socket', async () => {
     const socket = { data: {} };
-    await expect(gateway.handleUpdateDriverLocation({ lat: -23.5, lng: -46.6 }, socket as never))
+    await expect(gateway.handleUpdateDriverLocation({
+      eventKey: 'point-a',
+      recordedAt: '2026-08-12T12:00:00.000Z',
+      lat: -23.5,
+      lng: -46.6,
+      source: 'foreground',
+    }, socket as never))
       .rejects.toBeInstanceOf(WsException);
-    expect(driversService.updateDriverLocation).not.toHaveBeenCalled();
+    expect(driversService.ingestDriverLocations).not.toHaveBeenCalled();
+  });
+
+  it('does not persist a point after the driver session is revoked', async () => {
+    driverAuthService.validateAccessToken.mockRejectedValue(new Error('revoked'));
+    const socket = {
+      data: { driverAccess: { token: 'revoked-token', tenantId: 'tenant-a', driverId: 'driver-a' } },
+    };
+    await expect(gateway.handleUpdateDriverLocation({
+      eventKey: 'point-a', recordedAt: '2026-08-12T12:00:00.000Z',
+      lat: -23.5, lng: -46.6, source: 'foreground',
+    }, socket as never)).rejects.toBeInstanceOf(WsException);
+    expect(driversService.ingestDriverLocations).not.toHaveBeenCalled();
   });
 
   it('disconnects when a supplied driver token is invalid', async () => {

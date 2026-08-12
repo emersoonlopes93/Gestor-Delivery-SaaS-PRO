@@ -19,6 +19,7 @@ import type {
   DeliveryStopDTO,
   DriverShiftDTO,
   DriverWorkStateDTO,
+  DeliveryRunLocationHistoryDTO,
 } from '@gestor/types';
 import {
   DeliveryRunStatus,
@@ -145,6 +146,64 @@ export class DeliveryRunsService {
     return {
       shift: shift ? this.shiftToDTO(shift) : null,
       activeRun,
+      trackingRequired: Boolean(
+        shift
+        && activeRun
+        && [SharedDeliveryRunStatus.IN_PROGRESS, SharedDeliveryRunStatus.RETURNING].includes(activeRun.status),
+      ),
+    };
+  }
+
+  async getLocationHistory(
+    tenantId: string,
+    runId: string,
+    now = new Date(),
+  ): Promise<DeliveryRunLocationHistoryDTO> {
+    const run = await this.prisma.deliveryRun.findFirst({
+      where: { id: runId, tenantId },
+      select: {
+        id: true,
+        driverId: true,
+        shiftId: true,
+        startedAt: true,
+        completedAt: true,
+      },
+    });
+    if (!run) throw new NotFoundException('Rota não encontrada.');
+
+    const retentionCutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000);
+    const detailedAvailable = !run.completedAt || run.completedAt >= retentionCutoff;
+    const points = detailedAvailable
+      ? await this.prisma.deliveryDriverLocation.findMany({
+          where: { tenantId, runId: run.id, recordedAt: { gte: retentionCutoff } },
+          orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
+          select: {
+            lat: true,
+            lng: true,
+            recordedAt: true,
+            accuracy: true,
+            heading: true,
+            speed: true,
+            source: true,
+          },
+        })
+      : [];
+
+    return {
+      runId: run.id,
+      driverId: run.driverId,
+      shiftId: run.shiftId,
+      startedAt: run.startedAt?.toISOString() ?? null,
+      completedAt: run.completedAt?.toISOString() ?? null,
+      detailedAvailable,
+      retainedUntil: run.completedAt
+        ? new Date(run.completedAt.getTime() + 30 * 24 * 60 * 60 * 1_000).toISOString()
+        : null,
+      points: points.map((point) => ({
+        ...point,
+        recordedAt: point.recordedAt.toISOString(),
+        source: point.source === 'background' ? 'background' : 'foreground',
+      })),
     };
   }
 

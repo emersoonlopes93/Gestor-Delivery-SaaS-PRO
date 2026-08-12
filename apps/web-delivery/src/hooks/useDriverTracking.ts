@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { DriverDeliveryEvent, DriverRouteEvent } from '@gestor/types';
+import type {
+  DriverDeliveryEvent,
+  DriverLocationIngestResultDTO,
+  DriverLocationPointDTO,
+  DriverRouteEvent,
+} from '@gestor/types';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../lib/api';
 import { playAssignmentSound, processDriverDeliveryEvent } from '../lib/driverDeliveryEvents';
@@ -10,6 +15,11 @@ import {
   type StopForegroundGeolocation,
 } from '../lib/foregroundGeolocation';
 import { showNativeAssignmentNotification } from '../lib/nativeDriverNotifications';
+import {
+  acknowledgeLocationPoints,
+  enqueueLocationPoint,
+  readLocationBuffer,
+} from '../lib/driverLocationBuffer';
 
 const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
 
@@ -19,6 +29,11 @@ if (import.meta.env.PROD && !configuredWsUrl) {
 
 const WS_URL = configuredWsUrl || 'http://localhost:3333/delivery';
 const HTTP_LOCATION_INTERVAL_MS = 15_000;
+
+function createLocationEventKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `foreground-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function useDriverTracking() {
   const { user, accessToken } = useAuthStore();
@@ -75,14 +90,23 @@ export function useDriverTracking() {
     };
   }, [accessToken, user]);
 
-  const sendLocationHttp = useCallback(async (lat: number, lng: number) => {
+  const replayLocationBuffer = useCallback(async () => {
     if (!user?.driverId) return;
     const now = Date.now();
     if (now - lastHttpSentRef.current < HTTP_LOCATION_INTERVAL_MS) return;
     lastHttpSentRef.current = now;
 
     try {
-      await api.post('/delivery/driver/location', { lat, lng });
+      const points = readLocationBuffer().slice(0, 100);
+      if (points.length === 0) return;
+      const response = await api.post<DriverLocationIngestResultDTO>(
+        '/delivery/driver/location/batch',
+        { points },
+      );
+      const payload = response.data && typeof response.data === 'object' && 'data' in response.data
+        ? (response.data as { data: DriverLocationIngestResultDTO }).data
+        : response.data;
+      acknowledgeLocationPoints(payload.acknowledgedEventKeys);
     } catch (sendError) {
       console.warn('Failed to send location via HTTP:', sendError);
     }
@@ -97,22 +121,33 @@ export function useDriverTracking() {
   }, []);
 
   const startTracking = useCallback(async () => {
-    if (!user) return;
+    if (!user) return false;
     setError(null);
     const generation = trackingGenerationRef.current + 1;
     trackingGenerationRef.current = generation;
 
     try {
+      void replayLocationBuffer();
       const stop = await startForegroundGeolocation(
-        ({ latitude, longitude }) => {
+        ({ latitude, longitude, accuracy, heading, speed }) => {
           if (generation !== trackingGenerationRef.current) return;
           const location = { lat: latitude, lng: longitude };
+          const point: DriverLocationPointDTO = {
+            eventKey: createLocationEventKey(),
+            recordedAt: new Date().toISOString(),
+            ...location,
+            ...(accuracy !== undefined ? { accuracy } : {}),
+            ...(heading !== undefined ? { heading } : {}),
+            ...(speed !== undefined ? { speed } : {}),
+            source: 'foreground',
+          };
+          enqueueLocationPoint(point);
           setLastLocation(location);
 
           if (socketRef.current?.connected) {
-            socketRef.current.emit('updateDriverLocation', location);
+            socketRef.current.emit('updateDriverLocation', point);
           }
-          void sendLocationHttp(latitude, longitude);
+          void replayLocationBuffer();
         },
         (message) => {
           if (generation !== trackingGenerationRef.current) return;
@@ -123,18 +158,26 @@ export function useDriverTracking() {
 
       if (generation !== trackingGenerationRef.current) {
         await stop();
-        return;
+        return false;
       }
       stopGeolocationRef.current = stop;
       setIsTracking(true);
+      return true;
     } catch (trackingError) {
       if (generation !== trackingGenerationRef.current) return;
       setError(trackingError instanceof ForegroundGeolocationError
         ? trackingError.message
         : 'Não foi possível iniciar a localização.');
       setIsTracking(false);
+      return false;
     }
-  }, [sendLocationHttp, stopTracking, user]);
+  }, [replayLocationBuffer, stopTracking, user]);
+
+  useEffect(() => {
+    const replay = () => void replayLocationBuffer();
+    window.addEventListener('online', replay);
+    return () => window.removeEventListener('online', replay);
+  }, [replayLocationBuffer]);
 
   useEffect(() => stopTracking, [stopTracking]);
 
