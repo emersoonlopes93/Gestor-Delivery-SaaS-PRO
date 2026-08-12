@@ -83,6 +83,62 @@ export class DeliveryRunReasonDTO {
   reason!: string;
 }
 
+export class UpdateDeliveryRunSettingsDTO {
+  @IsBoolean()
+  requiresAcceptance!: boolean;
+}
+
+export interface DeliveryStopDTO {
+  id: string;
+  orderId: string;
+  sequence: number;
+  status: DeliveryStopStatus;
+  attempts: number;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  address: Record<string, unknown> | null;
+  arrivedAt: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  returnRequiredAt: string | null;
+  returnedAt: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+}
+
+export interface DeliveryRunDTO {
+  id: string;
+  driverId: string;
+  driverName: string;
+  status: DeliveryRunStatus;
+  version: number;
+  assignedAt: string | null;
+  acceptedAt: string | null;
+  startedAt: string | null;
+  returningAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  stops: DeliveryStopDTO[];
+}
+
+export interface DeliveryRunSettingsDTO {
+  requiresAcceptance: boolean;
+}
+
+export interface DeliveryRunBuilderDataDTO {
+  drivers: DriverDTO[];
+  orders: Array<{
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    customerPhone: string;
+    address: string;
+    createdAt: string;
+  }>;
+}
+
 export class CreateDriverDTO {
   @IsString()
   @MaxLength(150)

@@ -36,3 +36,15 @@ Uma rota em `PENDING_ACCEPTANCE`, `ASSIGNED`, `IN_PROGRESS` ou `RETURNING` mant�
 ## Limites da V1
 
 A sequência é manual. Não há provedor de mapas, otimização, ETA, geocoding em lote, financeiro por corrida, tracking em background ou permissão de localização em background neste contrato.
+
+## API do painel tenant
+
+As rotas abaixo exigem autenticação tenant; `tenantId` e ator são sempre derivados da sessão:
+
+- `GET /delivery/runs/builder`: entregadores livres com turno ativo e pedidos prontos que não pertencem a outra rota ativa;
+- `GET /delivery/runs/active`: rotas ativas com DTO canônico de paradas, sem expor objetos Prisma ou histórico interno;
+- `GET/PATCH /delivery/runs/settings`: leitura e alteração auditada da exigência de aceite;
+- `POST /delivery/runs`: criação e atribuição atômicas de uma rota com `driverId` e `orderIds` ordenados;
+- `PATCH /delivery/runs/:id/reorder`: reordenação otimista das paradas futuras com `expectedVersion`.
+
+O endpoint legado `POST /orders/:id/assign-driver` permanece temporariamente disponível com headers de depreciação. Os consumidores do painel usam `POST /delivery/runs`, inclusive para uma rota de parada única.

@@ -5,7 +5,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  DeliveryRunStatus as SharedDeliveryRunStatus,
+  DeliveryStopStatus as SharedDeliveryStopStatus,
+  DriverStatus as SharedDriverStatus,
+  DriverVehicleType as SharedDriverVehicleType,
   ORDER_STATUS_TRANSITIONS,
+} from '@gestor/types';
+import type {
+  DeliveryRunBuilderDataDTO,
+  DeliveryRunDTO,
+  DeliveryRunSettingsDTO,
+  DeliveryStopDTO,
 } from '@gestor/types';
 import {
   DeliveryRunStatus,
@@ -20,6 +30,10 @@ type TransactionClient = Prisma.TransactionClient;
 
 type RunWithStops = Prisma.DeliveryRunGetPayload<{
   include: { stops: { orderBy: { sequence: 'asc' } } };
+}>;
+
+type TenantRun = Prisma.DeliveryRunGetPayload<{
+  include: { driver: true; stops: { orderBy: { sequence: 'asc' } } };
 }>;
 
 const ACTIVE_RUN_STATUSES: DeliveryRunStatus[] = [
@@ -40,6 +54,99 @@ const OPEN_STOP_STATUSES: DeliveryStopStatus[] = [
 @Injectable()
 export class DeliveryRunsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getBuilderData(tenantId: string): Promise<DeliveryRunBuilderDataDTO> {
+    const [drivers, orders] = await Promise.all([
+      this.prisma.deliveryDriver.findMany({
+        where: {
+          tenantId,
+          isActive: true,
+          status: 'available',
+          shifts: { some: { status: DriverShiftStatus.ACTIVE } },
+          deliveryRuns: { none: { status: { in: ACTIVE_RUN_STATUSES } } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          tenantId,
+          fulfillmentType: 'delivery',
+          status: 'ready_for_delivery',
+          deliveryStops: { none: { status: { in: OPEN_STOP_STATUSES } } },
+        },
+        include: { deliveryAddress: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    return {
+      drivers: drivers.map(({ pin: _pin, ...driver }) => ({
+        ...driver,
+        status: SharedDriverStatus[driver.status],
+        vehicleType: SharedDriverVehicleType[driver.vehicleType],
+        lastLocationAt: driver.lastLocationAt?.toISOString() ?? null,
+      })),
+      orders: orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        address: order.deliveryAddress
+          ? `${order.deliveryAddress.street}, ${order.deliveryAddress.number} - ${order.deliveryAddress.neighborhood}`
+          : 'Endereço não informado',
+        createdAt: order.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async listActiveRuns(tenantId: string): Promise<DeliveryRunDTO[]> {
+    const runs = await this.prisma.deliveryRun.findMany({
+      where: { tenantId, status: { in: ACTIVE_RUN_STATUSES } },
+      include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return runs.map((run) => this.toDTO(run));
+  }
+
+  async getSettings(tenantId: string): Promise<DeliveryRunSettingsDTO> {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { deliveryRunRequiresAcceptance: true },
+    });
+    return { requiresAcceptance: settings?.deliveryRunRequiresAcceptance ?? true };
+  }
+
+  async updateSettings(
+    tenantId: string,
+    requiresAcceptance: boolean,
+    actorId: string,
+  ): Promise<DeliveryRunSettingsDTO> {
+    await this.prisma.$transaction(async (tx) => {
+      const before = await tx.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { deliveryRunRequiresAcceptance: true },
+      });
+      await tx.tenantSettings.upsert({
+        where: { tenantId },
+        create: { tenantId, deliveryRunRequiresAcceptance: requiresAcceptance },
+        update: { deliveryRunRequiresAcceptance: requiresAcceptance },
+      });
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          userId: actorId,
+          userType: 'tenant_user',
+          action: 'tenant.delivery.run_acceptance.update',
+          resource: 'tenant_settings',
+          details: {
+            before: before?.deliveryRunRequiresAcceptance ?? true,
+            after: requiresAcceptance,
+          },
+        },
+      });
+    });
+    return { requiresAcceptance };
+  }
 
   async startShift(tenantId: string, driverId: string) {
     return this.transaction(async (tx) => {
@@ -80,13 +187,19 @@ export class DeliveryRunsService {
     });
   }
 
-  async createRun(tenantId: string, driverId: string, orderIds: string[], actorId?: string) {
+  async createRun(
+    tenantId: string,
+    driverId: string,
+    orderIds: string[],
+    actorId?: string,
+    options: { assignImmediately?: boolean } = {},
+  ) {
     if (orderIds.length === 0 || new Set(orderIds).size !== orderIds.length) {
       throw new BadRequestException('A rota exige pedidos únicos e pelo menos uma parada.');
     }
 
     return this.transaction(async (tx) => {
-      const [driver, shift, orders] = await Promise.all([
+      const [driver, shift, orders, settings] = await Promise.all([
         tx.deliveryDriver.findFirst({ where: { id: driverId, tenantId, isActive: true, status: 'available' } }),
         tx.driverShift.findFirst({ where: { tenantId, driverId, status: DriverShiftStatus.ACTIVE } }),
         tx.order.findMany({
@@ -98,6 +211,12 @@ export class DeliveryRunsService {
           },
           include: { deliveryAddress: true },
         }),
+        options.assignImmediately
+          ? tx.tenantSettings.findUnique({
+              where: { tenantId },
+              select: { deliveryRunRequiresAcceptance: true },
+            })
+          : Promise.resolve(null),
       ]);
 
       if (!driver) throw new NotFoundException('Entregador não encontrado nesta loja.');
@@ -108,12 +227,28 @@ export class DeliveryRunsService {
 
       const byId = new Map(orders.map((order) => [order.id, order]));
       const createdAt = new Date();
+      const requiresAcceptance = settings?.deliveryRunRequiresAcceptance ?? true;
+      const assignedAt = options.assignImmediately ? createdAt : null;
       const run = await tx.deliveryRun.create({
         data: {
           tenantId,
           driverId,
           shiftId: shift.id,
-          history: [this.historyEvent('RUN_CREATED', createdAt, actorId)],
+          assignedAt,
+          acceptedAt: assignedAt && !requiresAcceptance ? assignedAt : null,
+          status: assignedAt && !requiresAcceptance
+            ? DeliveryRunStatus.ASSIGNED
+            : DeliveryRunStatus.PENDING_ACCEPTANCE,
+          history: [
+            this.historyEvent('RUN_CREATED', createdAt, actorId),
+            ...(assignedAt
+              ? [this.historyEvent(
+                  requiresAcceptance ? 'RUN_ASSIGNED' : 'RUN_AUTO_ACCEPTED',
+                  assignedAt,
+                  actorId,
+                )]
+              : []),
+          ],
           stops: {
             create: orderIds.map((orderId, index) => {
               const order = byId.get(orderId);
@@ -146,9 +281,42 @@ export class DeliveryRunsService {
         include: { stops: { orderBy: { sequence: 'asc' } } },
       });
 
+      if (assignedAt) {
+        await tx.order.updateMany({
+          where: { tenantId, id: { in: orderIds }, status: 'ready_for_delivery' },
+          data: { deliveryDriverId: driverId },
+        });
+      }
       await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'busy' } });
       return run;
     });
+  }
+
+  async createAssignedRun(
+    tenantId: string,
+    driverId: string,
+    orderIds: string[],
+    actorId: string,
+  ): Promise<DeliveryRunDTO> {
+    const created = await this.createRun(
+      tenantId,
+      driverId,
+      orderIds,
+      actorId,
+      { assignImmediately: true },
+    );
+    return this.getTenantRunDTO(tenantId, created.id);
+  }
+
+  async reorderTenantStops(
+    tenantId: string,
+    runId: string,
+    stopIds: string[],
+    expectedVersion: number,
+    actorId: string,
+  ): Promise<DeliveryRunDTO> {
+    await this.reorderStops(tenantId, runId, stopIds, expectedVersion, actorId);
+    return this.getTenantRunDTO(tenantId, runId);
   }
 
   async assignRun(tenantId: string, runId: string, actorId?: string) {
@@ -298,8 +466,13 @@ export class DeliveryRunsService {
     }
     return this.transaction(async (tx) => {
       const run = await this.getRun(tx, tenantId, runId);
-      if (run.status !== DeliveryRunStatus.IN_PROGRESS) {
-        throw new ConflictException('Somente rotas em andamento permitem reordenar paradas futuras.');
+      const reorderableStatuses: DeliveryRunStatus[] = [
+        DeliveryRunStatus.PENDING_ACCEPTANCE,
+        DeliveryRunStatus.ASSIGNED,
+        DeliveryRunStatus.IN_PROGRESS,
+      ];
+      if (!reorderableStatuses.includes(run.status)) {
+        throw new ConflictException('Esta rota não permite mais alterar a ordem das paradas.');
       }
       if (run.version !== expectedVersion) throw new ConflictException('A rota foi atualizada; recarregue antes de reordenar.');
 
@@ -538,6 +711,57 @@ export class DeliveryRunsService {
         history: this.appendHistory(run.history, this.historyEvent(type, occurredAt, actorId, details)),
       },
     });
+  }
+
+  private toDTO(run: TenantRun): DeliveryRunDTO {
+    return {
+      id: run.id,
+      driverId: run.driverId,
+      driverName: run.driver.name,
+      status: SharedDeliveryRunStatus[run.status],
+      version: run.version,
+      assignedAt: run.assignedAt?.toISOString() ?? null,
+      acceptedAt: run.acceptedAt?.toISOString() ?? null,
+      startedAt: run.startedAt?.toISOString() ?? null,
+      returningAt: run.returningAt?.toISOString() ?? null,
+      completedAt: run.completedAt?.toISOString() ?? null,
+      createdAt: run.createdAt.toISOString(),
+      stops: run.stops.map((stop) => this.stopToDTO(stop)),
+    };
+  }
+
+  private async getTenantRunDTO(tenantId: string, runId: string): Promise<DeliveryRunDTO> {
+    const run = await this.prisma.deliveryRun.findFirst({
+      where: { id: runId, tenantId },
+      include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
+    });
+    if (!run) throw new NotFoundException('Rota de entrega não encontrada.');
+    return this.toDTO(run);
+  }
+
+  private stopToDTO(stop: TenantRun['stops'][number]): DeliveryStopDTO {
+    const address = stop.addressSnapshot;
+    return {
+      id: stop.id,
+      orderId: stop.orderId,
+      sequence: stop.sequence,
+      status: SharedDeliveryStopStatus[stop.status],
+      attempts: stop.attempts,
+      orderNumber: stop.orderNumberSnapshot,
+      customerName: stop.customerNameSnapshot,
+      customerPhone: stop.customerPhoneSnapshot,
+      address: address && typeof address === 'object' && !Array.isArray(address)
+        ? address
+        : null,
+      arrivedAt: stop.arrivedAt?.toISOString() ?? null,
+      deliveredAt: stop.deliveredAt?.toISOString() ?? null,
+      failedAt: stop.failedAt?.toISOString() ?? null,
+      failureReason: stop.failureReason,
+      returnRequiredAt: stop.returnRequiredAt?.toISOString() ?? null,
+      returnedAt: stop.returnedAt?.toISOString() ?? null,
+      cancelledAt: stop.cancelledAt?.toISOString() ?? null,
+      cancellationReason: stop.cancellationReason,
+    };
   }
 
   private getRun(tx: TransactionClient, tenantId: string, runId: string): Promise<RunWithStops> {

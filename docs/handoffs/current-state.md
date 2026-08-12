@@ -1480,6 +1480,37 @@ Data: 2026-08-10
 ## Quick fix — categoria ativa no scroll do storefront
 
 Data: 2026-08-11
+## R12 PR B — construtor e operação tenant de rotas
+
+Data: 2026-08-11
+Branch: `feat/r12-tenant-route-builder`
+Base: `origin/main-copy` / `288fe8ed` (merge da PR #63)
+
+- Novos endpoints tenant-scoped entregam dados elegíveis do builder, rotas ativas, configuração de aceite e reorder versionado; criação + atribuição ocorrem na mesma transação serializável.
+- Respostas usam DTOs compartilhados e não expõem objetos Prisma, PIN, histórico interno ou `tenantId` controlável pelo cliente.
+- A tela de despacho agora monta uma rota com 1..N pedidos, permite ordenação manual por botões acessíveis, mostra rotas/paradas ativas e preserva cancelamentos/falhas/retornos visíveis.
+- Apenas entregadores ativos, `available`, com turno ativo e sem rota ativa são oferecidos. Apenas pedidos `ready_for_delivery` sem parada ativa são oferecidos.
+- A exigência de aceite é configurável por tenant e cada alteração gera `AuditLog` sem dado sensível.
+- Os consumidores do quadro operacional e drawer criam rota canônica de uma parada em vez de usar atribuição direta. O endpoint legado de atribuição foi marcado com headers de depreciação.
+- Realtime de pedidos invalida também builder/rotas em `orderCancelled`; polling de 15 segundos permanece como fallback.
+- Sem migration, dependência, provider, mapa, otimização, financeiro, background tracking ou mudança de feature flag neste PR.
+
+### Validação
+
+- Testes focados da API: 2 suites/15 testes passaram, incluindo rota atômica com três pedidos e reordenação completa antes do início.
+- Teste focado do web-tenant: 1 arquivo/2 testes passou.
+- Suíte integral da API: 95 suites/412 testes passaram; 4 suites/9 testes condicionais foram ignorados.
+- Suíte integral do web-tenant: 27 arquivos/109 testes passaram.
+- Lint e build da API e do web-tenant, `pnpm typecheck`, `pnpm check:no-any`, `pnpm check:features` e `git diff --check` passaram com exit code 0. O build web manteve somente o aviso preexistente de chunk grande.
+- `pnpm check:boundaries` manteve exit code 1 exclusivamente nas duas violações preexistentes em `StorefrontPreview.tsx` e `product-image-fallback.test.ts`; ambos estão sem diff contra `origin/main-copy`.
+- A avaliação visual/estrutural independente do construtor retornou PASS. A captura autenticada não estava disponível no ambiente local, portanto a evidência funcional da tela ficou nos testes, lint, typecheck e build.
+
+### Próximo passo
+
+- PR C deve migrar `/delivery/driver/active-runs` para o DTO canônico e expor o lifecycle do turno/rota/paradas no app do entregador com eventos privados tenant+driver.
+
+---
+
 ## R12 PR A — domínio de turnos e rotas multi-pedido
 
 Data: 2026-08-11
