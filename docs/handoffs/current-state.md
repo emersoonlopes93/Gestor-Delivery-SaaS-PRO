@@ -1,3 +1,19 @@
+## R13 PR B - tenant maps and order route history
+
+Date: 2026-08-12
+Branch: `feat/r13-tenant-maps`
+Base: `origin/main-copy` / `85d9775c`
+
+- The tenant delivery map keeps waiting-dispatch and in-route orders visible while adding active-run context, numbered stops, store origin, a motorcycle marker, and fresh/stale/unavailable location states.
+- The order drawer resolves `GET /delivery/runs/order/:orderId` before offering `Ver no mapa`; the tenant-scoped endpoint only returns a route whose stop contains that order.
+- The accessible tracking dialog shows the matching driver/run, complete stop addresses, current route history inside 30 days, and an explicit expired-history state without inventing ETA, optimization, or distance.
+- Leaflet/OpenStreetMap dependencies already present in the tenant app are reused; no provider, schema, migration, or new dependency was introduced.
+- Focus trapping, Escape dismissal, focus restoration, scroll locking, responsive safe-area sheet behavior, textual map summaries, and light/dark semantic tokens are covered by focused tests and independent UI evaluation.
+
+Validation: focused API tests passed with 2 suites/21 tests. Focused tenant coverage passed with 4 files/17 tests after restoring the R6 mobile safe-area contract; TypeScript checks for API and tenant and `git diff --check` passed. Full gates and CI are recorded in the PR handoff. No production, Dokploy, remote database, or deploy was accessed.
+
+---
+
 ## R11 PR B — PWA instalável e offline previsível
 
 Data: 2026-08-11

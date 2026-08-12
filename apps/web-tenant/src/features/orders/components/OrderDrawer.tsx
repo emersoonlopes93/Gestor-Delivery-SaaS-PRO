@@ -1,6 +1,7 @@
 import { memo, useEffect, useState, useCallback } from 'react';
-import { X, RefreshCw } from 'lucide-react';
-import { SOURCE_CHANNEL_LABELS, type DeliveryRunBuilderDataDTO, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
+import { MapPinned, X, RefreshCw } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { SOURCE_CHANNEL_LABELS, type DeliveryRunBuilderDataDTO, type DeliveryRunDTO, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
@@ -13,6 +14,8 @@ import { OrderActionsBar } from './OrderActionsBar';
 import { OrderPrintTemplate } from './OrderPrintTemplate';
 import { EditOrderModal } from './EditOrderModal';
 import { DriverSelectionModal } from './DriverSelectionModal';
+import { OrderTrackingDialog } from './OrderTrackingDialog';
+import { orderBelongsToRun } from '../../delivery/tracking-map.utils';
 import { Capacitor } from '@capacitor/core';
 import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
 import { printThermalText } from '../../../lib/thermal-print';
@@ -35,6 +38,14 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+  const trackingRunQuery = useQuery({
+    queryKey: ['delivery-run', 'order', order?.id],
+    enabled: Boolean(order?.id && order.fulfillmentType === 'delivery' && order.deliveryDriverId),
+    queryFn: async () => (await api.get<DeliveryRunDTO | null>(`/delivery/runs/order/${order?.id}`)).data ?? null,
+  });
+  const canTrackOrder = Boolean(order && orderBelongsToRun(order, trackingRunQuery.data));
+  const closeTracking = useCallback(() => setIsTrackingOpen(false), []);
 
   const fetchDetail = useCallback(async (quiet = false) => {
     if (!orderId) return;
@@ -247,17 +258,28 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
 
               {/* Entregador (se for entrega) */}
               {order.fulfillmentType === 'delivery' && (
-              <OrderDriverSection 
-                fulfillmentType={order.fulfillmentType}
-                driverId={order.deliveryDriverId}
-                driverName={order.deliveryDriverName}
-                driverPhone={order.deliveryDriverPhone}
-                driverStatus={order.deliveryDriverStatus}
-                  onAssignDriver={async () => {
-                    await fetchDrivers();
-                    setIsDriverModalOpen(true);
-                  }}
-                />
+                <div className="space-y-3">
+                  <OrderDriverSection
+                    fulfillmentType={order.fulfillmentType}
+                    driverId={order.deliveryDriverId}
+                    driverName={order.deliveryDriverName}
+                    driverPhone={order.deliveryDriverPhone}
+                    driverStatus={order.deliveryDriverStatus}
+                    onAssignDriver={async () => {
+                      await fetchDrivers();
+                      setIsDriverModalOpen(true);
+                    }}
+                  />
+                  {canTrackOrder ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsTrackingOpen(true)}
+                      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-black text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <MapPinned className="h-4 w-4" /> Ver no mapa
+                    </button>
+                  ) : null}
+                </div>
               )}
 
               {/* Itens */}
@@ -320,6 +342,10 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           isSubmitting={isUpdating}
         />
       )}
+
+      {isTrackingOpen && order && canTrackOrder ? (
+        <OrderTrackingDialog order={order} initialRun={trackingRunQuery.data ?? undefined} onClose={closeTracking} />
+      ) : null}
 
       {/* Template de Impressão (invisível na tela, visível no print) */}
       {isPrinting && order && (
