@@ -35,10 +35,10 @@ try {
       }));
     });
     const page = await context.newPage();
-    await page.route('**/api/v1/delivery/driver/active-runs', (route) => route.fulfill({
+    await page.route('**/api/v1/delivery/driver/work-state', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: [] }),
+      body: JSON.stringify({ success: true, data: { shift: null, activeRun: null } }),
     }));
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Motoboy' }).waitFor();

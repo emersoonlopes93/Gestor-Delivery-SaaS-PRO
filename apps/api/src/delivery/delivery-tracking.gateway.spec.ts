@@ -85,6 +85,27 @@ describe('DeliveryTrackingGateway driver authentication', () => {
     expect(emit).toHaveBeenCalledWith('driverDeliveryEvent', event);
   });
 
+  it('emits canonical route updates only to the tenant-scoped driver room', () => {
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    gateway.server = { to } as never;
+    const event = {
+      eventId: 'delivery.run_updated:run-a:1',
+      type: 'delivery.run_updated',
+      change: 'reordered',
+      runId: 'run-a',
+      occurredAt: '2026-08-11T00:00:00.000Z',
+    } as const;
+
+    gateway.emitDriverRouteEvent('tenant-a', 'driver-a', event);
+
+    expect(to).toHaveBeenCalledTimes(1);
+    expect(to).toHaveBeenCalledWith('driver:tenant-a:driver-a');
+    expect(to).not.toHaveBeenCalledWith('driver:tenant-a:driver-b');
+    expect(to).not.toHaveBeenCalledWith('driver:tenant-b:driver-a');
+    expect(emit).toHaveBeenCalledWith('driverRouteEvent', event);
+  });
+
   it('disconnects only sockets from the revoked session', () => {
     const sessionX = { data: { authSessionId: 'sid-x' }, disconnect: jest.fn() };
     const sessionY = { data: { authSessionId: 'sid-y' }, disconnect: jest.fn() };

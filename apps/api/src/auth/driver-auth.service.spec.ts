@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthSessionStatus, AuthSubjectType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
@@ -27,6 +27,9 @@ describe('DriverAuthService slugless login', () => {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
+    driverShift: { findFirst: jest.fn() },
+    deliveryRun: { findFirst: jest.fn() },
+    pushSubscription: { deleteMany: jest.fn() },
     authSession: { findUnique: jest.fn() },
   };
   const authSessionService = {
@@ -49,6 +52,8 @@ describe('DriverAuthService slugless login', () => {
       sessionId: 'session-a',
       refreshToken: 'refresh-a',
     });
+    prisma.driverShift.findFirst.mockResolvedValue(null);
+    prisma.deliveryRun.findFirst.mockResolvedValue(null);
     service = new DriverAuthService(prisma as never, jwtService, authSessionService as never);
   });
 
@@ -187,7 +192,23 @@ describe('DriverAuthService slugless login', () => {
       sub: 'driver-a', tenantId: 'tenant-a', sid: 'session-b', type: 'driver',
     }));
 
-    await service.logout('session-b');
+    await service.logout('driver-a', 'tenant-a', 'session-b');
+    expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-a', recipientType: 'driver', recipientId: 'driver-a' },
+    });
     expect(authSessionService.revokeSession).toHaveBeenCalledWith('session-b', 'logout');
+  });
+
+  it('keeps the session active while the driver has an active shift', async () => {
+    prisma.driverShift.findFirst.mockResolvedValue({ id: 'shift-a' });
+
+    await expect(service.logout('driver-a', 'tenant-a', 'session-b'))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.driverShift.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-a', driverId: 'driver-a', status: 'ACTIVE' },
+      select: { id: true },
+    });
+    expect(prisma.pushSubscription.deleteMany).not.toHaveBeenCalled();
+    expect(authSessionService.revokeSession).not.toHaveBeenCalled();
   });
 });

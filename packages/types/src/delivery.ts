@@ -123,6 +123,18 @@ export interface DeliveryRunDTO {
   stops: DeliveryStopDTO[];
 }
 
+export interface DriverShiftDTO {
+  id: string;
+  status: DriverShiftStatus;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface DriverWorkStateDTO {
+  shift: DriverShiftDTO | null;
+  activeRun: DeliveryRunDTO | null;
+}
+
 export interface DeliveryRunSettingsDTO {
   requiresAcceptance: boolean;
 }

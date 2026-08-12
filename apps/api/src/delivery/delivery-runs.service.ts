@@ -7,6 +7,7 @@ import {
 import {
   DeliveryRunStatus as SharedDeliveryRunStatus,
   DeliveryStopStatus as SharedDeliveryStopStatus,
+  DriverShiftStatus as SharedDriverShiftStatus,
   DriverStatus as SharedDriverStatus,
   DriverVehicleType as SharedDriverVehicleType,
   ORDER_STATUS_TRANSITIONS,
@@ -16,6 +17,8 @@ import type {
   DeliveryRunDTO,
   DeliveryRunSettingsDTO,
   DeliveryStopDTO,
+  DriverShiftDTO,
+  DriverWorkStateDTO,
 } from '@gestor/types';
 import {
   DeliveryRunStatus,
@@ -116,6 +119,35 @@ export class DeliveryRunsService {
     return { requiresAcceptance: settings?.deliveryRunRequiresAcceptance ?? true };
   }
 
+  async getActiveRunForDriver(
+    tenantId: string,
+    driverId: string,
+  ): Promise<DeliveryRunDTO | null> {
+    const run = await this.prisma.deliveryRun.findFirst({
+      where: { tenantId, driverId, status: { in: ACTIVE_RUN_STATUSES } },
+      include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return run ? this.toDTO(run) : null;
+  }
+
+  async getDriverWorkState(
+    tenantId: string,
+    driverId: string,
+  ): Promise<DriverWorkStateDTO> {
+    const [shift, activeRun] = await Promise.all([
+      this.prisma.driverShift.findFirst({
+        where: { tenantId, driverId, status: DriverShiftStatus.ACTIVE },
+        orderBy: { startedAt: 'desc' },
+      }),
+      this.getActiveRunForDriver(tenantId, driverId),
+    ]);
+    return {
+      shift: shift ? this.shiftToDTO(shift) : null,
+      activeRun,
+    };
+  }
+
   async updateSettings(
     tenantId: string,
     requiresAcceptance: boolean,
@@ -185,6 +217,14 @@ export class DeliveryRunsService {
       await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'offline' } });
       return ended;
     });
+  }
+
+  async startShiftForDriver(tenantId: string, driverId: string): Promise<DriverShiftDTO> {
+    return this.shiftToDTO(await this.startShift(tenantId, driverId));
+  }
+
+  async endShiftForDriver(tenantId: string, driverId: string): Promise<DriverShiftDTO> {
+    return this.shiftToDTO(await this.endShift(tenantId, driverId));
   }
 
   async createRun(
@@ -727,6 +767,20 @@ export class DeliveryRunsService {
       completedAt: run.completedAt?.toISOString() ?? null,
       createdAt: run.createdAt.toISOString(),
       stops: run.stops.map((stop) => this.stopToDTO(stop)),
+    };
+  }
+
+  private shiftToDTO(shift: {
+    id: string;
+    status: DriverShiftStatus;
+    startedAt: Date;
+    endedAt: Date | null;
+  }): DriverShiftDTO {
+    return {
+      id: shift.id,
+      status: SharedDriverShiftStatus[shift.status],
+      startedAt: shift.startedAt.toISOString(),
+      endedAt: shift.endedAt?.toISOString() ?? null,
     };
   }
 

@@ -10,7 +10,11 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger, Inject, forwardRef } from '@nestjs/common';
-import { DriverDeliveryEvent, DriverLocationUpdatedEvent } from '@gestor/types';
+import {
+  DriverDeliveryEvent,
+  DriverLocationUpdatedEvent,
+  DriverRouteEvent,
+} from '@gestor/types';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DriversService } from './drivers.service';
 import { DriverAuthService } from '../auth/driver-auth.service';
@@ -75,6 +79,10 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
 
   emitDriverDeliveryEvent(tenantId: string, driverId: string, event: DriverDeliveryEvent) {
     this.server?.to(this.driverRoom(tenantId, driverId)).emit('driverDeliveryEvent', event);
+  }
+
+  emitDriverRouteEvent(tenantId: string, driverId: string, event: DriverRouteEvent) {
+    this.server?.to(this.driverRoom(tenantId, driverId)).emit('driverRouteEvent', event);
   }
 
   private driverRoom(tenantId: string, driverId: string) {
