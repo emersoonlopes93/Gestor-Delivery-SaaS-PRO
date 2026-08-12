@@ -16,9 +16,17 @@ import { GeocodingService } from './geocoding.service';
 import { LocationModule } from '../location/location.module';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryRunsController } from './delivery-runs.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, LocationModule, forwardRef(() => OrdersModule)],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    RbacModule,
+    LocationModule,
+    NotificationsModule,
+    forwardRef(() => OrdersModule),
+  ],
   controllers: [
     DriversController,
     DriverOperationsController,

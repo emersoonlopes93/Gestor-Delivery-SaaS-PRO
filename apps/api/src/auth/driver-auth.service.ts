@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -269,14 +270,46 @@ export class DriverAuthService {
     }
   }
 
-  async logout(sessionId?: string) {
+  async logout(driverId: string, tenantId: string, sessionId?: string) {
+    await this.assertDriverCanLogout(driverId, tenantId);
+    await this.clearDriverPushSubscriptions(driverId, tenantId);
     await this.authSessionService.revokeSession(sessionId, 'logout');
     return { success: true };
   }
 
-  async logoutGlobal(driverId: string) {
+  async logoutGlobal(driverId: string, tenantId: string) {
+    await this.assertDriverCanLogout(driverId, tenantId);
+    await this.clearDriverPushSubscriptions(driverId, tenantId);
     await this.authSessionService.revokeSubjectSessions(AuthSubjectType.driver, driverId, 'logout_global');
     return { success: true };
+  }
+
+  private async clearDriverPushSubscriptions(driverId: string, tenantId: string) {
+    await this.prisma.pushSubscription.deleteMany({
+      where: { tenantId, recipientType: 'driver', recipientId: driverId },
+    });
+  }
+
+  private async assertDriverCanLogout(driverId: string, tenantId: string) {
+    const [activeShift, activeRun] = await Promise.all([
+      this.prisma.driverShift.findFirst({
+        where: { tenantId, driverId, status: 'ACTIVE' },
+        select: { id: true },
+      }),
+      this.prisma.deliveryRun.findFirst({
+        where: {
+          tenantId,
+          driverId,
+          status: { in: ['PENDING_ACCEPTANCE', 'ASSIGNED', 'IN_PROGRESS', 'RETURNING'] },
+        },
+        select: { id: true },
+      }),
+    ]);
+    if (activeShift || activeRun) {
+      throw new ConflictException(
+        'Finalize sua rota ou encerre seu turno antes de sair.',
+      );
+    }
   }
 
   async listSessions(driverId: string) {

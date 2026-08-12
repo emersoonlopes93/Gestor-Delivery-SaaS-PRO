@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { DriverDeliveryEvent } from '@gestor/types';
+import type { DriverDeliveryEvent, DriverRouteEvent } from '@gestor/types';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../lib/api';
 import { playAssignmentSound, processDriverDeliveryEvent } from '../lib/driverDeliveryEvents';
@@ -31,6 +31,7 @@ export function useDriverTracking() {
   const [error, setError] = useState<string | null>(null);
   const [lastLocation, setLastLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [lastDeliveryEvent, setLastDeliveryEvent] = useState<DriverDeliveryEvent | null>(null);
+  const [lastRouteEvent, setLastRouteEvent] = useState<DriverRouteEvent | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +59,7 @@ export function useDriverTracking() {
       });
     };
     socket.on('driverDeliveryEvent', handleDeliveryEvent);
+    socket.on('driverRouteEvent', setLastRouteEvent);
 
     const handleServiceWorkerMessage = (message: MessageEvent) => {
       if (message.data?.type === 'DRIVER_DELIVERY_PUSH') {
@@ -143,5 +145,6 @@ export function useDriverTracking() {
     error,
     lastLocation,
     lastDeliveryEvent,
+    lastRouteEvent,
   };
 }

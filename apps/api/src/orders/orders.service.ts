@@ -38,6 +38,7 @@ import type {
   PizzaCompositionDTO,
   OrderAutoAcceptSettings,
   DriverDeliveryEvent,
+  DriverRouteEvent,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import type { FulfillmentType } from '@gestor/types';
@@ -1284,6 +1285,14 @@ export class OrdersService {
         this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
       ]);
     }
+    const cancelledRun = nextStatus === 'cancelled'
+      ? await this.deliveryRunsService?.cancelStopFromOrderCancellation(
+          tenantId,
+          orderId,
+          dto.note ?? 'Pedido cancelado',
+        )
+      : null;
+
     if (order.deliveryDriverId) {
       const event = this.createDriverDeliveryEvent(
         nextStatus === 'cancelled' ? 'delivery.cancelled' : 'delivery.updated',
@@ -1298,11 +1307,24 @@ export class OrdersService {
           title: 'Entrega cancelada',
           body: `O pedido #${order.orderNumber} foi cancelado.`,
         });
+        if (cancelledRun) {
+          const stop = cancelledRun.stops.find((item) => item.orderId === orderId);
+          const occurredAt = new Date().toISOString();
+          const routeEvent: DriverRouteEvent = {
+            eventId: `delivery.stop_updated:${cancelledRun.id}:${stop?.id ?? orderId}:${occurredAt}`,
+            type: 'delivery.stop_updated',
+            change: 'cancelled',
+            runId: cancelledRun.id,
+            ...(stop ? { stopId: stop.id } : {}),
+            occurredAt,
+          };
+          this.deliveryTrackingGateway?.emitDriverRouteEvent(
+            tenantId,
+            order.deliveryDriverId,
+            routeEvent,
+          );
+        }
       }
-    }
-
-    if (nextStatus === 'cancelled') {
-      await this.deliveryRunsService?.cancelStopFromOrderCancellation(tenantId, orderId, dto.note ?? 'Pedido cancelado');
     }
 
     return updated;

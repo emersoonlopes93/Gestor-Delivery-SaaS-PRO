@@ -29,6 +29,26 @@ export interface DriverDeliveryEvent {
   occurredAt: string;
 }
 
+export type DriverRouteEventType =
+  | 'delivery.run_assigned'
+  | 'delivery.run_updated'
+  | 'delivery.stop_updated';
+
+export type DriverRouteEventChange =
+  | 'assigned'
+  | 'reordered'
+  | 'cancelled'
+  | 'updated';
+
+export interface DriverRouteEvent {
+  eventId: string;
+  type: DriverRouteEventType;
+  change: DriverRouteEventChange;
+  runId: string;
+  stopId?: string;
+  occurredAt: string;
+}
+
 export interface OrderStatusUpdatedEvent {
   orderId: string;
   orderNumber: string;

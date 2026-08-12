@@ -1,111 +1,209 @@
 import {
+  Body,
   Controller,
   Get,
+  Param,
   Patch,
   Post,
-  Param,
-  Body,
-  UseGuards,
   Req,
-  NotFoundException,
-  Inject,
-  forwardRef,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import {
+  DeliveryRunReasonDTO,
+  type DeliveryRunDTO,
+  type DriverRouteEvent,
+  UpdateDriverOperationalStatusDTO,
+} from '@gestor/types';
 import { DriverAuthGuard } from '../auth/guards/driver-auth.guard';
-import { PrismaService } from '../database/prisma.service';
+import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 import { DriversService } from './drivers.service';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
-import { AuthenticatedRequest } from '../common/interfaces/request.interface';
-import { OrdersService } from '../orders/orders.service';
-import { UpdateDriverOperationalStatusDTO } from '@gestor/types';
+import { DeliveryRunsService } from './delivery-runs.service';
+import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 
 @Controller('delivery/driver')
 @UseGuards(DriverAuthGuard)
 export class DriverOperationsController {
   constructor(
-    private readonly prisma: PrismaService,
     private readonly driversService: DriversService,
-    @Inject(forwardRef(() => OrdersService))
-    private readonly ordersService: OrdersService,
+    private readonly deliveryRunsService: DeliveryRunsService,
+    private readonly deliveryTrackingGateway: DeliveryTrackingGateway,
   ) {}
 
-  @Get('active-runs')
-  async getActiveRuns(@Req() req: AuthenticatedRequest) {
-    const user = req.user;
-
-    // BUG 3 FIX: Include ready_for_delivery so driver sees assigned-but-not-yet-dispatched orders
-    const runs = await this.prisma.order.findMany({
-      where: {
-        tenantId: user.tenantId,
-        deliveryDriverId: user.id,
-        status: { in: ['ready_for_delivery', 'out_for_delivery'] },
-      },
-      include: {
-        deliveryAddress: true,
-        items: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
-
-    return runs.map((run) => ({
-      id: run.id,
-      orderNumber: run.orderNumber,
-      status: run.status,
-      customerName: run.customerName,
-      customerPhone: run.customerPhone,
-      deliveryAddress: run.deliveryAddress
-        ? {
-            street: run.deliveryAddress.street,
-            number: run.deliveryAddress.number,
-            neighborhood: run.deliveryAddress.neighborhood,
-            city: run.deliveryAddress.city,
-            complement: run.deliveryAddress.complement,
-          }
-        : null,
-    }));
+  @Get('work-state')
+  getWorkState(@Req() req: AuthenticatedRequest) {
+    return this.deliveryRunsService.getDriverWorkState(req.user.tenantId, req.user.id);
   }
 
-  /**
-   * BUG 5 FIX: Endpoint para o entregador atualizar sua própria localização via HTTP REST.
-   * O app do entregador chama isso periodicamente para garantir persistência no DB,
-   * independente do WebSocket.
-   */
+  @Get('active-run')
+  getActiveRun(@Req() req: AuthenticatedRequest) {
+    return this.deliveryRunsService.getActiveRunForDriver(req.user.tenantId, req.user.id);
+  }
+
+  @Get('active-runs')
+  getDeprecatedActiveRun(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.setHeader('Deprecation', 'true');
+    response.setHeader('Link', '</delivery/driver/active-run>; rel="successor-version"');
+    return this.getActiveRun(req);
+  }
+
+  @Post('shift/start')
+  startShift(@Req() req: AuthenticatedRequest) {
+    return this.deliveryRunsService.startShiftForDriver(req.user.tenantId, req.user.id);
+  }
+
+  @Post('shift/end')
+  endShift(@Req() req: AuthenticatedRequest) {
+    return this.deliveryRunsService.endShiftForDriver(req.user.tenantId, req.user.id);
+  }
+
+  @Post('runs/:id/accept')
+  async acceptRun(@Req() req: AuthenticatedRequest, @Param('id') runId: string) {
+    await this.deliveryRunsService.acceptRun(req.user.tenantId, runId, req.user.id);
+    return this.refreshAndEmit(req, runId, 'delivery.run_updated');
+  }
+
+  @Post('runs/:id/reject')
+  async rejectRun(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') runId: string,
+    @Body() body: DeliveryRunReasonDTO,
+  ) {
+    await this.deliveryRunsService.rejectRun(
+      req.user.tenantId,
+      runId,
+      req.user.id,
+      body.reason,
+    );
+    this.emitRouteEvent(req, runId, 'delivery.run_updated');
+    return null;
+  }
+
+  @Post('runs/:id/start')
+  async startRun(@Req() req: AuthenticatedRequest, @Param('id') runId: string) {
+    await this.deliveryRunsService.startRun(req.user.tenantId, runId, req.user.id);
+    return this.refreshAndEmit(req, runId, 'delivery.run_updated');
+  }
+
+  @Post('runs/:id/stops/:stopId/arrived')
+  async markArrived(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') runId: string,
+    @Param('stopId') stopId: string,
+  ) {
+    await this.deliveryRunsService.markStopArrived(
+      req.user.tenantId,
+      runId,
+      stopId,
+      req.user.id,
+    );
+    return this.refreshAndEmit(req, runId, 'delivery.stop_updated', stopId);
+  }
+
+  @Post('runs/:id/stops/:stopId/complete')
+  async completeStop(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') runId: string,
+    @Param('stopId') stopId: string,
+  ) {
+    await this.deliveryRunsService.completeStop(
+      req.user.tenantId,
+      runId,
+      stopId,
+      req.user.id,
+    );
+    return this.refreshAndEmit(req, runId, 'delivery.stop_updated', stopId);
+  }
+
+  @Post('runs/:id/stops/:stopId/failed')
+  async markFailed(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') runId: string,
+    @Param('stopId') stopId: string,
+    @Body() body: DeliveryRunReasonDTO,
+  ) {
+    await this.deliveryRunsService.markFailedAttempt(
+      req.user.tenantId,
+      runId,
+      stopId,
+      req.user.id,
+      body.reason,
+    );
+    return this.refreshAndEmit(req, runId, 'delivery.stop_updated', stopId);
+  }
+
+  @Post('runs/:id/stops/:stopId/returned')
+  async confirmReturn(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') runId: string,
+    @Param('stopId') stopId: string,
+  ) {
+    await this.deliveryRunsService.confirmReturnedToStore(
+      req.user.tenantId,
+      runId,
+      stopId,
+      req.user.id,
+    );
+    return this.refreshAndEmit(req, runId, 'delivery.stop_updated', stopId);
+  }
+
+  @Post('runs/:id/complete')
+  async completeRun(@Req() req: AuthenticatedRequest, @Param('id') runId: string) {
+    await this.deliveryRunsService.completeRun(req.user.tenantId, runId, req.user.id);
+    return this.refreshAndEmit(req, runId, 'delivery.run_updated');
+  }
+
   @Post('location')
-  async updateMyLocation(@Req() req: AuthenticatedRequest, @Body() data: UpdateDriverLocationDTO) {
-    const user = req.user;
-    return this.driversService.updateDriverLocation(user.tenantId, user.id, data);
+  updateMyLocation(@Req() req: AuthenticatedRequest, @Body() data: UpdateDriverLocationDTO) {
+    return this.driversService.updateDriverLocation(req.user.tenantId, req.user.id, data);
   }
 
   @Patch('status')
-  async updateMyStatus(
+  updateMyStatus(
     @Req() req: AuthenticatedRequest,
     @Body() data: UpdateDriverOperationalStatusDTO,
   ) {
     return this.driversService.updateOperationalStatus(req.user.tenantId, req.user.id, data.status);
   }
 
-  @Patch('runs/:id/complete')
-  async completeRun(@Req() req: AuthenticatedRequest, @Param('id') orderId: string) {
-    const user = req.user;
+  private async refreshAndEmit(
+    req: AuthenticatedRequest,
+    runId: string,
+    type: DriverRouteEvent['type'],
+    stopId?: string,
+  ): Promise<DeliveryRunDTO | null> {
+    const run = await this.deliveryRunsService.getActiveRunForDriver(
+      req.user.tenantId,
+      req.user.id,
+    );
+    this.emitRouteEvent(req, runId, type, stopId);
+    return run;
+  }
 
-    const order = await this.prisma.order.findFirst({
-      where: {
-        id: orderId,
-        tenantId: user.tenantId,
-        deliveryDriverId: user.id,
-        status: 'out_for_delivery',
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Delivery not found or not currently active for you.');
-    }
-
-    return this.ordersService.updateOrderStatus(orderId, user.tenantId, {
-      status: 'completed',
-      note: 'Entrega concluída pelo entregador.',
-    });
+  private emitRouteEvent(
+    req: AuthenticatedRequest,
+    runId: string,
+    type: DriverRouteEvent['type'],
+    stopId?: string,
+  ) {
+    const occurredAt = new Date().toISOString();
+    const event: DriverRouteEvent = {
+      eventId: `${type}:${runId}:${stopId ?? 'run'}:${occurredAt}`,
+      type,
+      change: 'updated',
+      runId,
+      ...(stopId ? { stopId } : {}),
+      occurredAt,
+    };
+    this.deliveryTrackingGateway.emitDriverRouteEvent(
+      req.user.tenantId,
+      req.user.id,
+      event,
+    );
   }
 }

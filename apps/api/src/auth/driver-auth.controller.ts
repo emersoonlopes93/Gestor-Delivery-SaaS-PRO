@@ -44,15 +44,15 @@ export class DriverAuthController {
   @Post('logout')
   @UseGuards(DriverAuthGuard)
   async logout(@Req() req: Request) {
-    const user = req.user as { sid?: string };
-    return this.driverAuthService.logout(user.sid);
+    const user = req.user as { sub: string; tenantId: string; sid?: string };
+    return this.driverAuthService.logout(user.sub, user.tenantId, user.sid);
   }
 
   @Post('logout-global')
   @UseGuards(DriverAuthGuard)
   async logoutGlobal(@Req() req: Request) {
-    const user = req.user as { sub: string };
-    return this.driverAuthService.logoutGlobal(user.sub);
+    const user = req.user as { sub: string; tenantId: string };
+    return this.driverAuthService.logoutGlobal(user.sub, user.tenantId);
   }
 
   @Get('sessions')

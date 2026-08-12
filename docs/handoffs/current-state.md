@@ -1659,3 +1659,27 @@ Base: `origin/main-copy` / `b704020e` (merge da PR #61)
   validados por adapter tests e build, mas o smoke em hardware permanece pendente.
 - Nenhuma API, schema Prisma, migration, credencial, banco remoto, produção,
   Dokploy, deploy, release signing ou publicação de APK foi realizada.
+
+---
+
+## R12 PR C — ciclo operacional do entregador
+
+Data: 2026-08-11
+Branch: `feat/r12-driver-route-lifecycle`
+Base: `origin/main-copy` / `921fcaa8` (merge da PR #64)
+
+- O app do entregador agora consome `DriverShift`, `DeliveryRun` e `DeliveryStop` canônicos por `GET /delivery/driver/work-state`, com polling de reconciliação e eventos privados por rota.
+- Turno explícito, aceite/recusa por rota, início, chegada, entrega, falha, próxima parada, devolução e conclusão final são expostos por endpoints autenticados que derivam tenant e entregador exclusivamente do JWT.
+- Eventos `driverRouteEvent` são emitidos somente para a sala privada derivada pelo servidor. Atribuição e cancelamento preservam os eventos/push legados de R11 enquanto o fluxo operacional migra para o contrato canônico.
+- O logout fica bloqueado enquanto existe turno ou rota ativa. Quando permitido, remove as inscrições push tenant-scoped antes de revogar a sessão; a UI só limpa tracking e estado local após sucesso HTTP.
+- A tela mobile mostra a ordem textual completa das paradas, estados e retornos, anuncia cancelamentos/reordenações com `aria-live`, mantém alvos de toque e safe areas, e não adiciona mapa, ETA, valor por corrida ou tracking em background.
+- `GET /delivery/driver/active-runs` foi mantido apenas como alias depreciado do estado canônico singular; o consumidor e o smoke mobile usam `work-state`.
+
+### Validação
+
+- API: 4 suítes focadas/23 testes e suíte integral com 96 suítes/419 testes passaram; 4 suítes/9 testes condicionais foram ignorados. Lint, TypeScript e build passaram. O primeiro run integral encontrou somente workspaces locais sem `dist`; depois de compilar `@gestor/core`, `@gestor/utils` e `@gestor/theme`, o rerun passou integralmente.
+- Web-delivery: 9 arquivos/26 testes passaram, incluindo 8 cenários da nova tela, branding Android, GPS foreground, PWA, notificações e push. Lint, TypeScript e build passaram.
+- Regressão PWA real: manifest instalável, service worker ativo/controlando a página e navegação offline passaram. Layout mobile passou em 390x844 light e 430x932 dark.
+- `cap sync android` passou. `assembleDebug` passou com JBR 21 e o SDK Android local, gerando `app-debug.apk` com 5.404.653 bytes e SHA-256 `AFB1E769F84B697924BFEE92317C126D44B4E4FFE503A04E8516DD0012DCA385`.
+- Os gates globais, a CI da PR e a CI pós-merge ainda devem ser registrados antes de encerrar a sprint.
+- Nenhum schema Prisma, migration, dependência, feature flag, banco remoto, provider, produção, Dokploy, deploy ou publicação faz parte desta PR.

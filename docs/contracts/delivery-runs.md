@@ -48,3 +48,16 @@ As rotas abaixo exigem autenticação tenant; `tenantId` e ator são sempre deri
 - `PATCH /delivery/runs/:id/reorder`: reordenação otimista das paradas futuras com `expectedVersion`.
 
 O endpoint legado `POST /orders/:id/assign-driver` permanece temporariamente disponível com headers de depreciação. Os consumidores do painel usam `POST /delivery/runs`, inclusive para uma rota de parada única.
+
+## API do entregador
+
+As rotas abaixo exigem JWT de entregador. `tenantId` e `driverId` são sempre derivados da sessão validada; nenhum identificador operacional enviado pelo cliente pode substituir essa identidade:
+
+- `GET /delivery/driver/work-state`: retorna o turno ativo e a rota ativa canônica, ou `null` para cada estado ausente;
+- `POST /delivery/driver/shift/start` e `POST /delivery/driver/shift/end`: iniciam e encerram explicitamente o turno;
+- `POST /delivery/driver/runs/:id/accept|reject|start|complete`: executam as transições da rota;
+- `POST /delivery/driver/runs/:id/stops/:stopId/arrived|complete|failed|returned`: executam as transições da parada atual e dos retornos físicos.
+
+`GET /delivery/driver/active-run` retorna somente a rota canônica atual. O alias legado `GET /delivery/driver/active-runs` permanece temporariamente disponível com headers de depreciação, mas não devolve mais uma lista de pedidos apresentada como rotas.
+
+Encerrar turno ou sair da sessão enquanto existe turno ou rota ativa retorna conflito. Quando o logout é permitido, as inscrições Web Push do entregador naquele tenant são removidas antes da revogação da sessão.

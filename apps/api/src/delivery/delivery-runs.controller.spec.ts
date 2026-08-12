@@ -9,27 +9,55 @@ describe('DeliveryRunsController tenant contract', () => {
     createAssignedRun: jest.fn(),
     reorderTenantStops: jest.fn(),
   };
-  const controller = new DeliveryRunsController(service as never);
+  const gateway = {
+    emitDriverRouteEvent: jest.fn(),
+    emitDriverDeliveryEvent: jest.fn(),
+  };
+  const pushService = { enqueueDriverNotification: jest.fn() };
+  const controller = new DeliveryRunsController(
+    service as never,
+    gateway as never,
+    pushService as never,
+  );
   const request = { user: { tenantId: 'tenant-a', id: 'user-a' } };
 
   beforeEach(() => jest.clearAllMocks());
 
   it('derives tenant and actor from the authenticated request when creating a route', async () => {
-    service.createAssignedRun.mockResolvedValue({ id: 'run-a' });
+    service.createAssignedRun.mockResolvedValue({
+      id: 'run-a',
+      driverId: 'driver-a',
+      stops: [{ id: 'stop-a', orderId: 'order-a', orderNumber: '101' }],
+    });
     await controller.create(request as never, { driverId: 'driver-a', orderIds: ['order-a', 'order-b'] });
     expect(service.createAssignedRun).toHaveBeenCalledWith(
       'tenant-a', 'driver-a', ['order-a', 'order-b'], 'user-a',
     );
+    expect(gateway.emitDriverRouteEvent).toHaveBeenCalledWith(
+      'tenant-a',
+      'driver-a',
+      expect.objectContaining({ type: 'delivery.run_assigned', runId: 'run-a' }),
+    );
+    expect(pushService.enqueueDriverNotification).toHaveBeenCalledWith(
+      'tenant-a',
+      'driver-a',
+      expect.objectContaining({ title: 'Nova rota atribuída' }),
+    );
   });
 
   it('never accepts tenant or actor from the reorder payload', async () => {
-    service.reorderTenantStops.mockResolvedValue({ id: 'run-a' });
+    service.reorderTenantStops.mockResolvedValue({ id: 'run-a', driverId: 'driver-a' });
     await controller.reorder(request as never, 'run-a', {
       expectedVersion: 4,
       stopIds: ['stop-b', 'stop-c'],
     });
     expect(service.reorderTenantStops).toHaveBeenCalledWith(
       'tenant-a', 'run-a', ['stop-b', 'stop-c'], 4, 'user-a',
+    );
+    expect(gateway.emitDriverRouteEvent).toHaveBeenCalledWith(
+      'tenant-a',
+      'driver-a',
+      expect.objectContaining({ type: 'delivery.run_updated', change: 'reordered' }),
     );
   });
 
