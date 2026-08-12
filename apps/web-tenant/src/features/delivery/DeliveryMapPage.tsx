@@ -1,599 +1,142 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import type { LatLngBoundsExpression, LatLngExpression } from 'leaflet';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Bike, Crosshair, MapPin, Navigation, RefreshCw, Route } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import type { DeliveryRunDTO, DriverDTO, OrderDispatchItemDTO, Tenant } from '@gestor/types';
+import { DeliveryRunStatus } from '@gestor/types';
 import { api } from '@/lib/api-client';
-import { DriverStatus } from '@gestor/types';
-import type { DriverDTO, OrderDispatchItemDTO } from '@gestor/types';
-
-type DriverMarker = {
-  id: string;
-  name: string;
-  status: DriverDTO['status'];
-  lat: number;
-  lng: number;
-  lastLocationAt: string | null;
-};
-
-type OrderMarker = {
-  id: string;
-  orderNumber: string;
-  status: OrderDispatchItemDTO['status'];
-  customerName: string;
-  lat: number;
-  lng: number;
-  deliveryDriverName: string | null;
-  deliveryDriverId: string | null;
-};
-
-type SelectedTarget =
-  | { kind: 'driver'; id: string }
-  | { kind: 'order'; id: string }
-  | null;
-
-function fmtRelativeTime(iso: string | null): string {
-  if (!iso) return '—';
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '—';
-  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000));
-  if (diffSec < 10) return 'agora';
-  if (diffSec < 60) return `há ${diffSec}s`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `há ${diffMin}min`;
-  const diffHr = Math.floor(diffMin / 60);
-  return `há ${diffHr}h`;
-}
-
-function driverColor(status: DriverDTO['status']): string {
-  switch (status) {
-    case DriverStatus.available:
-      return '#16a34a';
-    case DriverStatus.busy:
-      return '#2563eb';
-    case DriverStatus.offline:
-    default:
-      return '#6b7280';
-  }
-}
-
-function createDriverDivIcon(status: DriverDTO['status']): L.DivIcon {
-  const color = driverColor(status);
-  const html = `
-    <div style="
-      width: 22px;
-      height: 22px;
-      border-radius: 9999px;
-      background: ${color};
-      border: 3px solid rgba(255,255,255,0.95);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
-    "></div>
-  `;
-
-  return L.divIcon({
-    className: '',
-    html,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-    popupAnchor: [0, -12],
-  });
-}
-
-function createOrderDivIcon(): L.DivIcon {
-  const html = `
-    <div style="
-      width: 24px;
-      height: 24px;
-      border-radius: 10px;
-      background: #f97316;
-      border: 3px solid rgba(255,255,255,0.95);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
-      transform: rotate(45deg);
-    "></div>
-  `;
-
-  return L.divIcon({
-    className: '',
-    html,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
-  });
-}
-
-function normalizeDriverMarkers(drivers: DriverDTO[]): DriverMarker[] {
-  const out: DriverMarker[] = [];
-  for (const d of drivers) {
-    const lat = d.currentLat;
-    const lng = d.currentLng;
-    if (typeof lat !== 'number' || typeof lng !== 'number') continue;
-
-    out.push({
-      id: d.id,
-      name: d.name,
-      status: d.status,
-      lat,
-      lng,
-      lastLocationAt: typeof d.lastLocationAt === 'string' ? d.lastLocationAt : null,
-    });
-  }
-  return out;
-}
-
-/** Drivers that are busy/available but have no GPS position yet */
-function normalizeDriversWithoutLocation(drivers: DriverDTO[]): DriverDTO[] {
-  return drivers.filter(
-    (d) =>
-      d.isActive &&
-      d.status !== 'offline' &&
-      (typeof d.currentLat !== 'number' || typeof d.currentLng !== 'number'),
-  );
-}
-
-function normalizeOrderMarkers(orders: OrderDispatchItemDTO[]): OrderMarker[] {
-  const out: OrderMarker[] = [];
-  for (const o of orders) {
-    const lat = o.deliveryLat;
-    const lng = o.deliveryLng;
-    if (typeof lat !== 'number' || typeof lng !== 'number') continue;
-
-    out.push({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      status: o.status,
-      customerName: o.customerName,
-      lat,
-      lng,
-      deliveryDriverName: o.deliveryDriverName ?? null,
-      deliveryDriverId: o.deliveryDriverId ?? null,
-    });
-  }
-  return out;
-}
-
-const MapActions = memo(function MapActions(props: {
-  fitBoundsKey: number;
-  selectedPosition: LatLngExpression | null;
-}) {
-  const { fitBoundsKey, selectedPosition } = props;
-  const map = useMap();
-
-  useEffect(() => {
-    if (!selectedPosition) return;
-    map.setView(selectedPosition, Math.max(map.getZoom(), 16), { animate: true });
-  }, [map, selectedPosition]);
-
-  useEffect(() => {
-    if (fitBoundsKey <= 0) return;
-    // fitBounds happens in parent by calling map.fitBounds via imperative ref;
-    // this component exists mostly to avoid re-rendering MapContainer.
-  }, [fitBoundsKey]);
-
-  return null;
-});
-
-const MapRefSync = memo(function MapRefSync(props: {
-  mapRef: React.MutableRefObject<L.Map | null>;
-}) {
-  const { mapRef } = props;
-  const map = useMap();
-
-  useEffect(() => {
-    mapRef.current = map;
-    return () => {
-      if (mapRef.current === map) mapRef.current = null;
-    };
-  }, [map, mapRef]);
-
-  return null;
-});
-
-const DriverMarkersLayer = memo(function DriverMarkersLayer(props: {
-  drivers: readonly DriverMarker[];
-  selected: SelectedTarget;
-  onSelect: (t: SelectedTarget) => void;
-}) {
-  const { drivers, selected, onSelect } = props;
-
-  const iconByStatus = useMemo(() => {
-    return {
-      [DriverStatus.available]: createDriverDivIcon(DriverStatus.available),
-      [DriverStatus.busy]: createDriverDivIcon(DriverStatus.busy),
-      [DriverStatus.offline]: createDriverDivIcon(DriverStatus.offline),
-    } satisfies Record<DriverDTO['status'], L.DivIcon>;
-  }, []);
-
-  return (
-    <>
-      {drivers.map((d) => (
-        <Marker
-          key={`driver-${d.id}`}
-          position={[d.lat, d.lng]}
-          icon={iconByStatus[d.status]}
-          eventHandlers={{
-            click: () => onSelect({ kind: 'driver', id: d.id }),
-          }}
-        >
-          <Popup>
-            <div className="text-sm">
-              <div className="font-semibold">{d.name}</div>
-              <div className="text-gray-600 dark:text-gray-400">Status: {d.status === DriverStatus.available ? 'Disponível' : d.status === DriverStatus.busy ? 'Em rota' : 'Offline'}</div>
-              <div className="text-gray-600 dark:text-gray-400">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
-              {selected?.kind === 'driver' && selected.id === d.id ? (
-                <div className="mt-2 text-[11px] text-primary-700 font-semibold">Selecionado</div>
-              ) : null}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </>
-  );
-});
-
-const OrderMarkersLayer = memo(function OrderMarkersLayer(props: {
-  orders: readonly OrderMarker[];
-  selected: SelectedTarget;
-  onSelect: (t: SelectedTarget) => void;
-}) {
-  const { orders, selected, onSelect } = props;
-  const icon = useMemo(() => createOrderDivIcon(), []);
-
-  return (
-    <>
-      {orders.map((o) => (
-        <Marker
-          key={`order-${o.id}`}
-          position={[o.lat, o.lng]}
-          icon={icon}
-          eventHandlers={{
-            click: () => onSelect({ kind: 'order', id: o.id }),
-          }}
-        >
-          <Popup>
-            <div className="text-sm">
-              <div className="font-semibold">Pedido {o.orderNumber}</div>
-              <div className="text-gray-600 dark:text-gray-400">Status: {o.status.replace(/_/g, ' ')}</div>
-              <div>Cliente: {o.customerName}</div>
-              <div className="text-gray-600 dark:text-gray-400">Entregador: {o.deliveryDriverName ?? '—'}</div>
-              {selected?.kind === 'order' && selected.id === o.id ? (
-                <div className="mt-2 text-[11px] text-primary-700 font-semibold">Selecionado</div>
-              ) : null}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </>
-  );
-});
-
-const DEFAULT_CENTER: LatLngExpression = [-23.55052, -46.633308];
+import { OperationalRouteMap, type OperationalDriver } from './components/OperationalRouteMap';
+import { LOGISTICS_QUERY_KEYS } from './lib/invalidate-logistics';
+import { driverMapState, formatStopAddress, nextRunStop, remainingRunStops, runStatusLabel } from './tracking-map.utils';
 
 export function DeliveryMapPage() {
-  const [selected, setSelected] = useState<SelectedTarget>(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
-  const mapRef = useRef<L.Map | null>(null);
-  const [fitSeq, setFitSeq] = useState(0);
+  const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
+  const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const driversQuery = useQuery({
-    queryKey: ['delivery-map', 'drivers'],
-    queryFn: async (): Promise<DriverDTO[]> => {
-      const res = await api.get<DriverDTO[]>('/delivery/drivers');
-      return res.data;
-    },
-    refetchInterval: 5000,
+    queryKey: LOGISTICS_QUERY_KEYS.mapDrivers,
+    queryFn: async () => (await api.get<DriverDTO[]>('/delivery/drivers')).data ?? [],
+    refetchInterval: 5_000,
   });
-
+  const runsQuery = useQuery({
+    queryKey: LOGISTICS_QUERY_KEYS.activeRuns,
+    queryFn: async () => (await api.get<DeliveryRunDTO[]>('/delivery/runs/active')).data ?? [],
+    refetchInterval: 5_000,
+  });
   const ordersQuery = useQuery({
-    queryKey: ['delivery-map', 'orders'],
-    queryFn: async (): Promise<OrderDispatchItemDTO[]> => {
-      const res = await api.get<OrderDispatchItemDTO[]>('/orders/operation/dispatch');
-      return res.data;
-    },
-    refetchInterval: 5000,
+    queryKey: LOGISTICS_QUERY_KEYS.mapOrders,
+    queryFn: async () => (await api.get<OrderDispatchItemDTO[]>('/orders/operation/dispatch')).data ?? [],
+    refetchInterval: 5_000,
+  });
+  const tenantQuery = useQuery({
+    queryKey: ['tenant', 'me'],
+    queryFn: async () => (await api.get<Tenant>('/tenant/me')).data,
+    staleTime: 60_000,
   });
 
-  const driverMarkers = useMemo(
-    () => normalizeDriverMarkers(driversQuery.data ?? []),
-    [driversQuery.data],
-  );
+  const operationalDrivers = useMemo<OperationalDriver[]>(() => {
+    const runsByDriver = new Map((runsQuery.data ?? []).map((run) => [run.driverId, run]));
+    return (driversQuery.data ?? [])
+      .filter((driver) => driver.isActive)
+      .map((driver) => ({ driver, run: runsByDriver.get(driver.id) ?? null }))
+      .sort((a, b) => Number(Boolean(b.run)) - Number(Boolean(a.run)) || a.driver.name.localeCompare(b.driver.name));
+  }, [driversQuery.data, runsQuery.data]);
 
-  const driversWithoutLocation = useMemo(
-    () => normalizeDriversWithoutLocation(driversQuery.data ?? []),
-    [driversQuery.data],
-  );
-
-  const orderMarkers = useMemo(
-    () => normalizeOrderMarkers(ordersQuery.data ?? []),
-    [ordersQuery.data],
-  );
-
-  const outForDeliveryOrders = useMemo(() => {
-    return orderMarkers.filter((o) => o.status === 'out_for_delivery');
-  }, [orderMarkers]);
-
-  const waitingDispatchOrders = useMemo(() => {
-    return (ordersQuery.data ?? []).filter((o) => o.status === 'ready_for_delivery');
-  }, [ordersQuery.data]);
-
-  const waitingDispatchMarkers = useMemo(() => {
-    return normalizeOrderMarkers(
-      (ordersQuery.data ?? []).filter((o) => o.status === 'ready_for_delivery'),
-    );
-  }, [ordersQuery.data]);
-
-
-
-  const selectedPosition = useMemo<LatLngExpression | null>(() => {
-    if (!selected) return null;
-    if (selected.kind === 'driver') {
-      const d = driverMarkers.find((x) => x.id === selected.id);
-      return d ? ([d.lat, d.lng] as LatLngExpression) : null;
-    }
-    const o = outForDeliveryOrders.find((x) => x.id === selected.id) ?? orderMarkers.find((x) => x.id === selected.id);
-    return o ? ([o.lat, o.lng] as LatLngExpression) : null;
-  }, [selected, driverMarkers, orderMarkers, outForDeliveryOrders]);
-
-  const bounds = useMemo<LatLngBoundsExpression | null>(() => {
-    const points: LatLngExpression[] = [];
-    for (const d of driverMarkers) points.push([d.lat, d.lng]);
-    for (const o of outForDeliveryOrders) points.push([o.lat, o.lng]);
-    if (points.length < 2) return null;
-    return points as LatLngBoundsExpression;
-  }, [driverMarkers, outForDeliveryOrders]);
-
-  const handleFit = useCallback(() => {
-    if (!mapRef.current) return;
-    if (bounds) {
-      mapRef.current.fitBounds(bounds, { padding: [32, 32], animate: true });
-    } else if (selectedPosition) {
-      mapRef.current.setView(selectedPosition, 16, { animate: true });
-    } else {
-      mapRef.current.setView(DEFAULT_CENTER, 13, { animate: true });
-    }
-    setFitSeq((v) => v + 1);
-  }, [bounds, selectedPosition]);
-
-  const handleSelect = useCallback((t: SelectedTarget) => {
-    setSelected(t);
-  }, []);
-
-  const isLoading = driversQuery.isLoading || ordersQuery.isLoading;
-  const isError = driversQuery.isError || ordersQuery.isError;
-  const totalDriversVisible = driverMarkers.length + driversWithoutLocation.length;
+  const focused = operationalDrivers.find(({ driver }) => driver.id === focusedDriverId) ?? null;
+  const dispatchOrders = useMemo(() => (ordersQuery.data ?? []).filter((order) => order.status === 'ready_for_delivery' || order.status === 'out_for_delivery'), [ordersQuery.data]);
+  const waitingOrders = dispatchOrders.filter((order) => order.status === 'ready_for_delivery');
+  const enRouteOrders = dispatchOrders.filter((order) => order.status === 'out_for_delivery');
+  const shownDrivers = focused ? [focused] : operationalDrivers;
+  const storePosition = typeof tenantQuery.data?.settings?.lat === 'number' && typeof tenantQuery.data.settings.lng === 'number'
+    ? { lat: tenantQuery.data.settings.lat, lng: tenantQuery.data.settings.lng }
+    : null;
+  const isLoading = driversQuery.isLoading || runsQuery.isLoading || ordersQuery.isLoading;
+  const isError = driversQuery.isError || runsQuery.isError || ordersQuery.isError;
 
   return (
-    <div className="h-full w-full">
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Operação — Mapa em tempo real</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Drivers e pedidos em rota. Polling a cada 5s.</p>
+    <main className="mx-auto h-full w-full max-w-[1600px] p-4 sm:p-6">
+      <header className="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+            <Navigation className="h-4 w-4" /> Central de despacho
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleFit}
-              className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
-            >
-              Ajustar mapa
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsPanelOpen((v) => !v)}
-              className="h-10 px-3 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700"
-            >
-              {isPanelOpen ? 'Ocultar painel' : 'Abrir painel'}
-            </button>
-          </div>
+          <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">Mapa da operação</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Posições conciliadas em tempo real e por consulta a cada 5 segundos.</p>
         </div>
+        <button type="button" onClick={() => { setFocusedDriverId(null); setFocusedOrderId(null); }} disabled={!focusedDriverId && !focusedOrderId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45">
+          <Crosshair className="h-4 w-4" /> Ver toda a operação
+        </button>
+      </header>
 
-        {isLoading ? <div className="text-sm text-gray-500 dark:text-gray-400">Carregando dados do mapa...</div> : null}
-        {isError ? <div className="text-sm text-red-600">Erro ao carregar dados do mapa.</div> : null}
+      {isLoading ? <div role="status" className="mb-4 flex min-h-11 items-center gap-2 text-sm font-semibold text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" /> Carregando entregadores e rotas…</div> : null}
+      {isError ? <div role="alert" className="mb-4 flex min-h-11 items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 text-sm font-bold text-destructive"><AlertTriangle className="h-4 w-4" /> Não foi possível atualizar o mapa. A última informação disponível não deve ser considerada ao vivo.</div> : null}
 
-        {driverMarkers.length === 0 && outForDeliveryOrders.length === 0 && driversWithoutLocation.length === 0 && !isLoading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Nenhum driver com localização disponível e nenhum pedido em rota.
-          </div>
-        ) : null}
-
-        <div className="relative grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
-          <div
-            className={
-              `lg:block ${isPanelOpen ? 'block' : 'hidden'} ` +
-              'safe-sheet lg:static fixed left-0 right-0 bottom-0 lg:bottom-auto lg:right-auto lg:left-auto z-40'
-            }
-          >
-            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-gray-900 dark:text-gray-100">Painel operacional</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Clique para focar no mapa</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPanelOpen(false)}
-                  className="lg:hidden text-xs font-semibold text-gray-600 dark:text-gray-400"
-                >
-                  Fechar
-                </button>
-              </div>
-
-              <div className="p-4 space-y-4 max-h-[60vh] lg:max-h-[650px] overflow-auto">
-                <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Drivers</h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{totalDriversVisible}</div>
-                  </div>
-                  <div className="space-y-2">
-                    {driverMarkers.map((d) => (
-                      <button
-                        key={`panel-driver-${d.id}`}
-                        type="button"
-                        onClick={() => handleSelect({ kind: 'driver', id: d.id })}
-                        className={
-                          'w-full text-left rounded-lg border px-3 py-2 transition-colors ' +
-                          (selected?.kind === 'driver' && selected.id === d.id
-                            ? 'border-primary-300 bg-primary-50'
-                            : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50')
-                        }
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{d.name}</div>
-                          <span
-                            className="inline-flex items-center gap-1 text-[11px] font-bold"
-                            style={{ color: driverColor(d.status) }}
-                          >
-                            <span
-                              style={{ backgroundColor: driverColor(d.status) }}
-                              className="inline-block w-2 h-2 rounded-full"
-                            />
-                            {d.status === DriverStatus.available ? 'Disponível' : d.status === DriverStatus.busy ? 'Em rota' : 'Offline'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
-                      </button>
-                    ))}
-
-                    {/* BUG 2 FIX: Drivers busy but without GPS position */}
-                    {driversWithoutLocation.map((d) => (
-                      <div
-                        key={`panel-driver-noloc-${d.id}`}
-                        className="w-full text-left rounded-lg border border-dashed border-orange-200 dark:border-orange-900/40 px-3 py-2 bg-orange-50/50 dark:bg-orange-900/10"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{d.name}</div>
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-500">
-                            <span className="inline-block w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                            {d.status === 'busy' ? 'Em rota' : 'Disponível'}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-orange-500 font-medium mt-0.5">⚠ Aguardando localização do entregador</div>
-                      </div>
-                    ))}
-
-                    {driverMarkers.length === 0 && driversWithoutLocation.length === 0 ? (
-                      <div className="text-xs text-gray-400">Sem drivers ativos.</div>
-                    ) : null}
-                  </div>
-                </section>
-
-                <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Aguardando despacho</h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{waitingDispatchOrders.length}</div>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    {waitingDispatchOrders.map((o) => (
-                      <div
-                        key={`panel-waiting-${o.id}`}
-                        className="w-full text-left rounded-lg border border-dashed border-yellow-200 dark:border-yellow-900/40 px-3 py-2 bg-yellow-50/50 dark:bg-yellow-900/10"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">{o.orderNumber}</div>
-                          <div className="text-[11px] font-black text-yellow-700">PRONTO</div>
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400 truncate">Cliente: {o.customerName}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          Entregador: {o.deliveryDriverName ?? 'Não atribuído'}
-                        </div>
-                        {!o.deliveryDriverName ? (
-                          <div className="text-[10px] text-orange-600 font-medium mt-0.5">
-                            Atribua um entregador no Despacho
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                    {waitingDispatchOrders.length === 0 ? (
-                      <div className="text-xs text-gray-400">Nenhum pedido aguardando despacho.</div>
-                    ) : null}
-                  </div>
-                </section>
-
-                <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Pedidos em rota</h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{outForDeliveryOrders.length}</div>
-                  </div>
-                  <div className="space-y-2">
-                    {outForDeliveryOrders.map((o) => (
-                      <button
-                        key={`panel-order-${o.id}`}
-                        type="button"
-                        onClick={() => handleSelect({ kind: 'order', id: o.id })}
-                        className={
-                          'w-full text-left rounded-lg border px-3 py-2 transition-colors ' +
-                          (selected?.kind === 'order' && selected.id === o.id
-                            ? 'border-primary-300 bg-primary-50'
-                            : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50')
-                        }
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">{o.orderNumber}</div>
-                          <div className="text-[11px] font-black text-orange-600">EM ROTA</div>
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400 truncate">Cliente: {o.customerName}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">Driver: {o.deliveryDriverName ?? '—'}</div>
-                      </button>
-                    ))}
-                    {outForDeliveryOrders.length === 0 ? (
-                      <div className="text-xs text-gray-400">Nenhum pedido em rota.</div>
-                    ) : null}
-                  </div>
-                </section>
-              </div>
+      <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <aside className={`${isPanelOpen ? 'block' : 'hidden'} safe-sheet lg:static fixed bottom-0 left-0 right-0 z-40 order-2 max-h-[72vh] overflow-hidden rounded-t-xl border border-border bg-card lg:order-1 lg:block lg:max-h-none lg:rounded-xl`}>
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <h2 className="font-black text-foreground">Entregadores</h2>
+              <p className="text-xs text-muted-foreground">Selecione para isolar uma rota</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-foreground">{operationalDrivers.length}</span>
+              <button type="button" onClick={() => setIsPanelOpen(false)} className="min-h-11 px-2 text-sm font-bold text-muted-foreground lg:hidden">Fechar</button>
             </div>
           </div>
-
-          <div className="min-h-[520px] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
-            <MapContainer
-              center={selectedPosition ?? DEFAULT_CENTER}
-              zoom={13}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <MapActions
-                fitBoundsKey={fitSeq}
-                selectedPosition={selectedPosition}
-              />
-
-              <MapRefSync
-                mapRef={mapRef}
-              />
-
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              <DriverMarkersLayer drivers={driverMarkers} selected={selected} onSelect={handleSelect} />
-              <OrderMarkersLayer orders={[...waitingDispatchMarkers, ...outForDeliveryOrders]} selected={selected} onSelect={handleSelect} />
-
-              {/* Linha simples driver -> destino (opcional) */}
-              {outForDeliveryOrders
-                .filter((o) => o.deliveryDriverId)
-                .map((o) => {
-                  const driver = driverMarkers.find((d) => d.id === o.deliveryDriverId);
-                  if (!driver) return null;
-                  return (
-                    <Polyline
-                      key={`line-${o.id}`}
-                      positions={[
-                        [driver.lat, driver.lng],
-                        [o.lat, o.lng],
-                      ]}
-                      pathOptions={{ color: '#fb923c', weight: 3, opacity: 0.8 }}
-                    />
-                  );
-                })}
-            </MapContainer>
+          <div className="max-h-[560px] overflow-y-auto">
+            <section className="border-b border-border" aria-labelledby="map-drivers-title">
+              <h3 id="map-drivers-title" className="px-4 pt-3 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Entregadores</h3>
+            {operationalDrivers.map(({ driver, run }) => {
+              const freshness = driverMapState(driver);
+              const nextStop = run ? nextRunStop(run) : null;
+              const active = focusedDriverId === driver.id;
+              return (
+                <button key={driver.id} type="button" onClick={() => { setFocusedOrderId(null); setFocusedDriverId(active ? null : driver.id); }} className={`w-full min-h-11 border-t border-border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${active ? 'bg-primary/10' : 'hover:bg-muted/70'}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg ${freshness.status === 'fresh' ? 'bg-primary text-primary-foreground' : freshness.status === 'stale' ? 'bg-amber-600 text-white' : 'bg-muted text-muted-foreground'}`}><Bike className="h-5 w-5" aria-hidden="true" /></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2"><span className="truncate text-sm font-black text-foreground">{driver.name}</span><span className="shrink-0 text-[11px] font-bold uppercase text-muted-foreground">{run ? runStatusLabel(run.status) : 'Sem rota'}</span></div>
+                      <p className={`mt-0.5 text-xs font-semibold ${freshness.status === 'fresh' ? 'text-primary' : freshness.status === 'stale' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>{freshness.label}</p>
+                      {run ? <p className="mt-2 text-xs text-foreground"><strong>{remainingRunStops(run)}</strong> entrega(s) restante(s){nextStop ? ` · Próxima: parada ${nextStop.sequence}, pedido ${nextStop.orderNumber}` : ''}</p> : <p className="mt-2 text-xs text-muted-foreground">Nenhuma rota operacional vinculada.</p>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+            {!isLoading && operationalDrivers.length === 0 ? <div className="px-6 py-8 text-center"><Bike className="mx-auto mb-3 h-7 w-7 text-muted-foreground" /><p className="text-sm font-bold text-foreground">Nenhum entregador ativo</p><p className="mt-1 text-xs text-muted-foreground">As rotas aparecerão aqui quando a operação começar.</p></div> : null}
+            </section>
+            <section className="border-b border-border" aria-labelledby="map-waiting-title">
+              <div className="flex items-center justify-between px-4 pb-2 pt-3"><h3 id="map-waiting-title" className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Aguardando despacho</h3><strong className="text-xs text-foreground">{waitingOrders.length}</strong></div>
+              {waitingOrders.map((order) => <button key={order.id} type="button" onClick={() => { setFocusedDriverId(null); setFocusedOrderId(order.id); }} className={`w-full min-h-11 border-t border-border px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${focusedOrderId === order.id ? 'bg-amber-500/10' : 'hover:bg-muted/70'}`}><span className="text-sm font-black text-foreground">Pedido {order.orderNumber}</span><span className="block truncate text-xs text-muted-foreground">{order.customerName} · {order.deliveryDriverName ?? 'Sem entregador'}</span></button>)}
+              {waitingOrders.length === 0 ? <p className="px-4 pb-4 text-xs text-muted-foreground">Nenhum pedido pronto aguardando despacho.</p> : null}
+            </section>
+            <section aria-labelledby="map-route-orders-title">
+              <div className="flex items-center justify-between px-4 pb-2 pt-3"><h3 id="map-route-orders-title" className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Pedidos em rota</h3><strong className="text-xs text-foreground">{enRouteOrders.length}</strong></div>
+              {enRouteOrders.map((order) => <button key={order.id} type="button" onClick={() => { setFocusedDriverId(order.deliveryDriverId ?? null); setFocusedOrderId(order.id); }} className={`w-full min-h-11 border-t border-border px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${focusedOrderId === order.id ? 'bg-orange-500/10' : 'hover:bg-muted/70'}`}><span className="text-sm font-black text-foreground">Pedido {order.orderNumber}</span><span className="block truncate text-xs text-muted-foreground">{order.customerName} · {order.deliveryDriverName ?? 'Entregador não informado'}</span></button>)}
+              {enRouteOrders.length === 0 ? <p className="px-4 pb-4 text-xs text-muted-foreground">Nenhum pedido em rota.</p> : null}
+            </section>
           </div>
-        </div>
+        </aside>
 
-        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          Drivers no mapa: {driverMarkers.length} | Sem GPS: {driversWithoutLocation.length} | Aguardando despacho:{' '}
-          {waitingDispatchOrders.length} | Em rota: {outForDeliveryOrders.length}
-        </div>
+        {!isPanelOpen ? (
+          <button type="button" onClick={() => setIsPanelOpen(true)} className="safe-sheet fixed bottom-0 left-4 right-4 z-30 min-h-11 rounded-t-xl bg-primary px-4 font-bold text-primary-foreground shadow-lg lg:hidden">
+            Ver painel operacional
+          </button>
+        ) : null}
+
+        <section className="order-1 min-w-0 lg:order-2" aria-label="Mapa de entregas">
+          <OperationalRouteMap drivers={shownDrivers} run={focused?.run ?? null} storePosition={storePosition} focusedOrderId={focusedOrderId ?? undefined} dispatchOrders={focused?.run ? [] : dispatchOrders} className="h-[58vh] min-h-[460px] rounded-xl" />
+          {focused?.run ? <div className="mt-3 flex flex-col gap-2 border-l-4 border-orange-500 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="flex items-center gap-2 text-sm font-black text-foreground"><Route className="h-4 w-4 text-orange-600" /> Rota de {focused.driver.name}</p><p className="mt-1 text-xs text-muted-foreground">Os números indicam a ordem operacional das paradas, sem otimização ou previsão de chegada.</p></div>{nextRunStop(focused.run) ? <div className="flex items-center gap-2 text-xs text-foreground"><MapPin className="h-4 w-4 text-orange-600" /><span><strong>Próxima:</strong> {formatStopAddress(nextRunStop(focused.run)?.address ?? null)}</span></div> : null}</div> : null}
+        </section>
       </div>
-    </div>
+
+      <footer className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+        <span>{operationalDrivers.filter(({ run }) => run?.status === DeliveryRunStatus.IN_PROGRESS).length} em rota</span>
+        <span>{operationalDrivers.filter(({ run }) => run?.status === DeliveryRunStatus.RETURNING).length} retornando</span>
+        <span>{operationalDrivers.filter(({ driver }) => driverMapState(driver).status === 'stale').length} com localização desatualizada</span>
+        <span>{operationalDrivers.filter(({ driver }) => driverMapState(driver).status === 'unavailable').length} sem GPS</span>
+        <span>{waitingOrders.length} aguardando despacho</span>
+      </footer>
+    </main>
   );
 }

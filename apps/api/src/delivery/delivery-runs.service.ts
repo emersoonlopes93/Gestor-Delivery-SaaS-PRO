@@ -132,6 +132,23 @@ export class DeliveryRunsService {
     return run ? this.toDTO(run) : null;
   }
 
+  async getRunForTenantOrder(
+    tenantId: string,
+    orderId: string,
+  ): Promise<DeliveryRunDTO | null> {
+    const stop = await this.prisma.deliveryStop.findFirst({
+      where: { tenantId, orderId },
+      orderBy: { createdAt: 'desc' },
+      select: { runId: true },
+    });
+    if (!stop) return null;
+    const run = await this.prisma.deliveryRun.findFirst({
+      where: { tenantId, id: stop.runId },
+      include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
+    });
+    return run ? this.toDTO(run) : null;
+  }
+
   async getDriverWorkState(
     tenantId: string,
     driverId: string,

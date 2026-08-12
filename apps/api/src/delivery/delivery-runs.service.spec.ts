@@ -52,6 +52,7 @@ describe('DeliveryRunsService', () => {
     driverShift: tx.driverShift,
     deliveryRun: tx.deliveryRun,
     deliveryDriverLocation: { findMany: jest.fn() },
+    deliveryStop: tx.deliveryStop,
     tenantSettings: tx.tenantSettings,
     order: tx.order,
     $transaction: jest.fn((operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
@@ -246,6 +247,21 @@ describe('DeliveryRunsService', () => {
     }));
     expect(result.drivers[0]).not.toHaveProperty('pin');
     expect(result.orders[0].address).toContain('Rua A');
+  });
+
+  it('resolves an order route without crossing tenant boundaries', async () => {
+    tx.deliveryStop.findFirst.mockResolvedValue({ runId: 'run-a' });
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({ driver: { name: 'Ana' } }));
+    await expect(service.getRunForTenantOrder('tenant-a', 'order-a'))
+      .resolves.toEqual(expect.objectContaining({ id: 'run-a', driverName: 'Ana' }));
+    expect(tx.deliveryStop.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-a', orderId: 'order-a' },
+      orderBy: { createdAt: 'desc' },
+      select: { runId: true },
+    });
+    expect(tx.deliveryRun.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId: 'tenant-a', id: 'run-a' },
+    }));
   });
 
   it('creates and assigns the complete route in the same transaction', async () => {

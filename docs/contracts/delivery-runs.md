@@ -43,11 +43,15 @@ As rotas abaixo exigem autenticação tenant; `tenantId` e ator são sempre deri
 
 - `GET /delivery/runs/builder`: entregadores livres com turno ativo e pedidos prontos que não pertencem a outra rota ativa;
 - `GET /delivery/runs/active`: rotas ativas com DTO canônico de paradas, sem expor objetos Prisma ou histórico interno;
+- `GET /delivery/runs/order/:orderId`: resolve, dentro do tenant autenticado, a rota canônica que contém o pedido ou retorna `null`;
+- `GET /delivery/runs/:id/locations`: retorna resumo operacional e amostras detalhadas ainda dentro da retenção de 30 dias;
 - `GET/PATCH /delivery/runs/settings`: leitura e alteração auditada da exigência de aceite;
 - `POST /delivery/runs`: criação e atribuição atômicas de uma rota com `driverId` e `orderIds` ordenados;
 - `PATCH /delivery/runs/:id/reorder`: reordenação otimista das paradas futuras com `expectedVersion`.
 
 O endpoint legado `POST /orders/:id/assign-driver` permanece temporariamente disponível com headers de depreciação. Os consumidores do painel usam `POST /delivery/runs`, inclusive para uma rota de parada única.
+
+O mapa do painel usa Leaflet/OpenStreetMap apenas para visualização: mostra a origem, a sequência manual das paradas e a posição do entregador com estado de atualização explícito. A ligação visual entre pontos não representa rota viária, otimização ou ETA. O trajeto detalhado deixa de ser oferecido depois da janela de retenção, preservando o resumo operacional.
 
 ## API do entregador
 

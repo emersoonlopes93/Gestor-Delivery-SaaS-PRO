@@ -4,6 +4,7 @@ describe('DeliveryRunsController tenant contract', () => {
   const service = {
     getBuilderData: jest.fn(),
     listActiveRuns: jest.fn(),
+    getRunForTenantOrder: jest.fn(),
     getLocationHistory: jest.fn(),
     getSettings: jest.fn(),
     updateSettings: jest.fn(),
@@ -71,5 +72,10 @@ describe('DeliveryRunsController tenant contract', () => {
   it('derives the history tenant from the authenticated tenant request', async () => {
     await controller.getLocationHistory(request as never, 'run-a');
     expect(service.getLocationHistory).toHaveBeenCalledWith('tenant-a', 'run-a');
+  });
+
+  it('derives tenant scope when resolving the route for an order', async () => {
+    await controller.getRunForOrder(request as never, 'order-a');
+    expect(service.getRunForTenantOrder).toHaveBeenCalledWith('tenant-a', 'order-a');
   });
 });
