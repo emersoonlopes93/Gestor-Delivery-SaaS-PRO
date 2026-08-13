@@ -12,9 +12,14 @@ import {
   Route,
   Settings2,
   Truck,
+  WalletCards,
 } from 'lucide-react';
 import type { DeliveryRunBuilderDataDTO, DeliveryRunDTO } from '@gestor/types';
 import { useDeliveryRuns } from './hooks/useDeliveryRuns';
+import {
+  DriverPayFields,
+} from './components/DriverPayFields';
+import { DEFAULT_DRIVER_PAY_VALUE, driverPaySummary, type DriverPayFormValue, validateDriverPay } from './components/driver-pay-form';
 
 const RUN_LABELS: Record<DeliveryRunDTO['status'], string> = {
   PENDING_ACCEPTANCE: 'Aguardando aceite',
@@ -86,10 +91,30 @@ export function DispatchPage() {
     isCreating,
     reorderStops,
     updateSettings,
+    paySettings,
+    isPaySettingsLoading,
+    isPaySettingsError,
+    updatePaySettings,
+    isUpdatingPaySettings,
   } = useDeliveryRuns();
   const [driverId, setDriverId] = useState('');
   const [orderIds, setOrderIds] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [payValue, setPayValue] = useState<DriverPayFormValue>(DEFAULT_DRIVER_PAY_VALUE);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [isPayEditorOpen, setIsPayEditorOpen] = useState(false);
+
+  useEffect(() => {
+    if (!paySettings) return;
+    setPayValue({
+      mode: paySettings.mode,
+      dailyRate: paySettings.dailyRate,
+      fixedAmount: paySettings.fixedAmount,
+      percentage: paySettings.percentage,
+      rateTable: paySettings.rateTable.length > 0 ? paySettings.rateTable : [{ upToKm: null, amount: 0 }],
+      payFailedAttempt: paySettings.payFailedAttempt,
+    });
+  }, [paySettings]);
 
   useEffect(() => {
     const eligible = new Set(builder.orders.map((order) => order.id));
@@ -127,6 +152,22 @@ export function DispatchPage() {
       setFeedback('Rota criada e atribuída ao entregador.');
     } catch (error: unknown) {
       setFeedback(messageFrom(error));
+    }
+  };
+
+  const savePaySettings = async () => {
+    const validationError = validateDriverPay(payValue);
+    if (validationError) {
+      setPayError(validationError);
+      return;
+    }
+    setPayError(null);
+    try {
+      await updatePaySettings(payValue);
+      setFeedback('Regra de pagamento dos entregadores atualizada.');
+      setIsPayEditorOpen(false);
+    } catch (error: unknown) {
+      setPayError(messageFrom(error));
     }
   };
 
@@ -223,6 +264,64 @@ export function DispatchPage() {
             </span>
           </label>
         </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby="driver-pay-settings-title">
+        {isPaySettingsLoading ? (
+          <div className="p-4 sm:p-5" aria-label="Carregando regras de pagamento">
+            <div className="h-14 animate-pulse rounded-lg bg-muted" />
+            <span className="sr-only">Carregando regras de pagamento...</span>
+          </div>
+        ) : isPaySettingsError || !paySettings ? (
+          <div className="p-4 sm:p-5">
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-status-danger/30 bg-status-danger/10 p-4 text-sm text-status-danger">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              Não foi possível carregar as regras de pagamento. Atualize a página para tentar novamente.
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className={`flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 ${isPayEditorOpen ? 'border-b border-border' : ''}`}>
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="rounded-lg bg-primary/10 p-2 text-primary"><WalletCards className="h-5 w-5" /></span>
+                <div className="min-w-0">
+                  <h2 id="driver-pay-settings-title" className="font-bold text-foreground">Pagamento dos entregadores</h2>
+                  <p className="mt-0.5 text-sm font-semibold text-foreground">{driverPaySummary(payValue, paySettings.currency)}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span><strong className="text-foreground">Diária:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: paySettings.currency }).format(payValue.dailyRate)}</span>
+                    <span><strong className="text-foreground">Tentativa após chegada:</strong> {payValue.payFailedAttempt ? 'paga' : 'não paga'}</span>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">A taxa cobrada do cliente é independente do pagamento devido ao entregador.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsPayEditorOpen((open) => !open); setPayError(null); }}
+                aria-expanded={isPayEditorOpen}
+                aria-controls="driver-pay-editor"
+                className="inline-flex w-full shrink-0 items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-bold text-foreground transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring sm:w-auto"
+              >
+                {isPayEditorOpen ? 'Fechar edição' : 'Editar regra'}
+              </button>
+            </div>
+            {isPayEditorOpen && (
+              <div id="driver-pay-editor" className="p-4 sm:p-5" aria-busy={isUpdatingPaySettings}>
+                <DriverPayFields value={payValue} onChange={setPayValue} idPrefix="tenant-driver-pay" currency={paySettings.currency} disabled={isUpdatingPaySettings} scope="store" />
+                {payError && <p role="alert" className="mt-3 text-sm font-semibold text-status-danger">{payError}</p>}
+                <div className="mt-4 flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                  <button type="button" onClick={() => {
+                    setPayValue({ mode: paySettings.mode, dailyRate: paySettings.dailyRate, fixedAmount: paySettings.fixedAmount, percentage: paySettings.percentage, rateTable: paySettings.rateTable.length ? paySettings.rateTable : [{ upToKm: null, amount: 0 }], payFailedAttempt: paySettings.payFailedAttempt });
+                    setPayError(null);
+                    setIsPayEditorOpen(false);
+                  }} disabled={isUpdatingPaySettings} className="rounded-lg border border-border px-4 py-2.5 text-sm font-bold text-foreground transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60">Cancelar</button>
+                  <button type="button" onClick={() => void savePaySettings()} disabled={isUpdatingPaySettings} className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60">
+                    {isUpdatingPaySettings ? 'Salvando regra...' : 'Salvar regra de pagamento'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby="route-builder-title">

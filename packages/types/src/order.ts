@@ -346,6 +346,7 @@ export interface OrderResponseDTO {
   itemsSubtotal: number;
   discountTotal: number;
   deliveryFee: number;
+  normalDeliveryFee?: number;
   serviceFee: number;
   total: number;
   sourceChannel: string;
@@ -508,6 +509,7 @@ export interface CheckoutValidationResult {
   itemsSubtotal: number;
   discountTotal: number;
   deliveryFee: number;
+  normalDeliveryFee?: number;
   estimatedDeliveryMinutes?: number | null;
   total: number;
   couponId: string | null;

@@ -39,6 +39,10 @@ O tracking detalhado é exigido somente quando existe `DriverShift ACTIVE` e a r
 
 `DeliveryRunDTO.origin` é opcional e só contém coordenadas reais da loja configurada pelo tenant. O retorno usa essa origem quando disponível; sem ela, a interface informa que o destino não está disponível e não infere rota a partir de endereços de clientes.
 
+## Integração com ganhos
+
+Turnos e paradas carregam snapshots financeiros definidos em [`driver-earnings.md`](./driver-earnings.md). A conclusão da parada e o encerramento do turno lançam ledger idempotente sem aguardar a rota completa.
+
 ## Limites da V1
 
 A sequência é manual. Não há provedor de rotas pago, otimização, ETA, geocoding em lote ou financeiro por corrida. O mapa é esquemático e as linhas representam somente a ordem persistida das paradas, não trajeto viário.

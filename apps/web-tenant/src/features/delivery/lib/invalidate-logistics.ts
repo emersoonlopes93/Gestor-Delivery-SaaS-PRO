@@ -8,6 +8,7 @@ export const LOGISTICS_QUERY_KEYS = {
   runBuilder: ['delivery-runs', 'builder'] as const,
   activeRuns: ['delivery-runs', 'active'] as const,
   runSettings: ['delivery-runs', 'settings'] as const,
+  driverPaySettings: ['delivery-runs', 'pay-settings'] as const,
 };
 
 /** Invalida caches compartilhados entre Despacho, Mapa e Entregadores. */

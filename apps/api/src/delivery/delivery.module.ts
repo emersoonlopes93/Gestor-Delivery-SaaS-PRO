@@ -18,6 +18,7 @@ import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryRunsController } from './delivery-runs.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DeliveryLocationRetentionService } from './delivery-location-retention.service';
+import { DriverEarningsService } from './driver-earnings.service';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DeliveryLocationRetentionService } from './delivery-location-retention.
   providers: [
     DriversService,
     DeliveryRunsService,
+    DriverEarningsService,
     DeliveryTrackingGateway,
     DeliveryLocationRetentionService,
     DeliveryCoverageService,

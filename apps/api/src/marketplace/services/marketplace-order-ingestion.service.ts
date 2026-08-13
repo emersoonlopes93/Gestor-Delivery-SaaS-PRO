@@ -393,6 +393,7 @@ export class MarketplaceOrderIngestionService {
           itemsSubtotal,
           discountTotal: 0,
           deliveryFee: 0,
+          normalDeliveryFee: 0,
           serviceFee: 0,
           total: itemsSubtotal,
           sourceChannel: 'marketplace_ifood',

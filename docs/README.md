@@ -53,6 +53,7 @@
 | [Eventos e WebSockets](./contracts/events-and-websockets.md) | Socket.IO, namespaces, payload |
 | [Turnos e rotas de entrega](./contracts/delivery-runs.md) | Turnos, rotas multi-pedido, paradas, retornos e concorrência |
 | [Pagamentos](./contracts/payments.md) | Criação, confirmação, webhook, reconciliação |
+| [Ganhos dos entregadores](./contracts/driver-earnings.md) | Regras, snapshots, ledger e saldos do entregador |
 | [Marketplace](./contracts/marketplace.md) | iFood, ingestão, sincronização |
 | [Agendamento](./contracts/scheduling.md) | Janelas, slots, timezone, capacidade e checkout |
 | [Tratamento de erros](./contracts/error-handling.md) | Envelopes, filtros, logging |

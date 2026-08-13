@@ -17,12 +17,14 @@ import {
   type DeliveryRunDTO,
   type DriverRouteEvent,
   UpdateDriverOperationalStatusDTO,
+  DriverCashTipDTO,
 } from '@gestor/types';
 import { DriverAuthGuard } from '../auth/guards/driver-auth.guard';
 import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 import { DriversService } from './drivers.service';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
+import { DriverEarningsService } from './driver-earnings.service';
 
 @Controller('delivery/driver')
 @UseGuards(DriverAuthGuard)
@@ -31,11 +33,22 @@ export class DriverOperationsController {
     private readonly driversService: DriversService,
     private readonly deliveryRunsService: DeliveryRunsService,
     private readonly deliveryTrackingGateway: DeliveryTrackingGateway,
+    private readonly earningsService: DriverEarningsService,
   ) {}
 
   @Get('work-state')
   getWorkState(@Req() req: AuthenticatedRequest) {
     return this.deliveryRunsService.getDriverWorkState(req.user.tenantId, req.user.id);
+  }
+
+  @Get('earnings')
+  getEarnings(@Req() req: AuthenticatedRequest) {
+    return this.earningsService.summary(req.user.tenantId, req.user.id);
+  }
+
+  @Post('cash-tips')
+  addCashTip(@Req() req: AuthenticatedRequest, @Body() dto: DriverCashTipDTO) {
+    return this.earningsService.addCashTip(req.user.tenantId, req.user.id, dto.orderId, dto.amount, req.user.id, 'delivery_driver');
   }
 
   @Get('active-run')

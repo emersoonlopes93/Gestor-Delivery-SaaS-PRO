@@ -35,6 +35,9 @@ export class DriversService {
 
     return drivers.map(({ pin: _pin, ...driver }) => ({
       ...driver,
+      dailyRate: driver.dailyRate === null ? null : Number(driver.dailyRate),
+      payFixedAmount: driver.payFixedAmount === null ? null : Number(driver.payFixedAmount),
+      payPercentage: driver.payPercentage === null ? null : Number(driver.payPercentage),
       lastLocationAt: driver.lastLocationAt?.toISOString() ?? null,
     }));
   }
@@ -114,6 +117,13 @@ export class DriversService {
       status: data.status,
       vehicleType: data.vehicleType,
       notes: data.notes,
+      payOverrideEnabled: data.payOverrideEnabled,
+      payMode: data.payMode,
+      dailyRate: data.dailyRate,
+      payFixedAmount: data.payFixedAmount,
+      payPercentage: data.payPercentage,
+      payRateTable: data.payRateTable?.map((tier) => ({ upToKm: tier.upToKm, amount: tier.amount })),
+      payFailedAttempt: data.payFailedAttempt,
     };
 
     if (data.phone) {
