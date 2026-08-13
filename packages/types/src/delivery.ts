@@ -366,6 +366,10 @@ export interface DriverEarningsSummaryDTO {
   shiftId: string; shiftStatus: DriverShiftStatus; deliveryFees: number; cashTips: number;
   dailyRate: number; dailyRatePreview: boolean; adjustments: number; totalEarnings: number;
   receivedDirectly: number; dueFromStore: number; currency: string;
+  eligibleCashTipOrders: DriverEarningsOrderDTO[];
+}
+export interface DriverEarningsOrderDTO {
+  orderId: string; orderNumber: string; customerName: string;
 }
 export class DriverCashTipDTO { @IsString() orderId!: string; @IsNumber() @Min(0.01) amount!: number }
 export class TenantCashTipDTO extends DriverCashTipDTO { @IsString() driverId!: string }

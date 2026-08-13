@@ -21,6 +21,8 @@ O início do turno congela diária e moeda no `DriverShift`. A criação da rota
 
 Ganhos totais são a soma do ledger mais a diária prevista no turno ativo. Já recebido soma lançamentos diretos; a receber é total menos recebido diretamente. Settlement e payout não pertencem à R14.
 
+Cada parada aceita no máximo um `TIP_CASH`, identificado por `cash-tip:<stopId>` independentemente de quem registrou. Repetir o mesmo valor é idempotente; tentar outro valor gera conflito e a correção deve ser um `ADJUSTMENT` append-only. O resumo do turno devolve apenas os pedidos atendidos que ainda podem receber gorjeta, inclusive depois que a rota foi concluída.
+
 ## Segurança
 
 Valores automáticos são calculados no backend. Toda operação filtra `tenantId`; o JWT determina `driverId`. Gorjeta cash exige pedido atendido pelo próprio entregador. Gestores precisam das permissões de delivery e ficam registrados como ator.
