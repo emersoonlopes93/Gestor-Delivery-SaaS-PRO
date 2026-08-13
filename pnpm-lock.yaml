@@ -11,6 +11,9 @@ importers:
       '@playwright/test':
         specifier: ^1.60.0
         version: 1.60.0
+      '@types/leaflet':
+        specifier: ^1.9.21
+        version: 1.9.21
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@22.19.17)(typescript@5.5.4)
@@ -334,6 +337,9 @@ importers:
 
   apps/web-delivery:
     dependencies:
+      '@capacitor-community/background-geolocation':
+        specifier: 1.2.26
+        version: 1.2.26(@capacitor/core@7.6.6)
       '@capacitor/core':
         specifier: ^7.4.4
         version: 7.6.6
@@ -367,6 +373,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      leaflet:
+        specifier: ^1.9.4
+        version: 1.9.4
       lucide-react:
         specifier: 0.453.0
         version: 0.453.0(react@18.3.1)
@@ -376,6 +385,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      react-leaflet:
+        specifier: 4.2.1
+        version: 4.2.1(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-router-dom:
         specifier: ^6.28.0
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1678,6 +1690,11 @@ packages:
 
   '@cacheable/utils@2.4.1':
     resolution: {integrity: sha512-eiFgzCbIneyMlLOmNG4g9xzF7Hv3Mga4LjxjcSC/ues6VYq2+gUbQI8JqNuw/ZM8tJIeIaBGpswAsqV2V7ApgA==}
+
+  '@capacitor-community/background-geolocation@1.2.26':
+    resolution: {integrity: sha512-kuva8VQ6zM+uIKgHUJTP87IYbmGKhX7DZw62JYfGZ888h4Xr5zeN+UTR6KBRHQVrGBpzSfbv+6/HQVuHYa7W5A==}
+    peerDependencies:
+      '@capacitor/core': '>=3.0.0'
 
   '@capacitor/android@7.6.6':
     resolution: {integrity: sha512-PnO8NFjpJJmMINjQQicPwS+hTMWFReIYJcfj8dzb/rRPgElxj+PBJi+6p9X4LUHd2yin8O5FGuqjNOT5BrvWvw==}
@@ -8485,6 +8502,10 @@ snapshots:
     dependencies:
       hashery: 1.5.1
       keyv: 5.6.0
+
+  '@capacitor-community/background-geolocation@1.2.26(@capacitor/core@7.6.6)':
+    dependencies:
+      '@capacitor/core': 7.6.6
 
   '@capacitor/android@7.6.6(@capacitor/core@7.6.6)':
     dependencies:

@@ -4,4 +4,7 @@
     <string name="title_activity_main">PedeHub Entregador</string>
     <string name="package_name">com.pedehub.driver</string>
     <string name="custom_url_scheme">com.pedehub.driver</string>
+    <string name="capacitor_background_geolocation_notification_channel_name">Entrega em andamento</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_pedehub_driver</string>
+    <string name="capacitor_background_geolocation_notification_color">#f97316</string>
 </resources>

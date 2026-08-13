@@ -14,6 +14,11 @@ import {
   startForegroundGeolocation,
   type StopForegroundGeolocation,
 } from '../lib/foregroundGeolocation';
+import { Capacitor } from '@capacitor/core';
+import {
+  BackgroundGeolocationError,
+  startBackgroundGeolocation,
+} from '../lib/backgroundGeolocation';
 import { showNativeAssignmentNotification } from '../lib/nativeDriverNotifications';
 import {
   acknowledgeLocationPoints,
@@ -30,9 +35,9 @@ if (import.meta.env.PROD && !configuredWsUrl) {
 const WS_URL = configuredWsUrl || 'http://localhost:3333/delivery';
 const HTTP_LOCATION_INTERVAL_MS = 15_000;
 
-function createLocationEventKey(): string {
+function createLocationEventKey(source: 'foreground' | 'background'): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `foreground-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${source}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export function useDriverTracking() {
@@ -128,18 +133,23 @@ export function useDriverTracking() {
 
     try {
       void replayLocationBuffer();
-      const stop = await startForegroundGeolocation(
-        ({ latitude, longitude, accuracy, heading, speed }) => {
+      const nativeBackground = Capacitor.isNativePlatform();
+      const source = nativeBackground ? 'background' : 'foreground';
+      const startGeolocation = nativeBackground ? startBackgroundGeolocation : startForegroundGeolocation;
+      const stop = await startGeolocation(
+        ({ latitude, longitude, accuracy, heading, speed, ...positionMetadata }) => {
           if (generation !== trackingGenerationRef.current) return;
           const location = { lat: latitude, lng: longitude };
           const point: DriverLocationPointDTO = {
-            eventKey: createLocationEventKey(),
-            recordedAt: new Date().toISOString(),
+            eventKey: createLocationEventKey(source),
+            recordedAt: 'recordedAt' in positionMetadata && typeof positionMetadata.recordedAt === 'string'
+              ? positionMetadata.recordedAt
+              : new Date().toISOString(),
             ...location,
             ...(accuracy !== undefined ? { accuracy } : {}),
             ...(heading !== undefined ? { heading } : {}),
             ...(speed !== undefined ? { speed } : {}),
-            source: 'foreground',
+            source,
           };
           enqueueLocationPoint(point);
           setLastLocation(location);
@@ -152,7 +162,6 @@ export function useDriverTracking() {
         (message) => {
           if (generation !== trackingGenerationRef.current) return;
           setError(message);
-          stopTracking();
         },
       );
 
@@ -165,13 +174,13 @@ export function useDriverTracking() {
       return true;
     } catch (trackingError) {
       if (generation !== trackingGenerationRef.current) return;
-      setError(trackingError instanceof ForegroundGeolocationError
+      setError(trackingError instanceof ForegroundGeolocationError || trackingError instanceof BackgroundGeolocationError
         ? trackingError.message
         : 'Não foi possível iniciar a localização.');
       setIsTracking(false);
       return false;
     }
-  }, [replayLocationBuffer, stopTracking, user]);
+  }, [replayLocationBuffer, user]);
 
   useEffect(() => {
     const replay = () => void replayLocationBuffer();

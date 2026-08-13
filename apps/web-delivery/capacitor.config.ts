@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   android: {
     adjustMarginsForEdgeToEdge: 'auto',
+    useLegacyBridge: true,
   },
   server: {
     androidScheme: 'https',

@@ -129,7 +129,7 @@ export class DeliveryRunsService {
       include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     });
-    return run ? this.toDTO(run) : null;
+    return run ? this.withTenantOrigin(tenantId, run) : null;
   }
 
   async getRunForTenantOrder(
@@ -844,6 +844,16 @@ export class DeliveryRunsService {
       createdAt: run.createdAt.toISOString(),
       stops: run.stops.map((stop) => this.stopToDTO(stop)),
     };
+  }
+
+  private async withTenantOrigin(tenantId: string, run: TenantRun): Promise<DeliveryRunDTO> {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { lat: true, lng: true },
+    });
+    const dto = this.toDTO(run);
+    if (typeof settings?.lat !== 'number' || typeof settings.lng !== 'number') return dto;
+    return { ...dto, origin: { lat: settings.lat, lng: settings.lng, label: 'Loja' } };
   }
 
   private shiftToDTO(shift: {
