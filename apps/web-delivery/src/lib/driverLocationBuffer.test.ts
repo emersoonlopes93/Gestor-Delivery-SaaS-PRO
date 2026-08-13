@@ -29,4 +29,20 @@ describe('driver location offline buffer', () => {
     acknowledgeLocationPoints(['point-a']);
     expect(readLocationBuffer().map((point) => point.eventKey)).toEqual(['point-b']);
   });
+
+  it('bounds background samples to the latest 500 points in FIFO order', () => {
+    for (let index = 0; index < 505; index += 1) {
+      enqueueLocationPoint({
+        eventKey: `background-${index}`,
+        recordedAt: new Date(1_723_000_000_000 + index * 1_000).toISOString(),
+        lat: -23.5,
+        lng: -46.6,
+        source: 'background',
+      });
+    }
+    const points = readLocationBuffer();
+    expect(points).toHaveLength(500);
+    expect(points[0]?.eventKey).toBe('background-5');
+    expect(points.at(-1)?.eventKey).toBe('background-504');
+  });
 });

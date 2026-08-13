@@ -1,3 +1,20 @@
+## R13 PR C - driver route map and Android background tracking
+
+Date: 2026-08-12
+Branch: `feat/r13-driver-background`
+Base: `origin/main-copy` / `2d3c58eb`
+
+- The courier page has an accessible internal schematic map, numbered stop sequence, textual equivalent, optional Google Maps/Waze/system navigation, and an explicit no-ETA/no-optimization explanation.
+- `@capacitor-community/background-geolocation` 1.2.26 is the sole new Capacitor background plugin: MIT licensed, Capacitor 7 compatible, and active only while the route requires tracking.
+- Plugin decision: selected for its maintained Capacitor 7 bridge and notification-backed Android foreground service; Transistorsoft Background Geolocation was rejected because production use requires a commercial license.
+- Native points reuse the bounded FIFO/replay path with source `background`, event-key idempotency, and device timestamps. A GPS outage after start announces reconnection and does not cancel the route.
+- `DeliveryRunDTO.origin` is nullable and tenant-scoped. A return renders or navigates to the store only when a real store coordinate exists; otherwise the destination is explicitly unavailable.
+- `cap sync android` and `gradlew test assembleDebug` passed with the local Android Studio JDK 21 and local SDK. No device was attached for hardware smoke.
+
+Validation: driver app test suite passed with 13 files/39 tests, lint and production build passed; focused API delivery-runs suite passed with 16 tests after building shared types/core. Design evaluation passed after a correction round. No migration, remote database, provider, production, Dokploy, or deploy was accessed.
+
+---
+
 ## R13 PR B - tenant maps and order route history
 
 Date: 2026-08-12

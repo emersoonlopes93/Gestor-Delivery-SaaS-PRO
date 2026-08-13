@@ -55,4 +55,65 @@
     background: var(--delivery-background);
     color: var(--delivery-foreground);
   }
+
+  .route-pin-shell {
+    background: transparent;
+    border: 0;
+  }
+
+  .route-pin {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #64748b;
+    box-shadow: 0 3px 10px rgb(15 23 42 / 35%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .route-pin--active { background: #f97316; transform: scale(1.12); }
+  .route-pin--return { background: #d97706; }
+  .route-pin--done { background: #059669; opacity: 0.68; }
+
+  .route-courier {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border: 5px solid #fff;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 28%), 0 3px 10px rgb(15 23 42 / 35%);
+    color: #fff;
+    font-size: 8px;
+  }
+
+  .leaflet-container {
+    background: var(--delivery-muted);
+    font-family: inherit;
+  }
+
+  .route-origin {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #0f172a;
+    box-shadow: 0 3px 10px rgb(15 23 42 / 35%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .driver-route-schematic .leaflet-pane,
+  .driver-route-schematic .leaflet-map-pane {
+    background-image: radial-gradient(circle at 1px 1px, rgb(100 116 139 / 22%) 1px, transparent 0);
+    background-size: 18px 18px;
+  }
 }

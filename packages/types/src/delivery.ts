@@ -116,6 +116,13 @@ export interface DeliveryStopDTO {
   cancellationReason: string | null;
 }
 
+/** Store/origin coordinates when the tenant has a geocoded store address. */
+export interface DeliveryRunOriginDTO {
+  lat: number;
+  lng: number;
+  label: string;
+}
+
 export interface DeliveryRunDTO {
   id: string;
   driverId: string;
@@ -128,6 +135,7 @@ export interface DeliveryRunDTO {
   returningAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  origin?: DeliveryRunOriginDTO | null;
   stops: DeliveryStopDTO[];
 }
 

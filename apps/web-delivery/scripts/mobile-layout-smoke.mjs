@@ -1,3 +1,4 @@
+/* global process */
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
@@ -41,7 +42,7 @@ try {
       body: JSON.stringify({ success: true, data: { shift: null, activeRun: null } }),
     }));
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('heading', { name: 'Motoboy' }).waitFor();
+    await page.locator('h1').waitFor();
     await page.evaluate(() => {
       document.documentElement.style.setProperty('--safe-area-top', '32px');
       document.documentElement.style.setProperty('--safe-area-bottom', '24px');

@@ -82,6 +82,9 @@ vi.mock('../hooks/usePushNotifications', () => ({
   }),
 }));
 vi.mock('../components/NativeNotificationBanner', () => ({ NativeNotificationBanner: () => null }));
+vi.mock('../components/DriverRouteMap', () => ({
+  DriverRouteMap: () => <div data-testid="driver-route-map" />,
+}));
 vi.mock('../lib/api', () => ({ api: { post: vi.fn() } }));
 
 function run(status: DeliveryRunStatus, stopStatus = DeliveryStopStatus.PENDING): DeliveryRunDTO {
@@ -155,7 +158,7 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     render(<ActiveDeliveryPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Ficar online' }));
     await waitFor(() => expect(mocks.startShift).toHaveBeenCalledOnce());
-    expect(screen.getByText('Funciona somente enquanto o app está aberto.')).toBeTruthy();
+    expect(screen.getByText(/use o aplicativo PedeHub Entregador para Android/)).toBeTruthy();
   });
 
   it('requires one route-level acceptance and exposes friendly rejection reasons', async () => {
@@ -186,6 +189,7 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     expect(screen.getByRole('radio', { name: /Cliente não estava no local/ })).toBeTruthy();
     expect(screen.getByText('Pedido #102')).toBeTruthy();
     expect(screen.getByText('Depois')).toBeTruthy();
+    expect(screen.getByTestId('driver-route-map')).toBeTruthy();
   });
 
   it('starts tracking for an in-progress route and stops it after the route ends', async () => {

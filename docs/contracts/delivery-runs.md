@@ -33,9 +33,15 @@ A parada preserva snapshots de número do pedido, cliente, telefone e endereço.
 
 Uma rota em `PENDING_ACCEPTANCE`, `ASSIGNED`, `IN_PROGRESS` ou `RETURNING` mantém o entregador `busy`. O entregador só volta a `available` quando a rota termina ou é recusada antes do início. O turno ativo permanece aberto depois da rota; encerrar o turno muda o entregador para `offline`.
 
+## Tracking e mapa operacional
+
+O tracking detalhado é exigido somente quando existe `DriverShift ACTIVE` e a rota está em `IN_PROGRESS` ou `RETURNING`; concluir uma parada individual não encerra a captura. No APK Android, uma rota ativa usa serviço foreground com notificação persistente e buffer FIFO local limitado para reenviar pontos em ordem após reconexão. O PWA mantém apenas tracking em foreground e comunica claramente essa limitação.
+
+`DeliveryRunDTO.origin` é opcional e só contém coordenadas reais da loja configurada pelo tenant. O retorno usa essa origem quando disponível; sem ela, a interface informa que o destino não está disponível e não infere rota a partir de endereços de clientes.
+
 ## Limites da V1
 
-A sequência é manual. Não há provedor de mapas, otimização, ETA, geocoding em lote, financeiro por corrida, tracking em background ou permissão de localização em background neste contrato.
+A sequência é manual. Não há provedor de rotas pago, otimização, ETA, geocoding em lote ou financeiro por corrida. O mapa é esquemático e as linhas representam somente a ordem persistida das paradas, não trajeto viário.
 
 ## API do painel tenant
 

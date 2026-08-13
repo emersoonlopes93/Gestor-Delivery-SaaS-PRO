@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 import {
   Bell,
   BellOff,
@@ -22,6 +23,7 @@ import {
   type DeliveryStopDTO,
 } from '@gestor/types';
 import { NativeNotificationBanner } from '../components/NativeNotificationBanner';
+import { DriverRouteMap } from '../components/DriverRouteMap';
 import { useDriverRoute } from '../hooks/useDriverRoute';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -172,6 +174,7 @@ export function ActiveDeliveryPage() {
     stop.status === DeliveryStopStatus.CURRENT || stop.status === DeliveryStopStatus.ARRIVED,
   );
   const returns = orderedStops.filter((stop) => stop.status === DeliveryStopStatus.RETURN_TO_STORE);
+  const nativePlatform = Capacitor.isNativePlatform();
 
   useEffect(() => {
     if (trackingRequired && !isTracking) {
@@ -225,7 +228,7 @@ export function ActiveDeliveryPage() {
 
   const startRun = async (runId: string) => {
     if (!isTracking && !(await startTracking())) {
-      setBlockingMessage('Localizacao necessaria. Ative a localizacao para iniciar esta rota.');
+      setBlockingMessage('A localização é necessária para iniciar a rota. Ative a permissão de localização e o GPS para continuar.');
       return false;
     }
     return mutateStartRun(runId);
@@ -418,6 +421,19 @@ export function ActiveDeliveryPage() {
               </section>
             )}
 
+            {(activeRun.status === DeliveryRunStatus.IN_PROGRESS
+              || activeRun.status === DeliveryRunStatus.RETURNING) && (
+              <DriverRouteMap
+                status={activeRun.status}
+                stops={orderedStops}
+                currentStop={currentStop}
+                currentPosition={lastLocation}
+                origin={activeRun.origin}
+                nativePlatform={nativePlatform}
+                addressText={addressText}
+              />
+            )}
+
             {activeRun.status === DeliveryRunStatus.IN_PROGRESS && currentStop && (
               <section className="overflow-hidden rounded-2xl border border-orange-200 bg-[var(--delivery-card)] shadow-sm dark:border-orange-900">
                 <div className="bg-orange-500 px-5 py-4 text-white">
@@ -480,7 +496,18 @@ export function ActiveDeliveryPage() {
               <ol className="mt-3 divide-y divide-[var(--delivery-border)]">
                 {orderedStops.map((stop) => (
                   <li key={stop.id} className="flex min-h-16 items-center gap-3 py-3">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--delivery-muted)]"><StopIcon status={stop.status} /></span>
+                    <span className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-black ${
+                      stop.status === DeliveryStopStatus.CURRENT || stop.status === DeliveryStopStatus.ARRIVED
+                        ? 'border-orange-500 bg-orange-500 text-white'
+                        : stop.status === DeliveryStopStatus.RETURN_TO_STORE
+                          ? 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
+                          : stop.status === DeliveryStopStatus.DELIVERED || stop.status === DeliveryStopStatus.RETURNED_TO_STORE
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-800 opacity-70 dark:bg-emerald-950/30 dark:text-emerald-200'
+                            : 'border-[var(--delivery-border)] bg-[var(--delivery-muted)] text-[var(--delivery-foreground)]'
+                    }`} aria-label={`Parada ${stop.sequence}`}>
+                      {stop.sequence}
+                      <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--delivery-card)]"><StopIcon status={stop.status} /></span>
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-[var(--delivery-foreground)]">Pedido #{stop.orderNumber}</p>
                       <p className="truncate text-xs text-[var(--delivery-muted-foreground)]">{stop.customerName}</p>
@@ -497,12 +524,25 @@ export function ActiveDeliveryPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 id="tracking-title" className="flex items-center gap-2 text-sm font-bold text-[var(--delivery-foreground)]"><Navigation className="h-4 w-4 text-blue-500" aria-hidden="true" />Localização</h2>
-              <p className="mt-1 text-xs text-[var(--delivery-muted-foreground)]">Funciona somente enquanto o app está aberto.</p>
+              {!nativePlatform && (
+                <p className="mt-1 text-xs leading-5 text-[var(--delivery-muted-foreground)]">
+                  Para acompanhar a rota com o app fechado ou tela bloqueada, use o aplicativo PedeHub Entregador para Android.
+                </p>
+              )}
             </div>
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${isTracking ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-[var(--delivery-muted)] text-[var(--delivery-muted-foreground)]'}`}>{isTracking ? 'Ativa' : 'Pausada'}</span>
           </div>
           {isTracking && lastLocation && <p className="mt-3 rounded-lg bg-[var(--delivery-muted)] p-3 font-mono text-[11px] text-[var(--delivery-muted-foreground)]">Lat: {lastLocation.lat.toFixed(5)} · Lng: {lastLocation.lng.toFixed(5)}</p>}
-          {trackingError && <p className="mt-3 text-xs font-medium text-red-600">{trackingError}</p>}
+          {trackingError && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <p className="font-bold">Localização temporariamente indisponível</p>
+              <p>
+                {trackingRequired
+                  ? 'Sua rota continua ativa e não será cancelada. Estamos tentando reconectar a localização.'
+                  : trackingError}
+              </p>
+            </div>
+          )}
           <button type="button" onClick={isTracking ? stopTracking : () => void startTracking()} className={`mt-4 min-h-11 w-full rounded-xl text-sm font-bold ${isTracking ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300' : 'bg-blue-600 text-white'}`}>{isTracking ? 'Parar localização' : 'Permitir localização'}</button>
         </section>
       </main>

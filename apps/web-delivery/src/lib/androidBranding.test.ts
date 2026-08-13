@@ -24,13 +24,20 @@ describe('driver Android source contract', () => {
     );
   });
 
-  it('declares only foreground location permissions and keyboard-safe resizing', () => {
+  it('declares route foreground-service permissions without continuous background permission', () => {
     const manifest = readText('android/app/src/main/AndroidManifest.xml');
+    const pluginManifest = readText('node_modules/@capacitor-community/background-geolocation/android/src/main/AndroidManifest.xml');
+    const strings = readText('android/app/src/main/res/values/strings.xml');
     const css = readText('src/index.css');
 
     expect(manifest).toContain('android.permission.ACCESS_COARSE_LOCATION');
     expect(manifest).toContain('android.permission.ACCESS_FINE_LOCATION');
     expect(manifest).not.toContain('android.permission.ACCESS_BACKGROUND_LOCATION');
+    expect(pluginManifest).toContain('android.permission.FOREGROUND_SERVICE_LOCATION');
+    expect(pluginManifest).toContain('android.permission.POST_NOTIFICATIONS');
+    expect(pluginManifest).toContain('android:foregroundServiceType="location"');
+    expect(strings).toContain('Entrega em andamento');
+    expect(strings).toContain('drawable/ic_stat_pedehub_driver');
     expect(manifest).toContain('android:windowSoftInputMode="adjustResize"');
     expect(css).toContain('env(safe-area-inset-top, 0px)');
     expect(css).toContain('env(safe-area-inset-bottom, 0px)');

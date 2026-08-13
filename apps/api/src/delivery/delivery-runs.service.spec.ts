@@ -80,8 +80,12 @@ describe('DeliveryRunsService', () => {
         { id: 'stop-next', status: DeliveryStopStatus.CURRENT },
       ],
     }));
+    tx.tenantSettings.findUnique.mockResolvedValue({ lat: -23.55, lng: -46.63 });
     await expect(service.getDriverWorkState('tenant-a', 'driver-a'))
-      .resolves.toEqual(expect.objectContaining({ trackingRequired: true }));
+      .resolves.toEqual(expect.objectContaining({
+        trackingRequired: true,
+        activeRun: expect.objectContaining({ origin: { lat: -23.55, lng: -46.63, label: 'Loja' } }),
+      }));
 
     tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
       status: DeliveryRunStatus.ASSIGNED,
