@@ -20,10 +20,12 @@ describe('DriverOperationsController canonical route contract', () => {
     completeRun: jest.fn(),
   };
   const gateway = { emitDriverRouteEvent: jest.fn() };
+  const earningsService = {};
   const controller = new DriverOperationsController(
     driversService as never,
     runsService as never,
     gateway as never,
+    earningsService as never,
   );
   const request = { user: { tenantId: 'tenant-a', id: 'driver-a' } };
 

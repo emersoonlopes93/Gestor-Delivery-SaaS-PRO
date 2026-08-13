@@ -57,10 +57,13 @@ describe('DeliveryRunsService', () => {
     order: tx.order,
     $transaction: jest.fn((operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
   };
-  const service = new DeliveryRunsService(prisma as never);
+  const earnings = { shiftSnapshot: jest.fn(), postDailyRate: jest.fn(), stopSnapshot: jest.fn(), postStop: jest.fn() };
+  const service = new DeliveryRunsService(prisma as never, earnings as never);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    earnings.shiftSnapshot.mockResolvedValue({ dailyRateSnapshot: 0, currencySnapshot: 'BRL', paySnapshotAt: new Date() });
+    earnings.stopSnapshot.mockReturnValue({ payAmountSnapshot: 7, payCurrencySnapshot: 'BRL', payAttemptSnapshot: false });
     prisma.$transaction.mockImplementation((operation) => operation(tx));
     tx.deliveryDriver.update.mockResolvedValue({ id: 'driver-a' });
     tx.deliveryRun.updateMany.mockResolvedValue({ count: 1 });

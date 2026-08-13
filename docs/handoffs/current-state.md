@@ -1733,3 +1733,18 @@ Base: `origin/main-copy` / `921fcaa8` (merge da PR #64)
 - `cap sync android` passou. `assembleDebug` passou com JBR 21 e o SDK Android local, gerando `app-debug.apk` com 5.404.653 bytes e SHA-256 `AFB1E769F84B697924BFEE92317C126D44B4E4FFE503A04E8516DD0012DCA385`.
 - Os gates globais, a CI da PR e a CI pós-merge ainda devem ser registrados antes de encerrar a sprint.
 - Nenhum schema Prisma, migration, dependência, feature flag, banco remoto, provider, produção, Dokploy, deploy ou publicação faz parte desta PR.
+## R14 PR A/B - driver pay snapshots and immutable ledger
+
+Date: 2026-08-13
+Branch: `feat/r14-driver-pay-snapshots`
+Base: `origin/main-copy` / `dd5bbb45`
+
+- Added tenant defaults and tenant-scoped driver overrides for daily rate and delivery pay modes: own distance table, normal delivery fee, percentage of normal fee, or fixed amount.
+- `Order.normalDeliveryFee` preserves the normal delivery base separately from customer charged `deliveryFee`; existing rows are safely backfilled from their known charged fee without inventing discounts.
+- Shift and stop pay snapshots freeze applied configuration before posting. Delivery, paid attempt/cancellation after arrival, daily rate, cash tip and audited adjustment post to an immutable idempotent driver ledger.
+- Cash tip is marked already received by the driver and does not increase due from store. Settlement, payout, online tips and global driver accounts remain intentionally absent.
+- Tenant delivery UI configures defaults and driver overrides. Driver earnings UX follows in the next PR.
+
+Validation so far: Prisma schema validation PASS, API TypeScript PASS, focused API suites 5 files/37 tests PASS plus expanded ledger coverage, tenant TypeScript PASS and focused tenant tests PASS. Docker Desktop was not running locally, so the canonical ephemeral migration gate is delegated to PR CI. No production, Dokploy, remote database or deploy was accessed.
+
+---

@@ -10,6 +10,7 @@ import {
   DriverShiftStatus as SharedDriverShiftStatus,
   DriverStatus as SharedDriverStatus,
   DriverVehicleType as SharedDriverVehicleType,
+  DriverPayMode as SharedDriverPayMode,
   ORDER_STATUS_TRANSITIONS,
 } from '@gestor/types';
 import type {
@@ -29,6 +30,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
+import { DriverEarningsService } from './driver-earnings.service';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -57,7 +59,7 @@ const OPEN_STOP_STATUSES: DeliveryStopStatus[] = [
 
 @Injectable()
 export class DeliveryRunsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly earnings: DriverEarningsService) {}
 
   async getBuilderData(tenantId: string): Promise<DeliveryRunBuilderDataDTO> {
     const [drivers, orders] = await Promise.all([
@@ -88,6 +90,11 @@ export class DeliveryRunsService {
         ...driver,
         status: SharedDriverStatus[driver.status],
         vehicleType: SharedDriverVehicleType[driver.vehicleType],
+        payMode: driver.payMode ? SharedDriverPayMode[driver.payMode] : null,
+        dailyRate: driver.dailyRate === null ? null : Number(driver.dailyRate),
+        payFixedAmount: driver.payFixedAmount === null ? null : Number(driver.payFixedAmount),
+        payPercentage: driver.payPercentage === null ? null : Number(driver.payPercentage),
+        payRateTable: this.payRateTiers(driver.payRateTable),
         lastLocationAt: driver.lastLocationAt?.toISOString() ?? null,
       })),
       orders: orders.map((order) => ({
@@ -266,7 +273,8 @@ export class DeliveryRunsService {
       });
       if (existing) return existing;
 
-      const shift = await tx.driverShift.create({ data: { tenantId, driverId } });
+      const paySnapshot = await this.earnings.shiftSnapshot(tx, tenantId, driver);
+      const shift = await tx.driverShift.create({ data: { tenantId, driverId, ...paySnapshot } });
       await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'available' } });
       return shift;
     });
@@ -286,6 +294,7 @@ export class DeliveryRunsService {
       if (activeRun) throw new ConflictException('Conclua a rota e os retornos antes de encerrar o turno.');
 
       const endedAt = new Date();
+      await this.earnings.postDailyRate(tx, shift);
       const ended = await tx.driverShift.update({
         where: { id: shift.id },
         data: { status: DriverShiftStatus.ENDED, endedAt },
@@ -327,23 +336,19 @@ export class DeliveryRunsService {
           },
           include: { deliveryAddress: true },
         }),
-        options.assignImmediately
-          ? tx.tenantSettings.findUnique({
-              where: { tenantId },
-              select: { deliveryRunRequiresAcceptance: true },
-            })
-          : Promise.resolve(null),
+        tx.tenantSettings.findUnique({ where: { tenantId } }),
       ]);
 
       if (!driver) throw new NotFoundException('Entregador não encontrado nesta loja.');
       if (!shift) throw new BadRequestException('O entregador precisa iniciar o turno antes de receber uma rota.');
+      if (!settings) throw new BadRequestException('ConfiguraÃ§Ã£o da loja nÃ£o encontrada.');
       if (orders.length !== orderIds.length) {
         throw new BadRequestException('Todos os pedidos devem pertencer à loja e estar prontos para entrega.');
       }
 
       const byId = new Map(orders.map((order) => [order.id, order]));
       const createdAt = new Date();
-      const requiresAcceptance = settings?.deliveryRunRequiresAcceptance ?? true;
+      const requiresAcceptance = options.assignImmediately ? settings.deliveryRunRequiresAcceptance : true;
       const assignedAt = options.assignImmediately ? createdAt : null;
       const run = await tx.deliveryRun.create({
         data: {
@@ -368,9 +373,11 @@ export class DeliveryRunsService {
           stops: {
             create: orderIds.map((orderId, index) => {
               const order = byId.get(orderId);
+              const paySnapshot = order ? this.earnings.stopSnapshot(driver, settings, order, settings) : null;
               if (!order) throw new BadRequestException('Pedido inválido na rota.');
               return {
                 tenantId,
+                ...paySnapshot,
                 orderId,
                 sequence: index + 1,
                 orderNumberSnapshot: order.orderNumber,
@@ -627,6 +634,7 @@ export class DeliveryRunsService {
       });
       if (!stop) return null;
       const cancelledAt = new Date();
+      await this.earnings.postStop(tx, stop, 'cancelled', stop.payAttemptSnapshot ?? false);
       await tx.deliveryStop.update({
         where: { id: stop.id },
         data: { status: DeliveryStopStatus.CANCELLED, cancelledAt, cancellationReason: reason },
@@ -686,6 +694,7 @@ export class DeliveryRunsService {
         where: { id: stop.id },
         data: { status: DeliveryStopStatus.DELIVERED, deliveredAt },
       });
+      await this.earnings.postStop(tx, { ...stop, run }, 'delivered', stop.payAttemptSnapshot ?? false);
       await this.advanceOrFinalize(tx, run, stop.id, deliveredAt, 'STOP_DELIVERED');
       return this.getRun(tx, tenantId, runId);
     });
@@ -716,6 +725,7 @@ export class DeliveryRunsService {
           returnRequiredAt: failedAt,
         },
       });
+      await this.earnings.postStop(tx, { ...stop, run }, 'attempt', stop.payAttemptSnapshot ?? false);
       await this.advanceOrFinalize(tx, run, stop.id, failedAt, 'STOP_FAILED_ATTEMPT', { reason: reason.trim() });
       return this.getRun(tx, tenantId, runId);
     });
@@ -861,12 +871,16 @@ export class DeliveryRunsService {
     status: DriverShiftStatus;
     startedAt: Date;
     endedAt: Date | null;
+    dailyRateSnapshot: Prisma.Decimal;
+    currencySnapshot: string;
   }): DriverShiftDTO {
     return {
       id: shift.id,
       status: SharedDriverShiftStatus[shift.status],
       startedAt: shift.startedAt.toISOString(),
       endedAt: shift.endedAt?.toISOString() ?? null,
+      dailyRate: Number(shift.dailyRateSnapshot),
+      currency: shift.currencySnapshot,
     };
   }
 
@@ -901,7 +915,20 @@ export class DeliveryRunsService {
       returnedAt: stop.returnedAt?.toISOString() ?? null,
       cancelledAt: stop.cancelledAt?.toISOString() ?? null,
       cancellationReason: stop.cancellationReason,
+      payAmount: stop.payAmountSnapshot ? Number(stop.payAmountSnapshot) : null,
+      payCurrency: stop.payCurrencySnapshot,
     };
+  }
+
+  private payRateTiers(value: Prisma.JsonValue): import('@gestor/types').DriverPayRateTierDTO[] | null {
+    if (!Array.isArray(value)) return null;
+    return value.flatMap((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+      const upToKm = 'upToKm' in item ? item.upToKm : undefined;
+      const amount = 'amount' in item ? item.amount : undefined;
+      return [(upToKm === null || typeof upToKm === 'number') && typeof amount === 'number'
+        ? { upToKm, amount } : null].filter((tier): tier is import('@gestor/types').DriverPayRateTierDTO => tier !== null);
+    });
   }
 
   private getRun(tx: TransactionClient, tenantId: string, runId: string): Promise<RunWithStops> {

@@ -27,6 +27,28 @@ export enum DriverShiftStatus {
   ENDED = 'ENDED',
 }
 
+export enum DriverPayMode {
+  DRIVER_RATE_TABLE = 'DRIVER_RATE_TABLE', NORMAL_DELIVERY_FEE = 'NORMAL_DELIVERY_FEE',
+  PERCENTAGE_NORMAL_FEE = 'PERCENTAGE_NORMAL_FEE', FIXED = 'FIXED',
+}
+export enum DriverLedgerEntryType {
+  DAILY_RATE = 'DAILY_RATE', DELIVERY_FEE = 'DELIVERY_FEE', TIP_CASH = 'TIP_CASH',
+  BONUS = 'BONUS', ADJUSTMENT = 'ADJUSTMENT',
+}
+export interface DriverPayRateTierDTO { upToKm: number | null; amount: number }
+export interface DriverPaySettingsDTO {
+  mode: DriverPayMode; dailyRate: number; fixedAmount: number; percentage: number;
+  rateTable: DriverPayRateTierDTO[]; payFailedAttempt: boolean; currency: string;
+}
+export class UpdateDriverPaySettingsDTO {
+  @IsEnum(DriverPayMode) mode!: DriverPayMode;
+  @IsNumber() @Min(0) dailyRate!: number;
+  @IsNumber() @Min(0) fixedAmount!: number;
+  @IsNumber() @Min(0) @Max(100) percentage!: number;
+  @IsArray() rateTable!: DriverPayRateTierDTO[];
+  @IsBoolean() payFailedAttempt!: boolean;
+}
+
 export enum DeliveryRunStatus {
   PENDING_ACCEPTANCE = 'PENDING_ACCEPTANCE',
   ASSIGNED = 'ASSIGNED',
@@ -114,6 +136,8 @@ export interface DeliveryStopDTO {
   returnedAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
+  payAmount: number | null;
+  payCurrency: string | null;
 }
 
 /** Store/origin coordinates when the tenant has a geocoded store address. */
@@ -144,6 +168,8 @@ export interface DriverShiftDTO {
   status: DriverShiftStatus;
   startedAt: string;
   endedAt: string | null;
+  dailyRate: number;
+  currency: string;
 }
 
 export interface DriverWorkStateDTO {
@@ -260,6 +286,13 @@ export class CreateDriverDTO {
   @IsString()
   @IsOptional()
   notes?: string;
+  @IsBoolean() @IsOptional() payOverrideEnabled?: boolean;
+  @IsEnum(DriverPayMode) @IsOptional() payMode?: DriverPayMode;
+  @IsNumber() @Min(0) @IsOptional() dailyRate?: number;
+  @IsNumber() @Min(0) @IsOptional() payFixedAmount?: number;
+  @IsNumber() @Min(0) @Max(100) @IsOptional() payPercentage?: number;
+  @IsArray() @IsOptional() payRateTable?: DriverPayRateTierDTO[];
+  @IsBoolean() @IsOptional() payFailedAttempt?: boolean;
 }
 
 export class UpdateDriverDTO {
@@ -288,6 +321,13 @@ export class UpdateDriverDTO {
   @IsString()
   @IsOptional()
   notes?: string;
+  @IsBoolean() @IsOptional() payOverrideEnabled?: boolean;
+  @IsEnum(DriverPayMode) @IsOptional() payMode?: DriverPayMode;
+  @IsNumber() @Min(0) @IsOptional() dailyRate?: number;
+  @IsNumber() @Min(0) @IsOptional() payFixedAmount?: number;
+  @IsNumber() @Min(0) @Max(100) @IsOptional() payPercentage?: number;
+  @IsArray() @IsOptional() payRateTable?: DriverPayRateTierDTO[];
+  @IsBoolean() @IsOptional() payFailedAttempt?: boolean;
 }
 
 export class UpdateDriverOperationalStatusDTO {
@@ -310,4 +350,26 @@ export interface DriverDTO {
   createdAt: Date | string;
   updatedAt: Date | string;
   pin?: string; // Temporário para exibir uma vez após criação/reset
+}
+
+export interface DriverDTO {
+  payOverrideEnabled?: boolean;
+  payMode?: DriverPayMode | null;
+  dailyRate?: number | null;
+  payFixedAmount?: number | null;
+  payPercentage?: number | null;
+  payRateTable?: DriverPayRateTierDTO[] | null;
+  payFailedAttempt?: boolean | null;
+}
+
+export interface DriverEarningsSummaryDTO {
+  shiftId: string; shiftStatus: DriverShiftStatus; deliveryFees: number; cashTips: number;
+  dailyRate: number; dailyRatePreview: boolean; adjustments: number; totalEarnings: number;
+  receivedDirectly: number; dueFromStore: number; currency: string;
+}
+export class DriverCashTipDTO { @IsString() orderId!: string; @IsNumber() @Min(0.01) amount!: number }
+export class TenantCashTipDTO extends DriverCashTipDTO { @IsString() driverId!: string }
+export class DriverAdjustmentDTO {
+  @IsString() driverId!: string; @IsNumber() amount!: number;
+  @IsString() @MaxLength(255) reason!: string;
 }

@@ -3,6 +3,8 @@ import type {
   DeliveryRunBuilderDataDTO,
   DeliveryRunDTO,
   DeliveryRunSettingsDTO,
+  DriverPaySettingsDTO,
+  UpdateDriverPaySettingsDTO,
 } from '@gestor/types';
 import { api } from '@/lib/api-client';
 import { invalidateLogisticsQueries, LOGISTICS_QUERY_KEYS } from '../lib/invalidate-logistics';
@@ -32,6 +34,13 @@ export function useDeliveryRuns() {
       return response.data ?? { requiresAcceptance: true };
     },
   });
+  const paySettings = useQuery({
+    queryKey: LOGISTICS_QUERY_KEYS.driverPaySettings,
+    queryFn: async (): Promise<DriverPaySettingsDTO> => {
+      const response = await api.get<DriverPaySettingsDTO>('/delivery/runs/pay-settings');
+      return response.data;
+    },
+  });
   const createRun = useMutation({
     mutationFn: async (payload: { driverId: string; orderIds: string[] }) => {
       const response = await api.post<DeliveryRunDTO>('/delivery/runs', payload);
@@ -58,16 +67,31 @@ export function useDeliveryRuns() {
       queryClient.setQueryData(LOGISTICS_QUERY_KEYS.runSettings, updated);
     },
   });
+  const updatePaySettings = useMutation({
+    mutationFn: async (payload: UpdateDriverPaySettingsDTO) => {
+      const response = await api.patch<DriverPaySettingsDTO>('/delivery/runs/pay-settings', payload);
+      return response.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(LOGISTICS_QUERY_KEYS.driverPaySettings, updated);
+      void queryClient.invalidateQueries({ queryKey: LOGISTICS_QUERY_KEYS.drivers });
+    },
+  });
 
   return {
     builder: builder.data ?? { drivers: [], orders: [] },
     activeRuns: activeRuns.data ?? [],
     settings: settings.data ?? { requiresAcceptance: true },
+    paySettings: paySettings.data,
+    isPaySettingsLoading: paySettings.isLoading,
+    isPaySettingsError: paySettings.isError,
     isLoading: builder.isLoading || activeRuns.isLoading || settings.isLoading,
     isError: builder.isError || activeRuns.isError || settings.isError,
     createRun: createRun.mutateAsync,
     isCreating: createRun.isPending,
     reorderStops: reorderStops.mutateAsync,
     updateSettings: updateSettings.mutateAsync,
+    updatePaySettings: updatePaySettings.mutateAsync,
+    isUpdatingPaySettings: updatePaySettings.isPending,
   };
 }

@@ -5,6 +5,9 @@ import {
   type DriverRouteEvent,
   ReorderDeliveryStopsDTO,
   UpdateDeliveryRunSettingsDTO,
+  UpdateDriverPaySettingsDTO,
+  DriverAdjustmentDTO,
+  TenantCashTipDTO,
 } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../common/decorators';
@@ -13,6 +16,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { PushService } from '../notifications/push.service';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
+import { DriverEarningsService } from './driver-earnings.service';
 
 @Controller('delivery/runs')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -21,12 +25,43 @@ export class DeliveryRunsController {
     private readonly deliveryRunsService: DeliveryRunsService,
     private readonly deliveryTrackingGateway: DeliveryTrackingGateway,
     private readonly pushService: PushService,
+    private readonly earningsService: DriverEarningsService,
   ) {}
 
   @Get('builder')
   @RequirePermissions('delivery.read', 'delivery.dispatch')
   getBuilderData(@Request() req: AuthenticatedRequest) {
     return this.deliveryRunsService.getBuilderData(req.user.tenantId);
+  }
+
+  @Get('pay-settings')
+  @RequirePermissions('delivery.read', 'delivery.manage_drivers')
+  getPaySettings(@Request() req: AuthenticatedRequest) {
+    return this.earningsService.getSettings(req.user.tenantId);
+  }
+
+  @Patch('pay-settings')
+  @RequirePermissions('delivery.manage_drivers')
+  updatePaySettings(@Request() req: AuthenticatedRequest, @Body() dto: UpdateDriverPaySettingsDTO) {
+    return this.earningsService.updateSettings(req.user.tenantId, req.user.id, dto);
+  }
+
+  @Get('drivers/:driverId/earnings')
+  @RequirePermissions('delivery.read', 'delivery.manage_drivers')
+  getDriverEarnings(@Request() req: AuthenticatedRequest, @Param('driverId') driverId: string) {
+    return this.earningsService.summary(req.user.tenantId, driverId);
+  }
+
+  @Post('adjustments')
+  @RequirePermissions('delivery.manage_drivers')
+  addAdjustment(@Request() req: AuthenticatedRequest, @Body() dto: DriverAdjustmentDTO) {
+    return this.earningsService.addAdjustment(req.user.tenantId, dto.driverId, dto.amount, dto.reason, req.user.id);
+  }
+
+  @Post('cash-tips')
+  @RequirePermissions('delivery.manage_drivers')
+  addCashTip(@Request() req: AuthenticatedRequest, @Body() dto: TenantCashTipDTO) {
+    return this.earningsService.addCashTip(req.user.tenantId, dto.driverId, dto.orderId, dto.amount, req.user.id, 'tenant_user');
   }
 
   @Get('active')

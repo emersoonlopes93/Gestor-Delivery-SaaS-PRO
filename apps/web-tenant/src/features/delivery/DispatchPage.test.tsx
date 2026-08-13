@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DeliveryRunStatus,
   DeliveryStopStatus,
+  DriverPayMode,
   DriverStatus,
   DriverVehicleType,
   type DeliveryRunDTO,
@@ -67,12 +68,25 @@ describe('DispatchPage multi-order route builder', () => {
       },
       activeRuns: [activeRun()],
       settings: { requiresAcceptance: true },
+      paySettings: {
+        mode: DriverPayMode.FIXED,
+        dailyRate: 50,
+        fixedAmount: 8,
+        percentage: 0,
+        rateTable: [{ upToKm: null, amount: 8 }],
+        payFailedAttempt: false,
+        currency: 'BRL',
+      },
+      isPaySettingsLoading: false,
+      isPaySettingsError: false,
       isLoading: false,
       isError: false,
       createRun: vi.fn(),
       isCreating: false,
       reorderStops: vi.fn(),
       updateSettings: vi.fn(),
+      updatePaySettings: vi.fn(),
+      isUpdatingPaySettings: false,
     });
   });
 
@@ -81,6 +95,10 @@ describe('DispatchPage multi-order route builder', () => {
     expect(html).toContain('Bia Livre');
     expect(html).toContain('Pedido 104');
     expect(html).toContain('Exigir aceite');
+    expect(html).toContain('Pagamento dos entregadores');
+    expect(html).toContain('A taxa cobrada do cliente é independente');
+    expect(html).toContain('Editar regra');
+    expect(html).not.toContain('Salvar regra de pagamento');
     expect(html).toContain('Somente entregadores online e livres');
   });
 

@@ -297,6 +297,7 @@ export class OrdersService {
             itemsSubtotal,
             discountTotal: discountTotal || 0,
             deliveryFee,
+            normalDeliveryFee: deliveryFee,
             serviceFee: 0,
             total: finalTotal,
             sourceChannel: dto.sourceChannel || 'direct_online',
@@ -1603,6 +1604,7 @@ export class OrdersService {
           itemsSubtotal,
           discountTotal: discountTotal || 0,
           deliveryFee,
+          normalDeliveryFee: deliveryFee,
           total: total,
         },
       });

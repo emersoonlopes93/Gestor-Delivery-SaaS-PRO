@@ -16,10 +16,12 @@ describe('DeliveryRunsController tenant contract', () => {
     emitDriverDeliveryEvent: jest.fn(),
   };
   const pushService = { enqueueDriverNotification: jest.fn() };
+  const earningsService = {};
   const controller = new DeliveryRunsController(
     service as never,
     gateway as never,
     pushService as never,
+    earningsService as never,
   );
   const request = { user: { tenantId: 'tenant-a', id: 'user-a' } };
 
