@@ -1294,6 +1294,29 @@ export class OrdersService {
         )
       : null;
 
+    if (nextStatus === 'ready_for_delivery') {
+      const pendingStop = await this.prisma.deliveryStop.findFirst({
+        where: {
+          tenantId,
+          orderId,
+          status: 'PENDING',
+          run: { status: { in: ['PENDING_ACCEPTANCE', 'ASSIGNED'] } },
+        },
+        select: { id: true, run: { select: { id: true, driverId: true } } },
+      });
+      if (pendingStop) {
+        const occurredAt = new Date().toISOString();
+        this.deliveryTrackingGateway?.emitDriverRouteEvent(tenantId, pendingStop.run.driverId, {
+          eventId: `delivery.stop_updated:${pendingStop.run.id}:${pendingStop.id}:${occurredAt}`,
+          type: 'delivery.stop_updated',
+          change: 'updated',
+          runId: pendingStop.run.id,
+          stopId: pendingStop.id,
+          occurredAt,
+        });
+      }
+    }
+
     if (order.deliveryDriverId) {
       const event = this.createDriverDeliveryEvent(
         nextStatus === 'cancelled' ? 'delivery.cancelled' : 'delivery.updated',

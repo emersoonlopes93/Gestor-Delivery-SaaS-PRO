@@ -118,6 +118,29 @@ export class UpdateDeliveryRunSettingsDTO {
   requiresAcceptance!: boolean;
 }
 
+export type SmartDispatchMode = 'OFF' | 'ASSISTED';
+export class UpdateSmartDispatchSettingsDTO {
+  @IsIn(['OFF', 'ASSISTED']) mode!: SmartDispatchMode;
+  @IsBoolean() useQueue!: boolean;
+  @IsBoolean() bypassDistantDrivers!: boolean;
+  @IsNumber() @Min(0.1) @Max(50) distanceThresholdKm!: number;
+  @IsBoolean() autoCarona!: boolean;
+  @IsInt() @Min(1) @Max(10) maxStops!: number;
+  @IsNumber() @Min(0.1) @Max(50) groupingRadiusKm!: number;
+}
+
+export interface SmartDispatchDriverDTO {
+  driverId: string; name: string; queuePosition: number; distanceKm: number | null;
+  status: 'eligible' | 'bypassed_distance' | 'bypassed_stale_location' | 'unavailable'; reason: string | null;
+}
+export interface SmartDispatchSuggestionDTO {
+  driver: SmartDispatchDriverDTO | null;
+  queue: SmartDispatchDriverDTO[];
+  orderIds: string[];
+  reasons: string[];
+  manualFallback: boolean;
+}
+
 export interface DeliveryStopDTO {
   id: string;
   orderId: string;
@@ -160,6 +183,13 @@ export interface DeliveryRunDTO {
   completedAt: string | null;
   createdAt: string;
   origin?: DeliveryRunOriginDTO | null;
+  kds?: {
+    blocked: boolean;
+    blockingOrdersCount: number;
+    blockingOrderNumbers: string[];
+    overrideApplied: boolean;
+    overrideAt: string | null;
+  };
   stops: DeliveryStopDTO[];
 }
 

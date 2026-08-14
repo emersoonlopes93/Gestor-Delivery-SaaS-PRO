@@ -345,7 +345,7 @@ export class DriversService {
       if (driver.status !== DriverStatus.busy) {
         await this.prisma.deliveryDriver.update({
           where: { id: driver.id },
-          data: { status: DriverStatus.busy },
+          data: { status: DriverStatus.busy, dispatchQueueJoinedAt: null },
         });
       }
       throw new BadRequestException('Conclua a entrega ativa antes de alterar sua disponibilidade.');
@@ -353,7 +353,12 @@ export class DriversService {
 
     return this.prisma.deliveryDriver.update({
       where: { id: driver.id },
-      data: { status },
+      data: {
+        status,
+        dispatchQueueJoinedAt: status === DriverStatus.available
+          ? driver.dispatchQueueJoinedAt ?? new Date()
+          : null,
+      },
       select: { id: true, status: true },
     });
   }

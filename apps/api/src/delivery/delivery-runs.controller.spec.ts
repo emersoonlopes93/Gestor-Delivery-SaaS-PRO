@@ -13,6 +13,7 @@ describe('DeliveryRunsController tenant contract', () => {
     endShiftForTenant: jest.fn(),
     createAssignedRun: jest.fn(),
     reorderTenantStops: jest.fn(),
+    overrideKdsLock: jest.fn(),
   };
   const gateway = {
     emitDriverRouteEvent: jest.fn(),
@@ -20,11 +21,13 @@ describe('DeliveryRunsController tenant contract', () => {
   };
   const pushService = { enqueueDriverNotification: jest.fn() };
   const earningsService = {};
+  const smartDispatchService = { suggestion: jest.fn(), accept: jest.fn() };
   const controller = new DeliveryRunsController(
     service as never,
     gateway as never,
     pushService as never,
     earningsService as never,
+    smartDispatchService as never,
   );
   const request = { user: { tenantId: 'tenant-a', id: 'user-a' } };
 
@@ -91,5 +94,12 @@ describe('DeliveryRunsController tenant contract', () => {
   it('derives tenant scope when resolving the route for an order', async () => {
     await controller.getRunForOrder(request as never, 'order-a');
     expect(service.getRunForTenantOrder).toHaveBeenCalledWith('tenant-a', 'order-a');
+  });
+
+  it('derives tenant and actor for a KDS override and notifies only the route driver', async () => {
+    service.overrideKdsLock.mockResolvedValue({ id: 'run-a', driverId: 'driver-a' });
+    await controller.overrideKdsLock(request as never, 'run-a', { reason: 'Liberação confirmada' });
+    expect(service.overrideKdsLock).toHaveBeenCalledWith('tenant-a', 'run-a', 'user-a', 'Liberação confirmada');
+    expect(gateway.emitDriverRouteEvent).toHaveBeenCalledWith('tenant-a', 'driver-a', expect.objectContaining({ runId: 'run-a', change: 'updated' }));
   });
 });

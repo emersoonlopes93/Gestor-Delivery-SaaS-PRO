@@ -34,6 +34,22 @@ A parada preserva snapshots de número do pedido, cliente, telefone e endereço.
 
 Uma rota em `PENDING_ACCEPTANCE`, `ASSIGNED`, `IN_PROGRESS` ou `RETURNING` mantém o entregador `busy`. Fora de rota, o próprio entregador alterna `available`/`offline`; essas alternâncias nunca criam, terminam ou remuneram turno. O turno ativo permanece aberto depois da rota; a loja encerra o turno e o entregador passa para `offline`.
 
+## Despacho assistido e fila FIFO
+
+O Auto-Dispatch V1 é assistido: ele sugere uma rota, mas a loja confirma a atribuição. A fila dos entregadores usa `dispatchQueueJoinedAt` persistido. Ficar online entra no fim da fila; permanecer online preserva a posição; ficar offline, iniciar/encerrar turno ou receber rota remove o entregador. Ao concluir a rota com turno ativo, o entregador volta disponível no fim da fila.
+
+Ausência de GPS, localização desatualizada ou distância acima do limite podem fazer o algoritmo ignorar um entregador naquela sugestão, sem alterar sua posição FIFO. A carona automática apenas agrupa pedidos elegíveis dentro do raio e do limite configurados; ela não otimiza trajeto nem cria ETA. Sugestões são recalculadas no aceite e a criação da rota continua sujeita às constraints e transações canônicas.
+
+O tenant consulta `GET /delivery/runs/smart-dispatch/suggestion` e confirma em `POST /delivery/runs/smart-dispatch/accept`, ambos protegidos por `delivery.dispatch`. Todos os filtros, inclusive fila, entregadores, pedidos e aceite, incluem `tenantId` derivado da sessão.
+
+## Trava KDS antes da saída
+
+Uma rota aceita só inicia normalmente quando todas as paradas ativas apontam para pedidos `ready_for_delivery`. O estado derivado é exposto em `DeliveryRunDTO.kds`, com bloqueio, quantidade e números humanos dos pedidos, além do indicador e horário de override. Motivo, ator e identificadores de auditoria não fazem parte desse DTO operacional do entregador.
+
+A loja pode liberar uma rota `ASSIGNED` com `POST /delivery/runs/:id/kds-override`, permissão `delivery.dispatch` e motivo obrigatório. O override é run-scoped, tenant-scoped, versionado, registrado no histórico da rota e no `AuditLog`; ele não altera `Order.status`. Ao iniciar uma rota liberada, somente pedidos que já estão prontos mudam para `out_for_delivery`.
+
+Quando um pedido de uma rota ainda não iniciada muda para `ready_for_delivery`, ou quando o override é aplicado, o backend publica `driverRouteEvent` apenas na sala privada do entregador daquela rota. O evento é um gatilho: o app refaz `GET /delivery/driver/work-state` e usa o DTO canônico, sem confiar em estado KDS derivado no payload do socket.
+
 ## Tracking e mapa operacional
 
 O tracking detalhado é exigido somente quando existe `DriverShift ACTIVE` e a rota está em `IN_PROGRESS` ou `RETURNING`; concluir uma parada individual não encerra a captura. No APK Android, uma rota ativa usa serviço foreground com notificação persistente e buffer FIFO local limitado para reenviar pontos em ordem após reconexão. O PWA mantém apenas tracking em foreground e comunica claramente essa limitação.

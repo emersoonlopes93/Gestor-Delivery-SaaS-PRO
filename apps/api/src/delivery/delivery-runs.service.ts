@@ -117,7 +117,7 @@ export class DeliveryRunsService {
       include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     });
-    return runs.map((run) => this.toDTO(run));
+    return Promise.all(runs.map((run) => this.withKdsState(tenantId, run, this.toDTO(run))));
   }
 
   async getSettings(tenantId: string): Promise<DeliveryRunSettingsDTO> {
@@ -154,7 +154,7 @@ export class DeliveryRunsService {
       where: { tenantId, id: stop.runId },
       include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
     });
-    return run ? this.toDTO(run) : null;
+    return run ? this.withKdsState(tenantId, run, this.toDTO(run)) : null;
   }
 
   async getDriverWorkState(
@@ -298,7 +298,7 @@ export class DeliveryRunsService {
 
       const paySnapshot = await this.earnings.shiftSnapshot(tx, tenantId, driver);
       const shift = await tx.driverShift.create({ data: { tenantId, driverId, businessDate, ...paySnapshot } });
-      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'offline' } });
+      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'offline', dispatchQueueJoinedAt: null } });
       return shift;
     });
   }
@@ -322,7 +322,7 @@ export class DeliveryRunsService {
         where: { id: shift.id },
         data: { status: DriverShiftStatus.ENDED, endedAt },
       });
-      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'offline' } });
+      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'offline', dispatchQueueJoinedAt: null } });
       return ended;
     });
   }
@@ -433,7 +433,7 @@ export class DeliveryRunsService {
           data: { deliveryDriverId: driverId },
         });
       }
-      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'busy' } });
+      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'busy', dispatchQueueJoinedAt: null } });
       return run;
     });
   }
@@ -567,9 +567,9 @@ export class DeliveryRunsService {
       const orders = await tx.order.findMany({ where: { tenantId, id: { in: orderIds } } });
       if (
         orders.length !== orderIds.length
-        || orders.some((order) => !ORDER_STATUS_TRANSITIONS[order.status].includes('out_for_delivery'))
+        || (!run.kdsOverrideAt && orders.some((order) => !ORDER_STATUS_TRANSITIONS[order.status].includes('out_for_delivery')))
       ) {
-        throw new ConflictException('Todos os pedidos precisam permanecer prontos para entrega.');
+        throw new ConflictException('A rota ainda possui pedidos em preparo. Aguarde a liberação da cozinha.');
       }
 
       const startedAt = new Date();
@@ -577,10 +577,11 @@ export class DeliveryRunsService {
         where: { tenantId, id: { in: orderIds }, status: 'ready_for_delivery', deliveryDriverId: driverId },
         data: { status: 'out_for_delivery' },
       });
-      if (updatedOrders.count !== orderIds.length) throw new ConflictException('A rota foi alterada durante o início.');
+      const readyOrders = orders.filter((order) => order.status === 'ready_for_delivery');
+      if (updatedOrders.count !== readyOrders.length) throw new ConflictException('A rota foi alterada durante o início.');
 
       await tx.orderTimeline.createMany({
-        data: orders.map((order) => ({
+        data: readyOrders.map((order) => ({
           tenantId,
           orderId: order.id,
           status: 'out_for_delivery',
@@ -604,6 +605,18 @@ export class DeliveryRunsService {
         include: { stops: { orderBy: { sequence: 'asc' } } },
       });
     });
+  }
+
+  async overrideKdsLock(tenantId: string, runId: string, actorId: string, reason: string): Promise<DeliveryRunDTO> {
+    if (!reason.trim()) throw new BadRequestException('Informe o motivo para liberar a saída.');
+    await this.transaction(async (tx) => {
+      const run = await this.getRun(tx, tenantId, runId);
+      if (run.status !== DeliveryRunStatus.ASSIGNED) throw new ConflictException('Somente uma rota aceita pode receber liberação da cozinha.');
+      const now = new Date();
+      await tx.deliveryRun.update({ where: { id: run.id }, data: { kdsOverrideAt: now, kdsOverrideBy: actorId, kdsOverrideReason: reason.trim(), version: { increment: 1 }, history: this.appendHistory(run.history, this.historyEvent('KDS_OVERRIDE', now, actorId, { reason: reason.trim() })) } });
+      await tx.auditLog.create({ data: { tenantId, userId: actorId, userType: 'tenant_user', action: 'tenant.delivery.run.kds_override', resource: 'delivery_run', details: { runId: run.id, reason: reason.trim() } } });
+    });
+    return this.getTenantRunDTO(tenantId, runId);
   }
 
   async reorderStops(tenantId: string, runId: string, stopIds: string[], expectedVersion: number, actorId?: string) {
@@ -842,7 +855,8 @@ export class DeliveryRunsService {
         history: finalHistory,
       },
     });
-    await tx.deliveryDriver.update({ where: { id: run.driverId }, data: { status: 'available' } });
+    const activeShift = await tx.driverShift.findFirst({ where: { tenantId: run.tenantId, driverId: run.driverId, status: DriverShiftStatus.ACTIVE }, select: { id: true } });
+    await tx.deliveryDriver.update({ where: { id: run.driverId }, data: { status: 'available', dispatchQueueJoinedAt: activeShift ? completedAt : null } });
   }
 
   private async recordRunEvent(
@@ -884,9 +898,21 @@ export class DeliveryRunsService {
       where: { tenantId },
       select: { lat: true, lng: true },
     });
-    const dto = this.toDTO(run);
+    const dto = await this.withKdsState(tenantId, run, this.toDTO(run));
     if (typeof settings?.lat !== 'number' || typeof settings.lng !== 'number') return dto;
     return { ...dto, origin: { lat: settings.lat, lng: settings.lng, label: 'Loja' } };
+  }
+
+  private async withKdsState(tenantId: string, run: TenantRun, dto: DeliveryRunDTO): Promise<DeliveryRunDTO> {
+    const stops = await this.prisma.deliveryStop.findMany({
+      where: { tenantId, runId: run.id, status: { in: OPEN_STOP_STATUSES } },
+      select: { orderNumberSnapshot: true, order: { select: { status: true } } },
+    });
+    const blockingOrderNumbers = stops
+      .filter((stop) => stop.order.status !== 'ready_for_delivery')
+      .map((stop) => stop.orderNumberSnapshot);
+    const overrideApplied = Boolean(run.kdsOverrideAt && blockingOrderNumbers.length > 0);
+    return { ...dto, kds: { blocked: blockingOrderNumbers.length > 0 && !overrideApplied, blockingOrdersCount: blockingOrderNumbers.length, blockingOrderNumbers, overrideApplied, overrideAt: run.kdsOverrideAt?.toISOString() ?? null } };
   }
 
   private shiftToDTO(shift: {
@@ -913,7 +939,7 @@ export class DeliveryRunsService {
       include: { driver: true, stops: { orderBy: { sequence: 'asc' } } },
     });
     if (!run) throw new NotFoundException('Rota de entrega não encontrada.');
-    return this.toDTO(run);
+    return this.withKdsState(tenantId, run, this.toDTO(run));
   }
 
   private stopToDTO(stop: TenantRun['stops'][number]): DeliveryStopDTO {

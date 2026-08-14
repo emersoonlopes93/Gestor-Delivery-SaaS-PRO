@@ -54,7 +54,7 @@ describe('DriversService operational availability', () => {
     )).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.deliveryDriver.update).toHaveBeenCalledWith({
       where: { id: 'driver-a' },
-      data: { status: DriverStatus.busy },
+      data: { status: DriverStatus.busy, dispatchQueueJoinedAt: null },
     });
   });
 
@@ -67,7 +67,7 @@ describe('DriversService operational availability', () => {
     )).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.deliveryDriver.update).toHaveBeenCalledWith({
       where: { id: 'driver-a' },
-      data: { status: DriverStatus.busy },
+      data: { status: DriverStatus.busy, dispatchQueueJoinedAt: null },
     });
   });
 
@@ -90,5 +90,21 @@ describe('DriversService operational availability', () => {
 
     expect(prisma.driverShift.findFirst).toHaveBeenCalledTimes(5);
     expect(prisma.deliveryDriver.update).toHaveBeenCalledTimes(10);
+  });
+
+  it('persists FIFO entry, preserves it while online, and clears it offline', async () => {
+    prisma.order.count.mockResolvedValue(0);
+    const joinedAt = new Date('2026-08-14T18:00:00.000Z');
+    prisma.deliveryDriver.findUnique.mockResolvedValue({
+      id: 'driver-a', tenantId: 'tenant-a', status: DriverStatus.available, dispatchQueueJoinedAt: joinedAt,
+    });
+    await service.updateOperationalStatus('tenant-a', 'driver-a', DriverStatus.available);
+    expect(prisma.deliveryDriver.update).toHaveBeenLastCalledWith({
+      where: { id: 'driver-a' }, data: { status: DriverStatus.available, dispatchQueueJoinedAt: joinedAt }, select: { id: true, status: true },
+    });
+    await service.updateOperationalStatus('tenant-a', 'driver-a', DriverStatus.offline);
+    expect(prisma.deliveryDriver.update).toHaveBeenLastCalledWith({
+      where: { id: 'driver-a' }, data: { status: DriverStatus.offline, dispatchQueueJoinedAt: null }, select: { id: true, status: true },
+    });
   });
 });

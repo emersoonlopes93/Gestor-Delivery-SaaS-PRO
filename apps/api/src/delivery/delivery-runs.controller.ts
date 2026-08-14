@@ -8,6 +8,7 @@ import {
   UpdateDriverPaySettingsDTO,
   DriverAdjustmentDTO,
   TenantCashTipDTO,
+  DeliveryRunReasonDTO,
 } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../common/decorators';
@@ -17,6 +18,7 @@ import { PushService } from '../notifications/push.service';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 import { DriverEarningsService } from './driver-earnings.service';
+import { SmartDispatchService } from './smart-dispatch.service';
 
 @Controller('delivery/runs')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -26,12 +28,35 @@ export class DeliveryRunsController {
     private readonly deliveryTrackingGateway: DeliveryTrackingGateway,
     private readonly pushService: PushService,
     private readonly earningsService: DriverEarningsService,
+    private readonly smartDispatchService: SmartDispatchService,
   ) {}
 
   @Get('builder')
   @RequirePermissions('delivery.read', 'delivery.dispatch')
   getBuilderData(@Request() req: AuthenticatedRequest) {
     return this.deliveryRunsService.getBuilderData(req.user.tenantId);
+  }
+
+  @Get('smart-dispatch/suggestion')
+  @RequirePermissions('delivery.dispatch')
+  getSmartSuggestion(@Request() req: AuthenticatedRequest) {
+    return this.smartDispatchService.suggestion(req.user.tenantId);
+  }
+
+  @Post('smart-dispatch/accept')
+  @RequirePermissions('delivery.dispatch')
+  acceptSmartSuggestion(@Request() req: AuthenticatedRequest, @Body() dto: CreateDeliveryRunDTO) {
+    return this.smartDispatchService.accept(req.user.tenantId, req.user.id, dto.driverId, dto.orderIds);
+  }
+
+  @Post(':id/kds-override')
+  @RequirePermissions('delivery.dispatch')
+  overrideKdsLock(@Request() req: AuthenticatedRequest, @Param('id') runId: string, @Body() dto: DeliveryRunReasonDTO) {
+    return this.deliveryRunsService.overrideKdsLock(req.user.tenantId, runId, req.user.id, dto.reason).then((run) => {
+      const occurredAt = new Date().toISOString();
+      this.deliveryTrackingGateway.emitDriverRouteEvent(req.user.tenantId, run.driverId, { eventId: `delivery.run_updated:${run.id}:${occurredAt}`, type: 'delivery.run_updated', change: 'updated', runId: run.id, occurredAt });
+      return run;
+    });
   }
 
   @Get('pay-settings')

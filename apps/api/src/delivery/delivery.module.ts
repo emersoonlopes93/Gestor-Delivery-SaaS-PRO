@@ -21,6 +21,7 @@ import { DeliveryLocationRetentionService } from './delivery-location-retention.
 import { DriverEarningsService } from './driver-earnings.service';
 import { DriverSettlementsController, DriverSettlementHistoryController } from './driver-settlements.controller';
 import { DriverSettlementsService } from './driver-settlements.service';
+import { SmartDispatchService } from './smart-dispatch.service';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { DriverSettlementsService } from './driver-settlements.service';
     DeliveryRunsService,
     DriverEarningsService,
     DriverSettlementsService,
+    SmartDispatchService,
     DeliveryTrackingGateway,
     DeliveryLocationRetentionService,
     DeliveryCoverageService,

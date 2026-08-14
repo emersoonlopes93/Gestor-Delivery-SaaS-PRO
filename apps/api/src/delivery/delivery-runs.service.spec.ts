@@ -69,6 +69,7 @@ describe('DeliveryRunsService', () => {
     tx.deliveryRun.updateMany.mockResolvedValue({ count: 1 });
     tx.deliveryStop.updateMany.mockResolvedValue({ count: 1 });
     tx.deliveryStop.count.mockResolvedValue(0);
+    tx.deliveryStop.findMany.mockResolvedValue([]);
   });
 
   it('requires tracking only while an active shift has an in-progress or returning route', async () => {
@@ -104,6 +105,55 @@ describe('DeliveryRunsService', () => {
     }));
     await expect(service.getDriverWorkState('tenant-a', 'driver-a'))
       .resolves.toEqual(expect.objectContaining({ trackingRequired: true }));
+  });
+
+  it('maps the canonical KDS block and run-scoped override without exposing audit fields', async () => {
+    tx.driverShift.findFirst.mockResolvedValue({
+      id: 'shift-a', status: 'ACTIVE', startedAt: new Date('2026-08-12T10:00:00.000Z'), endedAt: null,
+    });
+    tx.tenantSettings.findUnique.mockResolvedValue({ lat: null, lng: null });
+    tx.deliveryStop.findMany.mockResolvedValue([
+      { orderNumberSnapshot: '128', order: { status: 'preparing' } },
+    ]);
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.ASSIGNED,
+      driver: { name: 'Ana' },
+      kdsOverrideAt: null,
+      kdsOverrideBy: null,
+      kdsOverrideReason: null,
+    }));
+
+    const blocked = await service.getDriverWorkState('tenant-a', 'driver-a');
+    expect(blocked.activeRun).toMatchObject({
+      kds: {
+        blocked: true,
+        blockingOrdersCount: 1,
+        blockingOrderNumbers: ['128'],
+        overrideApplied: false,
+        overrideAt: null,
+      },
+    });
+    expect(blocked.activeRun).not.toHaveProperty('kdsOverrideReason');
+    expect(blocked.activeRun).not.toHaveProperty('kdsOverrideBy');
+
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.ASSIGNED,
+      driver: { name: 'Ana' },
+      kdsOverrideAt: new Date('2026-08-14T12:00:00.000Z'),
+      kdsOverrideBy: 'manager-a',
+      kdsOverrideReason: 'Liberação auditada',
+    }));
+
+    await expect(service.getDriverWorkState('tenant-a', 'driver-a')).resolves.toMatchObject({
+      activeRun: {
+        kds: {
+          blocked: false,
+          blockingOrdersCount: 1,
+          overrideApplied: true,
+          overrideAt: '2026-08-14T12:00:00.000Z',
+        },
+      },
+    });
   });
 
   it('returns tenant-scoped detailed run history inside the retention window', async () => {
@@ -171,7 +221,7 @@ describe('DeliveryRunsService', () => {
     await expect(service.startShift('tenant-a', 'driver-a')).resolves.toBe(created);
     expect(tx.driverShift.create).toHaveBeenCalledTimes(1);
     expect(tx.deliveryDriver.update).toHaveBeenCalledWith({
-      where: { id: 'driver-a' }, data: { status: 'offline' },
+      where: { id: 'driver-a' }, data: { status: 'offline', dispatchQueueJoinedAt: null },
     });
   });
 
@@ -236,7 +286,7 @@ describe('DeliveryRunsService', () => {
       { orderId: 'order-2', sequence: 2 },
     ]);
     expect(tx.deliveryDriver.update).toHaveBeenCalledWith({
-      where: { id: 'driver-a' }, data: { status: 'busy' },
+      where: { id: 'driver-a' }, data: { status: 'busy', dispatchQueueJoinedAt: null },
     });
   });
 
@@ -382,6 +432,32 @@ describe('DeliveryRunsService', () => {
     expect(tx.deliveryStop.update).toHaveBeenCalledWith({
       where: { id: 'stop-a' }, data: { status: DeliveryStopStatus.CURRENT },
     });
+  });
+
+  it('blocks start with an explicit kitchen message while an order is preparing', async () => {
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.ASSIGNED,
+      assignedAt: new Date(),
+      acceptedAt: new Date(),
+      stops: [{ id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.PENDING }],
+    }));
+    tx.order.findMany.mockResolvedValue([{ id: 'order-a', status: 'preparing' }]);
+    await expect(service.startRun('tenant-a', 'run-a', 'driver-a'))
+      .rejects.toThrow('A rota ainda possui pedidos em preparo');
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('applies a run-scoped audited override without changing order status', async () => {
+    const run = baseRun({ status: DeliveryRunStatus.ASSIGNED, driver: { name: 'Ana' } });
+    tx.deliveryRun.findFirst.mockResolvedValueOnce(run).mockResolvedValueOnce(run);
+    tx.deliveryRun.update.mockResolvedValue(run);
+    await service.overrideKdsLock('tenant-a', 'run-a', 'manager-a', 'Pedido autorizado pelo gestor');
+    expect(tx.deliveryRun.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'run-a' },
+      data: expect.objectContaining({ kdsOverrideBy: 'manager-a', kdsOverrideReason: 'Pedido autorizado pelo gestor' }),
+    }));
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-a', userId: 'manager-a' }) }));
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('rejects a concurrent reorder through the route version', async () => {
