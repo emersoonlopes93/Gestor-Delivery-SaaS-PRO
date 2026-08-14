@@ -11,10 +11,13 @@ import {
 } from '@gestor/types';
 import { DispatchPage } from './DispatchPage';
 import { useDeliveryRuns } from './hooks/useDeliveryRuns';
+import { useSmartDispatch } from './hooks/useSmartDispatch';
 
 vi.mock('./hooks/useDeliveryRuns', () => ({ useDeliveryRuns: vi.fn() }));
+vi.mock('./hooks/useSmartDispatch', () => ({ useSmartDispatch: vi.fn() }));
 
 const mockedUseDeliveryRuns = vi.mocked(useDeliveryRuns);
+const mockedUseSmartDispatch = vi.mocked(useSmartDispatch);
 
 function activeRun(): DeliveryRunDTO {
   return {
@@ -54,6 +57,25 @@ function activeRun(): DeliveryRunDTO {
 
 describe('DispatchPage multi-order route builder', () => {
   beforeEach(() => {
+    mockedUseSmartDispatch.mockReturnValue({
+      suggestion: {
+        driver: { driverId: 'driver-b', name: 'Bia Livre', queuePosition: 2, distanceKm: 1.4, status: 'eligible', reason: null },
+        queue: [
+          { driverId: 'driver-a', name: 'Ana Entregas', queuePosition: 1, distanceKm: null, status: 'bypassed_stale_location', reason: null },
+          { driverId: 'driver-b', name: 'Bia Livre', queuePosition: 2, distanceKm: 1.4, status: 'eligible', reason: null },
+        ],
+        orderIds: ['order-new'], reasons: [], manualFallback: false,
+      },
+      isLoading: false,
+      isRefreshing: false,
+      isError: false,
+      isStale: false,
+      refresh: vi.fn(),
+      accept: vi.fn(),
+      isAccepting: false,
+      overrideKds: vi.fn(),
+      isOverridingKds: false,
+    });
     mockedUseDeliveryRuns.mockReturnValue({
       builder: {
         drivers: [{
@@ -100,6 +122,38 @@ describe('DispatchPage multi-order route builder', () => {
     expect(html).toContain('Editar regra');
     expect(html).not.toContain('Salvar regra de pagamento');
     expect(html).toContain('Somente entregadores online e livres');
+    expect(html).toContain('Despacho assistido');
+    expect(html).toContain('A fila foi preservada.');
+    expect(html).toContain('Pedido');
+    expect(html).not.toContain('bypassed_stale_location');
+  });
+
+  it('renders the manual fallback without blocking the existing builder', () => {
+    mockedUseSmartDispatch.mockReturnValue({
+      ...mockedUseSmartDispatch(),
+      suggestion: { driver: null, queue: [], orderIds: [], reasons: [], manualFallback: true },
+    });
+    const html = renderToStaticMarkup(<DispatchPage />);
+    expect(html).toContain('Sem sugestão segura agora');
+    expect(html).toContain('Usar montagem manual');
+    expect(html).toContain('Montar nova rota');
+  });
+
+  it('shows the run-scoped KDS override only for an assigned blocked route', () => {
+    const blockedRun = activeRun();
+    blockedRun.status = DeliveryRunStatus.ASSIGNED;
+    blockedRun.kds = {
+      blocked: true,
+      blockingOrdersCount: 1,
+      blockingOrderNumbers: ['101'],
+      overrideApplied: false,
+      overrideAt: null,
+    };
+    mockedUseDeliveryRuns.mockReturnValue({ ...mockedUseDeliveryRuns(), activeRuns: [blockedRun] });
+    const html = renderToStaticMarkup(<DispatchPage />);
+    expect(html).toContain('Aguardando cozinha.');
+    expect(html).toContain('Liberar excepcionalmente');
+    expect(html).not.toContain('kdsOverrideReason');
   });
 
   it('keeps cancellation history and offers accessible reorder only for future stops', () => {

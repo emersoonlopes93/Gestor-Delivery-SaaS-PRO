@@ -1791,3 +1791,15 @@ Validation so far: Prisma schema validation PASS, API TypeScript PASS, focused A
 Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes de API e 3 arquivos/16 testes focados do app entregador passaram; builds dos três apps, `check:no-any` e `git diff --check` também passaram. A migração efêmera local foi bloqueada porque Docker Desktop não estava em execução. A PR #73 foi aberta em `2b3dcf12`, mas Actions não iniciou `build-and-migrate`, Gitleaks nem a prova PostgreSQL porque a conta GitHub informou pagamentos recentes falhos ou limite de gastos; os previews Vercel passaram. A integração está bloqueada até a regularização da conta e rerun dos checks. Nenhum banco remoto, produção, Dokploy ou deploy foi acessado.
 
 ---
+
+## R16 - Auto-Dispatch V1 assistido, FIFO e trava KDS (2026-08-14)
+
+- Branch `feat/r16-auto-dispatch-v1`, baseada em `2d6993fc` da R15.1. A PR R16 permanece deliberadamente não aberta enquanto a PR #73 estiver bloqueada por infraestrutura de Actions.
+- A configuração tenant habilita modo assistido, fila FIFO, bypass por distância/GPS, carona por raio e limite de paradas. A sugestão é tenant-scoped, humana e recalculada atomicamente no aceite; a criação final reutiliza as constraints serializáveis de `DeliveryRun`.
+- `dispatchQueueJoinedAt` preserva ordem operacional: online entra no fim, offline/busy/turno encerrado sai e a conclusão de rota com turno ativo reinsere no fim. O bypass não reordena a fila.
+- `DeliveryRunDTO.kds` deriva o bloqueio dos stops ativos e dos pedidos canônicos. O start é bloqueado enquanto houver pedido em preparo, salvo override tenant com motivo, histórico e `AuditLog`; o override não muda status de pedido.
+- O tenant recebeu sugestão, fila, aceite, fallback manual e modal acessível de override. O driver recebe mensagem humana, números dos pedidos bloqueadores e atualização canônica por `driverRouteEvent`, sem motivo/ator/IDs administrativos.
+- As migrations aditivas são `20260814050000_auto_dispatch_v1` e `20260814051000_delivery_run_kds_override`. `prisma validate` passou, mas `migrate deploy` local permanece não verificado porque o daemon Docker/PostgreSQL efêmero não estava disponível. Nenhum banco remoto foi acessado.
+- A avaliação independente da UI passou. Testes e gates finais da branch devem ser registrados no relatório/commits desta sessão; nenhum deploy, Dokploy, produção ou publicação faz parte desta entrega.
+
+---

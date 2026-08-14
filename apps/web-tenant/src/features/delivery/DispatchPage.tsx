@@ -1,21 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Bot,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleDot,
   Clock3,
   MapPin,
   Package,
+  RefreshCw,
   Route,
   Settings2,
+  ShieldAlert,
   Truck,
   WalletCards,
+  X,
 } from 'lucide-react';
 import type { DeliveryRunBuilderDataDTO, DeliveryRunDTO } from '@gestor/types';
 import { useDeliveryRuns } from './hooks/useDeliveryRuns';
+import { useSmartDispatch } from './hooks/useSmartDispatch';
 import {
   DriverPayFields,
 } from './components/DriverPayFields';
@@ -97,12 +103,29 @@ export function DispatchPage() {
     updatePaySettings,
     isUpdatingPaySettings,
   } = useDeliveryRuns();
+  const smartDispatch = useSmartDispatch();
   const [driverId, setDriverId] = useState('');
   const [orderIds, setOrderIds] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [payValue, setPayValue] = useState<DriverPayFormValue>(DEFAULT_DRIVER_PAY_VALUE);
   const [payError, setPayError] = useState<string | null>(null);
   const [isPayEditorOpen, setIsPayEditorOpen] = useState(false);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [smartFeedback, setSmartFeedback] = useState<string | null>(null);
+  const [overrideRun, setOverrideRun] = useState<DeliveryRunDTO | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+  const overrideReasonRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!overrideRun) return undefined;
+    overrideReasonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !smartDispatch.isOverridingKds) setOverrideRun(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [overrideRun, smartDispatch.isOverridingKds]);
 
   useEffect(() => {
     if (!paySettings) return;
@@ -152,6 +175,41 @@ export function DispatchPage() {
       setFeedback('Rota criada e atribuída ao entregador.');
     } catch (error: unknown) {
       setFeedback(messageFrom(error));
+    }
+  };
+
+  const acceptSuggestion = async () => {
+    const suggestion = smartDispatch.suggestion;
+    if (!suggestion?.driver || suggestion.orderIds.length === 0) return;
+    setSmartFeedback(null);
+    try {
+      await smartDispatch.accept({ driverId: suggestion.driver.driverId, orderIds: suggestion.orderIds });
+      setSmartFeedback('Sugestão aceita. A rota foi criada com a fila revalidada.');
+    } catch (error: unknown) {
+      setSmartFeedback(messageFrom(error));
+      await smartDispatch.refresh();
+    }
+  };
+
+  const openManualBuilder = () => {
+    document.getElementById('route-builder-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('delivery-run-driver')?.focus();
+  };
+
+  const submitKdsOverride = async () => {
+    const reason = overrideReason.trim();
+    if (!overrideRun || !reason) {
+      setOverrideError('Informe por que esta rota pode sair antes da liberação da cozinha.');
+      return;
+    }
+    setOverrideError(null);
+    try {
+      await smartDispatch.overrideKds({ runId: overrideRun.id, reason });
+      setFeedback('Saída excepcional liberada para esta rota.');
+      setOverrideRun(null);
+      setOverrideReason('');
+    } catch (error: unknown) {
+      setOverrideError(messageFrom(error));
     }
   };
 
@@ -236,6 +294,71 @@ export function DispatchPage() {
           {feedback}
         </div>
       )}
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card" aria-labelledby="assisted-dispatch-title">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="rounded-lg bg-primary/10 p-2 text-primary"><Bot className="h-5 w-5" /></span>
+            <div>
+              <h2 id="assisted-dispatch-title" className="font-bold text-foreground">Despacho assistido</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">A loja confirma a sugestão; a fila é revalidada antes de criar a rota.</p>
+            </div>
+          </div>
+          <button type="button" onClick={() => void smartDispatch.refresh()} disabled={smartDispatch.isRefreshing} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-bold text-foreground transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60">
+            <RefreshCw className={`h-4 w-4 ${smartDispatch.isRefreshing ? 'animate-spin' : ''}`} />
+            {smartDispatch.isRefreshing ? 'Atualizando...' : 'Atualizar sugestão'}
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-5" aria-live="polite">
+          {smartDispatch.isLoading ? (
+            <div aria-label="Carregando sugestão de despacho" className="space-y-3"><div className="h-16 animate-pulse rounded-lg bg-muted" /><div className="h-11 animate-pulse rounded-lg bg-muted" /></div>
+          ) : smartDispatch.isError ? (
+            <div role="alert" className="flex flex-col gap-3 rounded-lg border border-status-danger/30 bg-status-danger/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-status-danger">Não foi possível consultar a fila agora. O despacho manual continua disponível.</p>
+              <button type="button" onClick={() => void smartDispatch.refresh()} className="min-h-11 rounded-lg border border-status-danger/30 px-3 text-sm font-bold text-status-danger">Tentar novamente</button>
+            </div>
+          ) : smartDispatch.suggestion?.manualFallback || !smartDispatch.suggestion?.driver ? (
+            <div className="flex flex-col gap-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="font-bold text-foreground">Sem sugestão segura agora</p><p className="mt-1 text-sm text-muted-foreground">Monte a rota manualmente enquanto a fila aguarda um entregador elegível.</p></div>
+              <button type="button" onClick={openManualBuilder} className="min-h-11 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground">Usar montagem manual</button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {smartDispatch.suggestion.queue[0]?.driverId !== smartDispatch.suggestion.driver.driverId && (
+                <div className="flex items-start gap-3 border-l-4 border-status-warning bg-status-warning/10 px-4 py-3 text-sm text-foreground">
+                  <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                  <p><strong>A fila foi preservada.</strong> A posição 1 foi pulada temporariamente por não estar elegível agora e mantém seu lugar.</p>
+                </div>
+              )}
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary">Sugestão atual</p>
+                  <p className="mt-1 text-xl font-black text-foreground">{smartDispatch.suggestion.driver.name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Posição {smartDispatch.suggestion.driver.queuePosition} na fila
+                    {smartDispatch.suggestion.driver.distanceKm === null ? '' : ` · ${smartDispatch.suggestion.driver.distanceKm.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km da loja`}
+                  </p>
+                  <p className="mt-3 text-sm text-foreground"><strong>Pedidos:</strong> {smartDispatch.suggestion.orderIds.map((id) => builder.orders.find((order) => order.id === id)?.orderNumber).filter(Boolean).map((number) => `#${number}`).join(', ') || `${smartDispatch.suggestion.orderIds.length} selecionado(s)`}</p>
+                  {smartDispatch.isStale && <p className="mt-2 text-xs font-semibold text-status-warning">A operação pode ter mudado. Atualize antes de confirmar.</p>}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  <button type="button" onClick={() => void acceptSuggestion()} disabled={smartDispatch.isAccepting || smartDispatch.isStale} className="min-h-11 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">{smartDispatch.isAccepting ? 'Revalidando fila...' : 'Usar esta sugestão'}</button>
+                  <button type="button" onClick={openManualBuilder} disabled={smartDispatch.isAccepting} className="min-h-11 rounded-lg border border-border px-4 text-sm font-bold text-foreground hover:bg-muted">Montar manualmente</button>
+                </div>
+              </div>
+              <div className="border-t border-border pt-3">
+                <button type="button" aria-expanded={isQueueOpen} aria-controls="smart-dispatch-queue" onClick={() => setIsQueueOpen((open) => !open)} className="flex min-h-11 w-full items-center justify-between text-left text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                  Ver fila de entregadores ({smartDispatch.suggestion.queue.length})
+                  <ChevronDown className={`h-4 w-4 transition ${isQueueOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isQueueOpen && <ol id="smart-dispatch-queue" className="divide-y divide-border">{smartDispatch.suggestion.queue.map((driver) => <li key={driver.driverId} className="flex min-h-11 items-center gap-3 py-2 text-sm"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted font-black text-foreground">{driver.queuePosition}</span><span className="min-w-0 flex-1 truncate font-semibold text-foreground">{driver.name}</span><span className={`text-xs font-bold ${driver.status === 'eligible' ? 'text-status-success' : 'text-status-warning'}`}>{driver.status === 'eligible' ? 'Elegível' : driver.status === 'bypassed_distance' ? 'Distante agora' : driver.status === 'bypassed_stale_location' ? 'Localização indisponível' : 'Indisponível'}</span></li>)}</ol>}
+              </div>
+            </div>
+          )}
+          {smartFeedback && <p role="status" className="mt-3 text-sm font-semibold text-foreground">{smartFeedback}</p>}
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-card shadow-card" aria-labelledby="route-settings-title">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
@@ -511,6 +634,18 @@ export function DispatchPage() {
                 })}
               </ol>
 
+              {run.status === 'ASSIGNED' && run.kds?.blocked && !run.kds.overrideApplied && (
+                <div className="border-t border-status-warning/30 bg-status-warning/10 px-4 py-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2 text-sm text-foreground"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" /><p><strong>Aguardando cozinha.</strong> {run.kds.blockingOrdersCount} {run.kds.blockingOrdersCount === 1 ? 'pedido ainda está' : 'pedidos ainda estão'} em preparo: {run.kds.blockingOrderNumbers.map((number) => `#${number}`).join(', ')}.</p></div>
+                    <button type="button" onClick={() => { setOverrideRun(run); setOverrideReason(''); setOverrideError(null); }} className="min-h-11 shrink-0 rounded-lg border border-status-warning/40 px-3 text-sm font-bold text-foreground hover:bg-status-warning/10 focus:outline-none focus:ring-2 focus:ring-ring">Liberar excepcionalmente</button>
+                  </div>
+                </div>
+              )}
+              {run.status === 'ASSIGNED' && run.kds?.overrideApplied && (
+                <p className="border-t border-status-success/30 bg-status-success/10 px-4 py-3 text-sm font-semibold text-foreground"><Check className="mr-2 inline h-4 w-4 text-status-success" />Saída excepcional liberada para esta rota.</p>
+              )}
+
               {run.status !== 'PENDING_ACCEPTANCE' && run.status !== 'ASSIGNED' && (
                 <p className="border-t border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">Pedidos não podem ser adicionados depois que a rota inicia.</p>
               )}
@@ -526,6 +661,25 @@ export function DispatchPage() {
           </div>
         )}
       </section>
+
+      {overrideRun && (
+        <div role="presentation" className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !smartDispatch.isOverridingKds) setOverrideRun(null); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="kds-override-title" className="w-full max-w-lg rounded-t-2xl border border-border bg-card p-5 shadow-xl sm:rounded-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div><p className="text-xs font-bold uppercase tracking-wider text-status-warning">Exceção operacional</p><h2 id="kds-override-title" className="mt-1 text-xl font-black text-foreground">Liberar rota antes da cozinha?</h2></div>
+              <button type="button" aria-label="Fechar" disabled={smartDispatch.isOverridingKds} onClick={() => setOverrideRun(null)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"><X className="h-5 w-5" /></button>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Esta liberação vale somente para a rota de {overrideRun.driverName}. O motivo fica registrado para auditoria da loja.</p>
+            <label htmlFor="kds-override-reason" className="mt-4 block text-sm font-bold text-foreground">Motivo obrigatório</label>
+            <textarea ref={overrideReasonRef} id="kds-override-reason" value={overrideReason} onChange={(event) => { setOverrideReason(event.target.value); setOverrideError(null); }} disabled={smartDispatch.isOverridingKds} rows={3} maxLength={255} placeholder="Ex.: pedido será entregue em uma segunda saída" className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring disabled:opacity-60" />
+            {overrideError && <p role="alert" className="mt-2 text-sm font-semibold text-status-danger">{overrideError}</p>}
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" disabled={smartDispatch.isOverridingKds} onClick={() => setOverrideRun(null)} className="min-h-11 rounded-lg border border-border text-sm font-bold text-foreground hover:bg-muted disabled:opacity-50">Cancelar</button>
+              <button type="button" disabled={smartDispatch.isOverridingKds || !overrideReason.trim()} onClick={() => void submitKdsOverride()} className="min-h-11 rounded-lg bg-status-warning px-3 text-sm font-bold text-background disabled:cursor-not-allowed disabled:opacity-50">{smartDispatch.isOverridingKds ? 'Liberando...' : 'Confirmar liberação'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

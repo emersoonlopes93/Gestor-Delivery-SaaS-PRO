@@ -234,6 +234,41 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     expect(screen.queryByRole('button', { name: 'Aceitar rota' })).toBeNull();
   });
 
+  it('blocks route start while canonical KDS state still has orders in preparation', async () => {
+    const assigned = run(DeliveryRunStatus.ASSIGNED);
+    assigned.kds = {
+      blocked: true,
+      blockingOrdersCount: 2,
+      blockingOrderNumbers: ['101', '102'],
+      overrideApplied: false,
+      overrideAt: null,
+    };
+    setState(assigned);
+    render(<ActiveDeliveryPage />);
+    expect(screen.getByText(/pedidos #101, #102 ainda estão em preparo/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Iniciar rota' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar liberação' }));
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(mocks.startTracking).not.toHaveBeenCalled();
+    expect(mocks.startRun).not.toHaveBeenCalled();
+  });
+
+  it('shows the store release and allows start after a run-scoped KDS override', async () => {
+    const assigned = run(DeliveryRunStatus.ASSIGNED);
+    assigned.kds = {
+      blocked: false,
+      blockingOrdersCount: 1,
+      blockingOrderNumbers: ['101'],
+      overrideApplied: true,
+      overrideAt: '2026-08-11T12:03:00.000Z',
+    };
+    setState(assigned);
+    render(<ActiveDeliveryPage />);
+    expect(screen.getByRole('status').textContent).toContain('A loja liberou esta saída');
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar rota' }));
+    await waitFor(() => expect(mocks.startRun).toHaveBeenCalledWith('run-a'));
+  });
+
   it('supports arrival, completion or failed attempt while keeping the next stop visible', () => {
     setState(run(DeliveryRunStatus.IN_PROGRESS, DeliveryStopStatus.ARRIVED));
     render(<ActiveDeliveryPage />);

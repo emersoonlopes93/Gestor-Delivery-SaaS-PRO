@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
 import {
+  AlertTriangle,
   Bell,
   BellOff,
   Check,
@@ -13,6 +14,7 @@ import {
   Package,
   Phone,
   Power,
+  RefreshCw,
   RotateCcw,
   Truck,
   Route,
@@ -273,6 +275,10 @@ export function ActiveDeliveryPage() {
   };
 
   const startRun = async (runId: string) => {
+    if (activeRun?.id === runId && activeRun.kds?.blocked && !activeRun.kds.overrideApplied) {
+      setBlockingMessage('A cozinha ainda está preparando pedidos desta rota. Aguarde a liberação da loja.');
+      return false;
+    }
     if (!isTracking && !(await startTracking())) {
       setBlockingMessage('A localização é necessária para iniciar a rota. Ative a permissão de localização e o GPS para continuar.');
       return false;
@@ -520,11 +526,24 @@ export function ActiveDeliveryPage() {
             )}
 
             {activeRun.status === DeliveryRunStatus.ASSIGNED && (
-              <section className="rounded-2xl border border-emerald-200 bg-[var(--delivery-card)] p-5 shadow-sm dark:border-emerald-900">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Rota pronta</p>
+              <section className={`rounded-2xl border bg-[var(--delivery-card)] p-5 shadow-sm ${activeRun.kds?.blocked && !activeRun.kds.overrideApplied ? 'border-amber-300 dark:border-amber-800' : 'border-emerald-200 dark:border-emerald-900'}`}>
+                <p className={`text-xs font-bold uppercase tracking-[0.16em] ${activeRun.kds?.blocked && !activeRun.kds.overrideApplied ? 'text-amber-600' : 'text-emerald-600'}`}>{activeRun.kds?.blocked && !activeRun.kds.overrideApplied ? 'Aguardando cozinha' : 'Rota pronta'}</p>
                 <h2 className="mt-2 text-2xl font-black text-[var(--delivery-foreground)]">{orderedStops.length} {orderedStops.length === 1 ? 'entrega' : 'entregas'}</h2>
-                <p className="mt-1 text-sm text-[var(--delivery-muted-foreground)]">Inicie quando estiver pronto para sair.</p>
-                <button type="button" disabled={isMutating} onClick={() => void runAction(() => startRun(activeRun.id), 'Rota iniciada. Siga para a próxima entrega.')} className="mt-5 min-h-12 w-full rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50">Iniciar rota</button>
+                {activeRun.kds?.blocked && !activeRun.kds.overrideApplied ? (
+                  <div className="mt-3">
+                    <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                      <p>{activeRun.kds.blockingOrdersCount === 1 ? 'O pedido' : 'Os pedidos'} {activeRun.kds.blockingOrderNumbers.map((number) => `#${number}`).join(', ')} {activeRun.kds.blockingOrdersCount === 1 ? 'ainda está' : 'ainda estão'} em preparo. A loja avisará quando puder sair.</p>
+                    </div>
+                    <button type="button" onClick={() => void refresh()} disabled={isLoading || isMutating} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--delivery-border)] px-4 text-sm font-bold text-[var(--delivery-foreground)] disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />Atualizar liberação</button>
+                    <button type="button" disabled className="mt-2 min-h-12 w-full rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white opacity-50">Iniciar rota</button>
+                  </div>
+                ) : (
+                  <>
+                    {activeRun.kds?.overrideApplied ? <p role="status" className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">A loja liberou esta saída. Você já pode iniciar a rota.</p> : <p className="mt-1 text-sm text-[var(--delivery-muted-foreground)]">Inicie quando estiver pronto para sair.</p>}
+                    <button type="button" disabled={isMutating} onClick={() => void runAction(() => startRun(activeRun.id), 'Rota iniciada. Siga para a próxima entrega.')} className="mt-5 min-h-12 w-full rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50">Iniciar rota</button>
+                  </>
+                )}
               </section>
             )}
 
