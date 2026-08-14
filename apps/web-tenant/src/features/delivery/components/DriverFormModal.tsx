@@ -7,6 +7,8 @@ import {
   DriverPayFields,
 } from './DriverPayFields';
 import { DEFAULT_DRIVER_PAY_VALUE, driverPayOverridePayload, type DriverPayFormValue, validateDriverPay } from './driver-pay-form';
+import { DriverEarningsPanel } from './DriverEarningsPanel';
+import { useDriverEarnings } from '../hooks/useDriverEarnings';
 
 
 
@@ -18,6 +20,7 @@ interface Props {
 
 export function DriverFormModal({ isOpen, onClose, driver }: Props) {
   const { createDriver, updateDriver, resetPin } = useDrivers();
+  const earnings = useDriverEarnings(driver?.id ?? null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [vehicleType, setVehicleType] = useState<DriverVehicleType>(DriverVehicleType.motorcycle);
@@ -299,6 +302,15 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                     Gerar Novo Código de Acesso (PIN)
                   </button>
                 </div>
+
+                <DriverEarningsPanel
+                  summary={earnings.summary}
+                  isLoading={earnings.isLoading}
+                  isError={earnings.isError}
+                  isMutating={earnings.isMutating}
+                  onCashTip={earnings.addCashTip}
+                  onAdjustment={earnings.addAdjustment}
+                />
 
                 <section className="space-y-4 border-t border-border pt-5" aria-labelledby="driver-pay-override-title">
                   <div className="flex items-start gap-3">

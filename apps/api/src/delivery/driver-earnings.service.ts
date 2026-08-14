@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DriverLedgerEntryType, DriverPayMode, Prisma } from '@prisma/client';
 import {
   DriverEarningsSummaryDTO,
@@ -153,16 +153,31 @@ export class DriverEarningsService {
     const shift = shiftId ? await this.prisma.driverShift.findFirst({ where: { id: shiftId, tenantId, driverId } })
       : await this.prisma.driverShift.findFirst({ where: { tenantId, driverId }, orderBy: { startedAt: 'desc' } });
     if (!shift) throw new NotFoundException('Turno nÃ£o encontrado.');
-    const entries = await this.prisma.driverLedgerEntry.findMany({ where: { tenantId, driverId, shiftId: shift.id } });
+    const [entries, eligibleStops] = await Promise.all([
+      this.prisma.driverLedgerEntry.findMany({ where: { tenantId, driverId, shiftId: shift.id } }),
+      this.prisma.deliveryStop.findMany({
+        where: { tenantId, run: { driverId, shiftId: shift.id },
+          status: { in: ['ARRIVED', 'DELIVERED', 'RETURN_TO_STORE', 'RETURNED_TO_STORE'] } },
+        select: { id: true, orderId: true, orderNumberSnapshot: true, customerNameSnapshot: true },
+        orderBy: { sequence: 'asc' },
+      }),
+    ]);
     const sum = (type: DriverLedgerEntryType) => entries.filter((e) => e.type === type).reduce((v, e) => v + Number(e.amount), 0);
     const dailyPosted = sum(DriverLedgerEntryType.DAILY_RATE); const dailyRate = dailyPosted || Number(shift.dailyRateSnapshot);
     const deliveryFees = sum(DriverLedgerEntryType.DELIVERY_FEE); const cashTips = sum(DriverLedgerEntryType.TIP_CASH);
     const adjustments = sum(DriverLedgerEntryType.ADJUSTMENT) + sum(DriverLedgerEntryType.BONUS);
     const receivedDirectly = entries.filter((e) => e.receivedDirectlyByDriver).reduce((v, e) => v + Number(e.amount), 0);
     const totalEarnings = deliveryFees + cashTips + dailyRate + adjustments;
+    const tippedStopIds = new Set(entries.filter((entry) => entry.type === DriverLedgerEntryType.TIP_CASH)
+      .map((entry) => entry.stopId).filter((stopId): stopId is string => stopId !== null));
+    const eligibleCashTipOrders = eligibleStops.filter((stop) => !tippedStopIds.has(stop.id))
+      .map(({ orderId, orderNumberSnapshot, customerNameSnapshot }) => ({
+        orderId, orderNumber: orderNumberSnapshot, customerName: customerNameSnapshot,
+      }));
     return { shiftId: shift.id, shiftStatus: SharedDriverShiftStatus[shift.status], deliveryFees, cashTips, dailyRate,
       dailyRatePreview: shift.status === 'ACTIVE' && !dailyPosted, adjustments, totalEarnings,
-      receivedDirectly, dueFromStore: totalEarnings - receivedDirectly, currency: shift.currencySnapshot };
+      receivedDirectly, dueFromStore: totalEarnings - receivedDirectly, currency: shift.currencySnapshot,
+      eligibleCashTipOrders };
   }
 
   async addCashTip(tenantId: string, driverId: string, orderId: string, amount: number,
@@ -171,11 +186,22 @@ export class DriverEarningsService {
       run: { driverId }, status: { in: ['ARRIVED', 'DELIVERED', 'RETURN_TO_STORE', 'RETURNED_TO_STORE'] } },
       include: { run: true } });
     if (!stop) throw new BadRequestException('A gorjeta sÃ³ pode ser registrada para um pedido atendido por este entregador.');
-    const sourceKey = `cash-tip:${stop.id}:${actorType}:${actorId}:${amount.toFixed(2)}`;
+    const sourceKey = `cash-tip:${stop.id}`;
+    const existing = await this.prisma.driverLedgerEntry.findFirst({ where: { tenantId, driverId, sourceKey } });
+    if (existing) {
+      if (Number(existing.amount) !== amount) {
+        throw new ConflictException('Este pedido jÃƒÂ¡ possui uma gorjeta em dinheiro. Registre uma correÃƒÂ§ÃƒÂ£o por ajuste.');
+      }
+      return this.summary(tenantId, driverId, stop.run.shiftId);
+    }
     await this.prisma.driverLedgerEntry.createMany({ skipDuplicates: true, data: [{ tenantId, driverId,
       shiftId: stop.run.shiftId, runId: stop.runId, stopId: stop.id, orderId, type: DriverLedgerEntryType.TIP_CASH,
       amount, currency: stop.payCurrencySnapshot ?? 'BRL', receivedDirectlyByDriver: true,
       source: 'cash_tip', sourceKey, createdBy: actorId, createdByType: actorType }] });
+    const persisted = await this.prisma.driverLedgerEntry.findFirst({ where: { tenantId, driverId, sourceKey } });
+    if (persisted && Number(persisted.amount) !== amount) {
+      throw new ConflictException('Este pedido jÃƒÂ¡ possui uma gorjeta em dinheiro. Registre uma correÃƒÂ§ÃƒÂ£o por ajuste.');
+    }
     return this.summary(tenantId, driverId, stop.run.shiftId);
   }
 

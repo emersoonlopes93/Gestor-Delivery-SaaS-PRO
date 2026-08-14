@@ -19,4 +19,5 @@ export function invalidateLogisticsQueries(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: LOGISTICS_QUERY_KEYS.mapOrders });
   void queryClient.invalidateQueries({ queryKey: LOGISTICS_QUERY_KEYS.runBuilder });
   void queryClient.invalidateQueries({ queryKey: LOGISTICS_QUERY_KEYS.activeRuns });
+  void queryClient.invalidateQueries({ queryKey: ['driver-earnings'] });
 }

@@ -24,6 +24,8 @@ import {
 } from '@gestor/types';
 import { NativeNotificationBanner } from '../components/NativeNotificationBanner';
 import { DriverRouteMap } from '../components/DriverRouteMap';
+import { DriverEarningsCard } from '../components/DriverEarningsCard';
+import { useDriverEarnings } from '../hooks/useDriverEarnings';
 import { useDriverRoute } from '../hooks/useDriverRoute';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -154,6 +156,8 @@ export function ActiveDeliveryPage() {
     unsubscribe: unsubscribePush,
     cleanupForLogout: cleanupPushForLogout,
   } = usePushNotifications();
+  const earnings = useDriverEarnings();
+  const refreshEarnings = earnings.refresh;
 
   const [notice, setNotice] = useState<string | null>(null);
   const [blockingMessage, setBlockingMessage] = useState<string | null>(null);
@@ -195,7 +199,8 @@ export function ActiveDeliveryPage() {
       setNotice(`A entrega #${lastDeliveryEvent.orderNumber} foi atualizada.`);
     }
     void refresh();
-  }, [lastDeliveryEvent, refresh]);
+    void refreshEarnings();
+  }, [lastDeliveryEvent, refresh, refreshEarnings]);
 
   useEffect(() => {
     if (!lastRouteEvent) return;
@@ -209,11 +214,13 @@ export function ActiveDeliveryPage() {
       setNotice('Sua rota foi atualizada.');
     }
     void refresh();
-  }, [lastRouteEvent, refresh]);
+    void refreshEarnings();
+  }, [lastRouteEvent, refresh, refreshEarnings]);
 
   const runAction = async (action: () => Promise<boolean>, successMessage?: string) => {
     setBlockingMessage(null);
     const succeeded = await action();
+    if (succeeded) void refreshEarnings();
     if (succeeded && successMessage) setNotice(successMessage);
     return succeeded;
   };
@@ -377,6 +384,15 @@ export function ActiveDeliveryPage() {
             {shift ? 'Encerrar turno' : 'Ficar online'}
           </button>
         </section>
+
+        <DriverEarningsCard
+          summary={earnings.summary}
+          eligibleStops={earnings.summary?.eligibleCashTipOrders ?? []}
+          isLoading={earnings.isLoading}
+          isMutating={earnings.isMutating}
+          error={earnings.error}
+          onAddCashTip={earnings.addCashTip}
+        />
 
         {isLoading ? (
           <div className="rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-8 text-center text-sm text-[var(--delivery-muted-foreground)]">Carregando sua rota…</div>

@@ -1733,6 +1733,13 @@ Base: `origin/main-copy` / `921fcaa8` (merge da PR #64)
 - `cap sync android` passou. `assembleDebug` passou com JBR 21 e o SDK Android local, gerando `app-debug.apk` com 5.404.653 bytes e SHA-256 `AFB1E769F84B697924BFEE92317C126D44B4E4FFE503A04E8516DD0012DCA385`.
 - Os gates globais, a CI da PR e a CI pós-merge ainda devem ser registrados antes de encerrar a sprint.
 - Nenhum schema Prisma, migration, dependência, feature flag, banco remoto, provider, produção, Dokploy, deploy ou publicação faz parte desta PR.
+## R14 PR C - driver earnings UX and canonical cash tips (2026-08-13)
+
+- App do entregador e painel tenant exibem o resumo do ledger do turno, incluindo diária prevista/lançada, entregas, gorjetas cash, ajustes, recebido diretamente e devido pela loja.
+- Entregador e gestor registram gorjeta cash somente para pedidos elegíveis devolvidos pelo resumo tenant-scoped; pedidos continuam disponíveis após a conclusão da rota.
+- A gorjeta usa chave canônica por parada: retry do mesmo valor é idempotente, valor divergente retorna conflito e correções permanecem append-only via ajuste com motivo.
+- Sem settlement, payout, gorjeta online, deploy ou mutação de produção.
+
 ## R14 PR A/B - driver pay snapshots and immutable ledger
 
 Date: 2026-08-13

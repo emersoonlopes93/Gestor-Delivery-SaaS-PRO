@@ -44,8 +44,8 @@ describe('DriverEarningsService pay snapshots', () => {
 
 describe('DriverEarningsService ledger posting', () => {
   const prisma = {
-    driverLedgerEntry: { createMany: jest.fn(), findMany: jest.fn(), create: jest.fn() },
-    driverShift: { findFirst: jest.fn() }, deliveryStop: { findFirst: jest.fn() },
+    driverLedgerEntry: { createMany: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
+    driverShift: { findFirst: jest.fn() }, deliveryStop: { findFirst: jest.fn(), findMany: jest.fn() },
   };
   const service = new DriverEarningsService(prisma as never);
   const tx = { driverLedgerEntry: prisma.driverLedgerEntry };
@@ -53,7 +53,10 @@ describe('DriverEarningsService ledger posting', () => {
     arrivedAt: new Date(), payAmountSnapshot: new Prisma.Decimal(8), payCurrencySnapshot: 'BRL',
     run: { driverId: 'driver-a', shiftId: 'shift-a' } };
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.deliveryStop.findMany.mockResolvedValue([]);
+  });
 
   it('posts delivery and paid attempt with a stable idempotency source key', async () => {
     await service.postStop(tx as never, stop, 'delivered', false);
@@ -79,6 +82,32 @@ describe('DriverEarningsService ledger posting', () => {
       { type: 'DAILY_RATE', amount: new Prisma.Decimal(50), receivedDirectlyByDriver: false },
     ]);
     const summary = await service.summary('tenant-a', 'driver-a');
-    expect(summary).toMatchObject({ totalEarnings: 68, receivedDirectly: 10, dueFromStore: 58 });
+    expect(summary).toMatchObject({ totalEarnings: 68, receivedDirectly: 10, dueFromStore: 58,
+      eligibleCashTipOrders: [] });
+  });
+
+  it('uses one canonical cash-tip key per stop across driver and tenant retries', async () => {
+    prisma.deliveryStop.findFirst.mockResolvedValue({ ...stop, run: stop.run });
+    prisma.driverLedgerEntry.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ amount: new Prisma.Decimal(10) });
+    prisma.driverShift.findFirst.mockResolvedValue({ id: 'shift-a', tenantId: 'tenant-a', driverId: 'driver-a',
+      status: 'ACTIVE', dailyRateSnapshot: new Prisma.Decimal(0), currencySnapshot: 'BRL' });
+    prisma.driverLedgerEntry.findMany.mockResolvedValue([]);
+
+    await service.addCashTip('tenant-a', 'driver-a', 'order-a', 10, 'driver-a', 'delivery_driver');
+
+    expect(prisma.driverLedgerEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ sourceKey: 'cash-tip:stop-a' })],
+    }));
+  });
+
+  it('rejects a divergent cash tip when the stop already has one', async () => {
+    prisma.deliveryStop.findFirst.mockResolvedValue({ ...stop, run: stop.run });
+    prisma.driverLedgerEntry.findFirst.mockResolvedValue({ amount: new Prisma.Decimal(10) });
+
+    await expect(service.addCashTip('tenant-a', 'driver-a', 'order-a', 12, 'manager-a', 'tenant_user'))
+      .rejects.toThrow('jÃƒÂ¡ possui uma gorjeta');
+    expect(prisma.driverLedgerEntry.createMany).not.toHaveBeenCalled();
   });
 });

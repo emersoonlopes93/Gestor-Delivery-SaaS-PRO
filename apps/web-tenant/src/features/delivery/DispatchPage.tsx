@@ -417,10 +417,10 @@ export function DispatchPage() {
                       <span className="block truncate text-xs text-muted-foreground">{order.customerName}</span>
                     </span>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button type="button" onClick={() => moveSelected(index, -1)} disabled={index === 0} aria-label={`Mover pedido ${order.orderNumber} para cima`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-30">
+                      <button type="button" onClick={() => moveSelected(index, -1)} disabled={index === 0} aria-label={`Mover pedido ${order.orderNumber} para cima`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
                         <ArrowUp className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => moveSelected(index, 1)} disabled={index === selectedOrders.length - 1} aria-label={`Mover pedido ${order.orderNumber} para baixo`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-30">
+                      <button type="button" onClick={() => moveSelected(index, 1)} disabled={index === selectedOrders.length - 1} aria-label={`Mover pedido ${order.orderNumber} para baixo`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -495,8 +495,8 @@ export function DispatchPage() {
                           </div>
                           {canReorder && (
                             <div className="flex shrink-0 items-center gap-1">
-                              <button type="button" onClick={() => void moveFutureStop(run, stop.id, -1)} disabled={futureIndex === 0} aria-label={`Antecipar pedido ${stop.orderNumber}`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => void moveFutureStop(run, stop.id, 1)} disabled={futureIndex === future.length - 1} aria-label={`Adiar pedido ${stop.orderNumber}`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => void moveFutureStop(run, stop.id, -1)} disabled={futureIndex === 0} aria-label={`Antecipar pedido ${stop.orderNumber}`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"><ArrowUp className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => void moveFutureStop(run, stop.id, 1)} disabled={futureIndex === future.length - 1} aria-label={`Adiar pedido ${stop.orderNumber}`} className="rounded-md border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"><ArrowDown className="h-3.5 w-3.5" /></button>
                             </div>
                           )}
                         </div>

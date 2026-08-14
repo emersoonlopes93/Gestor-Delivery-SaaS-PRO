@@ -148,7 +148,7 @@ export function DriverPayFields({ value, onChange, idPrefix, currency = 'BRL', d
                       <input id={`${idPrefix}-tier-amount-${index}`} type="number" min="0" step="0.01" value={tier.amount} onChange={(event) => updateTier(index, { amount: event.target.valueAsNumber || 0 })} disabled={disabled} className={`${inputClassName} pl-10`} />
                     </div>
                   </label>
-                  <button type="button" aria-label={`Remover faixa ${index + 1}`} onClick={() => set('rateTable', value.rateTable.filter((_, tierIndex) => tierIndex !== index))} disabled={disabled || value.rateTable.length === 1 || terminal} className="flex h-9 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-bold text-muted-foreground transition hover:bg-status-danger/10 hover:text-status-danger focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-30 sm:w-9 sm:px-0">
+                  <button type="button" aria-label={`Remover faixa ${index + 1}`} onClick={() => set('rateTable', value.rateTable.filter((_, tierIndex) => tierIndex !== index))} disabled={disabled || value.rateTable.length === 1 || terminal} className="flex h-9 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-bold text-muted-foreground transition hover:bg-status-danger/10 hover:text-status-danger focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:w-9 sm:px-0">
                     <Trash2 className="h-4 w-4" /><span className="sm:sr-only">Remover faixa</span>
                   </button>
                 </div>
