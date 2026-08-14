@@ -72,6 +72,8 @@ model Tenant {
   deliveryRuns                   DeliveryRun[]
   deliveryStops                  DeliveryStop[]
   driverLedgerEntries            DriverLedgerEntry[]
+  driverSettlements              DriverSettlement[]
+  driverSettlementItems          DriverSettlementItem[]
   DeliveryRateDistanceTier       DeliveryRateDistanceTier[]
   deliveryRateRules              DeliveryRateRule[]
   dineInTables                   DineInTable[]
@@ -1196,6 +1198,7 @@ model DeliveryDriver {
   tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders             Order[]
   ledgerEntries      DriverLedgerEntry[]
+  settlements        DriverSettlement[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -1219,6 +1222,7 @@ model DriverShift {
   runs              DeliveryRun[]
   locations         DeliveryDriverLocation[]
   ledgerEntries     DriverLedgerEntry[]
+  settlementItem    DriverSettlementItem?
 
   @@index([tenantId, driverId, status])
   @@map("driver_shifts")
@@ -1326,6 +1330,44 @@ model DriverLedgerEntry {
   @@index([tenantId, driverId, shiftId, createdAt])
   @@index([tenantId, orderId])
   @@map("driver_ledger_entries")
+}
+
+model DriverSettlement {
+  id             String                 @id @default(uuid())
+  tenantId       String                 @map("tenant_id")
+  driverId       String                 @map("driver_id")
+  amount         Decimal                @db.Decimal(10, 2)
+  currency       String                 @default("BRL") @db.VarChar(10)
+  paymentMethod  DriverSettlementMethod @map("payment_method")
+  paidAt         DateTime               @map("paid_at")
+  notes          String?                @db.VarChar(500)
+  createdBy      String                 @map("created_by") @db.VarChar(100)
+  idempotencyKey String                 @map("idempotency_key") @db.VarChar(160)
+  createdAt      DateTime               @default(now()) @map("created_at")
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  driver         DeliveryDriver         @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  items          DriverSettlementItem[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, driverId, paidAt])
+  @@map("driver_settlements")
+}
+
+model DriverSettlementItem {
+  id               String           @id @default(uuid())
+  tenantId         String           @map("tenant_id")
+  settlementId     String           @map("settlement_id")
+  shiftId          String           @unique @map("shift_id")
+  grossEarnings    Decimal          @map("gross_earnings") @db.Decimal(10, 2)
+  receivedDirectly Decimal          @map("received_directly") @db.Decimal(10, 2)
+  amountDue        Decimal          @map("amount_due") @db.Decimal(10, 2)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  settlement       DriverSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  shift            DriverShift      @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, settlementId])
+  @@map("driver_settlement_items")
 }
 
 model DeliveryDriverLocation {
@@ -3593,6 +3635,13 @@ enum DriverLedgerEntryType {
   TIP_CASH
   BONUS
   ADJUSTMENT
+}
+
+enum DriverSettlementMethod {
+  PIX
+  CASH
+  BANK_TRANSFER
+  OTHER
 }
 
 enum DeliveryRunStatus {

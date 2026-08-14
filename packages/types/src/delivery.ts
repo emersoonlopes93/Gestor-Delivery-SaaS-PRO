@@ -377,3 +377,60 @@ export class DriverAdjustmentDTO {
   @IsString() driverId!: string; @IsNumber() amount!: number;
   @IsString() @MaxLength(255) reason!: string;
 }
+
+export enum DriverSettlementMethod {
+  PIX = 'PIX', CASH = 'CASH', BANK_TRANSFER = 'BANK_TRANSFER', OTHER = 'OTHER',
+}
+
+export enum DriverShiftPaymentStatus {
+  PENDING = 'PENDING', PAID = 'PAID',
+}
+
+export class CreateDriverSettlementDTO {
+  @IsString() driverId!: string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(31) @ArrayUnique() @IsString({ each: true }) shiftIds!: string[];
+  @IsEnum(DriverSettlementMethod) paymentMethod!: DriverSettlementMethod;
+  @IsISO8601({ strict: true }) @IsOptional() paidAt?: string;
+  @IsString() @MaxLength(500) @IsOptional() notes?: string;
+  @IsString() @MaxLength(160) idempotencyKey!: string;
+}
+
+export class DriverSettlementListQueryDTO {
+  @IsEnum(DriverShiftPaymentStatus) @IsOptional() status?: DriverShiftPaymentStatus;
+  @IsISO8601({ strict: true }) @IsOptional() from?: string;
+  @IsISO8601({ strict: true }) @IsOptional() to?: string;
+}
+
+export interface DriverSettlementShiftDTO {
+  shiftId: string;
+  startedAt: string;
+  endedAt: string;
+  grossEarnings: number;
+  receivedDirectly: number;
+  amountDue: number;
+  currency: string;
+  status: DriverShiftPaymentStatus;
+  settlementId: string | null;
+}
+
+export interface DriverSettlementHistoryDTO {
+  id: string;
+  driverId: string;
+  amount: number;
+  currency: string;
+  paymentMethod: DriverSettlementMethod;
+  paidAt: string;
+  notes: string | null;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  shifts: DriverSettlementShiftDTO[];
+}
+
+export interface DriverSettlementSummaryDTO {
+  driverId: string;
+  currentDue: number;
+  pendingShiftCount: number;
+  currency: string;
+  lastPayment: DriverSettlementHistoryDTO | null;
+}
