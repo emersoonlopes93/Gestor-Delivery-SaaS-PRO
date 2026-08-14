@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DeliveryRunStatus,
   DeliveryStopStatus,
   DriverShiftStatus,
+  DriverStatus,
   type DeliveryRunDTO,
   type DriverWorkStateDTO,
 } from '@gestor/types';
@@ -12,10 +13,10 @@ import { api } from '../lib/api';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  pathname: '/routes',
   clearSession: vi.fn(),
   refresh: vi.fn(),
-  startShift: vi.fn(),
-  endShift: vi.fn(),
+  setAvailability: vi.fn(),
   acceptRun: vi.fn(),
   rejectRun: vi.fn(),
   startRun: vi.fn(),
@@ -45,7 +46,11 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mocks.navigate,
+  useLocation: () => ({ pathname: mocks.pathname }),
+  NavLink: ({ children }: { children: unknown }) => <a href="#nav">{children}</a>,
+}));
 vi.mock('../store/authStore', () => ({
   useAuthStore: (selector: (state: unknown) => unknown) => selector({
     user: { name: 'Ana', driverId: 'driver-a' },
@@ -56,8 +61,7 @@ vi.mock('../hooks/useDriverRoute', () => ({
   useDriverRoute: () => ({
     ...mocks.routeState,
     refresh: mocks.refresh,
-    startShift: mocks.startShift,
-    endShift: mocks.endShift,
+    setAvailability: mocks.setAvailability,
     acceptRun: mocks.acceptRun,
     rejectRun: mocks.rejectRun,
     startRun: mocks.startRun,
@@ -101,10 +105,14 @@ vi.mock('../hooks/usePushNotifications', () => ({
     permissionState: 'unsupported',
     isSubscribed: false,
     isLoading: false,
+    error: null,
     requestPermissionAndSubscribe: vi.fn(),
     unsubscribe: vi.fn(),
     cleanupForLogout: mocks.cleanupPushForLogout,
   }),
+}));
+vi.mock('../hooks/useForegroundLocationPermission', () => ({
+  useForegroundLocationPermission: () => ({ permission: 'granted', isRequesting: false, request: vi.fn() }),
 }));
 vi.mock('../components/NativeNotificationBanner', () => ({ NativeNotificationBanner: () => null }));
 vi.mock('../components/DriverRouteMap', () => ({
@@ -157,6 +165,7 @@ function setState(activeRun: DeliveryRunDTO | null, hasShift = true) {
       DeliveryRunStatus.IN_PROGRESS,
       DeliveryRunStatus.RETURNING,
     ].includes(activeRun.status)),
+    availability: hasShift ? DriverStatus.offline : DriverStatus.offline,
     isLoading: false,
     isMutating: false,
     error: null,
@@ -164,13 +173,15 @@ function setState(activeRun: DeliveryRunDTO | null, hasShift = true) {
 }
 
 describe('ActiveDeliveryPage canonical route lifecycle', () => {
+  afterEach(cleanup);
   beforeEach(() => {
     vi.clearAllMocks();
     setState(null, false);
+    mocks.pathname = '/routes';
     mocks.trackingState.lastDeliveryEvent = null;
     mocks.trackingState.lastRouteEvent = null;
     mocks.trackingState.isTracking = false;
-    mocks.startShift.mockResolvedValue(true);
+    mocks.setAvailability.mockResolvedValue(true);
     mocks.startTracking.mockResolvedValue(true);
     mocks.startRun.mockResolvedValue(true);
     mocks.acceptRun.mockResolvedValue(true);
@@ -179,11 +190,28 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
     mocks.cleanupPushForLogout.mockResolvedValue(undefined);
   });
 
-  it('starts an explicit shift instead of treating GPS or login as online', async () => {
+  it('keeps availability disabled until the tenant starts the financial shift', async () => {
+    mocks.pathname = '/';
+    render(<ActiveDeliveryPage />);
+    expect(screen.getByRole('button', { name: 'Aguarde a liberação da loja' }).disabled).toBe(true);
+    expect(mocks.setAvailability).not.toHaveBeenCalled();
+  });
+
+  it('keeps the four app destinations available through their labelled bottom navigation', () => {
+    mocks.pathname = '/';
+    render(<ActiveDeliveryPage />);
+    expect(screen.getByRole('navigation', { name: 'Navega\u00e7\u00e3o principal' })).toBeTruthy();
+    for (const label of ['In\u00edcio', 'Rotas', 'Ganhos', 'Conta']) {
+      expect(screen.getByRole('link', { name: label })).toBeTruthy();
+    }
+  });
+
+  it('changes only operational availability after the tenant opens the shift', async () => {
+    mocks.pathname = '/';
+    setState(null, true);
     render(<ActiveDeliveryPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Ficar online' }));
-    await waitFor(() => expect(mocks.startShift).toHaveBeenCalledOnce());
-    expect(screen.getByText(/use o aplicativo PedeHub Entregador para Android/)).toBeTruthy();
+    await waitFor(() => expect(mocks.setAvailability).toHaveBeenCalledWith(DriverStatus.available));
   });
 
   it('requires one route-level acceptance and exposes friendly rejection reasons', async () => {
@@ -237,6 +265,7 @@ describe('ActiveDeliveryPage canonical route lifecycle', () => {
   });
 
   it('keeps the authenticated session when logout is blocked by active work', async () => {
+    mocks.pathname = '/account';
     setState(run(DeliveryRunStatus.IN_PROGRESS, DeliveryStopStatus.CURRENT));
     vi.mocked(api.post).mockRejectedValue({
       isAxiosError: true,

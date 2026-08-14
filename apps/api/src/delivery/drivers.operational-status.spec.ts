@@ -10,6 +10,7 @@ describe('DriversService operational availability', () => {
     },
     deliveryRun: { count: jest.fn() },
     order: { count: jest.fn() },
+    driverShift: { findFirst: jest.fn() },
   };
   const service = new DriversService(prisma as never, {} as never);
 
@@ -22,6 +23,7 @@ describe('DriversService operational availability', () => {
       id: 'driver-a', status: data.status,
     }));
     prisma.deliveryRun.count.mockResolvedValue(0);
+    prisma.driverShift.findFirst.mockResolvedValue({ id: 'shift-a' });
   });
 
   it('allows an idle authenticated driver to become available', async () => {
@@ -67,5 +69,26 @@ describe('DriversService operational availability', () => {
       where: { id: 'driver-a' },
       data: { status: DriverStatus.busy },
     });
+  });
+
+  it('does not turn availability into a financial shift start', async () => {
+    prisma.order.count.mockResolvedValue(0);
+    prisma.driverShift.findFirst.mockResolvedValue(null);
+    await expect(service.updateOperationalStatus(
+      'tenant-a', 'driver-a', DriverStatus.available,
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.deliveryDriver.update).not.toHaveBeenCalled();
+  });
+
+  it('allows repeated online/offline changes without creating another financial shift', async () => {
+    prisma.order.count.mockResolvedValue(0);
+    const statuses = Array.from({ length: 10 }, (_, index) => (
+      index % 2 === 0 ? DriverStatus.available : DriverStatus.offline
+    ));
+
+    await Promise.all(statuses.map((status) => service.updateOperationalStatus('tenant-a', 'driver-a', status)));
+
+    expect(prisma.driverShift.findFirst).toHaveBeenCalledTimes(5);
+    expect(prisma.deliveryDriver.update).toHaveBeenCalledTimes(10);
   });
 });

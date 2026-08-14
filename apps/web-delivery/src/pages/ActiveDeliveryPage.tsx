@@ -9,17 +9,22 @@ import {
   ChevronRight,
   MapPin,
   Navigation,
+  Home,
   Package,
   Phone,
   Power,
   RotateCcw,
   Truck,
+  Route,
+  UserRound,
+  WalletCards,
   XCircle,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   DeliveryRunStatus,
   DeliveryStopStatus,
+  DriverStatus,
   type DeliveryStopDTO,
 } from '@gestor/types';
 import { NativeNotificationBanner } from '../components/NativeNotificationBanner';
@@ -31,6 +36,7 @@ import { useDriverSettlements } from '../hooks/useDriverSettlements';
 import { useDriverRoute } from '../hooks/useDriverRoute';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useForegroundLocationPermission } from '../hooks/useForegroundLocationPermission';
 import { api } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
@@ -122,6 +128,7 @@ export function ActiveDeliveryPage() {
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     shift,
     activeRun,
@@ -130,8 +137,8 @@ export function ActiveDeliveryPage() {
     isMutating,
     error: routeError,
     refresh,
-    startShift,
-    endShift,
+    availability,
+    setAvailability,
     acceptRun,
     rejectRun,
     startRun: mutateStartRun,
@@ -154,12 +161,14 @@ export function ActiveDeliveryPage() {
     permissionState,
     isSubscribed,
     isLoading: pushLoading,
+    error: pushError,
     requestPermissionAndSubscribe,
     unsubscribe: unsubscribePush,
     cleanupForLogout: cleanupPushForLogout,
   } = usePushNotifications();
   const earnings = useDriverEarnings();
   const settlements = useDriverSettlements();
+  const locationPermission = useForegroundLocationPermission();
   const refreshEarnings = earnings.refresh;
 
   const [notice, setNotice] = useState<string | null>(null);
@@ -170,9 +179,32 @@ export function ActiveDeliveryPage() {
   const [failureReason, setFailureReason] = useState('');
   const [customReason, setCustomReason] = useState('');
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [showLocationIntro, setShowLocationIntro] = useState(false);
   const wasTrackingRequiredRef = useRef(false);
 
-  const showPushBanner = permissionState !== 'unsupported' && permissionState !== 'denied' && !isSubscribed;
+  const activeTab = location.pathname === '/routes'
+    ? 'routes'
+    : location.pathname === '/earnings'
+      ? 'earnings'
+      : location.pathname === '/account' ? 'account' : 'home';
+  useEffect(() => {
+    const key = `gestor.driver.location-intro.v1:${user?.driverId ?? 'anonymous'}`;
+    if (locationPermission.permission === 'prompt' && !window.localStorage.getItem(key)) {
+      setShowLocationIntro(true);
+    }
+  }, [locationPermission.permission, user?.driverId]);
+
+  const enableForegroundLocation = async () => {
+    const key = `gestor.driver.location-intro.v1:${user?.driverId ?? 'anonymous'}`;
+    const granted = await locationPermission.request();
+    window.localStorage.setItem(key, 'seen');
+    setShowLocationIntro(false);
+    setNotice(granted ? 'Localização ativada.' : 'Localização desativada. Você pode ativá-la nas configurações do aparelho ou navegador.');
+  };
+  const showPushBanner = activeTab === 'account'
+    && permissionState !== 'unsupported'
+    && permissionState !== 'denied'
+    && !isSubscribed;
   const orderedStops = useMemo(
     () => [...(activeRun?.stops ?? [])].sort((left, right) => left.sequence - right.sequence),
     [activeRun?.stops],
@@ -228,12 +260,16 @@ export function ActiveDeliveryPage() {
     return succeeded;
   };
 
-  const handleEndShift = async () => {
-    if (activeRun) {
-      setBlockingMessage('Você ainda está em rota. Finalize suas entregas ou devolva os pedidos pendentes antes de encerrar o turno.');
+  const toggleAvailability = async () => {
+    if (!shift) {
+      setBlockingMessage('Seu turno ainda não foi iniciado pela loja. Aguarde a liberação para ficar disponível.');
       return;
     }
-    await runAction(endShift, 'Turno encerrado. Até a próxima!');
+    const next = availability === DriverStatus.available ? DriverStatus.offline : DriverStatus.available;
+    await runAction(
+      () => setAvailability(next),
+      next === DriverStatus.available ? 'Você está disponível para novas rotas.' : 'Você ficou offline. Seu turno financeiro continua aberto.',
+    );
   };
 
   const startRun = async (runId: string) => {
@@ -304,7 +340,7 @@ export function ActiveDeliveryPage() {
             <h1 className="font-bold leading-tight text-[var(--delivery-foreground)]">Olá, {user?.name ?? 'entregador'}</h1>
           </div>
         </div>
-        <button
+        {activeTab === 'account' && <button
           type="button"
           onClick={() => void handleLogout()}
           disabled={logoutLoading}
@@ -312,10 +348,22 @@ export function ActiveDeliveryPage() {
           className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-[var(--delivery-muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/30"
         >
           <Power className="h-5 w-5" aria-hidden="true" />
-        </button>
+        </button>}
       </header>
 
-      <NativeNotificationBanner />
+      {showLocationIntro && (
+        <div className="absolute inset-0 z-20 flex items-end bg-slate-950/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="location-intro-title">
+          <section className="w-full rounded-2xl bg-[var(--delivery-card)] p-5 shadow-2xl">
+            <MapPin className="h-7 w-7 text-orange-600" aria-hidden="true" />
+            <h2 id="location-intro-title" className="mt-3 text-xl font-black text-[var(--delivery-foreground)]">PedeHub precisa da sua localização</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--delivery-muted-foreground)]">Usamos sua localização para acompanhar suas entregas durante as rotas.</p>
+            <button type="button" onClick={() => void enableForegroundLocation()} disabled={locationPermission.isRequesting} className="mt-5 min-h-12 w-full rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-50">{locationPermission.isRequesting ? 'Solicitando…' : 'Continuar'}</button>
+            <button type="button" onClick={() => { window.localStorage.setItem(`gestor.driver.location-intro.v1:${user?.driverId ?? 'anonymous'}`, 'seen'); setShowLocationIntro(false); }} className="mt-2 min-h-11 w-full rounded-xl text-sm font-bold text-[var(--delivery-muted-foreground)]">Agora não</button>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'account' && <NativeNotificationBanner />}
 
       {showPushBanner && (
         <div className="mx-3 mt-3 flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 p-3 dark:border-orange-900 dark:bg-orange-950/30">
@@ -328,7 +376,9 @@ export function ActiveDeliveryPage() {
           </div>
           <button
             type="button"
-            onClick={() => void requestPermissionAndSubscribe()}
+            onClick={() => void requestPermissionAndSubscribe().then((subscribed) => {
+              if (subscribed) setNotice('Alertas ativados.');
+            })}
             disabled={pushLoading}
             className="min-h-11 shrink-0 rounded-lg bg-orange-500 px-4 text-xs font-bold text-white disabled:opacity-50"
           >
@@ -336,7 +386,7 @@ export function ActiveDeliveryPage() {
           </button>
         </div>
       )}
-      {isSubscribed && (
+      {activeTab === 'account' && isSubscribed && (
         <div className="mx-3 mt-3 flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 dark:border-emerald-900 dark:bg-emerald-950/30">
           <Bell className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           <p className="flex-1 text-xs font-medium text-emerald-700 dark:text-emerald-200">Alertas de entrega ativos</p>
@@ -344,6 +394,15 @@ export function ActiveDeliveryPage() {
             <BellOff className="h-4 w-4 text-[var(--delivery-muted-foreground)]" aria-hidden="true" />
           </button>
         </div>
+      )}
+      {activeTab === 'account' && permissionState === 'denied' && (
+        <div role="status" className="mx-3 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          <p className="font-bold">Alertas desativados</p>
+          <p className="mt-1 text-xs">Você pode ativá-los nas configurações do aparelho ou navegador.</p>
+        </div>
+      )}
+      {activeTab === 'account' && pushError && (
+        <div role="alert" className="mx-3 mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">{pushError}</div>
       )}
 
       <main className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
@@ -364,48 +423,67 @@ export function ActiveDeliveryPage() {
           </div>
         )}
 
-        <section className="rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 shadow-sm" aria-labelledby="shift-title">
+        <section hidden={activeTab !== 'home'} className="rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 shadow-sm" aria-labelledby="shift-title">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p id="shift-title" className="text-sm font-bold text-[var(--delivery-foreground)]">Seu turno</p>
               <p className="mt-1 text-xs text-[var(--delivery-muted-foreground)]">
-                {shift ? (activeRun ? 'Online e com rota em andamento' : 'Online para receber uma rota') : 'Você está offline'}
+                {shift
+                  ? (activeRun ? 'Em rota' : availability === DriverStatus.available ? 'Disponível para receber uma rota' : 'Turno liberado pela loja. Você está offline.')
+                  : 'Seu turno ainda não foi iniciado pela loja.'}
               </p>
             </div>
-            <span className={`h-3 w-3 shrink-0 rounded-full ${shift ? 'bg-emerald-500' : 'bg-slate-300'}`} aria-hidden="true" />
+            <span className={`h-3 w-3 shrink-0 rounded-full ${availability === DriverStatus.available ? 'bg-emerald-500' : 'bg-slate-300'}`} aria-hidden="true" />
           </div>
           <button
             type="button"
-            onClick={() => void (shift ? handleEndShift() : runAction(startShift, 'Turno iniciado. Você está online.'))}
-            disabled={isMutating || isLoading}
+            onClick={() => void toggleAvailability()}
+            disabled={isMutating || isLoading || !shift || Boolean(activeRun)}
             className={`mt-4 min-h-11 w-full rounded-xl px-4 text-sm font-bold transition-colors disabled:opacity-50 ${
-              shift
+              availability === DriverStatus.available
                 ? 'border border-[var(--delivery-border)] bg-[var(--delivery-muted)] text-[var(--delivery-foreground)]'
                 : 'bg-emerald-600 text-white'
             }`}
           >
-            {shift ? 'Encerrar turno' : 'Ficar online'}
+            {!shift ? 'Aguarde a liberação da loja' : availability === DriverStatus.available ? 'Ficar offline' : 'Ficar online'}
           </button>
         </section>
 
-        <DriverEarningsCard
-          summary={earnings.summary}
-          eligibleStops={earnings.summary?.eligibleCashTipOrders ?? []}
-          isLoading={earnings.isLoading}
-          isMutating={earnings.isMutating}
-          error={earnings.error}
-          onAddCashTip={earnings.addCashTip}
-        />
+        <section hidden={activeTab !== 'home'} className="rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 shadow-sm" aria-labelledby="home-route-title">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-950/40"><Route className="h-5 w-5 text-orange-600" aria-hidden="true" /></span>
+            <div>
+              <h2 id="home-route-title" className="text-sm font-bold text-[var(--delivery-foreground)]">Rota atual</h2>
+              <p className="mt-1 text-xs text-[var(--delivery-muted-foreground)]">
+                {activeRun && currentStop ? `Pedido #${currentStop.orderNumber} é sua próxima entrega.` : activeRun ? 'Há uma rota aguardando sua ação.' : 'Nenhuma rota atribuída agora.'}
+              </p>
+            </div>
+          </div>
+          <NavLink to="/routes" className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-[var(--delivery-muted)] px-4 text-sm font-bold text-[var(--delivery-foreground)]">Ver rotas</NavLink>
+        </section>
 
-        <DriverSettlementsCard
-          summary={settlements.summary}
-          history={settlements.history}
-          isLoading={settlements.isLoading}
-          isRefreshing={settlements.isRefreshing}
-          error={settlements.error}
-          onRetry={settlements.refresh}
-          onOpenDetail={settlements.getDetail}
-        />
+        <section hidden={activeTab !== 'earnings'} aria-label="Ganhos e pagamentos" className="space-y-4">
+          <DriverEarningsCard
+            summary={earnings.summary}
+            eligibleStops={earnings.summary?.eligibleCashTipOrders ?? []}
+            isLoading={earnings.isLoading}
+            isMutating={earnings.isMutating}
+            error={earnings.error}
+            onAddCashTip={earnings.addCashTip}
+          />
+
+          <DriverSettlementsCard
+            summary={settlements.summary}
+            history={settlements.history}
+            isLoading={settlements.isLoading}
+            isRefreshing={settlements.isRefreshing}
+            error={settlements.error}
+            onRetry={settlements.refresh}
+            onOpenDetail={settlements.getDetail}
+          />
+        </section>
+
+        <section hidden={activeTab !== 'routes'} aria-label="Rotas" className="space-y-4">
 
         {isLoading ? (
           <div className="rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-8 text-center text-sm text-[var(--delivery-muted-foreground)]">Carregando sua rota…</div>
@@ -549,7 +627,9 @@ export function ActiveDeliveryPage() {
           </>
         )}
 
-        <section className="mb-8 rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 shadow-sm" aria-labelledby="tracking-title">
+        </section>
+
+        <section hidden={activeTab !== 'account'} className="mb-8 rounded-2xl border border-[var(--delivery-border)] bg-[var(--delivery-card)] p-4 shadow-sm" aria-labelledby="tracking-title">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 id="tracking-title" className="flex items-center gap-2 text-sm font-bold text-[var(--delivery-foreground)]"><Navigation className="h-4 w-4 text-blue-500" aria-hidden="true" />Localização</h2>
@@ -559,9 +639,9 @@ export function ActiveDeliveryPage() {
                 </p>
               )}
             </div>
-            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${isTracking ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-[var(--delivery-muted)] text-[var(--delivery-muted-foreground)]'}`}>{isTracking ? 'Ativa' : 'Pausada'}</span>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${locationPermission.permission === 'granted' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-[var(--delivery-muted)] text-[var(--delivery-muted-foreground)]'}`}>{locationPermission.permission === 'granted' ? 'Ativa' : 'Desativada'}</span>
           </div>
-          {isTracking && lastLocation && <p className="mt-3 rounded-lg bg-[var(--delivery-muted)] p-3 font-mono text-[11px] text-[var(--delivery-muted-foreground)]">Lat: {lastLocation.lat.toFixed(5)} · Lng: {lastLocation.lng.toFixed(5)}</p>}
+          <p className="mt-3 text-xs leading-5 text-[var(--delivery-muted-foreground)]">A localização é usada somente durante uma rota ativa. A permissão em segundo plano é solicitada apenas quando a rota exigir.</p>
           {trackingError && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
               <p className="font-bold">Localização temporariamente indisponível</p>
@@ -572,9 +652,24 @@ export function ActiveDeliveryPage() {
               </p>
             </div>
           )}
-          <button type="button" onClick={isTracking ? stopTracking : () => void startTracking()} className={`mt-4 min-h-11 w-full rounded-xl text-sm font-bold ${isTracking ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300' : 'bg-blue-600 text-white'}`}>{isTracking ? 'Parar localização' : 'Permitir localização'}</button>
+          {locationPermission.permission !== 'granted' && locationPermission.permission !== 'unavailable' && (
+            <button type="button" onClick={() => void enableForegroundLocation()} disabled={locationPermission.isRequesting} className="mt-4 min-h-11 w-full rounded-xl bg-blue-600 text-sm font-bold text-white disabled:opacity-50">{locationPermission.isRequesting ? 'Solicitando…' : 'Ativar localização'}</button>
+          )}
         </section>
       </main>
+      <nav aria-label="Navegação principal" className="grid grid-cols-4 border-t border-[var(--delivery-border)] bg-[var(--delivery-card)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+        {[
+          ['/', 'Início', Home],
+          ['/routes', 'Rotas', Route],
+          ['/earnings', 'Ganhos', WalletCards],
+          ['/account', 'Conta', UserRound],
+        ].map(([to, label, Icon]) => (
+          <NavLink key={to as string} to={to as string} end={to === '/'} className={({ isActive }) => `flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold ${isActive ? 'bg-orange-50 text-orange-600 dark:bg-orange-950/30' : 'text-[var(--delivery-muted-foreground)]'}`}>
+            <Icon className="h-5 w-5" aria-hidden="true" />
+            <span>{label as string}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

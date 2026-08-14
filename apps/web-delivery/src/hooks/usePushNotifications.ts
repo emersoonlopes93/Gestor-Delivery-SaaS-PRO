@@ -8,7 +8,7 @@ interface UsePushNotificationsReturn {
   isSubscribed: boolean;
   isLoading: boolean;
   error: string | null;
-  requestPermissionAndSubscribe: () => Promise<void>;
+  requestPermissionAndSubscribe: () => Promise<boolean>;
   unsubscribe: () => Promise<void>;
   cleanupForLogout: () => Promise<void>;
 }
@@ -53,7 +53,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   // Verificar suporte e estado inicial
   useEffect(() => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setPermissionState('unsupported');
       return;
     }
@@ -89,35 +89,39 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     return () => navigator.serviceWorker?.removeEventListener('message', handler);
   }, []);
 
-  const requestPermissionAndSubscribe = useCallback(async () => {
-    if (permissionState === 'unsupported') return;
+  const requestPermissionAndSubscribe = useCallback(async (): Promise<boolean> => {
+    if (permissionState === 'unsupported') return false;
+    if (isSubscribed) return true;
 
     setIsLoading(true);
     setError(null);
 
     try {
       // 1. Solicitar permissão
-      const permission = await Notification.requestPermission();
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
       setPermissionState(permission as PermissionState);
 
       if (permission !== 'granted') {
-        setError('Permissão de notificação negada.');
-        return;
+        setError('Alertas desativados. Você pode ativá-los nas configurações do aparelho ou navegador.');
+        return false;
       }
 
       // 2. Obter a chave VAPID
       const vapidKey = await getVapidPublicKey();
       if (!vapidKey) {
-        setError('Serviço de notificações não configurado.');
-        return;
+        setError('Serviço de notificações não configurado neste ambiente.');
+        return false;
       }
 
       // 3. Subscrever no PushManager
       const registration = swRegistrationRef.current ?? await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      });
+      const subscription = await registration.pushManager.getSubscription()
+        ?? await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
 
       // 4. Enviar subscription para o backend
       const subJson = subscription.toJSON();
@@ -128,13 +132,15 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       });
 
       setIsSubscribed(true);
+      return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao ativar notificações';
       setError(message);
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [permissionState]);
+  }, [isSubscribed, permissionState]);
 
   const unsubscribe = useCallback(async () => {
     setIsLoading(true);

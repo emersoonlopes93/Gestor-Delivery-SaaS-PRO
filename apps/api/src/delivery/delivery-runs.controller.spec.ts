@@ -8,6 +8,9 @@ describe('DeliveryRunsController tenant contract', () => {
     getLocationHistory: jest.fn(),
     getSettings: jest.fn(),
     updateSettings: jest.fn(),
+    getDriverWorkState: jest.fn(),
+    startShiftForTenant: jest.fn(),
+    endShiftForTenant: jest.fn(),
     createAssignedRun: jest.fn(),
     reorderTenantStops: jest.fn(),
   };
@@ -74,6 +77,15 @@ describe('DeliveryRunsController tenant contract', () => {
   it('derives the history tenant from the authenticated tenant request', async () => {
     await controller.getLocationHistory(request as never, 'run-a');
     expect(service.getLocationHistory).toHaveBeenCalledWith('tenant-a', 'run-a');
+  });
+
+  it('lets only the authenticated tenant operate a driver financial shift', async () => {
+    await controller.getDriverWorkState(request as never, 'driver-a');
+    await controller.startDriverShift(request as never, 'driver-a');
+    await controller.endDriverShift(request as never, 'driver-a');
+    expect(service.getDriverWorkState).toHaveBeenCalledWith('tenant-a', 'driver-a');
+    expect(service.startShiftForTenant).toHaveBeenCalledWith('tenant-a', 'driver-a');
+    expect(service.endShiftForTenant).toHaveBeenCalledWith('tenant-a', 'driver-a');
   });
 
   it('derives tenant scope when resolving the route for an order', async () => {

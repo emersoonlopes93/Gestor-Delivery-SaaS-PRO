@@ -1780,3 +1780,14 @@ Base: `origin/main-copy` / `dd5bbb45`
 Validation so far: Prisma schema validation PASS, API TypeScript PASS, focused API suites 5 files/37 tests PASS plus expanded ledger coverage, tenant TypeScript PASS and focused tenant tests PASS. Docker Desktop was not running locally, so the canonical ephemeral migration gate is delegated to PR CI. No production, Dokploy, remote database or deploy was accessed.
 
 ---
+
+## R15.1 - turno financeiro controlado pela loja e hotfix do app do entregador (2026-08-14)
+
+- `DriverShift.businessDate` e a migration aditiva criam uma unicidade parcial por tenant, entregador e data comercial. O serviço calcula a data no fuso do tenant, inicia o motorista offline e reutiliza apenas o turno ativo; encerrar o turno continua bloqueado por rota/retorno ativos e lança a diária uma vez.
+- Os endpoints de iniciar/encerrar turno agora pertencem ao painel tenant e exigem `delivery.manage_drivers`; os antigos endpoints do motorista devolvem `403`. O status `available` só é permitido com turno ativo, sem criar ou alterar lançamentos financeiros.
+- O app do motorista separa disponibilidade de turno, expõe navegação persistente Início/Rotas/Ganhos/Conta com URLs diretas e deixa localização foreground orientada por permissão. Alertas Web Push reaproveitam uma inscrição existente antes de assinar novamente; recursos nativos não configurados continuam explicitamente declarados.
+- O painel exibe o estado e os comandos de turno somente no modal de edição do entregador e respeita a mesma permissão no cliente e no servidor.
+
+Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes de API e 3 arquivos/16 testes focados do app entregador passaram; builds dos três apps, `check:no-any` e `git diff --check` também passaram. A migração efêmera local foi bloqueada porque Docker Desktop não estava em execução. A PR #73 foi aberta em `2b3dcf12`, mas Actions não iniciou `build-and-migrate`, Gitleaks nem a prova PostgreSQL porque a conta GitHub informou pagamentos recentes falhos ou limite de gastos; os previews Vercel passaram. A integração está bloqueada até a regularização da conta e rerun dos checks. Nenhum banco remoto, produção, Dokploy ou deploy foi acessado.
+
+---
