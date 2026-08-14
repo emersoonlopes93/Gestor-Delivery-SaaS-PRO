@@ -9,6 +9,8 @@ import {
 import { DEFAULT_DRIVER_PAY_VALUE, driverPayOverridePayload, type DriverPayFormValue, validateDriverPay } from './driver-pay-form';
 import { DriverEarningsPanel } from './DriverEarningsPanel';
 import { useDriverEarnings } from '../hooks/useDriverEarnings';
+import { DriverSettlementsPanel } from './DriverSettlementsPanel';
+import { usePermissions } from '@/hooks/use-tenant-auth';
 
 
 
@@ -21,6 +23,9 @@ interface Props {
 export function DriverFormModal({ isOpen, onClose, driver }: Props) {
   const { createDriver, updateDriver, resetPin } = useDrivers();
   const earnings = useDriverEarnings(driver?.id ?? null);
+  const { has } = usePermissions();
+  const canReadFinance = has('finance.read');
+  const canManageFinance = has('finance.manage');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [vehicleType, setVehicleType] = useState<DriverVehicleType>(DriverVehicleType.motorcycle);
@@ -310,6 +315,12 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                   isMutating={earnings.isMutating}
                   onCashTip={earnings.addCashTip}
                   onAdjustment={earnings.addAdjustment}
+                />
+
+                <DriverSettlementsPanel
+                  driverId={driver.id}
+                  canRead={canReadFinance}
+                  canManage={canManageFinance}
                 />
 
                 <section className="space-y-4 border-t border-border pt-5" aria-labelledby="driver-pay-override-title">

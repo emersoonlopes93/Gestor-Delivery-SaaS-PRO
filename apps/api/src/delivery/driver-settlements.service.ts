@@ -60,12 +60,14 @@ export class DriverSettlementsService {
 
   private shiftDTO(shift: ShiftForSettlement): DriverSettlementShiftDTO {
     const amounts = this.shiftAmounts(shift);
+    const grossEarnings = shift.settlementItem?.grossEarnings ?? amounts.grossEarnings;
+    const receivedDirectly = shift.settlementItem?.receivedDirectly ?? amounts.receivedDirectly;
     return {
       shiftId: shift.id,
       startedAt: shift.startedAt.toISOString(),
       endedAt: shift.endedAt?.toISOString() ?? shift.startedAt.toISOString(),
-      grossEarnings: Number(amounts.grossEarnings),
-      receivedDirectly: Number(amounts.receivedDirectly),
+      grossEarnings: Number(grossEarnings),
+      receivedDirectly: Number(receivedDirectly),
       amountDue: Number(shift.settlementItem?.amountDue ?? amounts.amountDue),
       currency: shift.currencySnapshot,
       status: shift.settlementItem ? DriverShiftPaymentStatus.PAID : DriverShiftPaymentStatus.PENDING,

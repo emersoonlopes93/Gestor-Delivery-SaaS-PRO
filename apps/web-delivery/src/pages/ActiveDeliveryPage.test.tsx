@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   cleanupPushForLogout: vi.fn(),
   refreshEarnings: vi.fn(),
   addCashTip: vi.fn(),
+  refreshSettlements: vi.fn(),
+  getSettlementDetail: vi.fn(),
   routeState: {} as DriverWorkStateDTO & {
     isLoading: boolean;
     isMutating: boolean;
@@ -74,6 +76,17 @@ vi.mock('../hooks/useDriverEarnings', () => ({
     error: null,
     refresh: mocks.refreshEarnings,
     addCashTip: mocks.addCashTip,
+  }),
+}));
+vi.mock('../hooks/useDriverSettlements', () => ({
+  useDriverSettlements: () => ({
+    summary: null,
+    history: [],
+    isLoading: false,
+    isRefreshing: false,
+    error: null,
+    refresh: mocks.refreshSettlements,
+    getDetail: mocks.getSettlementDetail,
   }),
 }));
 vi.mock('../hooks/useDriverTracking', () => ({
