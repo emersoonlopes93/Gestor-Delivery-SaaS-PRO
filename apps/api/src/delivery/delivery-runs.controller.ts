@@ -58,6 +58,24 @@ export class DeliveryRunsController {
     return this.earningsService.addAdjustment(req.user.tenantId, dto.driverId, dto.amount, dto.reason, req.user.id);
   }
 
+  @Get('drivers/:driverId/work-state')
+  @RequirePermissions('delivery.manage_drivers')
+  getDriverWorkState(@Request() req: AuthenticatedRequest, @Param('driverId') driverId: string) {
+    return this.deliveryRunsService.getDriverWorkState(req.user.tenantId, driverId);
+  }
+
+  @Post('drivers/:driverId/shift/start')
+  @RequirePermissions('delivery.manage_drivers')
+  startDriverShift(@Request() req: AuthenticatedRequest, @Param('driverId') driverId: string) {
+    return this.deliveryRunsService.startShiftForTenant(req.user.tenantId, driverId);
+  }
+
+  @Post('drivers/:driverId/shift/end')
+  @RequirePermissions('delivery.manage_drivers')
+  endDriverShift(@Request() req: AuthenticatedRequest, @Param('driverId') driverId: string) {
+    return this.deliveryRunsService.endShiftForTenant(req.user.tenantId, driverId);
+  }
+
   @Post('cash-tips')
   @RequirePermissions('delivery.manage_drivers')
   addCashTip(@Request() req: AuthenticatedRequest, @Body() dto: TenantCashTipDTO) {

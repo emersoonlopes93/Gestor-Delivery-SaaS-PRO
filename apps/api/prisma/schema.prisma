@@ -1211,6 +1211,7 @@ model DriverShift {
   driverId          String                   @map("driver_id")
   status            DriverShiftStatus        @default(ACTIVE)
   startedAt         DateTime                 @default(now()) @map("started_at")
+  businessDate      DateTime?                @map("business_date") @db.Date
   endedAt           DateTime?                @map("ended_at")
   createdAt         DateTime                 @default(now()) @map("created_at")
   updatedAt         DateTime                 @updatedAt @map("updated_at")
@@ -1225,6 +1226,7 @@ model DriverShift {
   settlementItem    DriverSettlementItem?
 
   @@index([tenantId, driverId, status])
+  @@index([tenantId, driverId, businessDate])
   @@map("driver_shifts")
 }
 

@@ -314,7 +314,7 @@ export class DriversService {
     status: DriverStatus.available | DriverStatus.offline,
   ) {
     const driver = await this.getDriver(tenantId, id);
-    const [activeRuns, legacyActiveDeliveries] = await Promise.all([
+    const [activeRuns, legacyActiveDeliveries, activeShift] = await Promise.all([
       this.prisma.deliveryRun.count({
         where: {
           tenantId,
@@ -329,7 +329,17 @@ export class DriversService {
           status: { in: ['ready_for_delivery', 'out_for_delivery'] },
         },
       }),
+      status === DriverStatus.available
+        ? this.prisma.driverShift.findFirst({
+            where: { tenantId, driverId: driver.id, status: 'ACTIVE' },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
     ]);
+
+    if (status === DriverStatus.available && !activeShift) {
+      throw new BadRequestException('Seu turno ainda não foi iniciado pela loja. Aguarde a liberação para ficar disponível.');
+    }
 
     if (activeRuns > 0 || legacyActiveDeliveries > 0) {
       if (driver.status !== DriverStatus.busy) {

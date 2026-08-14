@@ -159,6 +159,22 @@ describe('DeliveryRunsService', () => {
     expect(tx.driverShift.create).not.toHaveBeenCalled();
   });
 
+  it('allows availability changes without creating another paid shift for the same business date', async () => {
+    tx.deliveryDriver.findFirst.mockResolvedValue({ id: 'driver-a' });
+    tx.driverShift.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    tx.tenantSettings.findUnique.mockResolvedValue({ timezone: 'America/Sao_Paulo' });
+    const created = { id: 'shift-a', tenantId: 'tenant-a', driverId: 'driver-a', businessDate: new Date(), status: 'ACTIVE' };
+    tx.driverShift.create.mockResolvedValue(created);
+
+    await expect(service.startShift('tenant-a', 'driver-a')).resolves.toBe(created);
+    expect(tx.driverShift.create).toHaveBeenCalledTimes(1);
+    expect(tx.deliveryDriver.update).toHaveBeenCalledWith({
+      where: { id: 'driver-a' }, data: { status: 'offline' },
+    });
+  });
+
   it('does not reveal a driver from another tenant while starting a shift', async () => {
     tx.deliveryDriver.findFirst.mockResolvedValue(null);
     await expect(service.startShift('tenant-b', 'driver-a')).rejects.toBeInstanceOf(NotFoundException);
@@ -178,6 +194,20 @@ describe('DeliveryRunsService', () => {
       },
       select: { id: true },
     });
+  });
+
+  it('posts the daily rate exactly once when the tenant closes a shift', async () => {
+    const activeShift = {
+      id: 'shift-a', tenantId: 'tenant-a', driverId: 'driver-a',
+      dailyRateSnapshot: 50, currencySnapshot: 'BRL',
+    };
+    tx.driverShift.findFirst.mockResolvedValue(activeShift);
+    tx.deliveryRun.findFirst.mockResolvedValue(null);
+    tx.driverShift.update.mockResolvedValue({ ...activeShift, status: 'ENDED', endedAt: new Date() });
+
+    await service.endShift('tenant-a', 'driver-a');
+    expect(earnings.postDailyRate).toHaveBeenCalledTimes(1);
+    expect(earnings.postDailyRate).toHaveBeenCalledWith(tx, activeShift);
   });
 
   it('creates a multi-order route with stable manual sequence and address snapshots', async () => {

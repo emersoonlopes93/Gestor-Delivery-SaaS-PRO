@@ -28,6 +28,7 @@ import {
   DriverShiftStatus,
   Prisma,
 } from '@prisma/client';
+import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { DriverEarningsService } from './driver-earnings.service';
@@ -160,12 +161,16 @@ export class DeliveryRunsService {
     tenantId: string,
     driverId: string,
   ): Promise<DriverWorkStateDTO> {
-    const [shift, activeRun] = await Promise.all([
+    const [shift, activeRun, driver] = await Promise.all([
       this.prisma.driverShift.findFirst({
         where: { tenantId, driverId, status: DriverShiftStatus.ACTIVE },
         orderBy: { startedAt: 'desc' },
       }),
       this.getActiveRunForDriver(tenantId, driverId),
+      this.prisma.deliveryDriver.findFirst({
+        where: { tenantId, id: driverId },
+        select: { status: true },
+      }),
     ]);
     return {
       shift: shift ? this.shiftToDTO(shift) : null,
@@ -175,6 +180,7 @@ export class DeliveryRunsService {
         && activeRun
         && [SharedDeliveryRunStatus.IN_PROGRESS, SharedDeliveryRunStatus.RETURNING].includes(activeRun.status),
       ),
+      availability: driver ? SharedDriverStatus[driver.status] : SharedDriverStatus.offline,
     };
   }
 
@@ -273,9 +279,26 @@ export class DeliveryRunsService {
       });
       if (existing) return existing;
 
+      const settings = await tx.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { timezone: true },
+      });
+      const configuredZone = settings?.timezone?.trim() || 'America/Sao_Paulo';
+      const zonedNow = DateTime.now().setZone(configuredZone);
+      const businessDate = (zonedNow.isValid ? zonedNow : DateTime.now().setZone('America/Sao_Paulo'))
+        .startOf('day')
+        .toJSDate();
+      const alreadyStartedToday = await tx.driverShift.findFirst({
+        where: { tenantId, driverId, businessDate },
+        orderBy: { startedAt: 'desc' },
+      });
+      if (alreadyStartedToday) {
+        throw new ConflictException('Este entregador já teve um turno remunerado iniciado hoje.');
+      }
+
       const paySnapshot = await this.earnings.shiftSnapshot(tx, tenantId, driver);
-      const shift = await tx.driverShift.create({ data: { tenantId, driverId, ...paySnapshot } });
-      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'available' } });
+      const shift = await tx.driverShift.create({ data: { tenantId, driverId, businessDate, ...paySnapshot } });
+      await tx.deliveryDriver.update({ where: { id: driverId }, data: { status: 'offline' } });
       return shift;
     });
   }
@@ -304,11 +327,11 @@ export class DeliveryRunsService {
     });
   }
 
-  async startShiftForDriver(tenantId: string, driverId: string): Promise<DriverShiftDTO> {
+  async startShiftForTenant(tenantId: string, driverId: string): Promise<DriverShiftDTO> {
     return this.shiftToDTO(await this.startShift(tenantId, driverId));
   }
 
-  async endShiftForDriver(tenantId: string, driverId: string): Promise<DriverShiftDTO> {
+  async endShiftForTenant(tenantId: string, driverId: string): Promise<DriverShiftDTO> {
     return this.shiftToDTO(await this.endShift(tenantId, driverId));
   }
 
