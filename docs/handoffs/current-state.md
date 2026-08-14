@@ -1788,6 +1788,6 @@ Validation so far: Prisma schema validation PASS, API TypeScript PASS, focused A
 - O app do motorista separa disponibilidade de turno, expõe navegação persistente Início/Rotas/Ganhos/Conta com URLs diretas e deixa localização foreground orientada por permissão. Alertas Web Push reaproveitam uma inscrição existente antes de assinar novamente; recursos nativos não configurados continuam explicitamente declarados.
 - O painel exibe o estado e os comandos de turno somente no modal de edição do entregador e respeita a mesma permissão no cliente e no servidor.
 
-Validação local: TypeScript nos três apps, lint focado, 4 suítes/33 testes de API e 3 arquivos/14 testes focados do app entregador passaram. Os gates integrais, migração efêmera, CI e PR serão registrados ao final desta entrega. Nenhum banco remoto, produção, Dokploy ou deploy foi acessado.
+Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes de API e 3 arquivos/16 testes focados do app entregador passaram; builds dos três apps, `check:no-any` e `git diff --check` também passaram. A migração efêmera local foi bloqueada porque Docker Desktop não estava em execução. A PR #73 foi aberta em `2b3dcf12`, mas Actions não iniciou `build-and-migrate`, Gitleaks nem a prova PostgreSQL porque a conta GitHub informou pagamentos recentes falhos ou limite de gastos; os previews Vercel passaram. A integração está bloqueada até a regularização da conta e rerun dos checks. Nenhum banco remoto, produção, Dokploy ou deploy foi acessado.
 
 ---
