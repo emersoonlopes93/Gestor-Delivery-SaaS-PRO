@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import type { DriverWorkStateDTO } from '@gestor/types';
+import { DriverStatus, type DriverWorkStateDTO } from '@gestor/types';
 import { api } from '../lib/api';
 
-const EMPTY_STATE: DriverWorkStateDTO = { shift: null, activeRun: null, trackingRequired: false };
+const EMPTY_STATE: DriverWorkStateDTO = {
+  shift: null,
+  activeRun: null,
+  trackingRequired: false,
+  availability: DriverStatus.offline,
+};
 
 function unwrap<T>(payload: T | { success: boolean; data: T }): T {
   return payload && typeof payload === 'object' && 'success' in payload && 'data' in payload
@@ -71,8 +76,7 @@ export function useDriverRoute() {
     isMutating,
     error,
     refresh,
-    startShift: () => mutate(() => api.post('/delivery/driver/shift/start')),
-    endShift: () => mutate(() => api.post('/delivery/driver/shift/end')),
+    setAvailability: (status: DriverStatus.available | DriverStatus.offline) => mutate(() => api.patch('/delivery/driver/status', { status })),
     acceptRun: (runId: string) => mutate(() => api.post(runPath(runId, 'accept'))),
     rejectRun: (runId: string, reason: string) => mutate(() => api.post(runPath(runId, 'reject'), { reason })),
     startRun: (runId: string) => mutate(() => api.post(runPath(runId, 'start'))),

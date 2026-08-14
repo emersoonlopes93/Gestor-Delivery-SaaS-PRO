@@ -17,15 +17,13 @@ function App() {
         {/* Rota pública de login */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Home Route */}
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <ActiveDeliveryPage />
-            </ProtectedRoute>
-          } 
-        />
+        {['/', '/routes', '/earnings', '/account'].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={<ProtectedRoute><ActiveDeliveryPage /></ProtectedRoute>}
+          />
+        ))}
 
         {/* Rota Padrão / Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

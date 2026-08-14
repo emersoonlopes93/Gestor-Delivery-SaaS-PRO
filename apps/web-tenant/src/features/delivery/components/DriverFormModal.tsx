@@ -11,6 +11,7 @@ import { DriverEarningsPanel } from './DriverEarningsPanel';
 import { useDriverEarnings } from '../hooks/useDriverEarnings';
 import { DriverSettlementsPanel } from './DriverSettlementsPanel';
 import { usePermissions } from '@/hooks/use-tenant-auth';
+import { useDriverShift } from '../hooks/useDriverShift';
 
 
 
@@ -23,9 +24,11 @@ interface Props {
 export function DriverFormModal({ isOpen, onClose, driver }: Props) {
   const { createDriver, updateDriver, resetPin } = useDrivers();
   const earnings = useDriverEarnings(driver?.id ?? null);
+  const driverShift = useDriverShift(driver?.id ?? null);
   const { has } = usePermissions();
   const canReadFinance = has('finance.read');
   const canManageFinance = has('finance.manage');
+  const canManageDrivers = has('delivery.manage_drivers');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [vehicleType, setVehicleType] = useState<DriverVehicleType>(DriverVehicleType.motorcycle);
@@ -38,6 +41,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
   const [payOverrideEnabled, setPayOverrideEnabled] = useState(false);
   const [payValue, setPayValue] = useState<DriverPayFormValue>(DEFAULT_DRIVER_PAY_VALUE);
   const [payError, setPayError] = useState<string | null>(null);
+  const [shiftError, setShiftError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -283,6 +287,28 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                     <option value="offline">Offline / Indisponível</option>
                   </select>
                 </div>
+
+                <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="driver-shift-title" aria-busy={driverShift.isLoading || driverShift.isMutating}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 id="driver-shift-title" className="text-sm font-black text-foreground">Turno remunerado</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">Controlado pela loja. Alternar online/offline no app não cria diária.</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${driverShift.workState?.shift ? 'bg-status-success/10 text-status-success' : 'bg-muted text-muted-foreground'}`}>{driverShift.workState?.shift ? 'Aberto' : 'Encerrado'}</span>
+                  </div>
+                  {driverShift.error && <p role="alert" className="mt-3 text-sm text-status-danger">{driverShift.error}</p>}
+                  {shiftError && <p role="alert" className="mt-3 text-sm text-status-danger">{shiftError}</p>}
+                  <button
+                    type="button"
+                    disabled={!canManageDrivers || driverShift.isLoading || driverShift.isMutating || Boolean(driverShift.workState?.activeRun)}
+                    onClick={() => void (driverShift.workState?.shift ? driverShift.end() : driverShift.start()).then(() => setShiftError(null)).catch((error: unknown) => setShiftError(error instanceof Error ? error.message : 'Não foi possível alterar o turno.'))}
+                    className={`mt-4 min-h-11 w-full rounded-xl px-4 text-sm font-bold disabled:opacity-50 ${driverShift.workState?.shift ? 'border border-border bg-card text-foreground' : 'bg-primary text-primary-foreground'}`}
+                  >
+                    {driverShift.workState?.shift ? 'Encerrar turno' : 'Iniciar turno'}
+                  </button>
+                  {driverShift.workState?.activeRun && <p className="mt-2 text-xs text-status-warning">Finalize a rota e os retornos antes de encerrar o turno.</p>}
+                  {!canManageDrivers && <p className="mt-2 text-xs text-muted-foreground">Sua permissão atual não permite iniciar ou encerrar turnos.</p>}
+                </section>
 
                 <div className="flex items-center space-x-2">
                   <input

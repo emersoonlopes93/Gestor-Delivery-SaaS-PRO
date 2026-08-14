@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -67,13 +68,13 @@ export class DriverOperationsController {
   }
 
   @Post('shift/start')
-  startShift(@Req() req: AuthenticatedRequest) {
-    return this.deliveryRunsService.startShiftForDriver(req.user.tenantId, req.user.id);
+  startShift() {
+    throw new ForbiddenException('A loja inicia o turno remunerado. Use somente a disponibilidade operacional neste aplicativo.');
   }
 
   @Post('shift/end')
-  endShift(@Req() req: AuthenticatedRequest) {
-    return this.deliveryRunsService.endShiftForDriver(req.user.tenantId, req.user.id);
+  endShift() {
+    throw new ForbiddenException('A loja encerra o turno remunerado. Use somente a disponibilidade operacional neste aplicativo.');
   }
 
   @Post('runs/:id/accept')

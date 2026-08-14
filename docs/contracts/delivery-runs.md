@@ -2,7 +2,7 @@
 
 ## Escopo canônico
 
-`DriverShift`, `DeliveryRun` e `DeliveryStop` são as entidades canônicas da logística própria. Um login de entregador identifica a sessão; somente a ação explícita de ficar online inicia um turno. Um turno só pode terminar quando não existe rota ativa nem retorno pendente.
+`DriverShift`, `DeliveryRun` e `DeliveryStop` são as entidades canônicas da logística própria. Um login de entregador identifica a sessão, mas não abre turno financeiro. Somente a loja, com `delivery.manage_drivers`, inicia ou encerra um turno remunerado. Online/offline é disponibilidade operacional independente e só pode ficar online com turno ativo. Um turno só pode terminar quando não existe rota ativa nem retorno pendente.
 
 Uma rota pertence a um tenant, um entregador e ao turno ativo desse entregador. Ela contém uma ou mais paradas ordenadas, cada uma vinculada a um pedido de entrega pronto. Depois do início não é permitido adicionar pedidos nem criar uma segunda rota para o mesmo entregador.
 
@@ -19,6 +19,7 @@ Uma rota pertence a um tenant, um entregador e ao turno ativo desse entregador. 
 Todas as operações recebem `tenantId` explicitamente e executam em transação serializável com retry para conflito de serialização. Constraints parciais no PostgreSQL impedem simultaneamente:
 
 - dois turnos ativos para o mesmo entregador;
+- mais de um turno remunerado para o mesmo tenant, entregador e data comercial local;
 - duas rotas ativas para o mesmo entregador;
 - o mesmo pedido em duas paradas ativas;
 - duas paradas `CURRENT` na mesma rota.
@@ -31,7 +32,7 @@ A parada preserva snapshots de número do pedido, cliente, telefone e endereço.
 
 ## Disponibilidade
 
-Uma rota em `PENDING_ACCEPTANCE`, `ASSIGNED`, `IN_PROGRESS` ou `RETURNING` mantém o entregador `busy`. O entregador só volta a `available` quando a rota termina ou é recusada antes do início. O turno ativo permanece aberto depois da rota; encerrar o turno muda o entregador para `offline`.
+Uma rota em `PENDING_ACCEPTANCE`, `ASSIGNED`, `IN_PROGRESS` ou `RETURNING` mantém o entregador `busy`. Fora de rota, o próprio entregador alterna `available`/`offline`; essas alternâncias nunca criam, terminam ou remuneram turno. O turno ativo permanece aberto depois da rota; a loja encerra o turno e o entregador passa para `offline`.
 
 ## Tracking e mapa operacional
 
@@ -52,6 +53,8 @@ A sequência é manual. Não há provedor de rotas pago, otimização, ETA, geoc
 As rotas abaixo exigem autenticação tenant; `tenantId` e ator são sempre derivados da sessão:
 
 - `GET /delivery/runs/builder`: entregadores livres com turno ativo e pedidos prontos que não pertencem a outra rota ativa;
+- `GET /delivery/runs/drivers/:driverId/work-state`: estado tenant-scoped do turno, rota e disponibilidade operacional;
+- `POST /delivery/runs/drivers/:driverId/shift/start|end`: inicia ou encerra turno remunerado; exige `delivery.manage_drivers`, deriva tenant e impede duplicidade por data comercial;
 - `GET /delivery/runs/active`: rotas ativas com DTO canônico de paradas, sem expor objetos Prisma ou histórico interno;
 - `GET /delivery/runs/order/:orderId`: resolve, dentro do tenant autenticado, a rota canônica que contém o pedido ou retorna `null`;
 - `GET /delivery/runs/:id/locations`: retorna resumo operacional e amostras detalhadas ainda dentro da retenção de 30 dias;
@@ -68,7 +71,7 @@ O mapa do painel usa Leaflet/OpenStreetMap apenas para visualização: mostra a 
 As rotas abaixo exigem JWT de entregador. `tenantId` e `driverId` são sempre derivados da sessão validada; nenhum identificador operacional enviado pelo cliente pode substituir essa identidade:
 
 - `GET /delivery/driver/work-state`: retorna o turno ativo e a rota ativa canônica, ou `null` para cada estado ausente;
-- `POST /delivery/driver/shift/start` e `POST /delivery/driver/shift/end`: iniciam e encerram explicitamente o turno;
+- `POST /delivery/driver/shift/start` e `POST /delivery/driver/shift/end`: permanecem bloqueados com `403`; o motorista usa somente `PATCH /delivery/driver/status` para disponibilidade, e a loja controla o turno financeiro;
 - `POST /delivery/driver/runs/:id/accept|reject|start|complete`: executam as transições da rota;
 - `POST /delivery/driver/runs/:id/stops/:stopId/arrived|complete|failed|returned`: executam as transições da parada atual e dos retornos físicos.
 

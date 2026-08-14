@@ -176,6 +176,7 @@ export interface DriverWorkStateDTO {
   shift: DriverShiftDTO | null;
   activeRun: DeliveryRunDTO | null;
   trackingRequired: boolean;
+  availability: DriverStatus;
 }
 
 export const DRIVER_LOCATION_SOURCES = ['foreground', 'background'] as const;

@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { DriverOperationsController } from './driver.controller';
 
 describe('DriverOperationsController canonical route contract', () => {
@@ -8,8 +9,6 @@ describe('DriverOperationsController canonical route contract', () => {
   const runsService = {
     getDriverWorkState: jest.fn(),
     getActiveRunForDriver: jest.fn(),
-    startShiftForDriver: jest.fn(),
-    endShiftForDriver: jest.fn(),
     acceptRun: jest.fn(),
     rejectRun: jest.fn(),
     startRun: jest.fn(),
@@ -38,11 +37,9 @@ describe('DriverOperationsController canonical route contract', () => {
     });
   });
 
-  it('derives shift identity only from the authenticated driver session', async () => {
-    await controller.startShift(request as never);
-    await controller.endShift(request as never);
-    expect(runsService.startShiftForDriver).toHaveBeenCalledWith('tenant-a', 'driver-a');
-    expect(runsService.endShiftForDriver).toHaveBeenCalledWith('tenant-a', 'driver-a');
+  it('never lets a driver create or close a remunerated shift', () => {
+    expect(() => controller.startShift()).toThrow(ForbiddenException);
+    expect(() => controller.endShift()).toThrow(ForbiddenException);
   });
 
   it('derives location identity only from the authenticated driver session', async () => {
