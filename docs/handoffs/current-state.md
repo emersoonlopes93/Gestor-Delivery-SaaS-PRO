@@ -1,3 +1,16 @@
+## R15 PR B/C - settlement tenant and driver UI (2026-08-14)
+
+- O modal do entregador no tenant exibe resumo, turnos pendentes/pagos, período, seleção integral, confirmação explícita e histórico auditável; `finance.read` controla leitura e `finance.manage` controla o registro.
+- Retry exato preserva uma chave idempotente; mudanças de turnos, meio, data ou observações rotacionam a chave. Double-click é bloqueado antes da atualização assíncrona do estado e conflito 409 recebe mensagem específica.
+- O app do entregador mostra saldo atual, último pagamento, histórico e snapshots de turnos exclusivamente em leitura, deixando explícito que não realiza PIX, transferência, saque ou payout.
+- Detalhes financeiros usam modal superior isolado do conteúdo de fundo, com `inert`/`aria-hidden`, focus trap, Escape exclusivo, scroll lock e restauração de foco. Tabs seguem `tablist`/`tab`/`tabpanel`; ArrowLeft/ArrowRight circulam entre as opções e Home/End levam ao primeiro/último tab.
+- A listagem backend de turnos pagos usa os snapshots imutáveis de `DriverSettlementItem` para bruto, recebido diretamente e devido, inclusive quando o ledger recebe ajustes posteriores; suite focada da API passou com 9/9 testes após build de types.
+- Cobertura frontend inclui permissões, erro versus vazio, filtros, tabs e navegação completa por teclado, seleção, confirmação, double-click, retry idempotente, rotação de payload, conflito, refresh de sucesso, detalhe/auditoria e isolamento modal. As interações RTL do tenant rodam com `pnpm --dir apps/web-delivery exec vitest run --config vitest.tenant.config.ts`, pelo toolchain Vitest/Testing Library/jsdom já declarado no web-delivery; `apps/web-tenant/package.json` e `pnpm-lock.yaml` permanecem inalterados.
+- Validação local após instalação offline com lock congelado: web-tenant 34 arquivos/124 testes, interações RTL do tenant 1 arquivo/7 testes pelo runner dedicado e web-delivery 15 arquivos/43 testes passaram; build de types, `pnpm typecheck`, ESLint focado dos dois frontends, ambos os builds, `check:no-any`, `check:features` e `git diff --check` passaram. `check:theme` e `check:boundaries` mantêm apenas violações baseline fora do escopo.
+- Sem payout real, provider, deploy, produção, banco remoto, edição/reversão de settlement ou alteração do ledger R14.
+
+---
+
 ## R15 PR A - settlement domain (2026-08-14)
 
 - `DriverSettlement` e `DriverSettlementItem` registram quitação integral de turnos sem alterar o ledger R14.

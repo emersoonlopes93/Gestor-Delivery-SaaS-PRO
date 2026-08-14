@@ -25,7 +25,9 @@ import {
 import { NativeNotificationBanner } from '../components/NativeNotificationBanner';
 import { DriverRouteMap } from '../components/DriverRouteMap';
 import { DriverEarningsCard } from '../components/DriverEarningsCard';
+import { DriverSettlementsCard } from '../components/DriverSettlementsCard';
 import { useDriverEarnings } from '../hooks/useDriverEarnings';
+import { useDriverSettlements } from '../hooks/useDriverSettlements';
 import { useDriverRoute } from '../hooks/useDriverRoute';
 import { useDriverTracking } from '../hooks/useDriverTracking';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -157,6 +159,7 @@ export function ActiveDeliveryPage() {
     cleanupForLogout: cleanupPushForLogout,
   } = usePushNotifications();
   const earnings = useDriverEarnings();
+  const settlements = useDriverSettlements();
   const refreshEarnings = earnings.refresh;
 
   const [notice, setNotice] = useState<string | null>(null);
@@ -392,6 +395,16 @@ export function ActiveDeliveryPage() {
           isMutating={earnings.isMutating}
           error={earnings.error}
           onAddCashTip={earnings.addCashTip}
+        />
+
+        <DriverSettlementsCard
+          summary={settlements.summary}
+          history={settlements.history}
+          isLoading={settlements.isLoading}
+          isRefreshing={settlements.isRefreshing}
+          error={settlements.error}
+          onRetry={settlements.refresh}
+          onOpenDetail={settlements.getDetail}
         />
 
         {isLoading ? (

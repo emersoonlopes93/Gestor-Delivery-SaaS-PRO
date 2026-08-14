@@ -46,6 +46,23 @@ describe('DriverSettlementsService', () => {
     expect(result).toEqual([expect.objectContaining({ grossEarnings: 92, receivedDirectly: 10, amountDue: 82 })]);
   });
 
+  it('uses immutable settlement snapshots when listing a paid shift', async () => {
+    prisma.driverShift.findMany.mockResolvedValue([shift({
+      ledgerEntries: [
+        { id: 'daily-a', type: DriverLedgerEntryType.DAILY_RATE, amount: decimal(50), receivedDirectlyByDriver: false },
+        { id: 'delivery-a', type: DriverLedgerEntryType.DELIVERY_FEE, amount: decimal(32), receivedDirectlyByDriver: false },
+        { id: 'late-tip', type: DriverLedgerEntryType.TIP_CASH, amount: decimal(15), receivedDirectlyByDriver: true },
+      ],
+      settlementItem: {
+        settlementId: 'paid-a', grossEarnings: decimal(92), receivedDirectly: decimal(10), amountDue: decimal(82),
+      },
+    })]);
+
+    const result = await service.listShifts('tenant-a', 'driver-a', DriverShiftPaymentStatus.PAID);
+
+    expect(result).toEqual([expect.objectContaining({ grossEarnings: 92, receivedDirectly: 10, amountDue: 82 })]);
+  });
+
   it('blocks an active shift and a closed shift with an open return route', async () => {
     prisma.driverShift.findMany.mockResolvedValue([
       shift({ id: 'active', status: DriverShiftStatus.ACTIVE, endedAt: null }),
