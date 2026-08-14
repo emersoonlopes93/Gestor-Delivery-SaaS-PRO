@@ -19,6 +19,8 @@ import { DeliveryRunsController } from './delivery-runs.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DeliveryLocationRetentionService } from './delivery-location-retention.service';
 import { DriverEarningsService } from './driver-earnings.service';
+import { DriverSettlementsController, DriverSettlementHistoryController } from './driver-settlements.controller';
+import { DriverSettlementsService } from './driver-settlements.service';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { DriverEarningsService } from './driver-earnings.service';
     DriversController,
     DriverOperationsController,
     DeliveryRunsController,
+    DriverSettlementsController,
+    DriverSettlementHistoryController,
     DeliveryRateController,
     DeliveryCoverageController,
   ],
@@ -40,6 +44,7 @@ import { DriverEarningsService } from './driver-earnings.service';
     DriversService,
     DeliveryRunsService,
     DriverEarningsService,
+    DriverSettlementsService,
     DeliveryTrackingGateway,
     DeliveryLocationRetentionService,
     DeliveryCoverageService,

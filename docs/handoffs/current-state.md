@@ -1,3 +1,15 @@
+## R15 PR A - settlement domain (2026-08-14)
+
+- `DriverSettlement` e `DriverSettlementItem` registram quitação integral de turnos sem alterar o ledger R14.
+- Elegibilidade exige turno encerrado, diária aplicável lançada, nenhuma rota/retorno ativo, saldo positivo e turno ainda não pago.
+- Total é recalculado no backend; gorjeta cash é excluída do devido à loja.
+- Transação serializável, chave idempotente por tenant e unicidade de `shiftId` protegem retry, double-click e gestores concorrentes.
+- Settlements confirmados e itens são imutáveis no PostgreSQL. Reversão auditável ficou como follow-up.
+- APIs tenant usam `finance.read`/`finance.manage`; driver possui somente leitura do próprio histórico.
+- Sem payout, pagamento parcial, deploy ou banco remoto.
+
+---
+
 ## R13 PR C - driver route map and Android background tracking
 
 Date: 2026-08-12
