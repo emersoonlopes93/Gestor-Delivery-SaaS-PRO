@@ -773,7 +773,7 @@ export function CheckoutPage() {
   };
 
   return (
-    <div className="px-4 py-6 max-w-lg mx-auto pb-32">
+    <div className="px-4 py-6 max-w-lg mx-auto pb-44">
       <header className="flex items-center gap-3 mb-8">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-700" />
@@ -1186,13 +1186,22 @@ export function CheckoutPage() {
         </div>
       )}
 
-      <div className="storefront-safe-action fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-lg gap-3 border-t border-border bg-card/90 p-4 text-card-foreground backdrop-blur-md">
+      <div
+        className="storefront-safe-action fixed bottom-0 left-0 right-0 z-30 mx-auto flex max-w-lg gap-3 p-4 backdrop-blur-md"
+        style={{
+          borderTop: '1px solid var(--storefront-border)',
+          backgroundColor: 'rgba(255,255,255,0.92)',
+          color: 'var(--storefront-foreground)',
+        }}
+      >
         {currentStepIndex > 0 && (
           <button
             type="button"
+            id="checkout-back-btn"
             onClick={handleBackStep}
             disabled={isSubmitting}
-            className="flex items-center justify-center gap-1 rounded-2xl border border-border px-4 py-4 text-xs font-black uppercase tracking-wider text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            style={{ borderColor: 'var(--storefront-border)', color: 'var(--storefront-foreground)' }}
+            className="flex items-center justify-center gap-1 rounded-2xl border px-4 py-4 text-xs font-black uppercase tracking-wider transition-colors hover:bg-gray-100 disabled:opacity-50"
           >
             <ChevronLeft className="h-4 w-4" /> Voltar
           </button>
@@ -1200,15 +1209,21 @@ export function CheckoutPage() {
         {!isReviewStep && (
           <button
             type="button"
+            id="checkout-continue-btn"
             onClick={handleContinue}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-primary-700 active:scale-[0.99]"
+            disabled={isSubmitting}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-primary-700 active:scale-[0.99] disabled:opacity-60"
           >
             Continuar <ChevronRight className="h-4 w-4" />
           </button>
         )}
         {isReviewStep && payment.method !== PaymentMethod.credit_card && (
-          <button onClick={handleSubmit} disabled={!isFormValid || isSubmitting || isValidating}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-primary-700 active:scale-[0.99] disabled:bg-gray-200 disabled:text-gray-400">
+          <button
+            id="checkout-submit-btn"
+            onClick={handleSubmit}
+            disabled={!isFormValid || isSubmitting || isValidating}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-primary-700 active:scale-[0.99] disabled:bg-gray-200 disabled:text-gray-400"
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
