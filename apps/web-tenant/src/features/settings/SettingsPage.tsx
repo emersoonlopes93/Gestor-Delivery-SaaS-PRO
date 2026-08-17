@@ -22,11 +22,11 @@ interface WhatsAppStatusPayload {
 
 import { Building2, Calendar, ChefHat, Clock, Copy, Globe2, ImageIcon, MapPin, MessageCircleWarning, Save, Store, Trash2, Upload, Wallet } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { StoreStatusControl } from '../../components/store/StoreStatusControl';
 import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 import { CurrencyInput } from '@gestor/ui';
 import { Button } from '../../components/ui/Button';
+import { Switch } from '../../components/ui/Switch';
 import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
 
 interface BackendGeocodeResponse {
@@ -239,24 +239,6 @@ export function SettingsPage() {
       alert('Erro ao salvar configurações.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleTogglePause = async (nextPaused: boolean, reason: string) => {
-    try {
-      const res = await api.patch('/tenant/store-pause', {
-        isStorePaused: nextPaused,
-        storePauseReason: reason,
-      });
-      if (res.success) {
-        setSettings((current) => ({
-          ...current,
-          isStorePaused: nextPaused,
-          storePauseReason: reason,
-        }));
-      }
-    } catch (error) {
-      throw new Error('Não foi possível alterar o status da loja.');
     }
   };
 
@@ -536,11 +518,6 @@ export function SettingsPage() {
           </div>
         )}
 
-        <StoreStatusControl
-          isPaused={Boolean(settings.isStorePaused)}
-          pauseReason={settings.storePauseReason || ''}
-          onTogglePause={handleTogglePause}
-        />
       </div>
 
       <div className="w-full min-w-0 space-y-6">
@@ -1052,15 +1029,11 @@ export function SettingsPage() {
                   <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-border hover:border-border/70 transition-colors">
                     <div className="flex items-center justify-between">
                       <div><span className="text-sm font-bold text-foreground">{name}</span><span className={`ml-2 text-xs font-medium ${isAnyOpen ? 'text-status-success' : 'text-muted-foreground'}`}>{isAnyOpen ? 'Aberto' : 'Fechado'}</span></div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer"
-                          checked={isAnyOpen}
-                          onChange={(e) => toggleDayOpen(i, e.target.checked)}
-                        />
-                        <div className="w-9 h-5 bg-input rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2"></div>
-                      </label>
+                      <Switch
+                        checked={isAnyOpen}
+                        onCheckedChange={(checked) => toggleDayOpen(i, checked)}
+                        aria-label={`${isAnyOpen ? 'Fechar' : 'Abrir'} ${name}`}
+                      />
                     </div>
                     {isAnyOpen && (
                       <div className="space-y-2 mt-1">

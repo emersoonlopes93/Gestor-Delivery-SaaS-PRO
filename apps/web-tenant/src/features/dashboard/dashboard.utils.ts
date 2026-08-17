@@ -1,7 +1,8 @@
 import type { DashboardStatsDTO, OrderStatus, TenantOperatingHours, TenantSettings } from '@gestor/types';
 import { hasPermission } from '@gestor/auth';
+import { resolveStoreOperationalStatus, type StoreOperationalStatus } from '../../components/store/store-operational-status';
 
-export type StoreOperationalStatus = 'open' | 'closed' | 'paused';
+export type { StoreOperationalStatus } from '../../components/store/store-operational-status';
 export type DashboardPeriodPreset = 'today' | 'yesterday' | 'last7days';
 
 export const DASHBOARD_PERIOD_LABELS: Record<DashboardPeriodPreset, { control: string; sentence: string }> = {
@@ -71,39 +72,7 @@ export function getStoreStatus(
   operatingHours: TenantOperatingHours[],
   now = new Date(),
 ): StoreOperationalStatus {
-  if (settings?.isStorePaused) return 'paused';
-  if (operatingHours.length === 0) return 'closed';
-
-  const timezone = settings?.timezone || 'America/Sao_Paulo';
-  let parts: Intl.DateTimeFormatPart[];
-  try {
-    parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(now);
-  } catch {
-    parts = new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(now);
-  }
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  const rule = operatingHours.find((item) => item.dayOfWeek === dayMap[part('weekday')]);
-  if (!rule?.isOpen || !rule.openTime || !rule.closeTime) return 'closed';
-
-  const current = Number(part('hour')) * 60 + Number(part('minute'));
-  const [openHour, openMinute] = rule.openTime.split(':').map(Number);
-  const [closeHour, closeMinute] = rule.closeTime.split(':').map(Number);
-  const open = openHour * 60 + openMinute;
-  const close = closeHour * 60 + closeMinute;
-  const isInside = close < open ? current >= open || current <= close : current >= open && current <= close;
-  return isInside ? 'open' : 'closed';
+  return resolveStoreOperationalStatus(settings, operatingHours, now).status;
 }
 
 export function getOrdersInProgress(stats: DashboardStatsDTO | null) {

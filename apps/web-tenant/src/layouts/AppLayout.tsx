@@ -52,8 +52,9 @@ import { useTenantCapabilities } from '../hooks/useTenantCapabilities';
 import { usePlatformBranding } from '../hooks/usePlatformBranding';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { useChatSocket } from '../features/whatsapp/hooks/useChatSocket';
-import { StoreStatusBadge } from '../components/store/StoreStatusControl';
-import { Toaster } from 'react-hot-toast';
+import { StoreStatusControl } from '../components/store/StoreStatusControl';
+import { resolveStoreOperationalStatus } from '../components/store/store-operational-status';
+import toast, { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
@@ -415,65 +416,32 @@ export function AppLayout() {
     },
   });
 
-  const storeStatus = useMemo((): 'open' | 'closed' | 'paused' => {
-    if (!tenantData) return 'open';
-    const settings = tenantData.settings;
-    const isPaused = settings?.isStorePaused ?? false;
-    if (isPaused) return 'paused';
+  const resolvedStoreStatus = useMemo(() => resolveStoreOperationalStatus(
+    tenantData?.settings,
+    tenantData?.operatingHours ?? [],
+  ), [tenantData]);
+  const storeStatus = resolvedStoreStatus.status;
 
-    const operatingHours = tenantData.operatingHours || [];
-    const timezone = settings?.timezone || 'America/Sao_Paulo';
-
-    let localTimeStr: string;
-    let localDayStr: string;
-    try {
-      localTimeStr = new Date().toLocaleTimeString('pt-BR', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
-      localDayStr = new Date().toLocaleDateString('en-US', { timeZone: timezone, weekday: 'short' }).toLowerCase();
-    } catch {
-      localTimeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      localDayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-    }
-
-    const [hh, mm] = localTimeStr.split(':').map(Number);
-    const currentMinutes = hh * 60 + mm;
-
-    const weekdayMap: Record<string, number> = {
-      sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6
-    };
-    const dayOfWeek = weekdayMap[localDayStr] ?? 0;
-
-    let rules = operatingHours;
-    if (rules.length === 0) {
-      if (!import.meta.env.DEV) {
-        return 'closed';
+  const storePauseMutation = useMutation({
+    mutationFn: async (nextPaused: boolean) => {
+      if (!resolvedStoreStatus.canTogglePause) {
+        throw new Error('A pausa operacional só pode ser alterada dentro do horário de funcionamento.');
       }
-      rules = Array.from({ length: 7 }, (_, i) => ({
-        id: `mock-${i}`,
-        tenantId: tenantData.id,
-        dayOfWeek: i,
-        isOpen: true,
-        openTime: '08:00',
-        closeTime: '23:00',
-      } as TenantOperatingHours));
-    }
+      return api.patch('/tenant/store-pause', {
+        isStorePaused: nextPaused,
+        storePauseReason: nextPaused ? 'Pausa operacional pelo sidebar' : '',
+      });
+    },
+    onSuccess: (_response, nextPaused) => {
+      void queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      toast.success(nextPaused ? 'Recebimento de pedidos pausado.' : 'Recebimento de pedidos retomado.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível alterar a pausa operacional.');
+    },
+  });
 
-    const todayRule = rules.find((h: { dayOfWeek: number; isOpen: boolean; openTime: string | null; closeTime: string | null }) => h.dayOfWeek === dayOfWeek);
-
-    if (todayRule?.isOpen && todayRule.openTime && todayRule.closeTime) {
-      const [openH, openM] = todayRule.openTime.split(':').map(Number);
-      const [closeH, closeM] = todayRule.closeTime.split(':').map(Number);
-      const openMinutes = openH * 60 + openM;
-      const closeMinutes = closeH * 60 + closeM;
-
-      if (currentMinutes >= openMinutes && currentMinutes <= closeMinutes) {
-        return 'open';
-      }
-    }
-
-    return 'closed';
-  }, [tenantData]);
-
-  const previousStoreStatusRef = useRef<'open' | 'closed' | 'paused' | null>(null);
+  const previousStoreStatusRef = useRef<{ tenantId: string; status: 'open' | 'closed' | 'paused' } | null>(null);
 
   const handleSwitchStore = () => {
     if (!selectedTenantId || selectedTenantId === user?.tenantId) {
@@ -645,12 +613,15 @@ export function AppLayout() {
   }, [navigate]);
 
   useEffect(() => {
-    const previousStatus = previousStoreStatusRef.current;
-    if (!previousStatus) {
-      previousStoreStatusRef.current = storeStatus;
+    if (!tenantData?.id) return;
+
+    const previous = previousStoreStatusRef.current;
+    if (!previous || previous.tenantId !== tenantData.id) {
+      previousStoreStatusRef.current = { tenantId: tenantData.id, status: storeStatus };
       return;
     }
 
+    const previousStatus = previous.status;
     if (previousStatus !== storeStatus) {
       if (storeStatus === 'open') {
         emitNotificationEvent(createNotificationEvent({
@@ -674,7 +645,7 @@ export function AppLayout() {
       }
     }
 
-    previousStoreStatusRef.current = storeStatus;
+    previousStoreStatusRef.current = { tenantId: tenantData.id, status: storeStatus };
   }, [storeStatus, tenantData?.id]);
 
 
@@ -826,13 +797,14 @@ export function AppLayout() {
                 </div>
               ) : null}
 
-              <div className="inline-flex justify-center w-full">
-                <StoreStatusBadge
-                  status={storeStatus}
-                  compact
-                  onManage={() => navigate('/settings')}
-                />
-              </div>
+              <StoreStatusControl
+                status={storeStatus}
+                isPaused={Boolean(tenantData?.settings?.isStorePaused)}
+                canTogglePause={resolvedStoreStatus.canTogglePause}
+                nextOpenTime={resolvedStoreStatus.nextOpenTime}
+                isSaving={storePauseMutation.isPending}
+                onTogglePause={(nextPaused) => storePauseMutation.mutate(nextPaused)}
+              />
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-1.5 w-full">
