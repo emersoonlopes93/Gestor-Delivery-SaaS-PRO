@@ -16,6 +16,7 @@ import {
 } from '../marketplace/hooks';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { Switch } from '../../components/ui/Switch';
 
 type ManualConnectForm = {
   externalMerchantId: string;
@@ -204,7 +205,7 @@ export function IntegrationsPage() {
 
           <div className="rounded-2xl border border-border p-4 bg-card space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Billing</div>
                 <div className="text-sm font-bold text-foreground">{channelLabel}</div>
               </div>
@@ -219,14 +220,13 @@ export function IntegrationsPage() {
                   A regra final continua no SaaS Admin. Aqui mostramos o estado atual do preview.
                 </div>
               </div>
-              <button
-                type="button"
+              <Switch
+                checked={isBillingEnabled}
+                onCheckedChange={() => undefined}
                 disabled
-                className={`relative inline-flex h-8 w-14 items-center rounded-full border transition-colors ${isBillingEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+                aria-label="Marketplace iFood incluído na cobrança"
                 title="Configuração controlada pelo SaaS Admin"
-              >
-                <span className={`inline-block h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${isBillingEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
-              </button>
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-xl border border-border bg-background p-3">

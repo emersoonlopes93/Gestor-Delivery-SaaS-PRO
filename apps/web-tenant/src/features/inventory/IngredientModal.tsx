@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IngredientDTO, CreateIngredientDTO, UnitType } from '@gestor/types';
 import { CurrencyInput } from '@gestor/ui';
+import { Switch } from '../../components/ui/Switch';
 
 interface IngredientModalProps {
   isOpen: boolean;
@@ -220,21 +221,19 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
           {/* BLOCO B - COMPRA INICIAL / ENTRADA INICIAL */}
           {!editingIngredient && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
+              <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2">
                   <div className="w-1 h-5 bg-green-500 rounded-full"></div>
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
                 </div>
-                <label className="inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    checked={formData.initialPurchaseActive}
-                    onChange={(e) => setFormData({ ...formData, initialPurchaseActive: e.target.checked })}
+                <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
+                  <span className="min-w-0 text-sm font-medium text-muted-foreground">Lançar compra agora</span>
+                  <Switch
+                    checked={Boolean(formData.initialPurchaseActive)}
+                    onCheckedChange={(initialPurchaseActive) => setFormData({ ...formData, initialPurchaseActive })}
+                    aria-label="Lançar compra inicial agora"
                   />
-                  <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                  <span className="ml-3 text-sm font-medium text-muted-foreground">Lançar compra agora</span>
-                </label>
+                </div>
               </div>
 
               {formData.initialPurchaseActive && (

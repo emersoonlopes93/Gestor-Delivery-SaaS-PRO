@@ -1,3 +1,22 @@
+## Production quick fixes - store status, delivery coordinates, and switches (2026-08-17)
+
+Branch: `fix/production-quick-fixes`
+Base: `origin/main-copy` / `92effcdecadf98d38e1385ae9c5f9b262d01c465`
+
+- O status operacional da loja passou a usar um resolver único para horário, pausa manual, turnos múltiplos/noturnos e próxima abertura. O sidebar concentra `Loja Aberta`, `Loja Pausada` ou `Loja Fechada`; fora do horário o toggle fica desabilitado e não permite que uma retomada force abertura. O bloco duplicado foi removido de Configurações.
+- O toggle do sidebar reutiliza `PATCH /tenant/store-pause`; o efeito de notificação só compara estados depois que o tenant existe e nunca cruza estados de tenants diferentes.
+- O checkout agora preserva as coordenadas resolvidas pelo serviço canônico de cobertura/geocoding e as grava tanto no snapshot `OrderDeliveryAddress` quanto no endereço salvo do cliente. A configuração/endereço da loja já geocodificava e persistia latitude/longitude pelos fluxos existentes de Configurações e onboarding.
+- A proteção financeira do modo `DRIVER_RATE_TABLE` permanece fechada: coordenadas ausentes continuam impedindo a atribuição, com mensagens humanas específicas para loja, entrega ou ambos, sem expor latitude/longitude e com UTF-8 correto. Modos não baseados em distância não ganharam exigência nova.
+- Um `Switch` compartilhado, acessível e de tamanho fixo (`44x24`, `shrink-0`) substitui toggles locais em sidebar, horários, Inventário, Despacho, Integrações e Notificações. O layout mantém texto flexível e switch estável sem posicionamento absoluto.
+- Validação visual autenticada local passou em 390x844, 430x932, 768x900, 1024x900 e 1440x900, light/dark, com checagem automatizada de dimensões e overflow. Evidências: `C:\Users\Emerson\Documents\GitHub\pedehub-production-quick-fixes-qa`.
+- API: 4 shards cobriram a suíte integral com 103 suites/474 testes aprovados e 9 ignorados; testes focados de delivery/orders passaram com 3 suites/32 testes. O comando agregado `pnpm --filter @gestor/api test` excedeu duas janelas locais (5 e 15 minutos), mas todos os arquivos listados foram executados pelos quatro shards com exit 0. Lint e build da API passaram.
+- Tenant: 37 arquivos/134 testes, lint e build passaram. `pnpm typecheck`, `check:no-any`, `check:features` e `git diff --check` passaram. `check:boundaries` e `check:theme` reproduziram exatamente na base as mesmas 2 violações de boundary e 4 ocorrências críticas de tema fora do diff, portanto permanecem baseline only.
+- Smoke HTTP efêmero confirmou pausa `false -> true -> false`; o smoke visual confirmou loja fechada/toggle desabilitado fora do horário, loja aberta dentro do horário e ausência do bloco duplicado. O smoke de atribuição ficou coberto em serviço/testes, sem criar uma rota real via HTTP.
+- Contratos preservados: isolamento por `tenantId`, transições de pedido, remuneração por distância, DTO compartilhado de validação do checkout e provider de geocoding existente. Não houve schema, migration, dependência, feature flag ou alteração no app do entregador.
+- Risco residual: o gate agregado da API não concluiu dentro do timeout local, embora a mesma lista integral tenha passado em shards; a atribuição não recebeu smoke HTTP com uma rota persistida. Nenhum deploy, Dokploy, produção, banco remoto, provider ou GitHub Actions foi acessado.
+
+---
+
 ## R15 PR B/C - settlement tenant and driver UI (2026-08-14)
 
 - O modal do entregador no tenant exibe resumo, turnos pendentes/pagos, período, seleção integral, confirmação explícita e histórico auditável; `finance.read` controla leitura e `finance.manage` controla o registro.

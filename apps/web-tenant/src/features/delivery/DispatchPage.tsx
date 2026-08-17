@@ -26,6 +26,7 @@ import {
   DriverPayFields,
 } from './components/DriverPayFields';
 import { DEFAULT_DRIVER_PAY_VALUE, driverPaySummary, type DriverPayFormValue, validateDriverPay } from './components/driver-pay-form';
+import { Switch } from '../../components/ui/Switch';
 
 const RUN_LABELS: Record<DeliveryRunDTO['status'], string> = {
   PENDING_ACCEPTANCE: 'Aguardando aceite',
@@ -373,19 +374,14 @@ export function DispatchPage() {
               </p>
             </div>
           </div>
-          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground sm:justify-start">
-            <span>Exigir aceite</span>
-            <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
-              <input
-                type="checkbox"
-                checked={settings.requiresAcceptance}
-                onChange={(event) => void updateSettings(event.target.checked)}
-                className="peer sr-only"
-              />
-              <span className="absolute inset-0 rounded-full bg-muted-foreground/30 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card" />
-              <span className="relative ml-1 h-4 w-4 rounded-full bg-card shadow-sm transition-transform peer-checked:translate-x-5" />
-            </span>
-          </label>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground">
+            <span className="min-w-0">Exigir aceite</span>
+            <Switch
+              checked={settings.requiresAcceptance}
+              onCheckedChange={(checked) => void updateSettings(checked)}
+              aria-label="Exigir aceite do entregador"
+            />
+          </div>
         </div>
       </section>
 

@@ -15,6 +15,7 @@ import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Tenant, TenantSettings } from '@gestor/types';
 import { useSoundManager } from '../../notifications/useSoundManager';
+import { Switch } from '../../components/ui/Switch';
 
 const DEFAULT_TEMPLATES = {
   confirmed: 'Pedido #{{orderNumber}} confirmado! {{restaurantName}} ja esta preparando seu pedido.',
@@ -144,12 +145,11 @@ export function NotificationSettings() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setEnabled(!enabled)}
-              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${enabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
-            >
-              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
-            </button>
+            <Switch
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              aria-label="Ativar mensagens automáticas de status"
+            />
           </div>
         </section>
 
@@ -166,13 +166,11 @@ export function NotificationSettings() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => soundManager.setSoundPreferenceEnabled(!soundManager.soundPreferenceEnabled)}
+            <Switch
+              checked={soundManager.soundPreferenceEnabled}
+              onCheckedChange={soundManager.setSoundPreferenceEnabled}
               aria-label={soundManager.soundPreferenceEnabled ? "Desativar notificacoes sonoras" : "Ativar notificacoes sonoras"}
-              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${soundManager.soundPreferenceEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
-            >
-              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${soundManager.soundPreferenceEnabled ? 'right-1' : 'left-1'}`} />
-            </button>
+            />
           </div>
 
           <div className={`space-y-4 sm:space-y-6 transition-opacity ${soundManager.soundPreferenceEnabled ? 'opacity-100' : 'opacity-50'}`}>
@@ -248,12 +246,11 @@ export function NotificationSettings() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setBrowserNotificationsEnabled(!browserNotificationsEnabled)}
-                className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${browserNotificationsEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
-              >
-                <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${browserNotificationsEnabled ? 'right-1' : 'left-1'}`} />
-              </button>
+              <Switch
+                checked={browserNotificationsEnabled}
+                onCheckedChange={setBrowserNotificationsEnabled}
+                aria-label="Ativar notificações do navegador"
+              />
             </div>
           </div>
         </section>
