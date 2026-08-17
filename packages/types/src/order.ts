@@ -511,6 +511,7 @@ export interface CheckoutValidationResult {
   deliveryFee: number;
   normalDeliveryFee?: number;
   estimatedDeliveryMinutes?: number | null;
+  resolvedDeliveryCoordinates?: { lat: number; lng: number };
   total: number;
   couponId: string | null;
   cashbackUsed: number | null;

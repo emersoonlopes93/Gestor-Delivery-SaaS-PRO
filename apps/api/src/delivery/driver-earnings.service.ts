@@ -112,9 +112,19 @@ export class DriverEarningsService {
     if (pay.mode === DriverPayMode.PERCENTAGE_NORMAL_FEE) amount = base.mul(pay.percentage).div(100);
     if (pay.mode === DriverPayMode.FIXED) amount = pay.fixed;
     if (pay.mode === DriverPayMode.DRIVER_RATE_TABLE) {
-      if (distance === null) throw new BadRequestException('A tabela por distÃ¢ncia exige coordenadas da loja e do pedido.');
+      if (distance === null) {
+        const storeMissing = origin.lat === null || origin.lng === null;
+        const orderMissing = order.deliveryLat === null || order.deliveryLng === null;
+        if (storeMissing && orderMissing) {
+          throw new BadRequestException('Não foi possível calcular o pagamento do entregador porque os endereços da loja e da entrega ainda não possuem localização válida. Revise os endereços e tente novamente.');
+        }
+        if (storeMissing) {
+          throw new BadRequestException('Não foi possível calcular o pagamento do entregador porque o endereço da loja ainda não possui localização válida. Revise o endereço da loja e tente novamente.');
+        }
+        throw new BadRequestException('Não foi possível calcular o pagamento do entregador porque o endereço desta entrega ainda não possui localização válida. Revise o endereço do cliente e tente novamente.');
+      }
       const tier = this.tiers(pay.table).find((item) => item.upToKm === null || distance <= item.upToKm);
-      if (!tier) throw new BadRequestException('A tabela do entregador nÃ£o cobre esta distÃ¢ncia.');
+      if (!tier) throw new BadRequestException('A tabela do entregador não cobre esta distância.');
       amount = new Prisma.Decimal(tier.amount);
     }
     return { payModeSnapshot: pay.mode, payBaseSnapshot: base, payPercentageSnapshot: pay.percentage,

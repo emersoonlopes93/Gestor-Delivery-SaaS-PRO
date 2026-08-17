@@ -243,7 +243,17 @@ export class OrdersService {
       scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
       timeSlotId: dto.timeSlotId,
     });
-    const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
+    const {
+      tenantId,
+      lines,
+      itemsSubtotal,
+      discountTotal,
+      deliveryFee,
+      total,
+      couponId,
+      cashbackUsed,
+      resolvedDeliveryCoordinates,
+    } = validation;
 
     this.logger.debug(
       `createOrder: fulfillmentType=${dto.fulfillmentType} hasAddress=${!!dto.deliveryAddress} channel=${validatorChannel}`,
@@ -361,8 +371,8 @@ export class OrdersService {
               state: dto.deliveryAddress.state,
               zipCode: dto.deliveryAddress.zipCode,
               reference: dto.deliveryAddress.reference || null,
-              lat: dto.deliveryAddress.lat || null,
-              lng: dto.deliveryAddress.lng || null,
+              lat: dto.deliveryAddress.lat ?? resolvedDeliveryCoordinates?.lat ?? null,
+              lng: dto.deliveryAddress.lng ?? resolvedDeliveryCoordinates?.lng ?? null,
             },
           });
         }
@@ -470,8 +480,8 @@ export class OrdersService {
         state: dto.deliveryAddress.state,
         zipCode: dto.deliveryAddress.zipCode,
         reference: dto.deliveryAddress.reference || null,
-        lat: dto.deliveryAddress.lat ?? null,
-        lng: dto.deliveryAddress.lng ?? null,
+        lat: dto.deliveryAddress.lat ?? resolvedDeliveryCoordinates?.lat ?? null,
+        lng: dto.deliveryAddress.lng ?? resolvedDeliveryCoordinates?.lng ?? null,
       }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unknown address sync error';
         this.logger.warn(`Failed to sync customer address from order ${order.id}: ${message}`);

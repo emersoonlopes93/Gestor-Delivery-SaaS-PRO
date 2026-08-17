@@ -274,9 +274,16 @@ export class CheckoutValidatorService {
     const isDelivery = channel === 'storefront_delivery' || channel === 'whatsapp_ai';
     let deliveryFee = 0;
     let estimatedDeliveryMinutes: number | null = null;
+    let resolvedDeliveryCoordinates: { lat: number; lng: number } | undefined;
 
     if (isDelivery && options?.deliveryAddress) {
-      const hasCoords = Boolean(options.deliveryAddress.lat && options.deliveryAddress.lng);
+      const hasCoords = options.deliveryAddress.lat != null && options.deliveryAddress.lng != null;
+      if (hasCoords) {
+        resolvedDeliveryCoordinates = {
+          lat: options.deliveryAddress.lat!,
+          lng: options.deliveryAddress.lng!,
+        };
+      }
       const hasCoverage = await this.deliveryRateService.hasCoverageConfig(tenantId);
 
       if (hasCoverage) {
@@ -292,6 +299,7 @@ export class CheckoutValidatorService {
           }
           deliveryFee = decision.fee ?? 0;
           estimatedDeliveryMinutes = decision.estimatedDeliveryMinutes ?? null;
+          resolvedDeliveryCoordinates = decision.resolvedCoordinates ?? resolvedDeliveryCoordinates;
         } else {
           // No coords (whatsapp_ai without Google Maps): try rate by neighborhood/fixed
           const rateResult = await this.deliveryRateService.calculateRate({
@@ -301,6 +309,7 @@ export class CheckoutValidatorService {
           });
           deliveryFee = rateResult.fee ?? 0;
           estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
+          resolvedDeliveryCoordinates = rateResult.resolvedCoordinates ?? resolvedDeliveryCoordinates;
         }
       } else if (!hasCoords) {
         // No coverage config and no coords: use zero delivery fee (will be adjusted manually)
@@ -313,6 +322,7 @@ export class CheckoutValidatorService {
         });
         deliveryFee = rateResult.fee ?? 0;
         estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
+        resolvedDeliveryCoordinates = rateResult.resolvedCoordinates ?? resolvedDeliveryCoordinates;
       }
     } else if (isDelivery && channel === 'storefront_delivery' && !options?.deliveryAddress) {
       // storefront_delivery without address is an error
@@ -336,7 +346,8 @@ export class CheckoutValidatorService {
       discountTotal, 
       deliveryFee,
       estimatedDeliveryMinutes,
-      total: finalTotal, 
+      resolvedDeliveryCoordinates,
+      total: finalTotal,
       couponId, 
       cashbackUsed 
     };

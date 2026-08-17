@@ -34,6 +34,30 @@ describe('DriverEarningsService pay snapshots', () => {
       payMode: DriverPayMode.DRIVER_RATE_TABLE, payRateTable: settings.driverPayRateTable }, settings, order, settings).payAmountSnapshot)).toBe(5);
   });
 
+  it('reports which address is missing for distance-table pay', () => {
+    const distanceDriver = { ...storeDefault, payOverrideEnabled: true,
+      payMode: DriverPayMode.DRIVER_RATE_TABLE, payRateTable: settings.driverPayRateTable };
+    expect(() => service.stopSnapshot(distanceDriver, settings, order, { lat: null, lng: null }))
+      .toThrow('o endereço da loja ainda não possui localização válida');
+    expect(() => service.stopSnapshot(distanceDriver, settings,
+      { ...order, deliveryLat: null, deliveryLng: null }, settings))
+      .toThrow('o endereço desta entrega ainda não possui localização válida');
+    expect(() => service.stopSnapshot(distanceDriver, settings,
+      { ...order, deliveryLat: null, deliveryLng: null }, { lat: null, lng: null }))
+      .toThrow('os endereços da loja e da entrega ainda não possuem localização válida');
+  });
+
+  it('does not require coordinates for non-distance pay modes', () => {
+    const snapshot = service.stopSnapshot(
+      { ...storeDefault, payOverrideEnabled: true, payMode: DriverPayMode.FIXED, payFixedAmount: new Prisma.Decimal(7) },
+      settings,
+      { ...order, deliveryLat: null, deliveryLng: null },
+      { lat: null, lng: null },
+    );
+    expect(Number(snapshot.payAmountSnapshot)).toBe(7);
+    expect(snapshot.payDistanceKmSnapshot).toBeNull();
+  });
+
   it('freezes the applied configuration in the stop snapshot', () => {
     const snapshot = service.stopSnapshot(storeDefault, settings, order, settings);
     settings.driverPayFixedAmount = new Prisma.Decimal(99);

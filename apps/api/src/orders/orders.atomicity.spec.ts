@@ -35,6 +35,7 @@ describe('OrdersService public checkout atomicity', () => {
       itemsSubtotal: 20,
       discountTotal: 0,
       deliveryFee: 0,
+      resolvedDeliveryCoordinates: { lat: -23.56, lng: -46.64 },
       total: 20,
       couponId: 'coupon-1',
       cashbackUsed: 5,
@@ -68,8 +69,16 @@ describe('OrdersService public checkout atomicity', () => {
       customerName: 'Cliente',
       customerPhone: '11999999999',
       customerEmail: 'cliente@example.com',
-      fulfillmentType: 'pickup',
+      fulfillmentType: 'delivery',
       sourceChannel: 'direct_online',
+      deliveryAddress: {
+        street: 'Rua Teste',
+        number: '10',
+        neighborhood: 'Centro',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '01001000',
+      },
       items: [{ lineType: 'product', productId: 'product-1', quantity: 1 }],
       payment: { method: PaymentMethod.cash },
       useCashbackAmount: 5,
@@ -78,6 +87,9 @@ describe('OrdersService public checkout atomicity', () => {
 
     expect(committed).toBe(false);
     expect(inventoryService.processOrderDepletionInTransaction).toHaveBeenCalledWith(tx, 'tenant-a', 'order-1');
+    expect(tx.orderDeliveryAddress.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: 'tenant-a', lat: -23.56, lng: -46.64 }),
+    });
     expect(cashbackService.createTransaction).not.toHaveBeenCalled();
     expect(tx.coupon.update).not.toHaveBeenCalled();
   });
