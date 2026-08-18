@@ -857,6 +857,13 @@ export function ProductsPage() {
                         <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
                       </button>
                       <div className="flex items-center gap-4 shrink-0 ml-4">
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupExpanded(group.key)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-full bg-card border border-border transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                        >
+                          <ChevronDown size={16} className="text-foreground" />
+                        </button>
                         {group.category && (
                           <div onClick={(e) => e.stopPropagation()}>
                             <Switch
@@ -866,13 +873,6 @@ export function ProductsPage() {
                             />
                           </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => toggleGroupExpanded(group.key)}
-                          className={`w-8 h-8 flex items-center justify-center rounded-full bg-card border border-border transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
-                        >
-                          <ChevronDown size={16} className="text-foreground" />
-                        </button>
                       </div>
                     </div>
 
