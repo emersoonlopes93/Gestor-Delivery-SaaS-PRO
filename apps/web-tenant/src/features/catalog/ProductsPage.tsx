@@ -363,19 +363,8 @@ export function ProductsPage() {
             {formatMoney(product.basePrice)}
           </td>
 
-          <td className="px-6 py-4 text-sm whitespace-nowrap">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={product.isActive}
-                onCheckedChange={(checked: boolean) => setProductBusinessStatus(product, checked ? 'active' : 'paused')}
-                aria-label={`Status do produto ${product.name}`}
-              />
-              {!product.isActive && <span className="text-[10px] text-muted-foreground font-medium italic">Pausado</span>}
-            </div>
-          </td>
-
-          <td className="px-6 py-4 text-sm text-right">
-            <div className="flex justify-end gap-1.5">
+          <td className="px-6 py-4 text-sm text-left">
+            <div className="flex justify-start gap-1.5">
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
@@ -410,8 +399,19 @@ export function ProductsPage() {
                   <Trash2 size={16} />
                 </button>
               </div>
-              {(product._count?.optionGroupLinks ?? 0) > 0 && (
-                <div className="flex justify-end mt-2">
+            </td>
+
+            <td className="px-6 py-4 text-sm whitespace-nowrap text-right">
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex items-center gap-2">
+                  {!product.isActive && <span className="text-[10px] text-muted-foreground font-medium italic">Pausado</span>}
+                  <Switch
+                    checked={product.isActive}
+                    onCheckedChange={(checked: boolean) => setProductBusinessStatus(product, checked ? 'active' : 'paused')}
+                    aria-label={`Status do produto ${product.name}`}
+                  />
+                </div>
+                {(product._count?.optionGroupLinks ?? 0) > 0 && (
                   <button
                     type="button"
                     onClick={() => toggleComplementExpanded(product.id)}
@@ -420,8 +420,8 @@ export function ProductsPage() {
                     <span>Complements ({product._count!.optionGroupLinks})</span>
                     <ChevronDown size={14} className={`transition-transform duration-300 ${expandedComplements[product.id] ? 'rotate-180' : ''}`} />
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </td>
           </tr>
           {expandedComplements[product.id] && (
@@ -486,17 +486,14 @@ export function ProductsPage() {
             className="mt-3 md:mt-4 flex items-center justify-between pt-3 md:pt-4"
             style={{ borderTop: '1px solid var(--border-subtle)' }}
           >
-             <div className="flex items-center gap-2">
-               <Switch
-                checked={product.isActive}
-                onCheckedChange={(checked: boolean) => setProductBusinessStatus(product, checked ? 'active' : 'paused')}
-                aria-label={`Status do produto ${product.name}`}
-              />
-               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                {product.isActive ? 'Ativo' : 'Pausado'}
-              </span>
-             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
+                className="p-1.5 md:p-2 text-muted-foreground bg-muted dark:bg-muted/80 rounded-xl hover:bg-muted/70 transition-colors"
+                title="Ficha técnica"
+              >
+                <FileText size={14} />
+              </button>
               <button
                 onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
                 className="p-1.5 md:p-2 text-primary bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
@@ -513,13 +510,6 @@ export function ProductsPage() {
                 <Copy size={14} />
               </button>
               <button
-                onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-1.5 md:p-2 text-muted-foreground bg-muted dark:bg-muted/80 rounded-xl hover:bg-muted/70 transition-colors"
-                title="Ficha técnica"
-              >
-                <FileText size={14} />
-              </button>
-              <button
                 onClick={() => handleDelete(product.id)}
                 className="p-1.5 md:p-2 text-destructive bg-destructive/10 rounded-xl hover:bg-destructive/20 transition-colors"
                 title="Excluir"
@@ -527,6 +517,16 @@ export function ProductsPage() {
                 <Trash2 size={14} />
               </button>
             </div>
+             <div className="flex items-center gap-2">
+               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {product.isActive ? 'Ativo' : 'Pausado'}
+              </span>
+               <Switch
+                checked={product.isActive}
+                onCheckedChange={(checked: boolean) => setProductBusinessStatus(product, checked ? 'active' : 'paused')}
+                aria-label={`Status do produto ${product.name}`}
+              />
+             </div>
           </div>
           </div>
           {(product._count?.optionGroupLinks ?? 0) > 0 && (
@@ -808,8 +808,8 @@ export function ProductsPage() {
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Produto</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell text-left">Categoria</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Preço</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Status</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Ações</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody>
