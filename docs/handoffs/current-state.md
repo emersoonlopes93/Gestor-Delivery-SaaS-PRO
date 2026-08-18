@@ -1,3 +1,12 @@
+## Storefront Checkout Bugfixes (2026-08-17)
+
+- **Checkout v2 Layout Fixes**: 
+  - A transparência de bg-card/90 foi consertada aplicando um estilo CSS nativo para manter `rgba(255,255,255,0.92)` independente das variáveis CSS de Hex code do Tailwind.
+  - O sumiço do botão "Continuar" na "Etapa 2" (Fulfillment) foi resolvido corrigindo um bug clássico de layout do iOS Safari. O footer usava `fixed bottom-0`, que em páginas curtas (sem scroll) fica oculto atrás da barra de endereço inferior do navegador, pois o layout viewport não é ajustado automaticamente.
+  - A solução foi alterar as tags `<main>` em `StorefrontLayout` para `flex flex-col` (permitindo aos filhos herdar a altura de `100dvh`), ajustar o contêiner base de `CheckoutPage` para flex column (`flex-1 flex flex-col`) e mudar o footer de `fixed` para `sticky bottom-0`. Isso garante que o footer repouse naturalmente na parte inferior da tela usando unidades `dvh` reais sem sobreposição da UI nativa.
+
+---
+
 ## Production quick fixes - store status, delivery coordinates, and switches (2026-08-17)
 
 Branch: `fix/production-quick-fixes`

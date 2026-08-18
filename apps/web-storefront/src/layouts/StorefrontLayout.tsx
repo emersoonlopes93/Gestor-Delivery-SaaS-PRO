@@ -62,7 +62,7 @@ export function StorefrontLayout() {
           <AnalyticsProvider tenantSlug={tenantSlug ?? data.tenant.id}>
             <div className="flex min-h-[100dvh] w-full flex-col">
               <ConsentBanner />
-              <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
+              <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 flex flex-col">
                 <Outlet />
               </main>
               <ConsentFooterAction />
@@ -71,7 +71,7 @@ export function StorefrontLayout() {
           </AnalyticsProvider>
         </StorefrontConsentProvider>
       ) : (
-        <main className="relative z-10 mx-auto w-full max-w-4xl flex-1">
+        <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 flex flex-col">
           <Outlet />
         </main>
       )}

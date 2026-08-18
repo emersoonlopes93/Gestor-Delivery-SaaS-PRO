@@ -773,7 +773,8 @@ export function CheckoutPage() {
   };
 
   return (
-    <div className="px-4 py-6 max-w-lg mx-auto pb-44">
+    <div className="flex-1 flex flex-col mx-auto w-full max-w-lg">
+      <div className="flex-1 px-4 py-6">
       <header className="flex items-center gap-3 mb-8">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-700" />
@@ -1186,8 +1187,10 @@ export function CheckoutPage() {
         </div>
       )}
 
+      </div>
+      
       <div
-        className="storefront-safe-action fixed bottom-0 left-0 right-0 z-30 mx-auto flex max-w-lg gap-3 p-4 backdrop-blur-md"
+        className="storefront-safe-action sticky bottom-0 left-0 right-0 z-30 mx-auto flex w-full max-w-lg gap-3 p-4 backdrop-blur-md"
         style={{
           borderTop: '1px solid var(--storefront-border)',
           backgroundColor: 'rgba(255,255,255,0.92)',
