@@ -4,8 +4,10 @@ import { Product, ProductCategory, CreateProductDto } from '@gestor/types';
 import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, PauseCircle, Pencil, Trash2, FileText, Search, ChevronDown, Copy, Plus, ChefHat, X } from 'lucide-react';
+import { CheckCircle2, Pencil, Trash2, FileText, Search, ChevronDown, Copy, Plus, ChefHat, X } from 'lucide-react';
 import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
+import { Switch } from '../../components/ui/Switch';
+import { ProductComplementsInline } from './SubComponents/ProductComplementsInline';
 
 
 
@@ -48,7 +50,14 @@ export function ProductsPage() {
   const navigate = useNavigate();
   const { capabilities } = useTenantCapabilities();
   const baseMenuImportEnabled = capabilities?.actions?.['baseMenu.import']?.enabled === true;
-  const [viewMode, setViewMode] = useState<ProductsViewMode>('all');
+  const [viewMode, setViewMode] = useState<ProductsViewMode>(() => {
+    const saved = localStorage.getItem('gestor.catalog.viewMode');
+    return (saved === 'all' || saved === 'grouped') ? saved : 'grouped';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gestor.catalog.viewMode', viewMode);
+  }, [viewMode]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<ProductTypeFilter>('all');
@@ -59,6 +68,8 @@ export function ProductsPage() {
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [expandedComplements, setExpandedComplements] = useState<Record<string, boolean>>({});
   
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [bannerStats, setBannerStats] = useState({ categories: 0, products: 0, skipped: 0 });
@@ -255,6 +266,18 @@ export function ProductsPage() {
     return updateProductStatus(product, { isActive: true, isAvailable: false });
   };
 
+  const handleCategoryToggle = async (categoryId: string, isActive: boolean) => {
+    if (categoryId === '__uncategorized__') return;
+    const previous = categories.find((c) => c.id === categoryId)?.isActive;
+    setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, isActive } : c)));
+    try {
+      await api.patch(`/catalog/categories/${categoryId}`, { isActive });
+    } catch (error) {
+      setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, isActive: previous ?? true } : c)));
+      console.error('Erro ao alterar status da categoria:', error);
+    }
+  };
+
   const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const bulkSetActive = async (isActive: boolean) => {
     if (selectedIds.length === 0 || bulkSaving) return;
@@ -274,6 +297,10 @@ export function ProductsPage() {
     setExpandedGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
   };
 
+  const toggleComplementExpanded = (productId: string) => {
+    setExpandedComplements((prev) => ({ ...prev, [productId]: !prev[productId] }));
+  };
+
   const formatMoney = (value: unknown) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0));
   };
@@ -289,8 +316,13 @@ export function ProductsPage() {
       const typeLabel = typeMap[product.type ?? 'simple'] || 'Produto';
       const businessStatus = getBusinessStatus(product);
       return (
-        <tr key={product.id} className="border-b border-border last:border-b-0 bg-card text-card-foreground transition-colors duration-150 hover:bg-muted/60">
-          <td className="px-4 py-4"><input aria-label={`Selecionar ${product.name}`} type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelected(product.id)} /></td>
+        <React.Fragment key={product.id}>
+          <tr className={`border-b border-border last:border-b-0 bg-card text-card-foreground transition-colors duration-150 hover:bg-muted/60 ${expandedComplements[product.id] ? 'border-b-0' : ''}`}>
+            {isBulkMode && (
+            <td className="px-4 py-4">
+              <input aria-label={`Selecionar ${product.name}`} type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelected(product.id)} />
+            </td>
+          )}
           <td className="px-6 py-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-lg bg-muted dark:bg-muted/80 border border-border overflow-hidden shrink-0">
@@ -332,9 +364,14 @@ export function ProductsPage() {
           </td>
 
           <td className="px-6 py-4 text-sm whitespace-nowrap">
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${BUSINESS_STATUS_BADGE[businessStatus]}`}>
-              {BUSINESS_STATUS_LABEL[businessStatus]}
-            </span>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={product.isActive}
+                onCheckedChange={(checked: boolean) => setProductBusinessStatus(product, checked ? 'active' : 'paused')}
+                aria-label={`Status do produto ${product.name}`}
+              />
+              {!product.isActive && <span className="text-[10px] text-muted-foreground font-medium italic">Pausado</span>}
+            </div>
           </td>
 
           <td className="px-6 py-4 text-sm text-right">
@@ -365,40 +402,36 @@ export function ProductsPage() {
                 <Copy size={16} />
               </button>
               <button
-                onClick={() => setProductBusinessStatus(product, 'active')}
-                className="p-2 text-muted-foreground hover:text-status-success hover:bg-status-success/20 rounded-lg transition-colors"
-                title="Marcar como ativo"
-                type="button"
-              >
-                <CheckCircle2 size={16} />
-              </button>
-              <button
-                onClick={() => setProductBusinessStatus(product, 'paused')}
-                className="p-2 text-muted-foreground hover:text-status-warning hover:bg-status-warning/20 rounded-lg transition-colors"
-                title="Pausar"
-                type="button"
-              >
-                <PauseCircle size={16} />
-              </button>
-              <button
-                onClick={() => setProductBusinessStatus(product, 'sold_out')}
-                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                title="Marcar como esgotado"
-                type="button"
-              >
-                <AlertTriangle size={16} />
-              </button>
-              <button
-                onClick={() => handleDelete(product.id)}
-                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                title="Excluir"
-                type="button"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </td>
-        </tr>
+                  onClick={() => handleDelete(product.id)}
+                  className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                  title="Excluir"
+                  type="button"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              {(product._count?.optionGroupLinks ?? 0) > 0 && (
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleComplementExpanded(product.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/30 hover:bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors"
+                  >
+                    <span>Complements ({product._count!.optionGroupLinks})</span>
+                    <ChevronDown size={14} className={`transition-transform duration-300 ${expandedComplements[product.id] ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+              )}
+            </td>
+          </tr>
+          {expandedComplements[product.id] && (
+            <tr className="bg-card border-b border-border">
+              <td colSpan={isBulkMode ? 7 : 6} className="p-0">
+                <ProductComplementsInline productId={product.id} isParentActive={product.isActive} />
+              </td>
+            </tr>
+          )}
+        </React.Fragment>
       );
     });
   };
@@ -408,9 +441,12 @@ export function ProductsPage() {
       const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
       const businessStatus = getBusinessStatus(product);
       return (
-        <div key={product.id} className="card-premium p-3 md:p-4 hover:shadow-md transition-all">
-          <div className="flex items-start justify-between gap-3">
-            <input aria-label={`Selecionar ${product.name}`} type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelected(product.id)} />
+        <div key={product.id} className="card-premium hover:shadow-md transition-all overflow-hidden flex flex-col">
+          <div className="p-3 md:p-4">
+            <div className="flex items-start justify-between gap-3">
+            {isBulkMode && (
+              <input aria-label={`Selecionar ${product.name}`} type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelected(product.id)} />
+            )}
             <div className="flex gap-3 min-w-0 flex-1">
                <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted dark:bg-muted/80 border border-border overflow-hidden shrink-0 shadow-sm">
                 {product.image ? (
@@ -451,9 +487,13 @@ export function ProductsPage() {
             style={{ borderTop: '1px solid var(--border-subtle)' }}
           >
              <div className="flex items-center gap-2">
-               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${businessStatus === 'active' ? 'bg-status-success shadow-[0_0_8px_rgba(16,185,129,0.5)]' : businessStatus === 'paused' ? 'bg-status-warning' : 'bg-destructive'}`} />
+               <Switch
+                checked={product.isActive}
+                onCheckedChange={(checked: boolean) => setProductBusinessStatus(product, checked ? 'active' : 'paused')}
+                aria-label={`Status do produto ${product.name}`}
+              />
                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                {BUSINESS_STATUS_LABEL[businessStatus]}
+                {product.isActive ? 'Ativo' : 'Pausado'}
               </span>
              </div>
             <div className="flex items-center gap-1">
@@ -473,27 +513,6 @@ export function ProductsPage() {
                 <Copy size={14} />
               </button>
               <button
-                onClick={() => setProductBusinessStatus(product, 'active')}
-                className="p-1.5 md:p-2 text-status-success bg-status-success/10 rounded-xl hover:bg-status-success/20 transition-colors"
-                title="Marcar como ativo"
-              >
-                <CheckCircle2 size={14} />
-              </button>
-              <button
-                onClick={() => setProductBusinessStatus(product, 'paused')}
-                className="p-1.5 md:p-2 text-status-warning bg-status-warning/10 rounded-xl hover:bg-status-warning/20 transition-colors"
-                title="Pausar"
-              >
-                <PauseCircle size={14} />
-              </button>
-              <button
-                onClick={() => setProductBusinessStatus(product, 'sold_out')}
-                className="p-1.5 md:p-2 text-destructive bg-destructive/10 rounded-xl hover:bg-destructive/20 transition-colors"
-                title="Marcar como esgotado"
-              >
-                <AlertTriangle size={14} />
-              </button>
-              <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
                 className="p-1.5 md:p-2 text-muted-foreground bg-muted dark:bg-muted/80 rounded-xl hover:bg-muted/70 transition-colors"
                 title="Ficha técnica"
@@ -509,6 +528,22 @@ export function ProductsPage() {
               </button>
             </div>
           </div>
+          </div>
+          {(product._count?.optionGroupLinks ?? 0) > 0 && (
+            <div className="px-3 md:px-4 pb-3">
+              <button
+                type="button"
+                onClick={() => toggleComplementExpanded(product.id)}
+                className="w-full py-2 bg-muted/30 border border-border hover:bg-muted/50 rounded-lg flex items-center justify-center gap-2 transition-colors text-xs font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                <span>Complementos ({product._count!.optionGroupLinks})</span>
+                <ChevronDown size={14} className={`transition-transform duration-300 ${expandedComplements[product.id] ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+          )}
+          {expandedComplements[product.id] && (
+            <ProductComplementsInline productId={product.id} isParentActive={product.isActive} />
+          )}
         </div>
       );
     });
@@ -600,7 +635,18 @@ export function ProductsPage() {
           <p className="text-[11px] md:text-sm text-muted-foreground font-medium mt-0.5">Gerencie seu cardápio de forma simples.</p>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={() => setIsBulkMode(!isBulkMode)}
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl border transition-colors shadow-sm ${
+              isBulkMode 
+                ? 'bg-muted text-foreground border-border' 
+                : 'bg-card text-muted-foreground border-border hover:bg-muted'
+            }`}
+            type="button"
+          >
+            <span>{isBulkMode ? 'Concluir Seleção' : 'Seleção Múltipla'}</span>
+          </button>
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
@@ -756,7 +802,9 @@ export function ProductsPage() {
                   <table className="w-full min-w-full border-separate border-spacing-0">
                     <thead className="bg-muted border-b border-border">
                       <tr>
-                        <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Selecionar</th>
+                        {isBulkMode && (
+                          <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Selecionar</th>
+                        )}
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Produto</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell text-left">Categoria</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Preço</th>
@@ -799,35 +847,50 @@ export function ProductsPage() {
                 const isExpanded = expandedGroups[group.key] ?? true;
                 return (
                   <section key={group.key} className="card-premium border border-border bg-card shadow-sm overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-4 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted/20 transition-all"
-                    >
-                      <div className="text-left min-w-0 flex-1">
+                    <div className="w-full px-4 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted/20 transition-all">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroupExpanded(group.key)}
+                        className="text-left min-w-0 flex-1 flex flex-col justify-center"
+                      >
                         <div className="text-sm font-black text-foreground uppercase tracking-tight truncate">{title}</div>
                         <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0 ml-4">
-                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card border border-border transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                      </button>
+                      <div className="flex items-center gap-4 shrink-0 ml-4">
+                        {group.category && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Switch
+                              checked={group.category.isActive ?? true}
+                              onCheckedChange={(isActive) => handleCategoryToggle(group.category!.id, isActive)}
+                              aria-label={`Alternar status da categoria ${title}`}
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupExpanded(group.key)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-full bg-card border border-border transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                        >
                           <ChevronDown size={16} className="text-foreground" />
-                        </div>
+                        </button>
                       </div>
-                    </button>
+                    </div>
 
                     {isExpanded && (
                       <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                         {/* Mobile View: Cards */}
-                        <div className="md:hidden p-3 space-y-3">
+                        <div className={`md:hidden p-3 space-y-3 ${group.category?.isActive === false ? 'opacity-50' : ''}`}>
                           {renderCards(group.products)}
                         </div>
 
                         {/* Desktop View: Table */}
-                        <div className="hidden md:block max-h-[60vh] overflow-auto custom-scrollbar">
+                        <div className={`hidden md:block max-h-[60vh] overflow-auto custom-scrollbar ${group.category?.isActive === false ? 'opacity-50' : ''}`}>
                           <table className="w-full text-left border-collapse">
                             <thead className="bg-card border-b border-border sticky top-0 z-10">
                               <tr>
-                                <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Selecionar</th>
+                                {isBulkMode && (
+                                  <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Selecionar</th>
+                                )}
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Produto</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell">Categoria</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Preço</th>

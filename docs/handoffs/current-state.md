@@ -1,3 +1,19 @@
+## Reorganizar Cardápio: Categorias e Toggles (2026-08-18)
+
+Branch: `feat/catalog-category-availability-ux`
+Base: `origin/main-copy`
+
+- **Visualização Padrão**: O modo "Categorias" agora é o padrão da página de cardápio (`ProductsPage.tsx`) e a escolha é persistida no `localStorage`.
+- **Seleção Múltipla**: Adicionado um botão "Seleção Múltipla" (`isBulkMode`) que exibe ou oculta os checkboxes, reduzindo a poluição visual administrativa padrão.
+- **Toggles (Switches)**: 
+  - O cabeçalho de categorias agora possui um `Switch` integrado para ativar ou desativar categorias rapidamente.
+  - Produtos vinculados a categorias inativas são renderizados esmaecidos (`opacity-50`) para indicar a indisponibilidade herdada sem corromper o estado `isActive` interno.
+  - As ações redundantes de menu ("Ativar", "Pausar", "Esgotado") de produtos foram condensadas em um único `Switch` prático na visualização em lista e nos cards.
+- **Complementos Inline**: Criado o componente `ProductComplementsInline.tsx`. Os produtos exibem um botão de expansão "Complementos (N)" que carrega os grupos do produto sob demanda e permite alternar o estado (`isActive`) de itens individuais inline via `PATCH`. Prevenimos N+1 adicionando contagem no backend.
+- **Validação Local**: A tipagem de `_count` em `Product` foi ajustada. `pnpm typecheck`, lint do web-tenant e o script `check:no-any` completaram com sucesso. Sem push, hook de actions ou deploy.
+
+---
+
 ## Storefront Checkout Bugfixes (2026-08-17)
 
 - **Checkout v2 Layout Fixes**: 

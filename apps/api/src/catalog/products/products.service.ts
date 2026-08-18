@@ -252,7 +252,7 @@ export class ProductsService {
         })
       },
       orderBy: { order: 'asc' },
-      include: { category: true, mediaAsset: true, publication: { include: { rules: true } } }
+      include: { category: true, mediaAsset: true, publication: { include: { rules: true } }, _count: { select: { optionGroupLinks: true } } }
     });
 
     // If channel is provided, filter using AvailabilityService
