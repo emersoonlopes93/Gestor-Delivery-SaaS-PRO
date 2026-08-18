@@ -3,6 +3,11 @@ import { api } from '../lib/api';
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
+type ApiEnvelope<T> = {
+  success: boolean;
+  data: T;
+};
+
 interface UsePushNotificationsReturn {
   permissionState: PermissionState;
   isSubscribed: boolean;
@@ -26,8 +31,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 
 async function getVapidPublicKey(): Promise<string | null> {
   try {
-    const { data } = await api.get<{ publicKey: string }>('/notifications/push/vapid-key');
-    return data.publicKey || null;
+    const { data } = await api.get<ApiEnvelope<{ publicKey: string }>>('/notifications/push/vapid-key');
+    return data.data.publicKey || null;
   } catch {
     return null;
   }
