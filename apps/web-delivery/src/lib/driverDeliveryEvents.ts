@@ -26,18 +26,38 @@ export function processDriverDeliveryEvent(
   return true;
 }
 
+const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+let sharedAudioContext: AudioContext | null = null;
+
+export function initSharedAudioContext() {
+  if (!sharedAudioContext && AudioContextClass) {
+    sharedAudioContext = new AudioContextClass();
+  }
+  if (sharedAudioContext && sharedAudioContext.state === 'suspended') {
+    sharedAudioContext.resume().catch(() => {});
+  }
+}
+
 export function playAssignmentSound() {
-  const AudioContextClass = window.AudioContext;
-  if (!AudioContextClass) return;
-  const context = new AudioContextClass();
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  oscillator.frequency.value = 880;
-  gain.gain.setValueAtTime(0.12, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.35);
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.35);
-  oscillator.addEventListener('ended', () => void context.close(), { once: true });
+  if (!sharedAudioContext) initSharedAudioContext();
+  const context = sharedAudioContext;
+  if (!context) return;
+  
+  if (context.state === 'suspended') {
+    context.resume().catch(() => {});
+  }
+  
+  try {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.12, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.35);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.35);
+  } catch (e) {
+    // Ignore audio context errors
+  }
 }

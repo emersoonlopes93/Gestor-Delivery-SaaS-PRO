@@ -707,25 +707,34 @@ export class DeliveryRunsService {
         throw new ConflictException('A parada precisa estar marcada como chegada.');
       }
       const deliveredAt = new Date();
-      const order = await tx.order.findFirst({ where: { id: stop.orderId, tenantId, status: 'out_for_delivery' } });
-      if (!order || !ORDER_STATUS_TRANSITIONS[order.status].includes('completed')) {
+      const order = await tx.order.findFirst({ where: { id: stop.orderId, tenantId } });
+      if (!order) {
+        throw new ConflictException('Pedido não encontrado para esta parada.');
+      }
+      
+      const isAlreadyCompleted = order.status === 'completed';
+      
+      if (!isAlreadyCompleted && !ORDER_STATUS_TRANSITIONS[order.status].includes('completed')) {
         throw new ConflictException('O pedido não pode ser concluído neste estado.');
       }
-      const changed = await tx.order.updateMany({
-        where: { id: order.id, tenantId, status: 'out_for_delivery' },
-        data: { status: 'completed' },
-      });
-      if (changed.count !== 1) throw new ConflictException('O pedido foi atualizado durante a conclusão.');
-      await tx.orderTimeline.create({
-        data: {
-          tenantId,
-          orderId: order.id,
-          status: 'completed',
-          note: 'Entrega concluída na rota.',
-          actorId: driverId,
-          actorType: 'delivery_driver',
-        },
-      });
+
+      if (!isAlreadyCompleted) {
+        const changed = await tx.order.updateMany({
+          where: { id: order.id, tenantId, status: 'out_for_delivery' },
+          data: { status: 'completed' },
+        });
+        if (changed.count !== 1) throw new ConflictException('O pedido foi atualizado durante a conclusão.');
+        await tx.orderTimeline.create({
+          data: {
+            tenantId,
+            orderId: order.id,
+            status: 'completed',
+            note: 'Entrega concluída na rota.',
+            actorId: driverId,
+            actorType: 'delivery_driver',
+          },
+        });
+      }
       await tx.deliveryStop.update({
         where: { id: stop.id },
         data: { status: DeliveryStopStatus.DELIVERED, deliveredAt },

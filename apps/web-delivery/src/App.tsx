@@ -3,8 +3,23 @@ import { LoginPage } from './pages/LoginPage';
 import { ActiveDeliveryPage } from './pages/ActiveDeliveryPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PwaStatusBanner } from './components/PwaStatusBanner';
+import { useEffect } from 'react';
+import { initSharedAudioContext } from './lib/driverDeliveryEvents';
 
 function App() {
+  useEffect(() => {
+    const unlockAudio = () => {
+      initSharedAudioContext();
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
   return (
     <Router
       future={{
