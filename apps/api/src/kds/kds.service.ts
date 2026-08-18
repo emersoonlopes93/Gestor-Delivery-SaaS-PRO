@@ -104,6 +104,7 @@ export class KdsService {
         by: ['station'],
         where: {
           tenantId,
+          type: PrismaPrintType.kitchen,
           status: {
             notIn: [PrismaPrintJobStatus.completed]
           }
@@ -135,6 +136,7 @@ export class KdsService {
       where: {
         tenantId,
         station,
+        type: PrismaPrintType.kitchen,
         status: PrismaPrintJobStatus.pending,
       },
       orderBy: {
@@ -205,6 +207,7 @@ export class KdsService {
 
     const where: Prisma.PrintJobWhereInput = {
       tenantId,
+      type: PrismaPrintType.kitchen,
       station: station && station !== 'ALL' ? station : undefined,
     };
 

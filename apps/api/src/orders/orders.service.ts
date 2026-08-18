@@ -1157,7 +1157,7 @@ export class OrdersService {
       throw new BadRequestException('Não é possível despachar um pedido de entrega sem um entregador atribuído.');
     }
 
-    const shouldCreateProductionJobs = nextStatus === 'confirmed' || nextStatus === 'preparing';
+    const shouldCreateProductionJobs = nextStatus === 'preparing';
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
