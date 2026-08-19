@@ -26,14 +26,26 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 
 async function getVapidPublicKey(): Promise<string | null> {
   try {
-    const { data } = await api.get<{ publicKey: string }>('/notifications/push/vapid-key');
-    if (!data.publicKey) {
-      console.warn('[Push] VAPID public key not configured on server. Check VAPID_PUBLIC_KEY env var on the API.');
+    const response = await api.get<{ publicKey?: string } | { success: boolean; data: { publicKey?: string } }>(
+      '/notifications/push/vapid-key',
+    );
+    // A API usa TransformInterceptor global que envolve respostas em { success, data }
+    // mas o interceptor ignora objetos que já contêm 'success'. Tratamos ambos os casos.
+    const raw = response.data as Record<string, unknown>;
+    const publicKey =
+      typeof raw['publicKey'] === 'string'
+        ? raw['publicKey']
+        : typeof (raw['data'] as Record<string, unknown> | undefined)?.['publicKey'] === 'string'
+          ? ((raw['data'] as Record<string, unknown>)['publicKey'] as string)
+          : '';
+
+    if (!publicKey) {
+      console.warn('[Push] VAPID public key não configurada no servidor. Verifique VAPID_PUBLIC_KEY na API.');
       return null;
     }
-    return data.publicKey;
+    return publicKey;
   } catch (err) {
-    console.warn('[Push] Failed to fetch VAPID key:', err);
+    console.warn('[Push] Falha ao buscar chave VAPID:', err);
     return null;
   }
 }
