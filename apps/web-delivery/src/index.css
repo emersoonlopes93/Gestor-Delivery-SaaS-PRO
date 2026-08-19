@@ -93,7 +93,7 @@
   }
 
   .leaflet-container {
-    background: var(--delivery-muted);
+    background: #cbd5e1; /* slate-300 — fallback while tiles load */
     font-family: inherit;
   }
 
@@ -111,9 +111,5 @@
     font-weight: 900;
   }
 
-  .driver-route-schematic .leaflet-pane,
-  .driver-route-schematic .leaflet-map-pane {
-    background-image: radial-gradient(circle at 1px 1px, rgb(100 116 139 / 22%) 1px, transparent 0);
-    background-size: 18px 18px;
-  }
+  /* Removed: do not override leaflet-pane background — it hides tiles */
 }

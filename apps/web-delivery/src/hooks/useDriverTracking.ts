@@ -146,9 +146,9 @@ export function useDriverTracking() {
               ? positionMetadata.recordedAt
               : new Date().toISOString(),
             ...location,
-            ...(accuracy !== undefined ? { accuracy } : {}),
-            ...(heading !== undefined ? { heading } : {}),
-            ...(speed !== undefined ? { speed } : {}),
+            ...(typeof accuracy === 'number' && accuracy >= 0 ? { accuracy } : {}),
+            ...(typeof heading === 'number' && heading >= 0 ? { heading } : {}),
+            ...(typeof speed === 'number' && speed >= 0 ? { speed } : {}),
             source,
           };
           enqueueLocationPoint(point);

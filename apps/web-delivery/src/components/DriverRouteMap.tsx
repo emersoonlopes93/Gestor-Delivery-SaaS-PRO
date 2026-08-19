@@ -28,6 +28,15 @@ function FitRoute({ points }: { points: LatLngExpression[] }) {
   return null;
 }
 
+function InvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const timeout = setTimeout(() => map.invalidateSize(), 250);
+    return () => clearTimeout(timeout);
+  }, [map]);
+  return null;
+}
+
 type Props = {
   status: DeliveryRunStatus;
   stops: DeliveryStopDTO[];
@@ -69,6 +78,7 @@ export function DriverRouteMap({ status, stops, currentStop, currentPosition, or
     {canRenderMap && allPoints.length > 0 ? <div className="driver-route-schematic relative h-64 border-y border-[var(--delivery-border)]" role="region" aria-label={returning ? 'Esquema de retorno para a loja e posição atual' : 'Esquema da rota com a posição atual e paradas numeradas na ordem registrada'}>
       <MapContainer center={allPoints[0] ?? DEFAULT_CENTER} zoom={14} className="h-full w-full" zoomControl={false} attributionControl={false}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+        <InvalidateSize />
         <FitRoute points={allPoints} />
         {schematicPoints.length > 1 && <Polyline positions={schematicPoints} pathOptions={{ color: returning ? '#d97706' : '#f97316', weight: 4, opacity: 0.82, dashArray: '8 7' }} />}
         {currentPosition && <Marker position={[currentPosition.lat, currentPosition.lng]} icon={courierIcon} title="Sua posição atual" />}

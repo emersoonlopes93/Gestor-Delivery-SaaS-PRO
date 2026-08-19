@@ -27,8 +27,13 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 async function getVapidPublicKey(): Promise<string | null> {
   try {
     const { data } = await api.get<{ publicKey: string }>('/notifications/push/vapid-key');
-    return data.publicKey || null;
-  } catch {
+    if (!data.publicKey) {
+      console.warn('[Push] VAPID public key not configured on server. Check VAPID_PUBLIC_KEY env var on the API.');
+      return null;
+    }
+    return data.publicKey;
+  } catch (err) {
+    console.warn('[Push] Failed to fetch VAPID key:', err);
     return null;
   }
 }
@@ -111,7 +116,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       // 2. Obter a chave VAPID
       const vapidKey = await getVapidPublicKey();
       if (!vapidKey) {
-        setError('Serviço de notificações não configurado neste ambiente.');
+        setError('Notificações push não disponíveis: chaves VAPID não configuradas no servidor. Contacte o administrador.');
         return false;
       }
 
