@@ -1,16 +1,27 @@
 import { NotFoundException } from '@nestjs/common';
+import { OrderStatus, PrintType } from '@prisma/client';
 import { KdsService } from './kds.service';
 
 describe('KdsService getPrintJob', () => {
   const makeDb = () => ({
     order: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    productCategory: {
+      findMany: jest.fn(),
     },
     printJob: {
+      count: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
+      groupBy: jest.fn(),
       create: jest.fn(),
       upsert: jest.fn(),
       deleteMany: jest.fn(),
+    },
+    printerDevice: {
+      findFirst: jest.fn(),
     },
   });
 
@@ -101,5 +112,106 @@ describe('KdsService getPrintJob', () => {
         status: { in: expect.any(Array) },
       },
     });
+  });
+
+  it('uses the kitchen type filter without excluding a legitimate MAIN kitchen station', async () => {
+    const db = makeDb();
+    db.productCategory.findMany.mockResolvedValue([]);
+    db.printJob.groupBy.mockResolvedValue([{ station: 'MAIN' }]);
+    db.printJob.findMany.mockResolvedValue([]);
+    db.printJob.count.mockResolvedValue(0);
+    const service = makeService(db);
+
+    await expect(service.getAvailableStations()).resolves.toEqual(['GERAL', 'MAIN']);
+    await service.getPendingPrintJobs('MAIN');
+    await service.getAllPrintJobs('MAIN');
+
+    expect(db.printJob.groupBy).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ type: PrintType.kitchen }),
+    }));
+    expect(db.printJob.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({ station: 'MAIN', type: PrintType.kitchen }),
+    }));
+    expect(db.printJob.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({ station: 'MAIN', type: PrintType.kitchen }),
+    }));
+  });
+
+  it('does not create production jobs for a confirmed order', async () => {
+    const db = makeDb();
+    db.printJob.count.mockResolvedValue(0);
+    db.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      tenantId: 'tenant-a',
+      status: OrderStatus.confirmed,
+      items: [],
+    });
+
+    await expect(makeService(db).createProductionJobs('order-1')).resolves.toEqual([]);
+
+    expect(db.printJob.upsert).not.toHaveBeenCalled();
+    expect(db.printerDevice.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('creates kitchen production jobs once when an order is preparing, even after a retry', async () => {
+    const db = makeDb();
+    db.printJob.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1);
+    db.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      tenantId: 'tenant-a',
+      status: OrderStatus.preparing,
+      orderNumber: '#0001',
+      fulfillmentType: 'pickup',
+      customerName: 'Cliente',
+      customerPhone: '11999999999',
+      customerEmail: null,
+      tableNumber: null,
+      notes: null,
+      total: 10,
+      itemsSubtotal: 10,
+      discountTotal: 0,
+      deliveryFee: 0,
+      serviceFee: 0,
+      sourceChannel: 'pos',
+      paymentMethod: 'cash',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      items: [{
+        id: 'item-1',
+        lineType: 'product',
+        productId: 'product-1',
+        comboId: null,
+        quantity: 1,
+        unitPrice: 10,
+        lineTotal: 10,
+        notes: null,
+        snapshotName: 'Produto',
+        snapshotImage: null,
+        snapshotBasePrice: 10,
+        snapshotExtrasTotal: 0,
+        snapshotComposition: null,
+        snapshotCatalogV2Json: null,
+        product: { category: null },
+      }],
+    });
+    db.printerDevice.findFirst.mockResolvedValue(null);
+    db.printJob.upsert.mockResolvedValue({ id: 'kitchen-job' });
+    const service = new KdsService(
+      db as never,
+      { getTenantId: () => 'tenant-a' } as never,
+      { formatTicket: jest.fn().mockResolvedValue('ticket') } as never,
+    );
+
+    await expect(service.createProductionJobs('order-1')).resolves.toHaveLength(1);
+    await expect(service.createProductionJobs('order-1')).resolves.toEqual([]);
+
+    expect(db.printJob.upsert).toHaveBeenCalledTimes(1);
+    expect(db.printJob.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { idempotencyKey: 'auto_print_order-1_kitchen_GERAL' },
+      create: expect.objectContaining({ type: PrintType.kitchen }),
+    }));
   });
 });

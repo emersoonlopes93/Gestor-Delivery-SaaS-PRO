@@ -48,6 +48,7 @@ describe('PosService atomic sale', () => {
         ? jest.fn().mockRejectedValue(stockError)
         : jest.fn().mockResolvedValue(undefined),
     };
+    const kdsService = { createProductionJobs: jest.fn() };
     const ordersService = {
       confirmPosOrderInTransaction: jest.fn().mockResolvedValue({ id: 'order-1', status: 'confirmed' }),
       runConfirmedOrderSideEffects: jest.fn(),
@@ -59,14 +60,14 @@ describe('PosService atomic sale', () => {
       customerService as never,
       cashbackService as never,
       stockService as never,
-      {} as never,
+      kdsService as never,
       ordersService as never,
       { calculateDeliveryFee: jest.fn() } as never,
     );
     jest.spyOn(service, 'getOrderDetail').mockResolvedValue({ id: 'order-1', status: 'confirmed' } as never);
 
     return {
-      service, prisma, tx, cashService, cashbackService, stockService, ordersService,
+      service, prisma, tx, cashService, cashbackService, stockService, kdsService, ordersService,
       wasCommitted: () => committed,
     };
   };
@@ -111,6 +112,15 @@ describe('PosService atomic sale', () => {
       harness.tx, 'order-1', 'tenant-a', 'operator-1',
     );
     expect(harness.ordersService.runConfirmedOrderSideEffects).toHaveBeenCalledWith('order-1', 'tenant-a');
+    expect(harness.kdsService.createProductionJobs).not.toHaveBeenCalled();
+  });
+
+  it('does not create kitchen production jobs while saving a POS draft', async () => {
+    const harness = makeHarness();
+
+    await harness.service.upsertDraftSale('tenant-a', 'operator-1', sale);
+
+    expect(harness.kdsService.createProductionJobs).not.toHaveBeenCalled();
   });
 
   it('dual-writes the validated table id and its visual snapshot', async () => {
