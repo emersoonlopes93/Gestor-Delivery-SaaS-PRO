@@ -14,6 +14,7 @@ import {
 import { StorefrontCustomizationPayload } from '@gestor/types';
 import { ensureDefaultTenantRoles } from './default-tenant-roles';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
+import { omitTenantFinancialSecrets } from '../payment-foundation/payment-secret-redaction';
 
 type TenantUserLookupClient = Pick<Prisma.TransactionClient, 'tenantUser'>;
 
@@ -294,7 +295,10 @@ export class TenantService {
       }
     }
 
-    return tenant;
+    return {
+      ...tenant,
+      settings: tenant.settings ? omitTenantFinancialSecrets(tenant.settings) : null,
+    };
   }
 
   async getNetworkContext(tenantId: string) {
@@ -524,7 +528,10 @@ export class TenantService {
       include: { settings: true },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
-    return tenant;
+    return {
+      ...tenant,
+      settings: tenant.settings ? omitTenantFinancialSecrets(tenant.settings) : null,
+    };
   }
 
   /**
@@ -585,7 +592,7 @@ export class TenantService {
 
     await this.invalidateStorefrontCacheByTenantId(tenantId);
 
-    return updated;
+    return omitTenantFinancialSecrets(updated);
   }
 
   /**

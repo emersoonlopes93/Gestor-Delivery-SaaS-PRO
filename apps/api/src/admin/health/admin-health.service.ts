@@ -145,12 +145,16 @@ export class AdminHealthService {
    * Check health/status of a specific tenant.
    */
   async checkTenantHealth(tenantId: string) {
-    const [productsCount, settings, lastOrder] = await Promise.all([
+    const [productsCount, settings, lastOrder, mercadoPagoConnection] = await Promise.all([
       this.prisma.product.count({ where: { tenantId, isActive: true } }),
       this.prisma.tenantSettings.findUnique({ where: { tenantId } }),
       this.prisma.order.findFirst({
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.paymentProviderConnection.findFirst({
+        where: { tenantId, provider: 'mercado_pago', status: 'CONNECTED' },
+        select: { id: true },
       }),
     ]);
 
@@ -164,7 +168,7 @@ export class AdminHealthService {
       issues.push({ code: 'MISSING_ADDRESS', severity: 'high', message: 'Endereço da loja incompleto.' });
     }
 
-    const hasPayment = settings?.pixKey || settings?.mercadoPagoAccessToken || 
+    const hasPayment = settings?.pixKey || settings?.mercadoPagoAccessToken || mercadoPagoConnection ||
                       (settings?.paymentMethods && (settings.paymentMethods as string[]).length > 0);
     
     if (!hasPayment) {

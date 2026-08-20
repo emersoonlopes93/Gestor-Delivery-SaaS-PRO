@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { Prisma } from '@prisma/client';
+import { omitTenantFinancialSecrets } from '../../payment-foundation/payment-secret-redaction';
 
 @Injectable()
 export class AdminTenantsService {
@@ -37,7 +38,10 @@ export class AdminTenantsService {
     ]);
 
     return {
-      items: tenants,
+      items: tenants.map((tenant) => ({
+        ...tenant,
+        settings: tenant.settings ? omitTenantFinancialSecrets(tenant.settings) : null,
+      })),
       total,
       page,
       pageSize,
@@ -197,7 +201,11 @@ export class AdminTenantsService {
 
     if (!tenant) return null;
     const billingState = await this.tenantBillingResolver.getTenantBillingState(id);
-    return { ...tenant, billingState };
+    return {
+      ...tenant,
+      settings: tenant.settings ? omitTenantFinancialSecrets(tenant.settings) : null,
+      billingState,
+    };
   }
 
   async create(data: { name: string; slug: string; status?: 'active' | 'inactive' | 'suspended' | 'trial'; billingPlanId?: string }) {

@@ -1,3 +1,40 @@
+## Payment Foundation R1 (2026-08-20)
+
+Branch: `feat/payment-foundation-r1`
+Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
+
+- `PaymentProviderConnection` guarda uma conexão por tenant/provider e protege credenciais
+  com o envelope AES-256-GCM versionado já usado por marketplace. Respostas de tenant/admin,
+  telemetria e erros persistidos foram sanitizados; a storefront continua retornando somente
+  seu contrato explícito.
+- O Mercado Pago atual prefere a conexão criptografada. Credenciais ainda presentes em
+  `TenantSettings` são migradas e limpas atomicamente no primeiro uso quando o keyring está
+  configurado; sem a chave, o caminho legado permanece apenas como compatibilidade temporária
+  e requer migração operacional posterior.
+- `OrderPaymentAttempt` preserva várias tentativas por pedido, provider imutável, status
+  canônicos e idempotência tenant-scoped. Constraints e compare-and-set protegem corridas de
+  criação e transição.
+- A inbox provider-neutral registra somente eventos autenticados, persiste hash do payload,
+  valida tenant/provider/conexão/tentativa e deduplica processamento concorrente antes de
+  executar efeitos de pagamento.
+- O Pix Mercado Pago cria a tentativa antes da chamada e usa seu ID como chave idempotente.
+  Timeout externo permanece pendente/ambíguo e não aciona fallback financeiro silencioso.
+- Contratos afetados: pagamentos, isolamento de tenant, checkout Pix, webhook Mercado Pago e
+  transição existente de pedido pago. Não houve endpoint novo, split, Platform Fee, router,
+  chamada a Asaas, deploy, provider real adicional ou banco remoto.
+- Validação local: API integral com 111 suites/497 testes aprovados e 9 ignorados; lint e
+  build da API, typecheck global, `check:no-any`, `check:features` e `git diff --check`
+  passaram. `check:boundaries` (2 ocorrências) e `check:theme` (4 ocorrências) reproduziram
+  exatamente o baseline limpo, sempre fora do diff.
+- PostgreSQL 16 efêmero recebeu as 63 migrations do zero; Prisma validate/generate passaram.
+  Smoke SQL confirmou idempotência cross-tenant, múltiplas tentativas, provider imutável e
+  dedupe do inbox. O container efêmero foi removido depois da validação.
+- Riscos residuais: as colunas legadas continuam no schema para rollout compatível; tenants
+  sem keyring configurado exigem migração manual. O endurecimento completo da assinatura e
+  adapter Mercado Pago permanece para a fase de homologação.
+
+---
+
 ## Reorganizar Cardápio: Categorias e Toggles (2026-08-18)
 
 Branch: `feat/catalog-category-availability-ux`

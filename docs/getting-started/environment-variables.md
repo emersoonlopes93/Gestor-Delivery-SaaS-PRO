@@ -118,7 +118,7 @@ source_of_truth:
 | `MARKETPLACE_IFOOD_CLIENT_SECRET` | Cond. | Staging/Prod | Secret OAuth e chave HMAC oficial do webhook | **Sim** |
 | `MARKETPLACE_IFOOD_API_BASE_URL` | Não | Todos | Default `https://merchant-api.ifood.com.br` | Não |
 | `MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS` | Não | Todos | Timeout por request; default `10000` | Não |
-| `MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY` | Cond. | Todos | Chave AES de 32 bytes em base64; gerar e guardar no secret manager | **Sim** |
+| `MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY` | Cond. | Todos | Chave AES de 32 bytes em base64 para credenciais de marketplace e conexões financeiras; gerar e guardar no secret manager | **Sim** |
 | `MARKETPLACE_CREDENTIALS_KEY_VERSION` | Não | Todos | Identificador da chave atual gravado em `enc:v2`; default `current` | Não |
 | `MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY` | Não | Rotação | Chave AES anterior, somente durante janela de rotação | **Sim** |
 | `MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION` | Não | Rotação | Identificador exato da chave anterior | Não |

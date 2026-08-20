@@ -5,9 +5,10 @@ import { PaymentGatewayController } from './payment-gateway.controller';
 import { PaymentGatewayService } from './payment-gateway.service';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
+import { PaymentFoundationModule } from '../payment-foundation/payment-foundation.module';
 
 @Module({
-  imports: [ConfigModule, RbacModule],
+  imports: [ConfigModule, RbacModule, PaymentFoundationModule],
   controllers: [PaymentGatewayController],
   providers: [PaymentGatewayService, PrismaService, TenantContextService],
   exports: [PaymentGatewayService],

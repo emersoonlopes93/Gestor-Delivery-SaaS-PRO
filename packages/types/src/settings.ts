@@ -19,7 +19,6 @@ export interface TenantSettingsDTO {
   paymentMethods: string[];
   minimumOrderValue?: number;
   pixKey?: string;
-  mercadoPagoAccessToken?: string;
   logoUrl?: string;
   whatsappNotificationsEnabled: boolean;
   notificationTemplates: Record<string, string>;
