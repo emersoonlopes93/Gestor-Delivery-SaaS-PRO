@@ -95,6 +95,17 @@ Nenhum schema/migration, dependência, banco remoto, produção, Dokploy ou depl
 foi alterado. A publicação e o merge seguem o gate controlado autorizado ao fim
 da sessão.
 
+## KDS production jobs: preparing-only consistency (2026-08-20)
+
+Branch: `fix/kds-production-job-consistency`
+Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
+
+- Kitchen production jobs are now created only after the canonical transition to `preparing`. The confirmed POS side effects continue creating the customer receipt and notifications, but no longer call `createProductionJobs`.
+- Saving a POS draft no longer creates kitchen production jobs. `KdsService.createProductionJobs` also rejects any order whose persisted status is not `preparing`, protecting future callers from bypassing the invariant.
+- Existing idempotency remains in force through active-job checks and the persisted kitchen job idempotency key. Focused regression coverage proves confirmed produces no kitchen job, preparing produces one logical set across retry, the customer receipt remains produced, and KDS queries remain limited to `type = kitchen` while allowing a legitimate kitchen station named `MAIN`.
+- Validation: API full suite passed (103 suites, 477 tests; 4 suites/9 tests skipped), focused KDS/orders/POS tests passed (3 suites, 19 tests), API lint/build passed, and `pnpm typecheck`, `check:no-any`, `check:features`, and `git diff --check` passed. `check:boundaries` and `check:theme` reproduce the same pre-existing violations outside this diff (2 boundary imports and 4 theme opacity classes).
+- No schema, migration, lockfile, deploy, Dokploy, production, remote database, or external provider was touched.
+
 ---
 
 ## Reorganizar Cardápio: Categorias e Toggles (2026-08-18)
