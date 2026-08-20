@@ -613,8 +613,6 @@ export class PosService {
       return currentOrder;
     });
 
-    await this.kdsService.createProductionJobs(order.id, tenantId);
-
     return this.getOrderDetail(order.id, tenantId);
   }
 

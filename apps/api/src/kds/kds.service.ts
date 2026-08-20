@@ -535,6 +535,11 @@ export class KdsService {
         return [];
       }
 
+      if (order.status !== 'preparing') {
+        this.logger.debug(`createProductionJobs: order ${orderId} is ${order.status}; production jobs require preparing.`);
+        return [];
+      }
+
       // Agrupar itens por estação
       const mapItemsToTicket = (items: OrderWithItems['items']) => items.map(item => {
         const orderItem = item as OrderWithItems['items'][number];

@@ -2,7 +2,7 @@ import { OrderStatus } from '@prisma/client';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService MAIN printing producer', () => {
-  it('creates the MAIN receipt through PrintingService after confirmed POS side effects', async () => {
+  it('creates the MAIN receipt without creating kitchen production jobs after confirmed POS side effects', async () => {
     const order = {
       id: 'order-a',
       tenantId: 'tenant-a',
@@ -17,7 +17,7 @@ describe('OrdersService MAIN printing producer', () => {
       printJob: { count: jest.fn() },
       tenant: { findUnique: jest.fn() },
     };
-    const kdsService = { createProductionJobs: jest.fn().mockResolvedValue([{ id: 'kds-job' }]) };
+    const kdsService = { createProductionJobs: jest.fn() };
     const printingService = { createMainReceiptJobForOrder: jest.fn().mockResolvedValue({ id: 'main-job' }) };
     const service = new OrdersService(
       prisma as never,
@@ -40,7 +40,7 @@ describe('OrdersService MAIN printing producer', () => {
 
     await service.runConfirmedOrderSideEffects('order-a', 'tenant-a');
 
-    expect(kdsService.createProductionJobs).toHaveBeenCalledWith('order-a', 'tenant-a');
+    expect(kdsService.createProductionJobs).not.toHaveBeenCalled();
     expect(printingService.createMainReceiptJobForOrder).toHaveBeenCalledWith('tenant-a', 'order-a', orderDetail);
   });
 });

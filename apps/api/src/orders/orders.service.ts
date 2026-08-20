@@ -1433,16 +1433,6 @@ export class OrdersService {
       );
     }
 
-    const jobs = await this.kdsService.createProductionJobs(orderId, tenantId);
-    if (jobs.length === 0) {
-      const existingActiveJobsCount = await this.prisma.printJob.count({
-        where: { tenantId, orderId, status: { in: ['pending', 'printing'] } },
-      });
-      if (existingActiveJobsCount === 0) {
-        this.logger.error(`No active production jobs found for order ${orderId} after status confirmed`);
-      }
-    }
-
     const orderDetail = await this.getOrderDetail(orderId, tenantId);
     await this.printingService.createMainReceiptJobForOrder(tenantId, orderId, orderDetail);
 
