@@ -66,6 +66,9 @@ const baseEnvSchema = z.object({
   MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION: z.string().default(''),
 
   // Upload
+  MEDIA_STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
+  MEDIA_STORAGE_PROVIDER: z.enum(['local', 'r2']).optional(),
+  STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
   MEDIA_MAX_SIZE_BYTES: z.string().optional(),
   MEDIA_MAX_FILE_SIZE_MB: z.string().optional(),
 

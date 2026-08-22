@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { resolveMediaStorageDriver } from '../../config/environment-aliases';
 
 @Injectable()
 export class AdminHealthService {
@@ -100,7 +101,7 @@ export class AdminHealthService {
         productionReady,
         reasons: readinessReasons,
         nodeEnv: process.env.NODE_ENV ?? 'development',
-        storageDriver: process.env.MEDIA_STORAGE_PROVIDER || process.env.MEDIA_STORAGE_DRIVER || process.env.STORAGE_DRIVER || 'local',
+        storageDriver: resolveMediaStorageDriver(process.env),
         billingPaymentsEnabled: process.env.BILLING_PAYMENTS_ENABLED === 'true',
         billingGatewayProvider: process.env.BILLING_GATEWAY_PROVIDER ?? 'manual',
         billingGatewayMode: process.env.BILLING_GATEWAY_MODE ?? 'disabled',

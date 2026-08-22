@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { AsaasCustomerResponse, AsaasSubscriptionResponse, AsaasDeleteResponse } from './dto/asaas.dto';
+import { resolveAsaasBillingApiKey, resolveAsaasBillingBaseUrl } from '../config/environment-aliases';
 
 export interface AsaasCustomerInput {
   name: string;
@@ -26,8 +27,8 @@ export class AsaasService {
   private readonly apiKey: string;
 
   constructor() {
-    this.apiUrl = process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
-    this.apiKey = process.env.ASAAS_API_KEY || '';
+    this.apiUrl = resolveAsaasBillingBaseUrl(process.env);
+    this.apiKey = resolveAsaasBillingApiKey(process.env);
   }
 
   private get headers() {
@@ -39,7 +40,7 @@ export class AsaasService {
 
   async createCustomer(data: AsaasCustomerInput): Promise<AsaasCustomerResponse> {
     if (!this.apiKey) {
-      this.logger.warn('ASAAS_API_KEY not configured. Mocking customer creation.');
+      this.logger.warn('ASAAS_BILLING_API_KEY not configured. Mocking customer creation.');
       return { 
         id: `cus_mock_${Date.now()}`,
         name: data.name,
@@ -65,7 +66,7 @@ export class AsaasService {
 
   async createSubscription(data: AsaasSubscriptionInput): Promise<AsaasSubscriptionResponse> {
     if (!this.apiKey) {
-      this.logger.warn('ASAAS_API_KEY not configured. Mocking subscription creation.');
+      this.logger.warn('ASAAS_BILLING_API_KEY not configured. Mocking subscription creation.');
       return { 
         id: `sub_mock_${Date.now()}`,
         status: 'ACTIVE',
