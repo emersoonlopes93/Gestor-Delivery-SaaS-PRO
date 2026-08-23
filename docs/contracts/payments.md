@@ -2,8 +2,8 @@
 title: Contrato de Pagamentos
 status: current
 owner: engineering
-last_verified: 2026-08-20
-verified_against: feat/payment-foundation-r1 / Payment Foundation R1
+last_verified: 2026-08-23
+verified_against: feat/payment-monetization-foundation-r2 / Payment Monetization Foundation R2
 ---
 
 # Contrato de Pagamentos
@@ -60,6 +60,23 @@ provider, conexão opcional, valor, moeda, chave idempotente e status canônico.
   `REFUNDED` e `PARTIALLY_REFUNDED`. Status de provider são mapeados pelo adapter.
 - Transições usam compare-and-set no status para que concorrência não adquira o mesmo efeito
   financeiro duas vezes.
+
+## Payment Monetization Foundation R2
+
+- `PlatformFeePolicy` is provider-neutral and versioned by `selectorKey + version`, with an
+  effective interval. `FREE` covers tenants without a current Billing V2 subscription,
+  `PLAN:<billingPlanId>` supports plan-specific rules, and `PAID_DEFAULT` is the paid fallback.
+- Initial persisted policies are `FREE` R$ 0.38 and `PAID_DEFAULT` R$ 0.20, BRL/FIXED. They
+  are versioned data rather than business-logic constants.
+- Every new `OrderPaymentAttempt` snapshots policy, version, type, amount, currency and plan.
+  Pre-R2 attempts remain compatible and are not reinterpreted.
+- `PlatformFeeEntry` separates PedeHub revenue, provider fee and customer refund. Refund does
+  not erase an earned fee; a confirmed provider reversal creates one `TenantReceivable` for
+  only the amount no longer retained.
+- `OnlinePaymentActivation` is local and explicit. Signup creates no activation, connection
+  or external account. A request records actor and technical terms version.
+- SaaS Billing remains separate from Order Payments. No Asaas adapter, new Mercado Pago
+  integration, router, external refund or provider pricing was added.
 
 ## Webhook inbox
 

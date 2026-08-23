@@ -25,6 +25,12 @@ function attempt(overrides: Partial<OrderPaymentAttempt> = {}): OrderPaymentAtte
     failureCode: null,
     failureReason: null,
     metadataJson: null,
+    platformFeePolicyId: 'policy-free-v1',
+    platformFeePolicyVersion: 1,
+    platformFeeType: 'FIXED',
+    platformFeeExpectedAmount: new Prisma.Decimal('0.38'),
+    platformFeeCurrency: 'BRL',
+    tenantPlanSnapshot: 'free:no-active-billing-plan',
     createdAt: new Date('2026-08-20T12:00:00.000Z'),
     updatedAt: new Date('2026-08-20T12:00:00.000Z'),
     ...overrides,
@@ -35,7 +41,10 @@ describe('OrderPaymentAttemptService', () => {
   const tx = {
     order: { findFirst: jest.fn() },
     paymentProviderConnection: { findFirst: jest.fn() },
-    orderPaymentAttempt: { create: jest.fn() },
+    onlinePaymentActivation: { findUnique: jest.fn() },
+    orderPaymentAttempt: { create: jest.fn(), findFirst: jest.fn(), findFirstOrThrow: jest.fn(), updateMany: jest.fn() },
+    platformFeeEntry: { updateMany: jest.fn() },
+    auditLog: { create: jest.fn() },
   };
   const prisma = {
     orderPaymentAttempt: {
@@ -45,7 +54,19 @@ describe('OrderPaymentAttemptService', () => {
     },
     $transaction: jest.fn(),
   };
-  const service = new OrderPaymentAttemptService(prisma as never);
+  const platformFeePolicyService = {
+    resolveForTenant: jest.fn().mockResolvedValue({
+      policy: {
+        id: 'policy-free-v1', selectorKey: 'FREE', scope: 'FREE_TENANT', billingPlanId: null,
+        feeType: 'FIXED', fixedAmount: new Prisma.Decimal('0.38'), currency: 'BRL', version: 1,
+        effectiveFrom: new Date('2026-08-23T00:00:00.000Z'), effectiveUntil: null, active: true,
+        createdAt: new Date('2026-08-23T00:00:00.000Z'), updatedAt: new Date('2026-08-23T00:00:00.000Z'),
+      },
+      amount: new Prisma.Decimal('0.38'),
+      tenantPlanSnapshot: 'free:no-active-billing-plan',
+    }),
+  };
+  const service = new OrderPaymentAttemptService(prisma as never, platformFeePolicyService as never);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -79,6 +100,26 @@ describe('OrderPaymentAttemptService', () => {
     expect(tx.paymentProviderConnection.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ tenantId: 'tenant-a', provider: PaymentProvider.mercado_pago }),
     }));
+    expect(tx.orderPaymentAttempt.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        platformFeePolicyId: 'policy-free-v1',
+        platformFeePolicyVersion: 1,
+        platformFeeExpectedAmount: new Prisma.Decimal('0.38'),
+        tenantPlanSnapshot: 'free:no-active-billing-plan',
+      }),
+    }));
+  });
+
+  it('requires explicit activation only for flows that opt into the R2 activation gate', async () => {
+    prisma.orderPaymentAttempt.findFirst.mockResolvedValue(null);
+    tx.onlinePaymentActivation.findUnique.mockResolvedValue(null);
+
+    await expect(service.createAttempt({
+      tenantId: 'tenant-a', orderId: 'order-a', provider: PaymentProvider.mercado_pago,
+      providerConnectionId: 'connection-a', idempotencyKey: 'activation-gated',
+      requireOnlinePaymentActivation: true,
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.orderPaymentAttempt.create).not.toHaveBeenCalled();
   });
 
   it('reuses the same logical attempt for the same tenant, order and key', async () => {
@@ -182,5 +223,24 @@ describe('OrderPaymentAttemptService', () => {
 
     expect(first.id).toBe('attempt-a');
     expect(second.id).toBe('attempt-a');
+  });
+
+  it('earns the snapshotted Platform Fee atomically when payment becomes paid', async () => {
+    const pending = attempt({ status: OrderPaymentAttemptStatus.PENDING });
+    const paid = attempt({ status: OrderPaymentAttemptStatus.PAID, paidAt: new Date() });
+    tx.orderPaymentAttempt.findFirst.mockResolvedValue(pending);
+    tx.orderPaymentAttempt.updateMany.mockResolvedValue({ count: 1 });
+    tx.orderPaymentAttempt.findFirstOrThrow.mockResolvedValue(paid);
+    tx.platformFeeEntry.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.transitionStatusOnce({
+      tenantId: 'tenant-a', attemptId: 'attempt-a', status: OrderPaymentAttemptStatus.PAID,
+    });
+
+    expect(result.transitioned).toBe(true);
+    expect(tx.platformFeeEntry.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-a', orderPaymentAttemptId: 'attempt-a', state: 'PENDING' },
+      data: { state: 'EARNED', earnedAt: expect.any(Date) },
+    });
   });
 });

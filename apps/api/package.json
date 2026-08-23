@@ -39,6 +39,7 @@
         "smoke:webhook-security-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-webhook-security-flow.ts",
         "smoke:marketplace-ifood-p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-marketplace-ifood-p1-flow.ts",
         "smoke:monetization-p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-monetization-p1-flow.ts",
+        "smoke:payment-monetization-r2": "ts-node -r tsconfig-paths/register scripts/smoke-test-payment-monetization-r2.ts",
         "smoke:setup-ifood": "ts-node -r tsconfig-paths/register scripts/smoke-setup-ifood.ts",
         "smoke:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-v2.ts",
         "smoke:tenant-billing-portal": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-portal.ts",

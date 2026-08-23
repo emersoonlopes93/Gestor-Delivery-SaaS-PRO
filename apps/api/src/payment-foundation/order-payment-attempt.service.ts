@@ -9,9 +9,11 @@ import {
   OrderPaymentAttemptStatus,
   PaymentProvider,
   PaymentProviderConnectionStatus,
+  OnlinePaymentActivationStatus,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { PlatformFeePolicyService } from './platform-fee-policy.service';
 
 const ALLOWED_STATUS_TRANSITIONS: Record<OrderPaymentAttemptStatus, OrderPaymentAttemptStatus[]> = {
   CREATED: [
@@ -35,7 +37,10 @@ const ALLOWED_STATUS_TRANSITIONS: Record<OrderPaymentAttemptStatus, OrderPayment
 
 @Injectable()
 export class OrderPaymentAttemptService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly platformFeePolicyService: PlatformFeePolicyService,
+  ) {}
 
   async createAttempt(input: {
     tenantId: string;
@@ -44,6 +49,7 @@ export class OrderPaymentAttemptService {
     providerConnectionId?: string | null;
     idempotencyKey: string;
     expiresAt?: Date | null;
+    requireOnlinePaymentActivation?: boolean;
   }): Promise<OrderPaymentAttempt> {
     const idempotencyKey = input.idempotencyKey.trim();
     if (!idempotencyKey || idempotencyKey.length > 160) {
@@ -87,7 +93,23 @@ export class OrderPaymentAttemptService {
           }
         }
 
-        return tx.orderPaymentAttempt.create({
+        if (input.requireOnlinePaymentActivation) {
+          const activation = await tx.onlinePaymentActivation.findUnique({
+            where: { tenantId: input.tenantId },
+            select: { status: true },
+          });
+          if (activation?.status !== OnlinePaymentActivationStatus.ACTIVE) {
+            throw new ConflictException('Online payments are not active for this tenant.');
+          }
+        }
+
+        const effectiveAt = new Date();
+        const resolvedFee = await this.platformFeePolicyService.resolveForTenant(
+          input.tenantId,
+          effectiveAt,
+          tx,
+        );
+        const created = await tx.orderPaymentAttempt.create({
           data: {
             tenantId: input.tenantId,
             orderId: order.id,
@@ -97,8 +119,39 @@ export class OrderPaymentAttemptService {
             amount: order.total,
             currency: order.tenant.settings?.currency ?? 'BRL',
             expiresAt: input.expiresAt ?? null,
+            platformFeePolicyId: resolvedFee.policy.id,
+            platformFeePolicyVersion: resolvedFee.policy.version,
+            platformFeeType: resolvedFee.policy.feeType,
+            platformFeeExpectedAmount: resolvedFee.amount,
+            platformFeeCurrency: resolvedFee.policy.currency,
+            tenantPlanSnapshot: resolvedFee.tenantPlanSnapshot,
+            platformFeeEntry: {
+              create: {
+                tenantId: input.tenantId,
+                expectedAmount: resolvedFee.amount,
+                currency: resolvedFee.policy.currency,
+              },
+            },
           },
         });
+        await tx.auditLog.create({
+          data: {
+            tenantId: input.tenantId,
+            userId: null,
+            userType: 'system',
+            action: 'payment.platform_fee_snapshotted',
+            resource: 'order_payment_attempt',
+            details: {
+              attemptId: created.id,
+              policyId: resolvedFee.policy.id,
+              policyVersion: resolvedFee.policy.version,
+              expectedAmount: resolvedFee.amount.toFixed(2),
+              currency: resolvedFee.policy.currency,
+              tenantPlanSnapshot: resolvedFee.tenantPlanSnapshot,
+            },
+          },
+        });
+        return created;
       });
     } catch (error) {
       if (!this.isUniqueConstraint(error)) throw error;
@@ -161,27 +214,49 @@ export class OrderPaymentAttemptService {
     failureCode?: string | null;
     failureReason?: string | null;
   }): Promise<{ attempt: OrderPaymentAttempt; transitioned: boolean }> {
-    const attempt = await this.getForTenant(input.tenantId, input.attemptId);
-    if (attempt.status === input.status) return { attempt, transitioned: false };
-    if (!ALLOWED_STATUS_TRANSITIONS[attempt.status].includes(input.status)) {
-      throw new ConflictException(`Invalid payment attempt transition ${attempt.status}->${input.status}.`);
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.orderPaymentAttempt.findFirst({ where: { id: input.attemptId, tenantId: input.tenantId } });
+      if (!attempt) throw new NotFoundException('Payment attempt not found.');
+      if (attempt.status === input.status) return { attempt, transitioned: false };
+      if (!ALLOWED_STATUS_TRANSITIONS[attempt.status].includes(input.status)) {
+        throw new ConflictException(`Invalid payment attempt transition ${attempt.status}->${input.status}.`);
+      }
 
-    const now = new Date();
-    const claimed = await this.prisma.orderPaymentAttempt.updateMany({
-      where: { id: attempt.id, tenantId: input.tenantId, status: attempt.status },
-      data: {
-        status: input.status,
-        paidAt: input.status === OrderPaymentAttemptStatus.PAID ? now : undefined,
-        failedAt: input.status === OrderPaymentAttemptStatus.FAILED ? now : undefined,
-        failureCode: input.failureCode,
-        failureReason: input.failureReason,
-      },
+      const now = new Date();
+      const claimed = await tx.orderPaymentAttempt.updateMany({
+        where: { id: attempt.id, tenantId: input.tenantId, status: attempt.status },
+        data: {
+          status: input.status,
+          paidAt: input.status === OrderPaymentAttemptStatus.PAID ? now : undefined,
+          failedAt: input.status === OrderPaymentAttemptStatus.FAILED ? now : undefined,
+          failureCode: input.failureCode,
+          failureReason: input.failureReason,
+        },
+      });
+      const current = await tx.orderPaymentAttempt.findFirstOrThrow({ where: { id: attempt.id, tenantId: input.tenantId } });
+      if (claimed.count !== 1) {
+        if (current.status === input.status) return { attempt: current, transitioned: false };
+        throw new ConflictException(`Concurrent payment attempt transition ended in ${current.status}.`);
+      }
+      if (input.status === OrderPaymentAttemptStatus.PAID && attempt.platformFeePolicyId) {
+        const feeClaim = await tx.platformFeeEntry.updateMany({
+          where: { tenantId: input.tenantId, orderPaymentAttemptId: attempt.id, state: 'PENDING' },
+          data: { state: 'EARNED', earnedAt: now },
+        });
+        if (feeClaim.count !== 1) throw new ConflictException('Platform Fee could not be earned atomically.');
+        await tx.auditLog.create({
+          data: {
+            tenantId: input.tenantId,
+            userId: null,
+            userType: 'system',
+            action: 'payment.platform_fee_earned',
+            resource: 'platform_fee',
+            details: { attemptId: attempt.id },
+          },
+        });
+      }
+      return { attempt: current, transitioned: true };
     });
-    const current = await this.getForTenant(input.tenantId, input.attemptId);
-    if (claimed.count === 1) return { attempt: current, transitioned: true };
-    if (current.status === input.status) return { attempt: current, transitioned: false };
-    throw new ConflictException(`Concurrent payment attempt transition ended in ${current.status}.`);
   }
 
   async getForTenant(tenantId: string, attemptId: string): Promise<OrderPaymentAttempt> {

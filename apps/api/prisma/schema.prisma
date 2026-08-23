@@ -34,6 +34,9 @@ model Tenant {
   paymentTransactions            PaymentTransaction[]
   paymentProviderConnections     PaymentProviderConnection[]
   orderPaymentAttempts           OrderPaymentAttempt[]
+  platformFeeEntries             PlatformFeeEntry[]
+  tenantReceivables              TenantReceivable[]
+  onlinePaymentActivation        OnlinePaymentActivation?
   TenantSubscription             TenantSubscription?
   aiAgentConfig                  AiAgentConfig?
   analyticsDailyAggregates       AnalyticsDailyAggregate[]
@@ -1459,6 +1462,7 @@ model BillingPlan {
   modules               BillingPlanModule[]
   revenueTiers          BillingRevenueTier[]
   subscriptions         TenantBillingSubscription[]
+  platformFeePolicies   PlatformFeePolicy[]
 }
 
 model BillingRevenueTier {
@@ -1927,6 +1931,12 @@ model OrderPaymentAttempt {
   failureCode          String?                    @map("failure_code") @db.VarChar(120)
   failureReason        String?                    @map("failure_reason") @db.VarChar(500)
   metadataJson         Json?                      @map("metadata_json")
+  platformFeePolicyId  String?                    @map("platform_fee_policy_id")
+  platformFeePolicyVersion Int?                   @map("platform_fee_policy_version")
+  platformFeeType      PlatformFeeType?           @map("platform_fee_type")
+  platformFeeExpectedAmount Decimal?              @map("platform_fee_expected_amount") @db.Decimal(12, 2)
+  platformFeeCurrency  String?                    @map("platform_fee_currency") @db.VarChar(3)
+  tenantPlanSnapshot   String?                    @map("tenant_plan_snapshot") @db.VarChar(180)
   createdAt            DateTime                   @default(now()) @map("created_at")
   updatedAt            DateTime                   @updatedAt @map("updated_at")
   tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1934,12 +1944,100 @@ model OrderPaymentAttempt {
   providerConnection   PaymentProviderConnection? @relation(fields: [providerConnectionId], references: [id], onDelete: Restrict)
   paymentTransaction   PaymentTransaction?
   webhookEvents        ExternalWebhookEvent[]
+  platformFeePolicy    PlatformFeePolicy?         @relation(fields: [platformFeePolicyId], references: [id], onDelete: Restrict)
+  platformFeeEntry     PlatformFeeEntry?
 
   @@unique([tenantId, orderId, idempotencyKey])
   @@unique([providerConnectionId, externalPaymentId])
   @@index([tenantId, orderId, createdAt])
   @@index([tenantId, status])
+  @@index([platformFeePolicyId])
   @@map("order_payment_attempts")
+}
+
+model PlatformFeePolicy {
+  id             String              @id @default(uuid())
+  selectorKey    String              @map("selector_key") @db.VarChar(180)
+  scope          PlatformFeePolicyScope
+  billingPlanId  String?             @map("billing_plan_id")
+  feeType        PlatformFeeType     @default(FIXED) @map("fee_type")
+  fixedAmount    Decimal             @map("fixed_amount") @db.Decimal(12, 2)
+  currency       String              @default("BRL") @db.VarChar(3)
+  version        Int
+  effectiveFrom  DateTime            @map("effective_from")
+  effectiveUntil DateTime?           @map("effective_until")
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  billingPlan    BillingPlan?        @relation(fields: [billingPlanId], references: [id], onDelete: Restrict)
+  paymentAttempts OrderPaymentAttempt[]
+
+  @@unique([selectorKey, version])
+  @@index([selectorKey, active, effectiveFrom, effectiveUntil], map: "platform_fee_policy_effective_idx")
+  @@index([billingPlanId])
+  @@map("platform_fee_policies")
+}
+
+model PlatformFeeEntry {
+  id                        String           @id @default(uuid())
+  tenantId                  String           @map("tenant_id")
+  orderPaymentAttemptId     String           @unique @map("order_payment_attempt_id")
+  state                     PlatformFeeState @default(PENDING)
+  expectedAmount            Decimal          @map("expected_amount") @db.Decimal(12, 2)
+  actualCollectedAmount     Decimal          @default(0) @map("actual_collected_amount") @db.Decimal(12, 2)
+  currency                  String           @default("BRL") @db.VarChar(3)
+  providerSplitAllocationId String?          @map("provider_split_allocation_id") @db.VarChar(255)
+  externalReference         String?          @map("external_reference") @db.VarChar(255)
+  earnedAt                  DateTime?        @map("earned_at")
+  settledAt                 DateTime?        @map("settled_at")
+  reversedAt                DateTime?        @map("reversed_at")
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  updatedAt                 DateTime         @updatedAt @map("updated_at")
+  tenant                    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderPaymentAttempt       OrderPaymentAttempt @relation(fields: [orderPaymentAttemptId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, state])
+  @@map("platform_fee_entries")
+}
+
+model TenantReceivable {
+  id         String                       @id @default(uuid())
+  tenantId   String                       @map("tenant_id")
+  sourceType TenantReceivableSourceType   @map("source_type")
+  sourceId   String                       @map("source_id") @db.VarChar(160)
+  amount     Decimal                      @db.Decimal(12, 2)
+  currency   String                       @default("BRL") @db.VarChar(3)
+  status     TenantReceivableStatus       @default(OPEN)
+  reason     String                       @db.VarChar(255)
+  createdAt  DateTime                     @default(now()) @map("created_at")
+  updatedAt  DateTime                     @updatedAt @map("updated_at")
+  settledAt  DateTime?                    @map("settled_at")
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId, status])
+  @@map("tenant_receivables")
+}
+
+model OnlinePaymentActivation {
+  id                    String                        @id @default(uuid())
+  tenantId              String                        @unique @map("tenant_id")
+  status                OnlinePaymentActivationStatus @default(NOT_REQUESTED)
+  requestedAt           DateTime?                     @map("requested_at")
+  termsAcceptedAt       DateTime?                     @map("terms_accepted_at")
+  termsVersion          String?                       @map("terms_version") @db.VarChar(80)
+  termsAcceptedByUserId String?                       @map("terms_accepted_by_user_id")
+  onboardingStartedAt   DateTime?                     @map("onboarding_started_at")
+  activatedAt           DateTime?                     @map("activated_at")
+  suspendedAt           DateTime?                     @map("suspended_at")
+  failureReason         String?                       @map("failure_reason") @db.VarChar(255)
+  metadataJson          Json?                         @map("metadata_json")
+  createdAt             DateTime                      @default(now()) @map("created_at")
+  updatedAt             DateTime                      @updatedAt @map("updated_at")
+  tenant                Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("online_payment_activations")
 }
 
 model MarketplaceEventInbox {
@@ -3945,6 +4043,45 @@ enum OrderPaymentAttemptStatus {
   CANCELED
   REFUNDED
   PARTIALLY_REFUNDED
+}
+
+enum PlatformFeePolicyScope {
+  FREE_TENANT
+  PAID_DEFAULT
+  BILLING_PLAN
+}
+
+enum PlatformFeeType {
+  FIXED
+}
+
+enum PlatformFeeState {
+  PENDING
+  EARNED
+  SETTLED
+  REVERSED_BY_PROVIDER
+  DUE_FROM_TENANT
+  WAIVED
+}
+
+enum TenantReceivableSourceType {
+  PLATFORM_FEE_PROVIDER_REVERSAL
+}
+
+enum TenantReceivableStatus {
+  OPEN
+  SETTLED
+  WAIVED
+}
+
+enum OnlinePaymentActivationStatus {
+  NOT_REQUESTED
+  PENDING_TERMS
+  PENDING_ONBOARDING
+  PENDING_KYC
+  ACTIVE
+  SUSPENDED
+  FAILED
 }
 
 enum BillingGatewayMode {
