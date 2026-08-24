@@ -2,8 +2,8 @@
 title: Contrato de Pagamentos
 status: current
 owner: engineering
-last_verified: 2026-08-23
-verified_against: feat/payment-monetization-foundation-r2 / Payment Monetization Foundation R2
+last_verified: 2026-08-24
+verified_against: feat/payment-monetization-foundation-r2 / entitlement-aligned R2
 ---
 
 # Contrato de Pagamentos
@@ -64,8 +64,10 @@ provider, conexão opcional, valor, moeda, chave idempotente e status canônico.
 ## Payment Monetization Foundation R2
 
 - `PlatformFeePolicy` is provider-neutral and versioned by `selectorKey + version`, with an
-  effective interval. `FREE` covers tenants without a current Billing V2 subscription,
-  `PLAN:<billingPlanId>` supports plan-specific rules, and `PAID_DEFAULT` is the paid fallback.
+  effective interval. The shared billing entitlement decision grants paid pricing to `active`,
+  unexpired `trialing` and unexpired `grace_period`; expired windows, raw `past_due`, blocked
+  statuses and tenants without a subscription use `FREE`. `PLAN:<billingPlanId>` supports
+  plan-specific rules, and `PAID_DEFAULT` is the paid fallback.
 - Initial persisted policies are `FREE` R$ 0.38 and `PAID_DEFAULT` R$ 0.20, BRL/FIXED. They
   are versioned data rather than business-logic constants.
 - Every new `OrderPaymentAttempt` snapshots policy, version, type, amount, currency and plan.

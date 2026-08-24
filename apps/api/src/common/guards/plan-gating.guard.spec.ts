@@ -80,6 +80,36 @@ describe('PlanGatingGuard financial enforcement', () => {
       .toBe(true);
   });
 
+  it('keeps a valid grace period operational through the shared decision', async () => {
+    tenantBillingResolver.reconcileTenantBillingStatus.mockResolvedValue({
+      subscriptionStatus: 'grace_period',
+      trialEndsAt: null,
+      subscription: { gracePeriodEndsAt: new Date(Date.now() + 60_000) },
+      source: 'billing_v2',
+      allowAllModules: true,
+      includedModules: [],
+    });
+
+    await expect(makeGuard().canActivate(makeContext('/api/v1/orders') as never))
+      .resolves
+      .toBe(true);
+  });
+
+  it('continues to block raw past_due even when a future grace date exists', async () => {
+    tenantBillingResolver.reconcileTenantBillingStatus.mockResolvedValue({
+      subscriptionStatus: 'past_due',
+      trialEndsAt: null,
+      subscription: { gracePeriodEndsAt: new Date(Date.now() + 60_000) },
+      source: 'billing_v2',
+      allowAllModules: true,
+      includedModules: [],
+    });
+
+    await expect(makeGuard().canActivate(makeContext('/api/v1/orders') as never))
+      .rejects
+      .toBeInstanceOf(ForbiddenException);
+  });
+
   it('allows inventory only when the Billing V2 plan includes the module', async () => {
     reflector.getAllAndOverride.mockReturnValue('inventory');
     tenantBillingResolver.reconcileTenantBillingStatus.mockResolvedValue({

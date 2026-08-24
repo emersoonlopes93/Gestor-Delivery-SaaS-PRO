@@ -1,11 +1,13 @@
-## Payment Monetization Foundation R2 (2026-08-23)
+## Payment Monetization Foundation R2 (2026-08-24)
 
 - Isolated branch `feat/payment-monetization-foundation-r2`, based on `origin/main-copy`
   `df2566cd621c109853b367123e7b770aa83fa0ac`.
 - Added provider-neutral transaction monetization: versioned policy, immutable snapshot,
   Platform Fee lifecycle, idempotent receivable and explicit local activation.
-- Classification uses the current Billing V2 `billingPlanId`. No current subscription uses
-  `FREE`; plans can use `PLAN:<billingPlanId>` and otherwise use `PAID_DEFAULT`.
+- Classification now reuses the side-effect-free billing entitlement decision shared with the
+  operational guard and lifecycle. `active`, valid trial and valid grace use paid pricing;
+  expired windows, raw `past_due`, blocked states and no subscription use `FREE`. Paid plans
+  can use `PLAN:<billingPlanId>` and otherwise use `PAID_DEFAULT`.
 - Refund does not erase an earned fee. Provider reversal creates `DUE_FROM_TENANT`, deduped by
   `(tenantId, sourceType, sourceId)` and limited to expected fee minus retained amount.
 - Signup creates no onboarding, provider connection or external account. Tenant endpoints
@@ -15,6 +17,10 @@
   (21 tests), the full API suite in 4 shards (115 suites/519 tests passed; 4 suites/9 tests
   skipped), and the PostgreSQL smoke passed. Boundaries/theme reproduced only their unchanged
   baseline findings outside this diff.
+- Entitlement correction validation: 5 focused suites/41 tests and the full API suite in four
+  shards passed (117 suites/543 tests; 4 suites/9 tests skipped). API lint/build, global
+  typecheck, no-any/features and `git diff --check` passed. PostgreSQL 16 smoke proved Free,
+  Active, valid/expired Trial, valid/expired Grace, raw Past Due and immutable snapshots.
 
 ## Payment Foundation R1 (2026-08-20)
 

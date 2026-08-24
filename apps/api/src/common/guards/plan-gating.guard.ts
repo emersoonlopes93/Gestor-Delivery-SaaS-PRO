@@ -6,6 +6,7 @@ import { TenantBillingResolverService } from '../../billing/tenant-billing-resol
 import { REQUIRES_FEATURE_KEY } from '../decorators/requires-feature.decorator';
 import { FeatureControlService } from '../../feature-control/feature-control.service';
 import { getFeatureCatalogEntry } from '@gestor/core';
+import { resolveEffectiveBillingEntitlement } from '../../billing/billing-entitlement-decision';
 
 type RequestWithTenant = {
   headers: Record<string, string | string[] | undefined>;
@@ -92,22 +93,22 @@ export class PlanGatingGuard implements CanActivate {
       return;
     }
 
-    const now = new Date();
-    const normalizedStatus = status?.toString().toLowerCase() ?? '';
-    const trialExpired = normalizedStatus === 'trialing' && trialEndsAt != null && trialEndsAt < now;
-    const graceExpired = normalizedStatus === 'grace_period' && gracePeriodEndsAt != null && gracePeriodEndsAt < now;
-    const blockedStatus = ['past_due', 'suspended', 'canceled', 'cancelled', 'blocked'].includes(normalizedStatus);
+    const entitlement = resolveEffectiveBillingEntitlement({
+      status,
+      trialEndsAt,
+      gracePeriodEndsAt,
+    });
 
-    if (!trialExpired && !graceExpired && !blockedStatus) {
+    if (entitlement.canOperate) {
       return;
     }
 
     this.logger.warn({
       message: 'tenant_financial_enforcement_blocked',
       tenantId,
-      status: normalizedStatus || 'none',
-      trialExpired,
-      graceExpired,
+      status: entitlement.effectiveStatus ?? 'none',
+      trialExpired: entitlement.trialExpired,
+      graceExpired: entitlement.graceExpired,
       method: request.method,
       path: request.originalUrl ?? request.url ?? request.route?.path,
     });
@@ -116,9 +117,9 @@ export class PlanGatingGuard implements CanActivate {
       error: 'TENANT_FINANCIAL_BLOCKED',
       message: 'Sua assinatura precisa ser regularizada para operar. Acesse o billing para reativar.',
       details: {
-        status: normalizedStatus || null,
-        trialExpired,
-        graceExpired,
+        status: entitlement.effectiveStatus,
+        trialExpired: entitlement.trialExpired,
+        graceExpired: entitlement.graceExpired,
       },
     });
   }

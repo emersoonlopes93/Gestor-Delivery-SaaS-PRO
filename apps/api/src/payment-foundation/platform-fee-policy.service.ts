@@ -2,8 +2,8 @@ import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import {
   PlatformFeePolicy,
   Prisma,
-  TenantSubscriptionStatus,
 } from '@prisma/client';
+import { resolveEffectiveBillingEntitlement } from '../billing/billing-entitlement-decision';
 import { PrismaService } from '../database/prisma.service';
 
 type PolicyClient = Pick<Prisma.TransactionClient, 'tenantBillingSubscription' | 'platformFeePolicy'>;
@@ -13,13 +13,6 @@ export type ResolvedPlatformFeePolicy = {
   amount: Prisma.Decimal;
   tenantPlanSnapshot: string;
 };
-
-const PAID_SUBSCRIPTION_STATUSES: TenantSubscriptionStatus[] = [
-  TenantSubscriptionStatus.trialing,
-  TenantSubscriptionStatus.active,
-  TenantSubscriptionStatus.past_due,
-  TenantSubscriptionStatus.grace_period,
-];
 
 @Injectable()
 export class PlatformFeePolicyService {
@@ -31,13 +24,20 @@ export class PlatformFeePolicyService {
     client: PolicyClient = this.prisma,
   ): Promise<ResolvedPlatformFeePolicy> {
     const subscription = await client.tenantBillingSubscription.findFirst({
-      where: { tenantId, status: { in: PAID_SUBSCRIPTION_STATUSES } },
-      select: { billingPlanId: true },
+      where: { tenantId },
+      select: {
+        billingPlanId: true,
+        status: true,
+        trialEndsAt: true,
+        gracePeriodEndsAt: true,
+      },
       orderBy: [{ createdAt: 'desc' }],
     });
+    const entitlement = resolveEffectiveBillingEntitlement(subscription, effectiveAt);
+    const effectivePlanId = entitlement.effectivePlanId;
 
-    const exactSelector = subscription ? `PLAN:${subscription.billingPlanId}` : 'FREE';
-    const selectors = subscription ? [exactSelector, 'PAID_DEFAULT'] : [exactSelector];
+    const exactSelector = effectivePlanId ? `PLAN:${effectivePlanId}` : 'FREE';
+    const selectors = effectivePlanId ? [exactSelector, 'PAID_DEFAULT'] : [exactSelector];
     const policies = await client.platformFeePolicy.findMany({
       where: {
         selectorKey: { in: selectors },
@@ -59,7 +59,9 @@ export class PlatformFeePolicyService {
     return {
       policy,
       amount: new Prisma.Decimal(policy.fixedAmount).toDecimalPlaces(2),
-      tenantPlanSnapshot: subscription ? `billing-plan:${subscription.billingPlanId}` : 'free:no-active-billing-plan',
+      tenantPlanSnapshot: effectivePlanId
+        ? `billing-plan:${effectivePlanId}`
+        : `free:${entitlement.reason}`,
     };
   }
 }
