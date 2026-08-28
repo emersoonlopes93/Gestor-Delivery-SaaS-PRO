@@ -29,7 +29,7 @@ describe('R6 mobile safe-area and theme contracts', () => {
   it('protects fixed delivery and checkout actions with a bottom inset', () => {
     expect(bottomSheet).toContain('safe-sheet');
     expect(deliveryMap).toContain('safe-sheet lg:static fixed');
-    expect(checkout).toContain('storefront-safe-action fixed bottom-0');
+    expect(checkout).toContain('storefront-safe-action sticky bottom-0');
   });
 
   it('keeps modals safe and body portals on semantic theme tokens', () => {
@@ -48,6 +48,8 @@ describe('R6 mobile safe-area and theme contracts', () => {
     expect(tenantTheme).toContain("localStorage.setItem(THEME_STORAGE_KEY, theme)");
     expect(tenantTheme).toContain("addEventListener('change', systemPreferenceListener)");
     expect(tenantTheme).toContain("removeEventListener('change', systemPreferenceListener)");
+    expect(tenantTheme).toContain('resolvedTheme: ResolvedTheme');
+    expect(appLayout).toContain("setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')");
   });
 
   it('uses semantic tokens at the audited sheet and portal hotspots', () => {

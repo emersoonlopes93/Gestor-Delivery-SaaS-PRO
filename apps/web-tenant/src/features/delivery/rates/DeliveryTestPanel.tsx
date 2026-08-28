@@ -16,7 +16,7 @@ export function DeliveryTestPanel(props: DeliveryTestPanelProps) {
     <section className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
       <div>
         <h3 className="text-lg font-black text-foreground">Testar entrega</h3>
-        <p className="text-sm text-slate-500">Digite um endereço completo ou CEP e use a mesma lógica real do backend.</p>
+        <p className="text-sm text-muted-foreground">Digite um endereço completo ou CEP e use a mesma lógica real do backend.</p>
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row">
@@ -44,13 +44,13 @@ export function DeliveryTestPanel(props: DeliveryTestPanelProps) {
         <div
           className={
             'rounded-3xl border p-5 ' +
-            (props.result.available ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50')
+            (props.result.available ? 'border-status-success/30 bg-status-success/10' : 'border-destructive/30 bg-destructive/10')
           }
         >
-          <div className={'text-base font-black ' + (props.result.available ? 'text-green-700' : 'text-red-700')}>
+          <div className={'text-base font-black ' + (props.result.available ? 'text-status-success' : 'text-destructive')}>
             {props.result.available ? 'Entrega disponível' : 'Entrega indisponível'}
           </div>
-          <div className="mt-3 grid gap-2 text-sm text-slate-700">
+          <div className="mt-3 grid gap-2 text-sm text-foreground">
             <div><strong>Taxa:</strong> {fmtMoney(props.result.fee)}</div>
             {props.result.distanceKm != null ? <div><strong>Distância:</strong> {props.result.distanceKm.toFixed(2)} km</div> : null}
             {props.result.estimatedDeliveryMinutes != null ? (

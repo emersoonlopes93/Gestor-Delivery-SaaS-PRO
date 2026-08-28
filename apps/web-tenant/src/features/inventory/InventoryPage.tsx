@@ -138,7 +138,7 @@ export function InventoryPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as InventoryTab)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab.id ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab.id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
             <tab.icon size={14} />
             <span className="hidden md:inline">{tab.label}</span>

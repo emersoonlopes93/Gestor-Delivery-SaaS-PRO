@@ -107,7 +107,7 @@ export function OrderAutomationSettingsPage() {
             onClick={() => setForm((current) => ({ ...current, autoAcceptOrdersEnabled: !current.autoAcceptOrdersEnabled }))}
             className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${form.autoAcceptOrdersEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
           >
-            <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${form.autoAcceptOrdersEnabled ? 'right-1' : 'left-1'}`} />
+            <div className={`absolute top-[3px] h-6 w-6 rounded-full bg-primary-foreground shadow-sm transition-all duration-300 ${form.autoAcceptOrdersEnabled ? 'right-1' : 'left-1'}`} />
           </button>
         </div>
 
@@ -166,7 +166,7 @@ export function OrderAutomationSettingsPage() {
                   <div className="text-xs text-muted-foreground font-medium">So entra no autoaceite se a entrega for valida e sem pendencias criticas.</div>
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-colors ${form.autoAcceptDeliveryOrders ? 'bg-primary' : 'bg-muted'}`}>
-                  <div className={`mt-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${form.autoAcceptDeliveryOrders ? 'ml-4' : 'ml-0.5'}`} />
+                  <div className={`mt-0.5 h-5 w-5 rounded-full bg-primary-foreground shadow-sm transition-all ${form.autoAcceptDeliveryOrders ? 'ml-4' : 'ml-0.5'}`} />
                 </div>
               </div>
             </button>
@@ -182,7 +182,7 @@ export function OrderAutomationSettingsPage() {
                   <div className="text-xs text-muted-foreground font-medium">Mantem a conferencia operacional, mas sem exigir aceite manual quando elegivel.</div>
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-colors ${form.autoAcceptPickupOrders ? 'bg-primary' : 'bg-muted'}`}>
-                  <div className={`mt-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${form.autoAcceptPickupOrders ? 'ml-4' : 'ml-0.5'}`} />
+                  <div className={`mt-0.5 h-5 w-5 rounded-full bg-primary-foreground shadow-sm transition-all ${form.autoAcceptPickupOrders ? 'ml-4' : 'ml-0.5'}`} />
                 </div>
               </div>
             </button>

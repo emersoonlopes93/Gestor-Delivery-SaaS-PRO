@@ -77,6 +77,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Check theme compatibility
+        run: pnpm check:theme
+
       - name: Typecheck web tenant
         run: pnpm --filter @gestor/web-tenant exec tsc --noEmit
 

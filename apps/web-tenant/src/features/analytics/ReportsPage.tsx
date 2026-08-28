@@ -10,6 +10,14 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { DashboardStatsDTO } from '@gestor/types';
+import {
+  chartAxisColor,
+  chartGridColor,
+  chartTooltipContentStyle,
+  chartTooltipCursor,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+} from '../../components/charts/chart-theme';
 
 /**
  * Filter intervals for the reports
@@ -140,7 +148,11 @@ export function ReportsPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  contentStyle={chartTooltipContentStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
+                />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -195,10 +207,16 @@ export function ReportsPage() {
           <div className="h-[250px] w-full">
              <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.operational.peakHours}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="hour" tickFormatter={(h) => `${h}h`} />
-                <YAxis />
-                <Tooltip formatter={(value) => [`${value} pedidos`, 'Volume']} />
+                <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="hour" stroke={chartAxisColor} tickFormatter={(h) => `${h}h`} />
+                <YAxis stroke={chartAxisColor} />
+                <Tooltip
+                  contentStyle={chartTooltipContentStyle}
+                  cursor={chartTooltipCursor}
+                  itemStyle={chartTooltipItemStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  formatter={(value) => [`${value} pedidos`, 'Volume']}
+                />
                 <Bar dataKey="count" fill="#4F46E5" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

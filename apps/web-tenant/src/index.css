@@ -454,6 +454,28 @@
     background-color: var(--foreground);
   }
 
+  /* Leaflet usa tiles claros por padrão. O filtro fica restrito aos tiles para
+     preservar cores de marcadores, polígonos e controles operacionais. */
+  .theme-aware-map .leaflet-tile-pane {
+    transition: filter 200ms ease;
+  }
+
+  [data-theme="dark"] .theme-aware-map .leaflet-tile-pane {
+    filter: brightness(0.72) invert(1) contrast(0.9) hue-rotate(180deg) saturate(0.68);
+  }
+
+  [data-theme="dark"] .theme-aware-map .leaflet-control-attribution,
+  [data-theme="dark"] .theme-aware-map .leaflet-control-zoom a,
+  [data-theme="dark"] .theme-aware-map .leaflet-draw-toolbar a {
+    background-color: var(--popover);
+    border-color: var(--border);
+    color: var(--popover-foreground);
+  }
+
+  [data-theme="dark"] .theme-aware-map .leaflet-control-attribution a {
+    color: var(--primary);
+  }
+
   /* Glassmorphism refinado */
   .glass {
     background-color: var(--card);

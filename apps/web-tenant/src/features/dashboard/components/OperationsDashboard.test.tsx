@@ -75,8 +75,7 @@ describe('OperationsDashboard', () => {
       </MemoryRouter>,
     );
 
-    expect(html).toContain('border-slate-200 bg-white');
-    expect(html).toContain('dark:border-slate-800 dark:bg-slate-900');
+    expect(html).toContain('border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-card dark:border-slate-800 dark:bg-slate-900');
     expect(html).toContain('text-slate-900 dark:text-slate-100');
     expect(html).toContain('Loja fechada');
     expect(html).not.toContain('bg-slate-950');

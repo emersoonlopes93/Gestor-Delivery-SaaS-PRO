@@ -362,7 +362,7 @@ function SidebarGroupView(props: {
  */
 export function AppLayout() {
   const { user, clearUser, setUser } = useAuthStore();
-  const { theme, setTheme, initializeTheme } = useThemeStore();
+  const { resolvedTheme, setTheme, initializeTheme } = useThemeStore();
   const { isFeatureVisible } = useTenantCapabilities();
   const platformBrandingQuery = usePlatformBranding();
   const navigate = useNavigate();
@@ -881,12 +881,12 @@ export function AppLayout() {
             <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
                 className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all border-none"
                 title="Tema"
                 aria-label="Alternar Tema"
               >
-                {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
+                {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
               </button>
 
               <button
@@ -922,10 +922,11 @@ export function AppLayout() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
                 className="w-8 h-8 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all"
+                aria-label="Alternar tema"
               >
-                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                {resolvedTheme === 'dark' ? <Sun size={15} aria-hidden /> : <Moon size={15} aria-hidden />}
               </button>
               <div className="w-7 h-7 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
                 <UserCircle className="h-4.5 w-4.5" aria-hidden />

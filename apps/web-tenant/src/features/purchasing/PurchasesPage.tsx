@@ -42,10 +42,10 @@ export function PurchasesPage() {
   };
 
   const statusMap: Record<PurchaseStatus, { label: string, color: string, icon: LucideIcon }> = {
-    [PurchaseStatus.DRAFT]: { label: 'Rascunho', color: 'bg-gray-100 text-gray-700 dark:text-gray-300', icon: Clock },
-    [PurchaseStatus.PENDING]: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
-    [PurchaseStatus.RECEIVED]: { label: 'Recebido', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-    [PurchaseStatus.CANCELLED]: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: AlertCircle },
+    [PurchaseStatus.DRAFT]: { label: 'Rascunho', color: 'border border-border bg-muted text-muted-foreground', icon: Clock },
+    [PurchaseStatus.PENDING]: { label: 'Pendente', color: 'border border-status-warning/30 bg-status-warning/10 text-status-warning', icon: AlertCircle },
+    [PurchaseStatus.RECEIVED]: { label: 'Recebido', color: 'border border-status-success/30 bg-status-success/10 text-status-success', icon: CheckCircle2 },
+    [PurchaseStatus.CANCELLED]: { label: 'Cancelado', color: 'border border-destructive/30 bg-destructive/10 text-destructive', icon: AlertCircle },
   };
 
   const paymentStatusMap: Record<PaymentStatus, { label: string, color: string }> = {

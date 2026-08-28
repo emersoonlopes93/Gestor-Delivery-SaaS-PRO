@@ -10,6 +10,7 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
   const fmtDate = (d: string) => new Date(d).toLocaleString('pt-BR');
 
   return (
+    // @allow-theme-risk: impressão térmica exige fundo branco e tinta preta independentemente do tema da tela.
     <div className="print-template p-4 text-black bg-white font-mono text-sm leading-tight max-w-[80mm] mx-auto">
       <div className="text-center mb-4">
         <h1 className="text-xl font-bold uppercase">Pedido #{order.orderNumber}</h1>

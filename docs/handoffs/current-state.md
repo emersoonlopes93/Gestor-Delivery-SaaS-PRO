@@ -59,6 +59,39 @@ Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
 
 ---
 
+## Compatibilidade light/dark do web-tenant (2026-08-27)
+
+- Corrigidas superfícies, textos, estados, tabs, toggles e permission gates que
+  combinavam classes do tema claro com o tema dark, com foco nas zonas de
+  entrega, estoque, promoções, compras, entregadores, onboarding e automação de
+  pedidos.
+- Relatórios e Business Intelligence passaram a reutilizar estilos semânticos
+  de Recharts para tooltip, grade, eixos e cursor. O Leaflet recebeu tiles
+  escurecidos somente no tema dark e controles/legenda baseados em tokens.
+- O store de tema agora mantém `resolvedTheme`, inclusive quando a preferência
+  `system` muda durante a sessão; os controles desktop e mobile refletem o tema
+  efetivamente aplicado.
+- O gate `check:theme` passou a detectar `bg-white` e texto neutro escuro sem
+  variante no `web-tenant`, ignorando testes e exceções deliberadamente
+  documentadas, e foi adicionado ao job principal da CI.
+- O E2E autenticado foi ampliado para dashboard, zonas de entrega, relatórios,
+  estoque e promoções em light/dark e desktop/mobile. BI permanece coberto pelo
+  teste contratual porque o fixture efêmero não possui o plano `bi_advanced`.
+
+Validação: `check:theme`, TypeScript do web-tenant, lint do web-tenant, build do
+web-tenant e build da API passaram; a suíte do web-tenant passou com 38 arquivos
+e 138 testes. O E2E canônico passou (`WEB_TENANT_THEME_E2E_PASS`) contra
+PostgreSQL efêmero com 64 migrations e seed de teste, sem overflow, erros de
+console/página/rede nas rotas cobertas. Screenshots light/dark foram
+inspecionados e preservados fora do worktree em
+`C:\Users\Emerson\AppData\Local\Temp\gestor-theme-audit-20260827`.
+
+Nenhum schema/migration, dependência, banco remoto, produção, Dokploy ou deploy
+foi alterado. A publicação e o merge seguem o gate controlado autorizado ao fim
+da sessão.
+
+---
+
 ## Reorganizar Cardápio: Categorias e Toggles (2026-08-18)
 
 Branch: `feat/catalog-category-availability-ux`

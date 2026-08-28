@@ -94,7 +94,7 @@ function ToggleCard({
               onChange={(event) => onChange(event.target.checked)}
             />
             <div className="h-6 w-11 rounded-full bg-slate-200 transition peer-checked:bg-indigo-600 dark:bg-slate-700">
-              <div className="absolute left-[2px] top-[2px] h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5" />
+              <div className="absolute left-[2px] top-[2px] h-5 w-5 rounded-full bg-primary-foreground transition peer-checked:translate-x-5" />
             </div>
           </label>
         ) : (

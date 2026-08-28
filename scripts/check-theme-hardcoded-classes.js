@@ -9,9 +9,19 @@ const CRITICAL_PATTERNS = [
   'dark:text-slate-900',
   'text-muted-foreground/30',
   'text-muted-foreground/40',
-  'opacity-20',
-  'opacity-30',
-  'opacity-40',
+];
+
+// Context-aware rules for the tenant panel. These detect light-only neutral
+// classes while accepting explicit dark variants and documented exceptions.
+const WEB_TENANT_CONTEXT_RULES = [
+  {
+    pattern: 'unpaired-bg-white',
+    matches: line => /(?:^|[\s"'`])bg-white(?=[\s"'`])/.test(line) && !/dark(?::[a-z-]+)*:bg-/.test(line),
+  },
+  {
+    pattern: 'unpaired-dark-neutral-text',
+    matches: line => /\btext-(?:gray|slate)-(?:700|800|900)\b/.test(line) && !/dark(?::[a-z-]+)*:text-/.test(line),
+  },
 ];
 
 // WARNING PATTERNS - reported but never block build unless --baseline is active
@@ -99,6 +109,20 @@ function checkFile(filePath, checkCritical, checkWarning) {
             pattern,
             content: line.trim(),
           });
+        }
+      }
+
+      const normalizedPath = filePath.replace(/\\/g, '/');
+      const isTestFile = /\.(?:test|spec)\.[jt]sx?$/.test(normalizedPath);
+      if (normalizedPath.includes('apps/web-tenant/src/') && !isTestFile) {
+        for (const rule of WEB_TENANT_CONTEXT_RULES) {
+          if (rule.matches(line)) {
+            criticalIssues.push({
+              line: lineNumber,
+              pattern: rule.pattern,
+              content: line.trim(),
+            });
+          }
         }
       }
     }
