@@ -8,6 +8,8 @@ const radiusTiers = read('../features/delivery/rates/RadiusTiersPanel.tsx');
 const specialAreas = read('../features/delivery/rates/SpecialAreasPanel.tsx');
 const deliveryTest = read('../features/delivery/rates/DeliveryTestPanel.tsx');
 const deliveryMap = read('../features/delivery/rates/DeliveryMapCanvas.tsx');
+const operationalRouteMap = read('../features/delivery/components/OperationalRouteMap.tsx');
+const suppliers = read('../features/purchasing/SuppliersPage.tsx');
 const tenantCss = read('../index.css');
 const reports = read('../features/analytics/ReportsPage.tsx');
 const businessIntelligence = read('../features/analytics/BusinessIntelligencePage.tsx');
@@ -29,9 +31,18 @@ describe('web-tenant light and dark compatibility contracts', () => {
 
   it('limits the dark map treatment to tiles and themes its overlay controls', () => {
     expect(deliveryMap).toContain('theme-aware-map');
+    expect(operationalRouteMap).toContain('theme-aware-map');
     expect(deliveryMap).toContain('bg-popover/95');
     expect(tenantCss).toContain('[data-theme="dark"] .theme-aware-map .leaflet-tile-pane');
     expect(tenantCss).toContain('hue-rotate(180deg)');
+  });
+
+  it('keeps supplier table surfaces semantic in dark mode', () => {
+    expect(suppliers).toContain('bg-card');
+    expect(suppliers).toContain('bg-muted/50');
+    expect(suppliers).toContain('divide-border');
+    expect(suppliers).not.toContain('dark:bg-gray-900/50/50');
+    expect(suppliers).not.toMatch(/\bbg-white(?=\s|["'])/);
   });
 
   it('uses semantic chart chrome instead of Recharts light defaults', () => {

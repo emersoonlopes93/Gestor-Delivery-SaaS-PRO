@@ -77,6 +77,11 @@ Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
 - O E2E autenticado foi ampliado para dashboard, zonas de entrega, relatórios,
   estoque e promoções em light/dark e desktop/mobile. BI permanece coberto pelo
   teste contratual porque o fixture efêmero não possui o plano `bi_advanced`.
+- Após a revisão visual, a tabela de Fornecedores passou a usar superfícies,
+  divisórias e estados semânticos; as variantes Tailwind inválidas que mantinham
+  o cabeçalho claro no dark foram removidas. O `OperationalRouteMap` recebeu
+  `theme-aware-map`, reutilizando o filtro dark de tiles já adotado nos mapas de
+  zonas e entrega. Fornecedores entrou no smoke visual autenticado.
 
 Validação: `check:theme`, TypeScript do web-tenant, lint do web-tenant, build do
 web-tenant e build da API passaram; a suíte do web-tenant passou com 38 arquivos

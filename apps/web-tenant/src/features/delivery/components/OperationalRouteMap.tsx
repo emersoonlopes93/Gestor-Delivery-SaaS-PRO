@@ -88,7 +88,7 @@ export function OperationalRouteMap({ drivers = [], run = null, routePoints = []
 
   return (
     <div className={`relative overflow-hidden border border-border bg-muted ${className}`}>
-      <MapContainer center={allPoints[0] ? [allPoints[0].lat, allPoints[0].lng] : DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={allPoints[0] ? [allPoints[0].lat, allPoints[0].lng] : DEFAULT_CENTER} zoom={13} className="theme-aware-map h-full w-full">
         <FitMap points={allPoints} />
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {routePoints.length > 1 ? <Polyline positions={routePoints.map((point) => [point.lat, point.lng])} pathOptions={{ color: '#4f46e5', weight: 4, opacity: 0.82 }} /> : null}
