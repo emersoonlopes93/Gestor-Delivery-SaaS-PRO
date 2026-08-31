@@ -7,6 +7,7 @@ import { DriverRouteMap } from './DriverRouteMap';
 vi.mock('leaflet', () => ({ default: { divIcon: (options: unknown) => options } }));
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children?: ReactNode }) => <div data-testid="leaflet-map">{children}</div>,
+  TileLayer: () => null,
   Marker: ({ title }: { title?: string }) => <span>{title}</span>,
   Polyline: () => <span data-testid="route-line" />,
   useMap: () => ({ setView: vi.fn(), fitBounds: vi.fn() }),
