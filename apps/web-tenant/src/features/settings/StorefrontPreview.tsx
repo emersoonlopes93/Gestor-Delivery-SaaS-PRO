@@ -11,7 +11,7 @@ import {
   SmartShowcase,
   StorefrontShell,
   toStorefrontProduct,
-} from '@gestor/storefront-ui';
+} from '@gestor/storefront-preview';
 
 interface StorefrontPreviewProps {
   payload: StorefrontPayload;

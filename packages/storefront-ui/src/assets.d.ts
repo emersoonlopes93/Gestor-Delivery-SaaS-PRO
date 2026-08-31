@@ -1,4 +1,4 @@
 declare module '*.webp' {
-  const url: string;
-  export default url;
+  const src: string;
+  export default src;
 }

@@ -36,6 +36,7 @@
       "@gestor/auth": ["../../packages/auth/src/index.ts"],
       "@gestor/config": ["../../packages/config/src/index.ts"],
       "@gestor/theme": ["../../packages/theme/src/index.ts"],
+      "@gestor/storefront-preview": ["../../packages/storefront-preview/src/index.ts"],
       "@gestor/ui": ["../../packages/ui/src/index.ts"]
     }
   },
@@ -47,6 +48,7 @@
     "../../packages/auth/src",
     "../../packages/config/src",
     "../../packages/theme/src",
+    "../../packages/storefront-preview/src",
     "../../packages/ui/src"
   ],
   "exclude": [

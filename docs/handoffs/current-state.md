@@ -1,3 +1,18 @@
+## Storefront preview boundary extraction (2026-08-31)
+
+- Criado `@gestor/storefront-preview` como camada neutra e fonte unica dos
+  primitives compartilhados de renderizacao, fallback de imagem e conversao de
+  produtos. `@gestor/storefront-ui` preserva a API anterior por re-export.
+- O web-tenant deixou de importar `@gestor/storefront-ui`; nenhuma regra ou
+  allowlist do checker foi relaxada. O novo package foi classificado para nao
+  depender de apps, `@gestor/ui` ou da fachada `@gestor/storefront-ui`.
+- Tailwind e o scanner de tema passaram a cobrir a nova origem dos componentes.
+  Nao houve mudanca intencional de UI/UX, tema, API, payments, billing, Prisma ou
+  migrations.
+- Validacao: package novo lint/build e 2 testes; fachada build; web-tenant 38
+  arquivos/139 testes e web-storefront 14 arquivos/73 testes; lint/build dos
+  dois apps; boundaries, theme, typecheck, no-any e features passaram.
+
 ## Payment Monetization Foundation R2 (2026-08-24)
 
 - Isolated branch `feat/payment-monetization-foundation-r2`, based on `origin/main-copy`

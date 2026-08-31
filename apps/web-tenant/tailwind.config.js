@@ -5,7 +5,7 @@ export default {
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
     '../../packages/ui/src/**/*.{ts,tsx}',
-    '../../packages/storefront-ui/src/**/*.{ts,tsx}'
+    '../../packages/storefront-preview/src/**/*.{ts,tsx}'
   ],
   theme: {
     extend: {

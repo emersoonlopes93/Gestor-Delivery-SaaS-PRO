@@ -53,6 +53,7 @@ const DIRECTORIES_TO_SCAN = [
   'apps/web-admin/src',
   'apps/web-storefront/src',
   'packages/ui/src',
+  'packages/storefront-preview/src',
   'packages/storefront-ui/src',
 ];
 

@@ -21,7 +21,7 @@
     "@gestor/auth": "workspace:*",
     "@gestor/config": "workspace:*",
     "@gestor/core": "workspace:*",
-    "@gestor/storefront-ui": "workspace:*",
+    "@gestor/storefront-preview": "workspace:*",
     "@gestor/types": "workspace:*",
     "@gestor/utils": "workspace:*",
     "@tanstack/react-query": "^5.60.0",

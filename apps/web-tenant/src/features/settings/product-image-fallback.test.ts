@@ -3,7 +3,7 @@ import {
   nextProductImageAfterError,
   PRODUCT_FALLBACK_IMAGES,
   resolveProductImage,
-} from '@gestor/storefront-ui';
+} from '@gestor/storefront-preview';
 
 describe('canonical product image fallback', () => {
   it('keeps the product image as the first choice', () => {

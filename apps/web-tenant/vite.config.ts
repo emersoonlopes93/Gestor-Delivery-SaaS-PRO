@@ -13,6 +13,7 @@ export default defineConfig({
       '@gestor/auth': path.resolve(__dirname, '../../packages/auth/src/index.ts'),
       '@gestor/config': path.resolve(__dirname, '../../packages/config/src/index.ts'),
       '@gestor/theme': path.resolve(__dirname, '../../packages/theme/src/index.ts'),
+      '@gestor/storefront-preview': path.resolve(__dirname, '../../packages/storefront-preview/src/index.ts'),
       '@gestor/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
     },
   },

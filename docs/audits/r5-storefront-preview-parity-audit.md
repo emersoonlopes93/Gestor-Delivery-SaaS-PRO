@@ -1,5 +1,18 @@
 # AUDIT R5 — Preview administrativo e storefront público
 
+## Atualizacao arquitetural - 2026-08-31
+
+- `@gestor/storefront-preview` passou a ser a fonte neutra dos primitives de
+  renderizacao compartilhados entre o preview administrativo e o storefront
+  publico: shell/theme provider, navegacao de categorias, showcase, renderers de
+  produto, tipos/conversor e fallback de imagem.
+- `@gestor/storefront-ui` preserva compatibilidade por re-export e mantem apenas
+  o empty state especifico que nao participa do preview.
+- O web-tenant importa diretamente a camada neutra. A regra que proibe
+  `web-tenant -> @gestor/storefront-ui` permanece inalterada, sem allowlist.
+- Os assets e a implementacao continuam com uma unica fonte de verdade; nao ha
+  ciclo de packages nem alteracao visual ou funcional intencional.
+
 Data: 2026-08-01
 Base: `7b9d89c6a0b7f79f79c2a168080a85fec4d44657`
 
