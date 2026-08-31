@@ -7,7 +7,17 @@ import { NotFoundException } from '@nestjs/common';
 import { PaymentCredentialService } from './payment-credential.service';
 import { PaymentProviderConnectionService } from './payment-provider-connection.service';
 
+const controlledCredentialEnvKeys = [
+  'MARKETPLACE_CREDENTIALS_KEY_VERSION',
+  'MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY',
+  'MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION',
+  'MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY',
+] as const;
+
+const testCredentialEncryptionKey = Buffer.alloc(32, 12).toString('base64');
+
 describe('PaymentProviderConnectionService', () => {
+  const originalCredentialEnv = new Map<string, string | undefined>();
   const now = new Date('2026-08-20T12:00:00.000Z');
   const connection = {
     id: 'connection-a',
@@ -34,13 +44,36 @@ describe('PaymentProviderConnectionService', () => {
     $transaction: jest.fn(),
   };
   const credentialService = new PaymentCredentialService(new ConfigService({
-    MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: Buffer.alloc(32, 12).toString('base64'),
+    MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: testCredentialEncryptionKey,
     MARKETPLACE_CREDENTIALS_KEY_VERSION: 'payment-r1',
   }));
   const service = new PaymentProviderConnectionService(prisma as never, credentialService);
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    for (const key of controlledCredentialEnvKeys) {
+      originalCredentialEnv.set(key, process.env[key]);
+    }
+
+    process.env.MARKETPLACE_CREDENTIALS_KEY_VERSION = 'payment-r1';
+    process.env.MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY = testCredentialEncryptionKey;
+    delete process.env.MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION;
+    delete process.env.MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY;
+  });
+
+  afterEach(() => {
+    for (const key of controlledCredentialEnvKeys) {
+      const originalValue = originalCredentialEnv.get(key);
+
+      if (originalValue === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = originalValue;
+      }
+    }
+
+    originalCredentialEnv.clear();
   });
 
   it('stores encrypted credentials but returns only a safe connection DTO', async () => {
