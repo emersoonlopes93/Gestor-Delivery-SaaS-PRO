@@ -88,9 +88,22 @@ export class MarketplaceEventInboxService {
     const payloadHash = input.payloadHash ?? createHash('sha256')
       .update(JSON.stringify(input.parsed.rawPayload))
       .digest('hex');
-    const dedupeKey = input.parsed.eventId?.trim() || payloadHash;
+    const legacyDedupeKey = input.parsed.eventId?.trim() || payloadHash;
+    const dedupeScope = input.parsed.externalMerchantId?.trim()
+      ?? input.parsed.externalStoreId?.trim()
+      ?? input.connection?.id
+      ?? 'unresolved';
+    const dedupeKey = createHash('sha256')
+      .update(`${input.parsed.provider}:${dedupeScope}:${legacyDedupeKey}`)
+      .digest('hex');
     const existing = await this.prisma.marketplaceEventInbox.findFirst({
-      where: { provider: input.parsed.provider, dedupeKey },
+      where: {
+        provider: input.parsed.provider,
+        OR: [
+          { dedupeKey },
+          ...(input.connection ? [{ dedupeKey: legacyDedupeKey, connectionId: input.connection.id }] : []),
+        ],
+      },
     });
     if (existing) {
       await this.prisma.marketplaceEventInbox.update({
@@ -105,6 +118,7 @@ export class MarketplaceEventInboxService {
       this.logger.log({
         message: 'marketplace_event_duplicate',
         tenantId: existing.tenantId,
+        connectionId: existing.connectionId,
         externalOrderId: existing.externalOrderId,
         eventId: existing.eventId,
         correlationId: existing.correlationId,

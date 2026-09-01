@@ -21,6 +21,7 @@ import { NormalizedMarketplaceOrder } from '../marketplace.types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { MarketplaceStatusSyncService } from './marketplace-status-sync.service';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
+import { buildMarketplaceOrderIdempotencyKey } from '../marketplace-idempotency';
 
 @Injectable()
 export class MarketplaceOrderIngestionService {
@@ -57,7 +58,7 @@ export class MarketplaceOrderIngestionService {
       await this.failInbox(inbox.id, 'Marketplace connection not found for event.');
       this.logger.error({
         message: 'marketplace_merchant_mapping_failure',
-        merchantId: inbox.externalMerchantId,
+        merchantId: this.maskExternalIdentifier(inbox.externalMerchantId),
         externalOrderId: inbox.externalOrderId,
         eventId: inbox.eventId,
         correlationId: inbox.correlationId,
@@ -90,7 +91,7 @@ export class MarketplaceOrderIngestionService {
       }
 
       const existingOrder = await this.prisma.marketplaceOrder.findFirst({
-        where: { tenantId: connection.tenantId, provider: inbox.provider, externalOrderId },
+        where: { connectionId: connection.id, provider: inbox.provider, externalOrderId },
         select: {
           lastExternalEventAt: true,
           lastExternalEventSequence: true,
@@ -109,7 +110,8 @@ export class MarketplaceOrderIngestionService {
         this.logger.warn({
           message: 'marketplace_event_out_of_order',
           tenantId: connection.tenantId,
-          merchantId: connection.externalMerchantId,
+          connectionId: connection.id,
+          merchantId: this.maskExternalIdentifier(connection.externalMerchantId),
           externalOrderId,
           eventId: inbox.eventId,
           correlationId: inbox.correlationId,
@@ -147,7 +149,8 @@ export class MarketplaceOrderIngestionService {
               ? 'marketplace_confirmation_deadline_expired'
               : 'marketplace_confirmation_deadline_near',
             tenantId: connection.tenantId,
-            merchantId: connection.externalMerchantId,
+            connectionId: connection.id,
+            merchantId: this.maskExternalIdentifier(connection.externalMerchantId),
             orderId: marketplaceOrder.internalOrderId,
             externalOrderId,
             eventId: inbox.eventId,
@@ -176,8 +179,8 @@ export class MarketplaceOrderIngestionService {
         const internalOrderId = await this.createInternalOrderFromNormalized(normalizedOrder);
         await this.prisma.marketplaceOrder.update({
           where: {
-            tenantId_provider_externalOrderId: {
-              tenantId: connection.tenantId,
+            connectionId_provider_externalOrderId: {
+              connectionId: connection.id,
               provider: normalizedOrder.provider,
               externalOrderId: normalizedOrder.externalOrderId,
             },
@@ -210,10 +213,11 @@ export class MarketplaceOrderIngestionService {
 
       await this.statusSyncService.reconcileExternalEvent({
         tenantId: connection.tenantId,
+        connectionId: connection.id,
         externalOrderId,
         topic: inbox.topic,
       });
-      await this.applyExternalLifecycleEvent(connection.tenantId, externalOrderId, inbox.topic);
+      await this.applyExternalLifecycleEvent(connection.tenantId, connection.id, externalOrderId, inbox.topic);
 
       await this.prisma.marketplaceEventInbox.update({
         where: { id: inbox.id },
@@ -269,7 +273,7 @@ export class MarketplaceOrderIngestionService {
   ) {
     const existing = await this.prisma.marketplaceOrder.findFirst({
       where: {
-        tenantId,
+        connectionId,
         provider: normalized.provider,
         externalOrderId: normalized.externalOrderId,
       },
@@ -352,7 +356,7 @@ export class MarketplaceOrderIngestionService {
 
   private async createInternalOrderFromNormalized(normalized: NormalizedMarketplaceOrder): Promise<string> {
     const tenantId = normalized.connection.tenantId;
-    const idempotencyKey = `marketplace:ifood:${normalized.externalOrderId}`;
+    const idempotencyKey = buildMarketplaceOrderIdempotencyKey(normalized.connection.id, normalized.externalOrderId);
     const existing = await this.prisma.order.findFirst({
       where: {
         tenantId,
@@ -489,6 +493,7 @@ export class MarketplaceOrderIngestionService {
 
   private async applyExternalLifecycleEvent(
     tenantId: string,
+    connectionId: string,
     externalOrderId: string,
     topic?: string | null,
   ): Promise<void> {
@@ -503,7 +508,7 @@ export class MarketplaceOrderIngestionService {
     if (!targetStatus) return;
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
-      where: { tenantId, provider: MarketplaceProvider.IFOOD, externalOrderId },
+      where: { tenantId, connectionId, provider: MarketplaceProvider.IFOOD, externalOrderId },
       select: { id: true, internalOrderId: true, provider: true },
     });
     if (!marketplaceOrder?.internalOrderId) return;
@@ -595,6 +600,12 @@ export class MarketplaceOrderIngestionService {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
       ? value as Record<string, unknown>
       : null;
+  }
+
+  private maskExternalIdentifier(value: string | null): string | null {
+    if (!value) return null;
+    if (value.length <= 6) return `${value.slice(0, 2)}***`;
+    return `${value.slice(0, 3)}***${value.slice(-3)}`;
   }
 
   private toInputJsonValue(value: unknown): Prisma.InputJsonValue {

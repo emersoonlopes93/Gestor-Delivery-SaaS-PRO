@@ -11,6 +11,7 @@ import {
   useMarketplaceEvents,
   useMarketplaceOrders,
   useMarketplaceStatus,
+  useReconnectMarketplace,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
 } from '../marketplace/hooks';
@@ -41,7 +42,9 @@ function formatCurrency(value?: string | number | null) {
 
 function statusBadge(status?: string | null) {
   const tone = String(status || '').toUpperCase();
-  if (tone.includes('PROCESSED') || tone.includes('CONNECTED')) return <Badge variant="success" size="sm">Ativo</Badge>;
+  if (tone.includes('TOKEN_EXPIRED')) return <Badge variant="warning" size="sm">Reautenticação necessária</Badge>;
+  if (tone.includes('PAUSED')) return <Badge variant="warning" size="sm">Pausada</Badge>;
+  if (tone.includes('PROCESSED') || tone === 'CONNECTED') return <Badge variant="success" size="sm">Ativo</Badge>;
   if (tone.includes('PROCESS')) return <Badge variant="warning" size="sm">Processando</Badge>;
   if (tone.includes('FAILED') || tone.includes('ERROR') || tone.includes('DISCONNECTED')) return <Badge variant="destructive" size="sm">Offline</Badge>;
   return <Badge variant="info" size="sm">{status || '—'}</Badge>;
@@ -63,7 +66,8 @@ export function IntegrationsPage() {
   const { data: billingPreview } = useBillingPreview();
 
   const connectMutation = useConnectMarketplaceManual('ifood');
-  const disconnectMutation = useDisconnectMarketplace('ifood');
+  const disconnectMutation = useDisconnectMarketplace();
+  const reconnectMutation = useReconnectMarketplace();
   const reprocessEventMutation = useReprocessMarketplaceEvent();
   const reprocessOrderMutation = useReprocessMarketplaceOrder();
 
@@ -91,6 +95,7 @@ export function IntegrationsPage() {
       });
       toast.success('Conexão iFood atualizada.');
       setShowManualForm(false);
+      setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: 'iFood' });
       await Promise.all([refetchStatus(), refetchConnections(), refetchOrders(), refetchEvents()]);
       queryClient.invalidateQueries({ queryKey: ['marketplace-billing-preview'] });
     } catch (error) {
@@ -99,14 +104,26 @@ export function IntegrationsPage() {
     }
   };
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = async (connectionId: string) => {
     try {
-      await disconnectMutation.mutateAsync();
+      await disconnectMutation.mutateAsync(connectionId);
       toast.success('Conexão iFood desconectada.');
       await refetchStatus();
       await refetchConnections();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Falha ao desconectar.';
+      toast.error(message);
+    }
+  };
+
+  const handleReconnect = async (connectionId: string) => {
+    try {
+      await reconnectMutation.mutateAsync(connectionId);
+      toast.success('Loja iFood reconectada.');
+      await refetchStatus();
+      await refetchConnections();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao reconectar.';
       toast.error(message);
     }
   };
@@ -170,16 +187,7 @@ export function IntegrationsPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all"
               >
                 <Settings2 className="w-4 h-4" />
-                {showManualForm ? 'Fechar' : 'Conectar manualmente'}
-              </button>
-              <button
-                type="button"
-                onClick={handleDisconnect}
-                disabled={disconnectMutation.isPending || !activeConnection}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                {disconnectMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unplug className="w-4 h-4" />}
-                Desconectar
+                {showManualForm ? 'Fechar' : 'Adicionar loja iFood'}
               </button>
             </div>
           </div>
@@ -248,7 +256,7 @@ export function IntegrationsPage() {
             <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-4">
               <div className="flex items-center gap-2 text-sm font-black text-foreground">
                 <ShieldCheck className="w-4 h-4 text-primary" />
-                Conexão manual iFood
+                Adicionar loja iFood
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <label className="space-y-1">
@@ -332,13 +340,37 @@ export function IntegrationsPage() {
                 <div className="text-sm text-muted-foreground">Nenhuma conexão encontrada.</div>
               ) : (
                 connections?.map((connection) => (
-                  <div key={connection.id} className="rounded-2xl border border-border bg-muted/20 p-3">
+                  <div key={connection.id} className="rounded-2xl border border-border bg-muted/20 p-3 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-black text-foreground">{connection.displayName || connection.provider}</div>
-                        <div className="text-xs text-muted-foreground">{connection.externalStoreId || connection.externalMerchantId || 'Sem IDs externos'}</div>
+                        <div className="text-xs text-muted-foreground">Merchant: {connection.externalMerchantId || 'não informado'}</div>
+                        {connection.externalStoreId ? <div className="text-xs text-muted-foreground">Store: {connection.externalStoreId}</div> : null}
                       </div>
                       {statusBadge(connection.status)}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      {connection.status === 'CONNECTED' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDisconnect(connection.id)}
+                          disabled={disconnectMutation.isPending}
+                          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50"
+                        >
+                          <Unplug className="h-3.5 w-3.5" />
+                          Desconectar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleReconnect(connection.id)}
+                          disabled={reconnectMutation.isPending}
+                          className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          Reconectar
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))

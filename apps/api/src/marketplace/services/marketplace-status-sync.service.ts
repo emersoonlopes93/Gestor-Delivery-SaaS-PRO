@@ -318,6 +318,7 @@ export class MarketplaceStatusSyncService {
 
   async reconcileExternalEvent(input: {
     tenantId: string;
+    connectionId: string;
     externalOrderId: string;
     topic?: string | null;
   }): Promise<void> {
@@ -325,7 +326,12 @@ export class MarketplaceStatusSyncService {
     if (!topic || !['CONFIRMED', 'ORDER_CONFIRMED', 'CANCELLED', 'ORDER_CANCELLED', 'CANCELLATION_REQUEST_FAILED'].includes(topic)) return;
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
-      where: { tenantId: input.tenantId, provider: MarketplaceProvider.IFOOD, externalOrderId: input.externalOrderId },
+      where: {
+        tenantId: input.tenantId,
+        connectionId: input.connectionId,
+        provider: MarketplaceProvider.IFOOD,
+        externalOrderId: input.externalOrderId,
+      },
     });
     if (!marketplaceOrder) return;
 

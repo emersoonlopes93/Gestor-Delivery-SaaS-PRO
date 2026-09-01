@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api-client';
 
 export type MarketplaceProvider = 'ifood';
-export type MarketplaceConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'PENDING' | 'ERROR';
+export type MarketplaceConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'TOKEN_EXPIRED' | 'ERROR' | 'PAUSED';
 export type MarketplaceEventStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
 
 export type MarketplaceConnectionDTO = {
@@ -15,6 +15,8 @@ export type MarketplaceConnectionDTO = {
   displayName: string | null;
   authType: string | null;
   settingsJson: Record<string, unknown> | null;
+  hasAccessToken: boolean;
+  hasRefreshToken: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -110,15 +112,29 @@ export function useConnectMarketplaceManual(provider: MarketplaceProvider = 'ifo
   });
 }
 
-export function useDisconnectMarketplace(provider: MarketplaceProvider = 'ifood') {
+export function useDisconnectMarketplace() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/${provider}/disconnect`);
+    mutationFn: async (connectionId: string) => {
+      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/connections/${connectionId}/disconnect`);
       return res.data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['marketplace-status', provider] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+    },
+  });
+}
+
+export function useReconnectMarketplace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (connectionId: string) => {
+      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/connections/${connectionId}/connect/manual`, {});
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status'] });
       await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
     },
   });

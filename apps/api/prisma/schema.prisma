@@ -1883,10 +1883,10 @@ model MarketplaceConnection {
   orders                        MarketplaceOrder[]
   operations                    MarketplaceOperation[]
 
-  @@unique([tenantId, provider])
   @@unique([provider, externalMerchantId])
   @@unique([provider, externalStoreId])
   @@index([tenantId, provider])
+  @@index([tenantId, provider, status])
   @@index([provider, pollingStatus, pollingNextAttemptAt], map: "marketplace_connections_provider_polling_status_polling_next_at")
   @@index([tenantId, pollingStatus])
   @@map("marketplace_connections")
@@ -2109,7 +2109,8 @@ model MarketplaceOrder {
   operations                MarketplaceOperation[]
   divergences               MarketplaceDivergence[]
 
-  @@unique([tenantId, provider, externalOrderId])
+  @@unique([connectionId, provider, externalOrderId])
+  @@index([tenantId, provider, externalOrderId])
   @@index([internalOrderId])
   @@index([connectionId])
   @@map("marketplace_orders")

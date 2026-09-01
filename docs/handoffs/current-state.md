@@ -1,3 +1,18 @@
+## Multi-iFood Foundation V1 (2026-09-01)
+
+- Objetivo: remover a suposição `1 tenant = 1 iFood` preservando o agregado e a operação marketplace já existentes.
+- Source of truth: `MarketplaceConnection`; um tenant pode possuir várias conexões, enquanto `provider + externalMerchantId` e `provider + externalStoreId` continuam globalmente únicos.
+- Schema: a migration `20260901013000_multi_ifood_foundation_v1` remove a unicidade `(tenantId, provider)`, adiciona índice por tenant/provider/status e muda a unicidade do pedido para `(connectionId, provider, externalOrderId)`.
+- Compatibilidade: linhas existentes já representam a primeira conexão e são preservadas sem backfill ou dual-write. Status/provider endpoints legados permanecem temporariamente para onboarding; a gestão nova usa `connectionId`.
+- API/UI: create lista novas conexões; get/update/reconnect/disconnect/delete lógico validam tenant + connection. A UI lista nome, merchant, store e status por loja, com ações independentes e sem material criptográfico.
+- Ingestion: webhook resolve merchant/store para conexão e tenant; dedupe inclui a conexão/merchant com fallback para a chave legada da mesma conexão. Pedido, idempotência interna e lifecycle são connection-scoped.
+- OAuth/polling: mantido o modelo real existente — client credentials centralizadas agrupam merchants; refresh token cria isolamento e lock por conexão. Polling e falhas continuam por conexão.
+- Segurança: AES-256-GCM existente continua sendo a primitive de credenciais; respostas administrativas expõem apenas flags booleanas, nunca ciphertext/token. Logs novos incluem connectionId e merchant mascarado.
+- Validação PostgreSQL local: 65 migrations from zero passaram; upgrade de 64 migrations preservou conexão legada e aceitou segunda conexão do mesmo tenant. Teste PostgreSQL comprovou merchant globalmente único, credenciais/status independentes e mesmo externalOrderId válido entre conexões. O `migrate diff` mostrou somente quatro renames de índices preexistentes e idênticos nos dois bancos, fora desta migration.
+- Follow-ups: homologação OAuth/iFood real e E2E autenticado; eventual remoção dos endpoints provider-scoped legados; nenhum routing V2, catálogo amplo ou reconciliação financeira foi incluído.
+- Fora de escopo preservado: KDS, auto-dispatch, payment foundation, providers financeiros, Dokploy, produção e banco remoto.
+- Validação final: API completa em quatro shards com 119 suites/558 testes aprovados e 4 suites/9 testes ignorados; regressão marketplace + KDS/POS/printing com 17 suites/88 testes; web-tenant completo com 39 arquivos/140 testes; teste PostgreSQL com 1 suite/1 teste; `typecheck`, lint, builds API/web-tenant, `check:no-any`, `check:features`, `check:boundaries`, `check:theme` e `git diff --check` passaram. Após o ajuste final da identidade de dedupe, a suite de inbox (8/8), lint/build da API e `check:no-any` foram reexecutados com sucesso.
+
 ## Storefront preview boundary extraction (2026-08-31)
 
 - Criado `@gestor/storefront-preview` como camada neutra e fonte unica dos

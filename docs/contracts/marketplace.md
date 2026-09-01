@@ -2,8 +2,8 @@
 title: Contrato de Marketplace — iFood
 status: current
 owner: engineering
-last_verified: 2026-07-16
-verified_against: feat/ifood-reconciliation-operations / a689dd4 (commit inicial)
+last_verified: 2026-09-01
+verified_against: feat/multi-ifood-foundation-v1
 ---
 
 # Contrato de Marketplace — iFood
@@ -53,16 +53,27 @@ O código não fixa o tempo de validade de token: usa `expiresIn`, pois o valor 
 - Um `401` renova o token uma única vez. Um segundo `401` marca a conexão como `TOKEN_EXPIRED` e não entra em retry infinito.
 - Tokens, secrets, Authorization e payloads pessoais não são registrados em logs.
 
-O vínculo de tenant é a combinação persistida `MarketplaceConnection(tenantId, provider, externalMerchantId/externalStoreId)`. IDs enviados no webhook nunca são tratados como `tenantId`; são resolvidos contra esse vínculo interno único.
+O vínculo de tenant é a conexão persistida `MarketplaceConnection(tenantId, provider, externalMerchantId/externalStoreId)`. Um tenant pode possuir várias conexões iFood; `provider + externalMerchantId` e `provider + externalStoreId` permanecem globalmente únicos. IDs enviados no webhook nunca são tratados como `tenantId`: resolvem primeiro a conexão e somente então o tenant.
+
+Registros existentes continuam válidos como a primeira conexão do tenant. A migration V1 remove apenas a unicidade single-store `(tenantId, provider)`; não apaga nem reescreve credenciais, pedidos ou eventos.
+
+### 3.1 Gestão tenant-scoped das conexões
+
+- `GET /marketplaces/connections` lista somente conexões do tenant autenticado.
+- `POST /marketplaces/:provider/connect/manual` cria uma nova conexão; merchant/store duplicado retorna conflito.
+- `GET|PATCH|DELETE /marketplaces/connections/:connectionId` sempre combina o ID com o tenant da sessão. `DELETE` é desconexão lógica e preserva histórico.
+- `POST /marketplaces/connections/:connectionId/connect/manual` e `.../disconnect` alteram somente a conexão selecionada.
+- Os endpoints provider-scoped de status/disconnect permanecem temporariamente para compatibilidade do onboarding legado e operam sobre a conexão mais recente.
+- Respostas retornam somente flags `hasAccessToken`/`hasRefreshToken`; ciphertext, access token e refresh token não são serializados.
 
 ## 4. Webhook e ingestão
 
 1. O endpoint público recebe o raw body.
 2. `X-IFood-Signature` é validado por HMAC-SHA256 com comparação constante antes do processamento.
 3. O evento é normalizado e o merchant/store é resolvido internamente.
-4. O inbox persiste `provider + dedupeKey` com unique constraint.
+4. O inbox persiste `provider + dedupeKey` com unique constraint; a chave incorpora conexão/merchant e mantém leitura compatível das chaves legadas da mesma conexão.
 5. Evento duplicado retorna aceite idempotente e não cria outro pedido.
-6. O pedido usa unique constraint `(tenantId, provider, externalOrderId)`.
+6. O pedido usa unique constraint `(connectionId, provider, externalOrderId)`.
 7. Eventos finais não podem violar `ORDER_STATUS_TRANSITIONS`; divergência é registrada em log operacional.
 
 O bypass `x-marketplace-smoke` só é aceito fora de produção ou quando o smoke foi explicitamente habilitado.
@@ -104,8 +115,8 @@ O consumidor envia o código escolhido em `marketplaceReasonCode`. Antes do POST
 |---|---|---|
 | Confirmar | `ifood:confirm:<marketplaceOrderId>:v1` | unique `(tenantId, idempotencyKey)` + jobId determinístico + status condicional |
 | Cancelar | `ifood:cancel:<marketplaceOrderId>:<hash-do-código>` | mesma proteção; código não aparece no jobId |
-| Webhook | `eventId` oficial ou hash do raw body | unique `(provider, dedupeKey)` |
-| Importar pedido | external order por tenant/provider | unique `(tenantId, provider, externalOrderId)` |
+| Webhook | conexão/merchant + `eventId` oficial ou hash do raw body | unique `(provider, dedupeKey)` |
+| Importar pedido | connection + external order | unique `(connectionId, provider, externalOrderId)` |
 
 Enquanto há operação `PENDING`, `QUEUED`, `PROCESSING` ou `ACCEPTED`, uma operação conflitante é rejeitada. O worker revalida `tenantId`, pedido interno, pedido externo, tipo, versão e correlation ID contra a linha persistida antes de chamar o provider.
 
@@ -134,7 +145,7 @@ O payload contém somente `tenantId`, ID interno, ID externo, tipo, correlation 
 
 `MarketplaceOperation` registra tenant, conexão, pedidos interno/externo, operação, status, tentativas, timestamps, HTTP normalizado, código do provider, erro sanitizado e correlation ID. `GET /marketplaces/operations` expõe somente linhas do tenant autenticado.
 
-Migrations: `20260716050000_marketplace_bidirectional_operations`, `20260716150000_marketplace_reconciliation_operations` e `20260716190000_ifood_polling_fallback`. Todas são aditivas. A terceira adiciona canal inicial/final, contador/último recebimento, estado e contadores de polling e metadados de ordenação. Rollback seguro primeiro desativa `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED`, depois o bidirecional se necessário, e volta o código preservando auditoria. Remover colunas, constraints ou enums exige mudança separada, backup e aprovação.
+Migrations relevantes: `20260716050000_marketplace_bidirectional_operations`, `20260716150000_marketplace_reconciliation_operations`, `20260716190000_ifood_polling_fallback` e `20260901013000_multi_ifood_foundation_v1`. A V1 multi-iFood preserva os registros existentes, remove a constraint single-store e torna a identidade do pedido connection-scoped. Rollback seguro primeiro desativa `MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED`, depois o bidirecional se necessário, e volta o código preservando auditoria. Reintroduzir a constraint single-store exige consolidar dados e fica fora de rollback automático.
 
 Logs estruturados incluem IDs operacionais, duração, tentativa/resultado e classificação, mas nunca token, secret, Authorization ou payload integral.
 
@@ -171,7 +182,7 @@ Fora do escopo: catálogo, publicação, preços, estoque, promoções, segundo 
 | evento desconhecido | Inbox | nenhum efeito de lifecycle | nenhuma | Sim; persiste para auditoria |
 | evento mais antigo que `lastExternalEventAt` | Inbox | nenhum; regressão bloqueada | nenhuma | Sim; termina `IGNORED` |
 
-Todo evento persiste `eventId`, `createdAt`, sequência quando disponível, correlation ID, hash e chave de deduplicação. A unique constraint `(provider, dedupeKey)` é a autoridade. O código faz uma leitura rápida para duplicatas e também captura `P2002`, fechando a corrida entre workers. Eventos `PROCESSED` ou `IGNORED` retornam sucesso sem repetir efeitos; `FAILED` pode ser reprocessado com claim condicional.
+Todo evento persiste `eventId`, `createdAt`, sequência quando disponível, correlation ID, hash e chave de deduplicação. A unique constraint `(provider, dedupeKey)` é a autoridade, mas a chave é derivada de conexão/merchant + identidade do evento. O código lê também a chave legada quando ela pertence à mesma conexão e captura `P2002`, fechando a corrida entre workers. Eventos `PROCESSED` ou `IGNORED` retornam sucesso sem repetir efeitos; `FAILED` pode ser reprocessado com claim condicional.
 
 ## 14. Reconciliação e divergências
 

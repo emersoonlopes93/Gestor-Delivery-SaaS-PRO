@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import type { TenantJwtPayload } from '@gestor/types';
 import { MarketplaceEventStatus, Prisma } from '@prisma/client';
@@ -33,6 +33,65 @@ export class MarketplaceTenantController {
   async listConnections(@Req() req: TenantRequest) {
     const rows = await this.connectionService.listTenantConnections(req.user.tenantId);
     return rows.map((row) => this.connectionService.maskConnection(row));
+  }
+
+  @Get('connections/:connectionId')
+  @RequirePermissions('settings.manage')
+  async getConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
+    const connection = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
+    return this.connectionService.maskConnection(connection);
+  }
+
+  @Patch('connections/:connectionId')
+  @RequirePermissions('settings.manage')
+  async updateConnection(
+    @Req() req: TenantRequest,
+    @Param('connectionId') connectionId: string,
+    @Body() body: {
+      externalMerchantId?: string;
+      externalStoreId?: string;
+      displayName?: string;
+      authType?: string;
+      accessToken?: string;
+      refreshToken?: string;
+      tokenExpiresAt?: string;
+      settingsJson?: Record<string, unknown>;
+    },
+  ) {
+    const connection = await this.connectionService.updateManual(req.user.tenantId, connectionId, {
+      ...body,
+      settingsJson: (body.settingsJson ?? undefined) as Prisma.InputJsonValue | undefined,
+    });
+    return this.connectionService.maskConnection(connection);
+  }
+
+  @Post('connections/:connectionId/connect/manual')
+  @RequirePermissions('settings.manage')
+  async reconnectConnection(
+    @Req() req: TenantRequest,
+    @Param('connectionId') connectionId: string,
+    @Body() body: {
+      accessToken?: string;
+      refreshToken?: string;
+      tokenExpiresAt?: string;
+    },
+  ) {
+    const connection = await this.connectionService.updateManual(req.user.tenantId, connectionId, body);
+    return this.connectionService.maskConnection(connection);
+  }
+
+  @Post('connections/:connectionId/disconnect')
+  @RequirePermissions('settings.manage')
+  async disconnectConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
+    const connection = await this.connectionService.disconnectById(req.user.tenantId, connectionId);
+    return this.connectionService.maskConnection(connection);
+  }
+
+  @Delete('connections/:connectionId')
+  @RequirePermissions('settings.manage')
+  async removeConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
+    const connection = await this.connectionService.disconnectById(req.user.tenantId, connectionId);
+    return this.connectionService.maskConnection(connection);
   }
 
   @Get(':provider/status')
@@ -84,6 +143,7 @@ export class MarketplaceTenantController {
       take: 100,
       select: {
         id: true,
+        connectionId: true,
         provider: true,
         externalOrderId: true,
         externalDisplayId: true,
@@ -124,6 +184,7 @@ export class MarketplaceTenantController {
       take: 100,
       select: {
         id: true,
+        connectionId: true,
         provider: true,
         eventId: true,
         externalMerchantId: true,

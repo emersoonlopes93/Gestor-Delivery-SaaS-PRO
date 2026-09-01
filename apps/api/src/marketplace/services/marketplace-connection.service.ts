@@ -1,7 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceConnectionStatus, MarketplaceProvider, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceCredentialService } from './marketplace-credential.service';
+
+type ManualConnectionInput = {
+  externalMerchantId?: string;
+  externalStoreId?: string;
+  displayName?: string;
+  authType?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: string;
+  settingsJson?: Prisma.InputJsonValue;
+};
 
 @Injectable()
 export class MarketplaceConnectionService {
@@ -24,72 +35,106 @@ export class MarketplaceConnectionService {
     });
   }
 
+  async getTenantConnection(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
+    const connection = await this.prisma.marketplaceConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+    if (!connection) throw new NotFoundException('Marketplace connection not found.');
+    return connection;
+  }
+
   async connectManual(
     tenantId: string,
     provider: MarketplaceProvider,
-    input: {
-      externalMerchantId?: string;
-      externalStoreId?: string;
-      displayName?: string;
-      authType?: string;
-      accessToken?: string;
-      refreshToken?: string;
-      tokenExpiresAt?: string;
-      settingsJson?: Prisma.InputJsonValue;
-    },
+    input: ManualConnectionInput,
   ): Promise<MarketplaceConnection> {
-    const existing = await this.prisma.marketplaceConnection.findFirst({
-      where: { tenantId, provider },
-    });
-    const tokenExpiresAt = input.tokenExpiresAt ? new Date(input.tokenExpiresAt) : existing?.tokenExpiresAt ?? null;
-    if (input.tokenExpiresAt && Number.isNaN(tokenExpiresAt?.getTime())) {
-      throw new BadRequestException('Invalid marketplace token expiration.');
-    }
-
+    const identifiers = this.normalizeIdentifiers(provider, input);
+    await this.assertIdentifiersAvailable(provider, identifiers);
     const data = {
       tenantId,
       provider,
       status: MarketplaceConnectionStatus.CONNECTED,
-      externalMerchantId: input.externalMerchantId?.trim() || null,
-      externalStoreId: input.externalStoreId?.trim() || null,
+      ...identifiers,
       displayName: input.displayName?.trim() || null,
       authType: input.authType?.trim() || null,
       accessTokenEnc: input.accessToken?.trim()
         ? this.credentials.encrypt(input.accessToken.trim())
-        : existing?.accessTokenEnc ?? null,
+        : null,
       refreshTokenEnc: input.refreshToken?.trim()
         ? this.credentials.encrypt(input.refreshToken.trim())
-        : existing?.refreshTokenEnc ?? null,
-      tokenExpiresAt,
+        : null,
+      tokenExpiresAt: this.parseTokenExpiration(input.tokenExpiresAt),
       settingsJson: this.sanitizeSettings(input.settingsJson),
     };
 
-    if (existing) {
-      return this.prisma.marketplaceConnection.update({
-        where: { id: existing.id, tenantId },
-        data,
-      });
+    try {
+      return await this.prisma.marketplaceConnection.create({ data });
+    } catch (error) {
+      this.rethrowUniqueIdentifierViolation(error);
+      throw error;
     }
-
-    return this.prisma.marketplaceConnection.create({
-      data,
-    });
   }
 
-  async disconnect(tenantId: string, provider: MarketplaceProvider) {
-    const connection = await this.prisma.marketplaceConnection.findFirst({
-      where: { tenantId, provider },
+  async updateManual(
+    tenantId: string,
+    connectionId: string,
+    input: ManualConnectionInput,
+  ): Promise<MarketplaceConnection> {
+    const existing = await this.getTenantConnection(tenantId, connectionId);
+    const identifiers = this.normalizeIdentifiers(existing.provider, {
+      externalMerchantId: input.externalMerchantId ?? existing.externalMerchantId ?? undefined,
+      externalStoreId: input.externalStoreId ?? existing.externalStoreId ?? undefined,
     });
-    if (!connection) throw new NotFoundException('Marketplace connection not found.');
+    await this.assertIdentifiersAvailable(existing.provider, identifiers, existing.id);
 
+    try {
+      return await this.prisma.marketplaceConnection.update({
+        where: { id: existing.id, tenantId },
+        data: {
+          ...identifiers,
+          status: MarketplaceConnectionStatus.CONNECTED,
+          displayName: input.displayName === undefined ? existing.displayName : input.displayName.trim() || null,
+          authType: input.authType === undefined ? existing.authType : input.authType.trim() || null,
+          accessTokenEnc: input.accessToken?.trim()
+            ? this.credentials.encrypt(input.accessToken.trim())
+            : existing.accessTokenEnc,
+          refreshTokenEnc: input.refreshToken?.trim()
+            ? this.credentials.encrypt(input.refreshToken.trim())
+            : existing.refreshTokenEnc,
+          tokenExpiresAt: input.tokenExpiresAt === undefined
+            ? existing.tokenExpiresAt
+            : this.parseTokenExpiration(input.tokenExpiresAt),
+          settingsJson: input.settingsJson === undefined
+            ? existing.settingsJson ?? undefined
+            : this.sanitizeSettings(input.settingsJson),
+        },
+      });
+    } catch (error) {
+      this.rethrowUniqueIdentifierViolation(error);
+      throw error;
+    }
+  }
+
+  async disconnectById(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
+    const connection = await this.getTenantConnection(tenantId, connectionId);
     return this.prisma.marketplaceConnection.update({
       where: { id: connection.id, tenantId },
       data: {
         status: MarketplaceConnectionStatus.DISCONNECTED,
         accessTokenEnc: null,
         refreshTokenEnc: null,
+        tokenExpiresAt: null,
       },
     });
+  }
+
+  async disconnect(tenantId: string, provider: MarketplaceProvider) {
+    const connection = await this.prisma.marketplaceConnection.findFirst({
+      where: { tenantId, provider },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+    if (!connection) throw new NotFoundException('Marketplace connection not found.');
+    return this.disconnectById(tenantId, connection.id);
   }
 
   async resolveConnection(input: {
@@ -124,11 +169,60 @@ export class MarketplaceConnectionService {
   }
 
   maskConnection(connection: MarketplaceConnection) {
+    const { accessTokenEnc, refreshTokenEnc, ...safeConnection } = connection;
     return {
-      ...connection,
-      accessTokenEnc: connection.accessTokenEnc ? '***' : null,
-      refreshTokenEnc: connection.refreshTokenEnc ? '***' : null,
+      ...safeConnection,
+      hasAccessToken: Boolean(accessTokenEnc),
+      hasRefreshToken: Boolean(refreshTokenEnc),
     };
+  }
+
+  private normalizeIdentifiers(
+    provider: MarketplaceProvider,
+    input: { externalMerchantId?: string; externalStoreId?: string },
+  ): { externalMerchantId: string | null; externalStoreId: string | null } {
+    const externalMerchantId = input.externalMerchantId?.trim() || null;
+    const externalStoreId = input.externalStoreId?.trim() || null;
+    if (provider === MarketplaceProvider.IFOOD && !externalMerchantId) {
+      throw new BadRequestException('iFood merchantId is required.');
+    }
+    return { externalMerchantId, externalStoreId };
+  }
+
+  private async assertIdentifiersAvailable(
+    provider: MarketplaceProvider,
+    identifiers: { externalMerchantId: string | null; externalStoreId: string | null },
+    excludeConnectionId?: string,
+  ): Promise<void> {
+    const candidates = [
+      ...(identifiers.externalMerchantId ? [{ externalMerchantId: identifiers.externalMerchantId }] : []),
+      ...(identifiers.externalStoreId ? [{ externalStoreId: identifiers.externalStoreId }] : []),
+    ];
+    if (candidates.length === 0) return;
+    const conflict = await this.prisma.marketplaceConnection.findFirst({
+      where: {
+        provider,
+        OR: candidates,
+        ...(excludeConnectionId ? { id: { not: excludeConnectionId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (conflict) throw new ConflictException('Marketplace merchant or store is already connected.');
+  }
+
+  private parseTokenExpiration(value?: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid marketplace token expiration.');
+    }
+    return parsed;
+  }
+
+  private rethrowUniqueIdentifierViolation(error: unknown): void {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new ConflictException('Marketplace merchant or store is already connected.');
+    }
   }
 
   private sanitizeSettings(settings?: Prisma.InputJsonValue): Prisma.InputJsonObject {
