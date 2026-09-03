@@ -5,7 +5,6 @@ import {
   MarketplaceEventStatus,
   MarketplaceOperationStatus,
   MarketplaceOperationType,
-  MarketplaceProvider,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceCredentialService } from './marketplace-credential.service';
@@ -25,7 +24,7 @@ export class MarketplaceAdminOperationsService {
 
   async listPollingConnections(tenantId: string) {
     return this.prisma.marketplaceConnection.findMany({
-      where: { tenantId, provider: MarketplaceProvider.IFOOD },
+      where: { tenantId },
       orderBy: [{ createdAt: 'desc' }],
       select: {
         id: true,
@@ -61,7 +60,6 @@ export class MarketplaceAdminOperationsService {
   }) {
     const where = {
       tenantId: input.tenantId,
-      provider: MarketplaceProvider.IFOOD,
       ...(input.status ? { status: input.status } : {}),
       ...(input.operation ? { operation: input.operation } : {}),
     };
@@ -148,7 +146,6 @@ export class MarketplaceAdminOperationsService {
   async listFailures(input: MarketplaceAdminPage) {
     const where = {
       tenantId: input.tenantId,
-      provider: MarketplaceProvider.IFOOD,
       status: { in: [MarketplaceOperationStatus.FAILED, MarketplaceOperationStatus.INTERVENTION_REQUIRED] },
     };
     const [total, items] = await this.prisma.$transaction([

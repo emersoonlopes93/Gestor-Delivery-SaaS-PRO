@@ -356,7 +356,11 @@ export class MarketplaceOrderIngestionService {
 
   private async createInternalOrderFromNormalized(normalized: NormalizedMarketplaceOrder): Promise<string> {
     const tenantId = normalized.connection.tenantId;
-    const idempotencyKey = buildMarketplaceOrderIdempotencyKey(normalized.connection.id, normalized.externalOrderId);
+    const idempotencyKey = buildMarketplaceOrderIdempotencyKey(
+      normalized.connection.id,
+      normalized.externalOrderId,
+      normalized.provider,
+    );
     const existing = await this.prisma.order.findFirst({
       where: {
         tenantId,
@@ -376,7 +380,11 @@ export class MarketplaceOrderIngestionService {
       customerId = customer?.id ?? null;
     }
 
-    const itemsSubtotal = normalized.items.reduce((sum, item) => sum + item.totalPrice, 0);
+    const itemsSubtotal = normalized.itemsSubtotal
+      ?? normalized.items.reduce((sum, item) => sum + item.totalPrice, 0);
+    const sourceChannel = normalized.provider === MarketplaceProvider.FOOD_99
+      ? 'marketplace_99food'
+      : 'marketplace_ifood';
     const order = await this.prisma.$transaction(async (tx) => {
       const updatedTenant = await tx.tenant.update({
         where: { id: tenantId },
@@ -395,16 +403,19 @@ export class MarketplaceOrderIngestionService {
           customerPhone: normalized.customerPhone,
           customerEmail: normalized.customerEmail ?? null,
           itemsSubtotal,
-          discountTotal: 0,
-          deliveryFee: 0,
-          normalDeliveryFee: 0,
-          serviceFee: 0,
-          total: itemsSubtotal,
-          sourceChannel: 'marketplace_ifood',
+          discountTotal: normalized.discountTotal ?? 0,
+          deliveryFee: normalized.deliveryFee ?? 0,
+          normalDeliveryFee: normalized.deliveryFee ?? 0,
+          serviceFee: normalized.serviceFee ?? 0,
+          total: normalized.total ?? itemsSubtotal,
+          sourceChannel,
           idempotencyKey,
           notes: normalized.notes ?? null,
           customerId,
           paymentMethod: (normalized.paymentMethod ?? PaymentMethod.other) as PaymentMethod,
+          changeFor: normalized.changeFor,
+          scheduledFor: normalized.scheduledFor,
+          isScheduled: Boolean(normalized.scheduledFor),
           publicTrackingToken: generatePublicTrackingToken(),
         },
       });
@@ -425,7 +436,9 @@ export class MarketplaceOrderIngestionService {
             snapshotImage: null,
             snapshotBasePrice: item.unitPrice,
             snapshotExtrasTotal: 0,
-            snapshotComposition: null,
+            snapshotComposition: item.options?.length
+              ? JSON.stringify({ options: item.options })
+              : undefined,
           },
         });
       }
@@ -454,7 +467,7 @@ export class MarketplaceOrderIngestionService {
           orderId: created.id,
           tenantId,
           status: OrderStatus.pending,
-          note: `Pedido importado via marketplace_ifood (${normalized.externalOrderId}).`,
+          note: `Pedido importado via ${sourceChannel} (${normalized.externalOrderId}).`,
           actorType: 'system',
         },
       });
@@ -498,25 +511,39 @@ export class MarketplaceOrderIngestionService {
     topic?: string | null,
   ): Promise<void> {
     const normalizedTopic = topic?.trim().toUpperCase();
-    const targetStatus = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED'
-      ? OrderStatus.confirmed
+    const lifecycleKind = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED'
+      ? 'confirmed'
+      : normalizedTopic === 'READY_FOR_PICKUP' || normalizedTopic === 'READY_TO_PICKUP'
+        ? 'ready'
+        : normalizedTopic === 'DISPATCHED'
+          ? 'dispatched'
       : normalizedTopic === 'CANCELLED' || normalizedTopic === 'ORDER_CANCELLED'
         ? OrderStatus.cancelled
-        : normalizedTopic === 'COMPLETED' || normalizedTopic === 'ORDER_COMPLETED' || normalizedTopic === 'CONCLUDED'
-          ? OrderStatus.completed
+        : normalizedTopic === 'COMPLETED' || normalizedTopic === 'ORDER_COMPLETED'
+          || normalizedTopic === 'CONCLUDED' || normalizedTopic === 'DELIVERED'
+          ? 'completed'
           : null;
-    if (!targetStatus) return;
+    if (!lifecycleKind) return;
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
-      where: { tenantId, connectionId, provider: MarketplaceProvider.IFOOD, externalOrderId },
+      where: { tenantId, connectionId, externalOrderId },
       select: { id: true, internalOrderId: true, provider: true },
     });
     if (!marketplaceOrder?.internalOrderId) return;
     const order = await this.prisma.order.findFirst({
       where: { id: marketplaceOrder.internalOrderId, tenantId },
-      select: { status: true },
+      select: { status: true, fulfillmentType: true },
     });
     if (!order) return;
+    const targetStatus = lifecycleKind === 'confirmed'
+      ? OrderStatus.confirmed
+      : lifecycleKind === 'ready'
+        ? order.fulfillmentType === 'pickup' ? OrderStatus.ready_for_pickup : OrderStatus.ready_for_delivery
+        : lifecycleKind === 'dispatched'
+          ? OrderStatus.out_for_delivery
+          : lifecycleKind === 'completed'
+            ? OrderStatus.completed
+            : OrderStatus.cancelled;
     const pendingCancel = targetStatus === OrderStatus.confirmed
       ? await this.prisma.marketplaceOperation.findFirst({
           where: {
@@ -586,7 +613,7 @@ export class MarketplaceOrderIngestionService {
     await this.ordersService.updateOrderStatus(
       marketplaceOrder.internalOrderId,
       tenantId,
-      { status: targetStatus, note: `Status confirmado por evento iFood (${normalizedTopic}).` },
+      { status: targetStatus, note: `Status confirmado por evento ${marketplaceOrder.provider} (${normalizedTopic}).` },
       undefined,
       { marketplaceEvent: true },
     );

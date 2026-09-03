@@ -100,6 +100,18 @@ Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
 
 ---
 
+## 99Food Orders V1 — branch pronta para Sandbox (2026-09-03)
+
+- Objetivo: implementar o adapter 99Food/Open Delivery v4 sobre a fundação marketplace multi-loja existente, sem deploy, produção ou chamadas autenticadas ao provider.
+- Branch/worktree: `feat/99food-orders-v1`, criada de `origin/main-copy` em `a723413124b0ac7af5914eebda02396318da89ed`; trabalho executado em `C:\wt\pedehub\99food-orders`.
+- Alterações: OAuth por loja com credencial criptografada, autorização estrutural, webhook HMAC do corpo bruto, inbox idempotente, polling por conexão com persist-before-ACK, snapshot autoritativo, normalização completa, lifecycle bidirecional e migration aditiva dos tipos de operação.
+- Logística: `delivery.deliveredBy=MARKETPLACE` e ownership desconhecido bloqueiam atribuição, rota e auto-dispatch internos; somente `MERCHANT` é elegível.
+- Contratos: marketplace, pedidos/status, filas/jobs, eventos/webhooks, multi-tenancy e delivery. Nenhuma mudança de pagamento, fiscal, catálogo, estoque ou preço.
+- UI tenant: 99Food não aparece mais como “Em breve”; a ação de autorização abre a URL oficial e exibe erro explícito quando as credenciais não estão configuradas. Admin continua consumindo as estruturas genéricas já existentes de conexões, operações e divergências.
+- Validação Sandbox: indisponível porque não há App ID/Client Secret Sandbox no ambiente. Permanecem pendentes OAuth real, evento assinado real, polling/ACK, importação de pedido e lifecycle completo. Decisão de promoção: `READY_FOR_SANDBOX_VALIDATION`; não promover para `main-copy` antes dessas evidências.
+
+---
+
 ## Compatibilidade light/dark do web-tenant (2026-08-27)
 
 - Corrigidas superfícies, textos, estados, tabs, toggles e permission gates que

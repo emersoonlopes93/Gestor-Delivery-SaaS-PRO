@@ -30,6 +30,7 @@ import {
 } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
+import { allowsInternalDeliveryAssignment } from '../marketplace/marketplace-logistics';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { DriverEarningsService } from './driver-earnings.service';
 
@@ -357,7 +358,7 @@ export class DeliveryRunsService {
             fulfillmentType: 'delivery',
             status: 'ready_for_delivery',
           },
-          include: { deliveryAddress: true },
+          include: { deliveryAddress: true, marketplaceOrders: { select: { provider: true, normalizedPayload: true } } },
         }),
         tx.tenantSettings.findUnique({ where: { tenantId } }),
       ]);
@@ -367,6 +368,9 @@ export class DeliveryRunsService {
       if (!settings) throw new BadRequestException('ConfiguraÃ§Ã£o da loja nÃ£o encontrada.');
       if (orders.length !== orderIds.length) {
         throw new BadRequestException('Todos os pedidos devem pertencer à loja e estar prontos para entrega.');
+      }
+      if (orders.some((order) => !allowsInternalDeliveryAssignment(order.marketplaceOrders))) {
+        throw new BadRequestException('A logistica deste pedido pertence ao marketplace e nao pode receber rota interna.');
       }
 
       const byId = new Map(orders.map((order) => [order.id, order]));

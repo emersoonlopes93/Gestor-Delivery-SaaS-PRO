@@ -26,6 +26,22 @@ export type MarketplaceCancellationReason = {
   description: string;
 };
 
+export type MarketplacePollAcknowledgment = {
+  id: string;
+  orderId: string;
+  eventType: string;
+};
+
+export type MarketplaceLogisticsOwnership = 'merchant' | 'provider' | 'not_applicable' | 'unknown';
+
+export type NormalizedMarketplaceOrderOption = {
+  externalOptionId?: string | null;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+};
+
 export type NormalizedMarketplaceOrderItem = {
   externalItemId?: string | null;
   name: string;
@@ -34,6 +50,7 @@ export type NormalizedMarketplaceOrderItem = {
   totalPrice: number;
   notes?: string | null;
   productId?: string | null;
+  options?: NormalizedMarketplaceOrderOption[];
 };
 
 export type NormalizedMarketplaceOrder = {
@@ -46,11 +63,21 @@ export type NormalizedMarketplaceOrder = {
   preparationStartAt?: Date | null;
   confirmationDeadlineAt?: Date | null;
   fulfillmentType: 'delivery' | 'pickup';
+  logisticsOwnership: MarketplaceLogisticsOwnership;
   customerName: string;
   customerPhone: string;
   customerEmail?: string | null;
   notes?: string | null;
   paymentMethod?: 'cash' | 'pix' | 'credit_card' | 'debit_card' | 'card_on_delivery' | 'other';
+  isPrepaid?: boolean;
+  amountDue?: number;
+  changeFor?: number | null;
+  itemsSubtotal?: number;
+  discountTotal?: number;
+  deliveryFee?: number;
+  serviceFee?: number;
+  total?: number;
+  scheduledFor?: Date | null;
   items: NormalizedMarketplaceOrderItem[];
   deliveryAddress?: {
     street: string;

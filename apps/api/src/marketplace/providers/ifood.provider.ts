@@ -146,6 +146,7 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       fulfillmentType: this.normalizeFulfillmentType(
         this.readString(order, ['fulfillmentType', 'fulfillment_type', 'serviceType', 'service_type']),
       ),
+      logisticsOwnership: 'unknown',
       customerName: this.readString(customer, ['name']) ?? 'Cliente Marketplace',
       customerPhone: this.readString(customer, ['phone', 'phoneNumber']) ?? '00000000000',
       customerEmail: this.readString(customer, ['email']),

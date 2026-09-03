@@ -3981,6 +3981,9 @@ enum MarketplacePollingStatus {
 
 enum MarketplaceOperationType {
   CONFIRM
+  READY
+  DISPATCH
+  DELIVER
   CANCEL
 }
 

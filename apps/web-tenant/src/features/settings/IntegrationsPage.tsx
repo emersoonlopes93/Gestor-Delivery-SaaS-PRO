@@ -14,6 +14,7 @@ import {
   useReconnectMarketplace,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
+  useFood99AuthorizationUrl,
 } from '../marketplace/hooks';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -53,6 +54,7 @@ function statusBadge(status?: string | null) {
 export function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [showManualForm, setShowManualForm] = useState(false);
+  const [manualProvider, setManualProvider] = useState<'ifood' | '99food'>('ifood');
   const [manualForm, setManualForm] = useState<ManualConnectForm>({
     externalMerchantId: '',
     externalStoreId: '',
@@ -66,10 +68,12 @@ export function IntegrationsPage() {
   const { data: billingPreview } = useBillingPreview();
 
   const connectMutation = useConnectMarketplaceManual('ifood');
+  const connectFood99Mutation = useConnectMarketplaceManual('99food');
   const disconnectMutation = useDisconnectMarketplace();
   const reconnectMutation = useReconnectMarketplace();
   const reprocessEventMutation = useReprocessMarketplaceEvent();
   const reprocessOrderMutation = useReprocessMarketplaceOrder();
+  const food99Authorization = useFood99AuthorizationUrl();
 
   const activeConnection = useMemo(() => status ?? connections?.find((c) => c.provider === 'ifood') ?? null, [status, connections]);
   const isBillingEnabled = Boolean(billingPreview?.includedChannels?.includes('marketplace_ifood'));
@@ -83,19 +87,22 @@ export function IntegrationsPage() {
     }
 
     try {
-      await connectMutation.mutateAsync({
+      const selectedMutation = manualProvider === '99food' ? connectFood99Mutation : connectMutation;
+      await selectedMutation.mutateAsync({
         externalMerchantId: manualForm.externalMerchantId.trim(),
         externalStoreId: manualForm.externalStoreId.trim(),
-        displayName: manualForm.displayName.trim() || 'iFood',
-        authType: 'manual',
+        displayName: manualForm.displayName.trim() || (manualProvider === '99food' ? '99Food' : 'iFood'),
+        authType: manualProvider === '99food' ? 'oauth2_client_credentials' : 'manual',
         settingsJson: {
           autoConfirmOrders: false,
+          pollingFallbackEnabled: manualProvider === '99food',
+          presenceMode: manualProvider === '99food' ? 'POLLING' : 'WEBHOOK',
           importAsStatus: 'pending',
         },
       });
-      toast.success('Conexão iFood atualizada.');
+      toast.success(`Conexão ${manualProvider === '99food' ? '99Food' : 'iFood'} atualizada.`);
       setShowManualForm(false);
-      setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: 'iFood' });
+      setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: manualProvider === '99food' ? '99Food' : 'iFood' });
       await Promise.all([refetchStatus(), refetchConnections(), refetchOrders(), refetchEvents()]);
       queryClient.invalidateQueries({ queryKey: ['marketplace-billing-preview'] });
     } catch (error) {
@@ -134,7 +141,7 @@ export function IntegrationsPage() {
     { id: 'ifood', label: 'iFood', provider: 'ifood' as const, comingSoon: false },
     { id: 'rappi', label: 'Rappi', provider: 'rappi' as const, comingSoon: true },
     { id: 'ubereats', label: 'Uber Eats', provider: 'ubereats' as const, comingSoon: true },
-    { id: '99food', label: '99Food', provider: '99food' as const, comingSoon: true },
+    { id: '99food', label: '99Food', provider: '99food' as const, comingSoon: false },
   ];
 
   return (
@@ -183,11 +190,27 @@ export function IntegrationsPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setShowManualForm((v) => !v)}
+                onClick={() => {
+                  setManualProvider('ifood');
+                  setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: 'iFood' });
+                  setShowManualForm((v) => !v);
+                }}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all"
               >
                 <Settings2 className="w-4 h-4" />
                 {showManualForm ? 'Fechar' : 'Adicionar loja iFood'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualProvider('99food');
+                  setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: '99Food' });
+                  setShowManualForm(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-black text-foreground hover:bg-muted transition-all"
+              >
+                <Settings2 className="w-4 h-4" />
+                Adicionar loja 99Food
               </button>
             </div>
           </div>
@@ -256,7 +279,7 @@ export function IntegrationsPage() {
             <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-4">
               <div className="flex items-center gap-2 text-sm font-black text-foreground">
                 <ShieldCheck className="w-4 h-4 text-primary" />
-                Adicionar loja iFood
+                Adicionar loja {manualProvider === '99food' ? '99Food' : 'iFood'}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <label className="space-y-1">
@@ -283,7 +306,7 @@ export function IntegrationsPage() {
                     value={manualForm.displayName}
                     onChange={(e) => setManualForm((prev) => ({ ...prev, displayName: e.target.value }))}
                     className="input-premium"
-                    placeholder="iFood"
+                    placeholder={manualProvider === '99food' ? '99Food' : 'iFood'}
                   />
                 </label>
               </div>
@@ -298,10 +321,10 @@ export function IntegrationsPage() {
                 <button
                   type="button"
                   onClick={handleManualConnect}
-                  disabled={connectMutation.isPending}
+                  disabled={connectMutation.isPending || connectFood99Mutation.isPending}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                 >
-                  {connectMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                  {connectMutation.isPending || connectFood99Mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
                   Salvar conexão
                 </button>
               </div>
@@ -322,7 +345,24 @@ export function IntegrationsPage() {
                     <div className="text-sm font-black text-foreground">{item.label}</div>
                     <div className="text-xs text-muted-foreground">{item.comingSoon ? 'Em breve' : 'Disponível agora'}</div>
                   </div>
-                  {item.comingSoon ? <Badge variant="info" size="sm">Em breve</Badge> : <Badge variant="success" size="sm">Ativo</Badge>}
+                  {item.id === '99food' ? (
+                    <button
+                      type="button"
+                      disabled={food99Authorization.isPending}
+                      onClick={async () => {
+                        try {
+                          const url = await food99Authorization.mutateAsync();
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                          toast.success('Autorizacao 99Food aberta em uma nova aba.');
+                        } catch (error) {
+                          toast.error(error instanceof Error ? error.message : 'Credenciais 99Food indisponiveis.');
+                        }
+                      }}
+                      className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50"
+                    >
+                      {food99Authorization.isPending ? 'Abrindo...' : 'Autorizar'}
+                    </button>
+                  ) : item.comingSoon ? <Badge variant="info" size="sm">Em breve</Badge> : <Badge variant="success" size="sm">Ativo</Badge>}
                 </div>
               ))}
             </div>

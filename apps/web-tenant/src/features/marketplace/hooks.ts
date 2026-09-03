@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api-client';
 
-export type MarketplaceProvider = 'ifood';
+export type MarketplaceProvider = 'ifood' | '99food';
 export type MarketplaceConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'TOKEN_EXPIRED' | 'ERROR' | 'PAUSED';
 export type MarketplaceEventStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
 
@@ -195,6 +195,15 @@ export function useBillingPreview() {
     queryFn: async () => {
       const res = await api.get<{ usagePreview?: BillingPreviewDTO }>('/billing/me');
       return res.data?.usagePreview ?? null;
+    },
+  });
+}
+
+export function useFood99AuthorizationUrl() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post<{ url: string }>('/marketplaces/99food/authorization-url');
+      return res.data.url;
     },
   });
 }

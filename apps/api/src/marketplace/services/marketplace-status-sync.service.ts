@@ -18,6 +18,7 @@ import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
+import { allowsInternalDeliveryAssignment } from '../marketplace-logistics';
 
 export type MarketplaceStatusJob = {
   tenantId: string;
@@ -48,26 +49,28 @@ export class MarketplaceStatusSyncService {
     status: string;
     reason?: string | null;
   }): Promise<{ deferred: boolean; operationId?: string }> {
-    if (!['confirmed', 'cancelled'].includes(input.status)) return { deferred: false };
+    if (!['confirmed', 'ready_for_delivery', 'ready_for_pickup', 'out_for_delivery', 'completed', 'cancelled'].includes(input.status)) {
+      return { deferred: false };
+    }
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
       where: { tenantId: input.tenantId, internalOrderId: input.orderId },
       include: { connection: true },
     });
     if (!marketplaceOrder) return { deferred: false };
-    if (this.config.get<string>('MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED') !== 'true') {
-      throw new ServiceUnavailableException('Bidirectional iFood operations are disabled in this environment.');
-    }
-    if (marketplaceOrder.provider !== MarketplaceProvider.IFOOD) {
-      throw new BadRequestException('Bidirectional status sync is only supported for iFood.');
-    }
+    const isFood99 = marketplaceOrder.provider === MarketplaceProvider.FOOD_99;
+    const enabled = isFood99
+      ? this.config.get<string>('MARKETPLACE_99FOOD_ENABLED') === 'true'
+      : this.config.get<string>('MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED') === 'true';
+    if (!enabled) throw new ServiceUnavailableException('Marketplace bidirectional operations are disabled in this environment.');
+    if (!isFood99 && !['confirmed', 'cancelled'].includes(input.status)) return { deferred: false };
     const capability = await this.featureControl.resolveTenantFeature({
       tenantId: input.tenantId,
-      featureKey: 'ifood_marketplace',
+      featureKey: isFood99 ? 'marketplace_orders' : 'ifood_marketplace',
     });
-    if (!capability.enabled) throw new BadRequestException('iFood marketplace feature is disabled for this tenant.');
+    if (!capability.enabled) throw new BadRequestException('Marketplace feature is disabled for this tenant.');
     if (marketplaceOrder.connection.status !== MarketplaceConnectionStatus.CONNECTED) {
-      throw new ServiceUnavailableException('iFood connection is not operational.');
+      throw new ServiceUnavailableException('Marketplace connection is not operational.');
     }
     if (!this.queue) {
       await this.divergenceService.record({
@@ -83,21 +86,33 @@ export class MarketplaceStatusSyncService {
         recommendedAction: 'Restore the worker and reconcile the remote order before retrying.',
         correlationId: randomUUID(),
       });
-      throw new ServiceUnavailableException('BullMQ is required for bidirectional iFood operations.');
+      throw new ServiceUnavailableException('BullMQ is required for marketplace operations.');
     }
 
     const operation = input.status === 'confirmed'
       ? MarketplaceOperationType.CONFIRM
-      : MarketplaceOperationType.CANCEL;
+      : input.status === 'ready_for_delivery' || input.status === 'ready_for_pickup'
+        ? MarketplaceOperationType.READY
+        : input.status === 'out_for_delivery'
+          ? MarketplaceOperationType.DISPATCH
+          : input.status === 'completed'
+            ? MarketplaceOperationType.DELIVER
+            : MarketplaceOperationType.CANCEL;
+    if (isFood99
+      && (operation === MarketplaceOperationType.DISPATCH || operation === MarketplaceOperationType.DELIVER)
+      && !allowsInternalDeliveryAssignment([{ provider: marketplaceOrder.provider, normalizedPayload: marketplaceOrder.normalizedPayload }])) {
+      throw new BadRequestException('A logistica deste pedido pertence a 99Food; despacho interno nao e permitido.');
+    }
     const reason = input.reason?.trim() || null;
     if (operation === MarketplaceOperationType.CANCEL && !reason) {
-      throw new BadRequestException('An iFood cancellation reason code is required.');
+      throw new BadRequestException('A marketplace cancellation reason code is required.');
     }
 
     const reasonFingerprint = reason
       ? createHash('sha256').update(reason).digest('hex').slice(0, 12)
       : 'v1';
-    const idempotencyKey = `ifood:${operation.toLowerCase()}:${marketplaceOrder.id}:${reasonFingerprint}`;
+    const providerKey = marketplaceOrder.provider.toLowerCase();
+    const idempotencyKey = `${providerKey}:${operation.toLowerCase()}:${marketplaceOrder.id}:${reasonFingerprint}`;
     const activeOperation = await this.prisma.marketplaceOperation.findFirst({
       where: {
         tenantId: input.tenantId,
@@ -113,7 +128,7 @@ export class MarketplaceStatusSyncService {
       },
     });
     if (activeOperation && activeOperation.idempotencyKey !== idempotencyKey) {
-      throw new BadRequestException('Another iFood status operation is still pending for this order.');
+      throw new BadRequestException('Another marketplace status operation is still pending for this order.');
     }
     if (activeOperation && activeOperation.status !== MarketplaceOperationStatus.PENDING) {
       return { deferred: true, operationId: activeOperation.id };
@@ -157,12 +172,12 @@ export class MarketplaceStatusSyncService {
       payloadVersion: 1,
       operationId: record.id,
     };
-    const jobId = `ifood-${operation.toLowerCase()}-${input.tenantId}-${marketplaceOrder.id}-${reasonFingerprint}`;
+    const jobId = `${providerKey}-${operation.toLowerCase()}-${input.tenantId}-${marketplaceOrder.id}-${reasonFingerprint}`;
     const enqueuedAt = new Date();
     await this.queue.add('order-status-sync', job, {
       jobId,
       attempts: 3,
-      backoff: { type: 'ifood-retry-after', delay: 5000 },
+      backoff: { type: isFood99 ? 'food99-retry-after' : 'ifood-retry-after', delay: 5000 },
     });
     await this.prisma.marketplaceOperation.update({
       where: { id: record.id, tenantId: input.tenantId },
@@ -229,13 +244,23 @@ export class MarketplaceStatusSyncService {
 
     const provider = this.providerRegistry.get(record.provider);
     try {
-      const result = record.operation === MarketplaceOperationType.CONFIRM
-        ? await provider.confirmOrder?.({
+      const operationInput = {
             connection: record.connection,
             externalOrderId: record.externalOrderId,
             correlationId: record.correlationId,
-          })
-        : await provider.cancelOrder?.({
+      };
+      const normalizedPayload = this.asRecord(record.marketplaceOrder.normalizedPayload);
+      const result = record.operation === MarketplaceOperationType.CONFIRM
+        ? await provider.confirmOrder?.(operationInput)
+        : record.operation === MarketplaceOperationType.READY
+          ? await provider.readyOrder?.(operationInput)
+          : record.operation === MarketplaceOperationType.DISPATCH
+            ? await provider.dispatchOrder?.(operationInput)
+            : record.operation === MarketplaceOperationType.DELIVER
+              ? normalizedPayload?.fulfillmentType === 'pickup'
+                ? await provider.pickUpOrder?.(operationInput)
+                : await provider.deliverOrder?.(operationInput)
+              : await provider.cancelOrder?.({
             connection: record.connection,
             externalOrderId: record.externalOrderId,
             reason: record.cancellationReason ?? '',
@@ -323,19 +348,22 @@ export class MarketplaceStatusSyncService {
     topic?: string | null;
   }): Promise<void> {
     const topic = input.topic?.trim().toUpperCase();
-    if (!topic || !['CONFIRMED', 'ORDER_CONFIRMED', 'CANCELLED', 'ORDER_CANCELLED', 'CANCELLATION_REQUEST_FAILED'].includes(topic)) return;
+    if (!topic || ![
+      'CONFIRMED', 'ORDER_CONFIRMED', 'READY_FOR_PICKUP', 'READY_TO_PICKUP', 'DISPATCHED',
+      'DELIVERED', 'CONCLUDED', 'COMPLETED', 'CANCELLED', 'ORDER_CANCELLED',
+      'CANCELLATION_REQUEST_FAILED', 'CANCELLATION_REQUEST_DENIED',
+    ].includes(topic)) return;
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
       where: {
         tenantId: input.tenantId,
         connectionId: input.connectionId,
-        provider: MarketplaceProvider.IFOOD,
         externalOrderId: input.externalOrderId,
       },
     });
     if (!marketplaceOrder) return;
 
-    if (topic === 'CANCELLATION_REQUEST_FAILED') {
+    if (topic === 'CANCELLATION_REQUEST_FAILED' || topic === 'CANCELLATION_REQUEST_DENIED') {
       await this.prisma.marketplaceOperation.updateMany({
         where: {
           tenantId: input.tenantId,
@@ -354,13 +382,21 @@ export class MarketplaceStatusSyncService {
           status: MarketplaceOperationStatus.INTERVENTION_REQUIRED,
           completedAt: new Date(),
           providerCode: topic,
-          lastError: 'iFood rejected the cancellation request.',
+          lastError: 'Marketplace rejected the cancellation request.',
         },
       });
       return;
     }
 
-    const operation = topic.includes('CANCEL') ? MarketplaceOperationType.CANCEL : MarketplaceOperationType.CONFIRM;
+    const operation = topic.includes('CANCEL')
+      ? MarketplaceOperationType.CANCEL
+      : topic.includes('READY')
+        ? MarketplaceOperationType.READY
+        : topic === 'DISPATCHED'
+          ? MarketplaceOperationType.DISPATCH
+          : ['DELIVERED', 'CONCLUDED', 'COMPLETED'].includes(topic)
+            ? MarketplaceOperationType.DELIVER
+            : MarketplaceOperationType.CONFIRM;
     await this.prisma.$transaction([
       this.prisma.marketplaceOperation.updateMany({
         where: {
@@ -388,5 +424,11 @@ export class MarketplaceStatusSyncService {
         data: { statusExternal: topic, lastSyncedAt: new Date() },
       }),
     ]);
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> | null {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
   }
 }

@@ -60,6 +60,15 @@ const baseEnvSchema = z.object({
   MARKETPLACE_IFOOD_POLLING_CATEGORIES: z.string().default('ALL'),
   MARKETPLACE_IFOOD_POLLING_TYPES: z.string().default(''),
   MARKETPLACE_IFOOD_POLLING_GROUPS: z.string().default(''),
+  MARKETPLACE_99FOOD_APP_ID: z.string().default(''),
+  MARKETPLACE_99FOOD_CLIENT_SECRET: z.string().default(''),
+  MARKETPLACE_99FOOD_API_BASE_URL: z.string().url().default('https://openapi.99food.com'),
+  MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  MARKETPLACE_99FOOD_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_99FOOD_POLLING_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_99FOOD_POLLING_INTERVAL_MS: z.coerce.number().int().min(30000).max(300000).default(30000),
+  MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS: z.coerce.number().int().min(30000).max(3600000).default(300000),
+  MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN: z.coerce.number().int().min(1).max(1000).default(100),
   MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: z.string().default(''),
   MARKETPLACE_CREDENTIALS_KEY_VERSION: z.string().min(1).default('current'),
   MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY: z.string().default(''),
@@ -178,6 +187,32 @@ export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
         message: `Configure types ou groups, nao ambos, para evitar filtros duplicados e auto-ACK inesperado.`,
       });
     }
+  }
+
+  if (data.MARKETPLACE_99FOOD_ENABLED === 'true') {
+    if (!data.MARKETPLACE_99FOOD_APP_ID || !data.MARKETPLACE_99FOOD_CLIENT_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MARKETPLACE_99FOOD_APP_ID'],
+        message: '99Food exige App ID e Client Secret.',
+      });
+    }
+    if (Buffer.from(data.MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY, 'base64').length !== 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY'],
+        message: 'A chave de credenciais deve conter 32 bytes codificados em base64.',
+      });
+    }
+  }
+
+  if (data.MARKETPLACE_99FOOD_POLLING_ENABLED === 'true'
+    && (data.MARKETPLACE_99FOOD_ENABLED !== 'true' || data.BULLMQ_ENABLED !== 'true' || data.REDIS_ENABLED !== 'true')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['MARKETPLACE_99FOOD_POLLING_ENABLED'],
+      message: 'Polling 99Food exige integracao, Redis e BullMQ habilitados.',
+    });
   }
 });
 

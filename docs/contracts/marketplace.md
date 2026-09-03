@@ -238,3 +238,15 @@ Os seams de polling e OAuth existem somente para tornar falha, retry e isolament
 ## 19. Criptografia e rotação
 
 Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 bytes e auth tag obrigatória. `enc:v1` continua legível apenas com a chave atual para migração; plaintext falha fechado. A leitura aceita somente a versão atual e uma versão anterior explicitamente configurada. O endpoint administrativo recifra tokens sem retornar plaintext, token ou ciphertext.
+
+## 20. 99Food Orders V1
+
+A integração 99Food usa o protocolo Open Delivery v4 e permanece desligada por padrão. Cada `MarketplaceConnection` representa uma loja e exige `externalMerchantId` e `externalStoreId` (`AppShopId`). O OAuth `client_credentials` usa `client_id=<AppID>_<AppShopId>`; o access token é armazenado exclusivamente com a criptografia versionada existente. App ID e Client Secret são configurações de ambiente e nunca retornam pela API.
+
+O webhook valida `X-App-Signature` como HMAC-SHA256 do corpo bruto com o Client Secret e responde `204` somente depois que a inbox aceitou o evento. `X-App-MerchantId` resolve a conexão; identificador ausente ou não mapeado falha fechado. O evento é apenas um sinal: a importação sempre busca `GET /v4/opendelivery/v1/orders/{orderId}` e trata o snapshot como autoridade.
+
+O polling é opt-in por ambiente e por conexão. Cada loja recebe job e token independentes. O worker persiste ou confirma a duplicata antes de enviar o ACK oficial completo (`id`, `orderId`, `eventType`), em lotes de até 2.000. `429` e `5xx` usam retry exponencial e `Retry-After`; erro permanente bloqueia a conexão sem contaminar outras lojas.
+
+Pedidos usam `marketplace_99food`, preservam itens, opções, taxas, descontos, total, pagamento, troco, endereço e timestamps do snapshot. `delivery.deliveredBy` define a autoridade logística: somente `MERCHANT` permite entregador, rota e auto-dispatch internos; `MARKETPLACE` ou valor desconhecido falham fechado. O lifecycle outbound cobre confirmar, pronto, despachar, entregar/retirar e solicitar cancelamento; aceite e recusa de cancelamento existem no adapter para o fluxo assíncrono.
+
+Variáveis: `MARKETPLACE_99FOOD_APP_ID`, `MARKETPLACE_99FOOD_CLIENT_SECRET`, `MARKETPLACE_99FOOD_API_BASE_URL`, `MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS`, `MARKETPLACE_99FOOD_ENABLED`, `MARKETPLACE_99FOOD_POLLING_ENABLED`, `MARKETPLACE_99FOOD_POLLING_INTERVAL_MS`, `MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS` e `MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN`. Habilitar polling exige Redis e BullMQ. Sem credenciais Sandbox, testes reais de OAuth, webhook, polling, pedido e lifecycle permanecem obrigatoriamente pendentes; a feature não pode ser declarada homologada.

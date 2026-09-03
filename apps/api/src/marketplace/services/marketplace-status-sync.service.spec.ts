@@ -130,4 +130,37 @@ describe('MarketplaceStatusSyncService', () => {
       data: expect.objectContaining({ status: MarketplaceOperationStatus.INTERVENTION_REQUIRED, httpStatus: 403 }),
     }));
   });
+
+  it('queues the 99Food ready lifecycle with provider-specific backoff', async () => {
+    const { service, prisma, queue } = makeService();
+    prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
+      ...marketplaceOrder,
+      provider: MarketplaceProvider.FOOD_99,
+      normalizedPayload: { logisticsOwnership: 'merchant', fulfillmentType: 'delivery' },
+    });
+    await expect(service.handleInternalStatusChanged({
+      tenantId: 'tenant-1', orderId: 'order-1', status: 'ready_for_delivery',
+    })).resolves.toEqual({ deferred: true, operationId: 'operation-1' });
+    expect(queue?.add).toHaveBeenCalledWith(
+      'order-status-sync',
+      expect.objectContaining({ operation: MarketplaceOperationType.READY }),
+      expect.objectContaining({
+        jobId: expect.stringContaining('food_99-ready-tenant-1'),
+        backoff: { type: 'food99-retry-after', delay: 5000 },
+      }),
+    );
+  });
+
+  it('blocks internal dispatch for provider-owned 99Food logistics', async () => {
+    const { service, prisma, queue } = makeService();
+    prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
+      ...marketplaceOrder,
+      provider: MarketplaceProvider.FOOD_99,
+      normalizedPayload: { logisticsOwnership: 'provider', fulfillmentType: 'delivery' },
+    });
+    await expect(service.handleInternalStatusChanged({
+      tenantId: 'tenant-1', orderId: 'order-1', status: 'out_for_delivery',
+    })).rejects.toThrow('pertence a 99Food');
+    expect(queue?.add).not.toHaveBeenCalled();
+  });
 });

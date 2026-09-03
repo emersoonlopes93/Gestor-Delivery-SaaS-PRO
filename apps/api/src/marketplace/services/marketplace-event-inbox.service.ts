@@ -227,7 +227,9 @@ export class MarketplaceEventInboxService {
   }
 
   private sanitizeHeaders(headers: Record<string, string | string[] | undefined>) {
-    const masked = new Set(['authorization', 'x-api-key', 'x-ifood-token']);
+    const masked = new Set([
+      'authorization', 'x-api-key', 'x-ifood-token', 'x-app-signature', 'didi-header-sign',
+    ]);
     return Object.fromEntries(
       Object.entries(headers).map(([key, value]) => [
         key,

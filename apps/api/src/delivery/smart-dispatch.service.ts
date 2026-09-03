@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { getLocationFreshness, type SmartDispatchSuggestionDTO } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { DeliveryRunsService } from './delivery-runs.service';
+import { allowsInternalDeliveryAssignment } from '../marketplace/marketplace-logistics';
 
 const activeRunStatuses = ['PENDING_ACCEPTANCE', 'ASSIGNED', 'IN_PROGRESS', 'RETURNING'] as const;
 
@@ -19,7 +20,7 @@ export class SmartDispatchService {
         where: { tenantId, isActive: true, status: 'available', dispatchQueueJoinedAt: { not: null }, shifts: { some: { status: 'ACTIVE' } }, deliveryRuns: { none: { status: { in: [...activeRunStatuses] } } } },
         orderBy: [{ dispatchQueueJoinedAt: 'asc' }, { id: 'asc' }],
       }),
-      this.prisma.order.findMany({ where: { tenantId, fulfillmentType: 'delivery', status: 'ready_for_delivery', deliveryStops: { none: { run: { status: { in: [...activeRunStatuses] } } } } }, include: { deliveryAddress: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+      this.prisma.order.findMany({ where: { tenantId, fulfillmentType: 'delivery', status: 'ready_for_delivery', deliveryStops: { none: { run: { status: { in: [...activeRunStatuses] } } } } }, include: { deliveryAddress: true, marketplaceOrders: { select: { provider: true, normalizedPayload: true } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
     ]);
     const queue = drivers.map((driver, index) => {
       const fresh = getLocationFreshness(driver.lastLocationAt);
@@ -31,7 +32,7 @@ export class SmartDispatchService {
     const candidate = queue.find((driver) => driver.status === 'eligible') ?? null;
     const orderIds = candidate
       ? nearbyOrders(
-        orders,
+        orders.filter((order) => allowsInternalDeliveryAssignment(order.marketplaceOrders)),
         settings.smartDispatchAutoCarona ? settings.smartDispatchMaxStops : 1,
         settings.smartDispatchGroupingKm,
       )
