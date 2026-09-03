@@ -48,12 +48,14 @@ export class MarketplaceReconciliationService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (!this.queue || this.config.get<string>('MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED') !== 'true') return;
+    const enabled = this.config.get<string>('MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED') === 'true'
+      || this.config.get<string>('MARKETPLACE_99FOOD_ENABLED') === 'true';
+    if (!this.queue || !enabled) return;
     await this.queue.add(
       'operation-reconciliation-scan',
       { schemaVersion: 1 },
       {
-        jobId: 'ifood-operation-reconciliation',
+        jobId: 'marketplace-operation-reconciliation',
         repeat: { every: 60_000 },
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
@@ -64,7 +66,7 @@ export class MarketplaceReconciliationService implements OnModuleInit {
   async reconcileBatch(limit = 100): Promise<{ inspected: number; resolved: number; alerted: number }> {
     const safeLimit = Math.min(Math.max(limit, 1), 250);
     const connections = await this.prisma.marketplaceConnection.findMany({
-      where: { provider: MarketplaceProvider.IFOOD },
+      where: {},
       select: { tenantId: true },
       distinct: ['tenantId'],
       take: 1000,
@@ -77,7 +79,6 @@ export class MarketplaceReconciliationService implements OnModuleInit {
       const operations = await this.prisma.marketplaceOperation.findMany({
         where: {
           tenantId,
-          provider: MarketplaceProvider.IFOOD,
           status: { in: ACTIVE_RECONCILIATION_STATUSES },
         },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -177,7 +178,11 @@ export class MarketplaceReconciliationService implements OnModuleInit {
       },
     });
 
-    const targetStatus = this.targetStatus(operation.operation, remoteState);
+    const targetStatus = this.targetStatus(
+      operation.operation,
+      remoteState,
+      operation.marketplaceOrder.internalOrder?.fulfillmentType,
+    );
     if (targetStatus) {
       const localOrder = operation.marketplaceOrder.internalOrder;
       if (localOrder && localOrder.status !== targetStatus) {
@@ -202,7 +207,7 @@ export class MarketplaceReconciliationService implements OnModuleInit {
         await this.ordersService.updateOrderStatus(
           localOrder.id,
           tenantId,
-          { status: targetStatus, note: `Status reconciliado com iFood (${remoteState}).` },
+          { status: targetStatus, note: `Status reconciliado com ${operation.provider} (${remoteState}).` },
           undefined,
           { marketplaceEvent: true },
         );
@@ -324,9 +329,12 @@ export class MarketplaceReconciliationService implements OnModuleInit {
     };
     const enqueuedAt = new Date();
     await this.queue.add('order-status-sync', job, {
-      jobId: `ifood-admin-retry-${child.id}`,
+      jobId: `${child.provider.toLowerCase()}-admin-retry-${child.id}`,
       attempts: 3,
-      backoff: { type: 'ifood-retry-after', delay: 5000 },
+      backoff: {
+        type: child.provider === MarketplaceProvider.FOOD_99 ? 'food99-retry-after' : 'ifood-retry-after',
+        delay: 5000,
+      },
     });
     await this.prisma.$transaction([
       this.prisma.marketplaceOperation.updateMany({
@@ -353,7 +361,11 @@ export class MarketplaceReconciliationService implements OnModuleInit {
     return { operationId: child.id, originalOperationId: original.id, correlationId, retryNumber };
   }
 
-  private targetStatus(operation: MarketplaceOperationType, remoteState: string): OrderStatus | null {
+  private targetStatus(
+    operation: MarketplaceOperationType,
+    remoteState: string,
+    fulfillmentType?: string,
+  ): OrderStatus | null {
     const normalized = remoteState.toUpperCase();
     if (operation === MarketplaceOperationType.CANCEL && normalized.includes('CANCEL')) return OrderStatus.cancelled;
     if (
@@ -361,6 +373,14 @@ export class MarketplaceReconciliationService implements OnModuleInit {
       && ['CONFIRMED', 'PREPARING', 'READY_TO_PICKUP', 'READY_FOR_DELIVERY', 'DISPATCHED', 'COMPLETED', 'CONCLUDED']
         .some((status) => normalized.includes(status))
     ) return OrderStatus.confirmed;
+    if (operation === MarketplaceOperationType.READY && normalized.includes('READY')) {
+      return fulfillmentType === 'pickup' ? OrderStatus.ready_for_pickup : OrderStatus.ready_for_delivery;
+    }
+    if (operation === MarketplaceOperationType.DISPATCH && normalized.includes('DISPATCH')) return OrderStatus.out_for_delivery;
+    if (operation === MarketplaceOperationType.DELIVER
+      && ['DELIVERED', 'PICKED_UP', 'COMPLETED', 'CONCLUDED'].some((status) => normalized.includes(status))) {
+      return OrderStatus.completed;
+    }
     return null;
   }
 

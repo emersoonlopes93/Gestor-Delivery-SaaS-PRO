@@ -380,7 +380,6 @@ export class DeliveryRunsService {
       if (orders.length !== orderIds.length) {
         throw new BadRequestException('Todos os pedidos devem pertencer à loja e estar prontos para entrega.');
       }
-
       const blockedOrder = orders.find(
         (order) => !this.isOwnFleetEligible(tenantId, order.id, order.marketplaceOrders),
       );

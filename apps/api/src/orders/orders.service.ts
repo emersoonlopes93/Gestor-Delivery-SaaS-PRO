@@ -9,6 +9,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { allowsInternalDeliveryAssignment } from '../marketplace/marketplace-logistics';
 import { OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
@@ -1794,13 +1795,20 @@ export class OrdersService {
   ): Promise<OrderDispatchItemDTO> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
-      include: { deliveryDriver: true },
+      include: {
+        deliveryDriver: true,
+        marketplaceOrders: { select: { provider: true, normalizedPayload: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
     if (order.fulfillmentType !== 'delivery') {
       throw new BadRequestException('Somente pedidos de entrega podem receber entregador.');
+    }
+
+    if (driverId && !allowsInternalDeliveryAssignment(order.marketplaceOrders)) {
+      throw new BadRequestException('A logistica deste pedido pertence ao marketplace e nao pode receber entregador interno.');
     }
 
     const previousDriverId = order.deliveryDriverId;

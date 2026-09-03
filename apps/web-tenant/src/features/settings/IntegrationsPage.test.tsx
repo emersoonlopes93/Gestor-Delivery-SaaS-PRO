@@ -12,6 +12,7 @@ import {
   useReconnectMarketplace,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
+  useFood99AuthorizationUrl,
 } from '../marketplace/hooks';
 
 vi.mock('@tanstack/react-query', () => ({
@@ -28,6 +29,7 @@ vi.mock('../marketplace/hooks', () => ({
   useReconnectMarketplace: vi.fn(),
   useReprocessMarketplaceEvent: vi.fn(),
   useReprocessMarketplaceOrder: vi.fn(),
+  useFood99AuthorizationUrl: vi.fn(),
 }));
 
 const mutation = () => ({ isPending: false, mutate: vi.fn(), mutateAsync: vi.fn() });
@@ -64,6 +66,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useReconnectMarketplace).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceEvent).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceOrder).mockReturnValue(mutation() as never);
+    vi.mocked(useFood99AuthorizationUrl).mockReturnValue(mutation() as never);
   });
 
   it('renders multiple merchants with independent status and actions without secrets', () => {
@@ -78,6 +81,8 @@ describe('IntegrationsPage multi-iFood connections', () => {
     expect(html).toContain('Desconectar');
     expect(html).toContain('Reconectar');
     expect(html).toContain('Adicionar loja iFood');
+    expect(html).toContain('99Food');
+    expect(html).toContain('Autorizar');
     expect(html).not.toContain('accessToken');
     expect(html).not.toContain('refreshToken');
   });

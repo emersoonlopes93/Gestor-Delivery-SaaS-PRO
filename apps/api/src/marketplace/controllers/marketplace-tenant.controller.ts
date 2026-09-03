@@ -12,12 +12,14 @@ import { MarketplaceEventInboxService } from '../services/marketplace-event-inbo
 import { MarketplaceOrderIngestionService } from '../services/marketplace-order-ingestion.service';
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceStatusSyncService } from '../services/marketplace-status-sync.service';
+import { Food99HttpClientService } from '../services/food99-http-client.service';
+import { randomUUID } from 'crypto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
 @Controller('marketplaces')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
-@RequiresFeature('ifood_marketplace')
+@RequiresFeature('marketplace_orders')
 export class MarketplaceTenantController {
   constructor(
     private readonly providerRegistry: MarketplaceProviderRegistryService,
@@ -26,7 +28,14 @@ export class MarketplaceTenantController {
     private readonly ingestionService: MarketplaceOrderIngestionService,
     private readonly prisma: PrismaService,
     private readonly statusSyncService: MarketplaceStatusSyncService,
+    private readonly food99Client: Food99HttpClientService,
   ) {}
+
+  @Post('99food/authorization-url')
+  @RequirePermissions('settings.manage')
+  async getFood99AuthorizationUrl() {
+    return { url: await this.food99Client.getAuthorizationUrl(randomUUID()) };
+  }
 
   @Get('connections')
   @RequirePermissions('settings.manage')
@@ -253,5 +262,73 @@ export class MarketplaceTenantController {
     @Param('marketplaceOrderId') marketplaceOrderId: string,
   ) {
     return this.statusSyncService.getCancellationReasons(req.user.tenantId, marketplaceOrderId);
+  }
+
+  @Post('orders/:marketplaceOrderId/cancellation/accept')
+  @RequirePermissions('orders.cancel')
+  async acceptFood99Cancellation(
+    @Req() req: TenantRequest,
+    @Param('marketplaceOrderId') marketplaceOrderId: string,
+  ) {
+    const order = await this.prisma.marketplaceOrder.findFirst({
+      where: { id: marketplaceOrderId, tenantId: req.user.tenantId },
+      include: { connection: true },
+    });
+    if (!order) throw new BadRequestException('Marketplace order not found.');
+    const adapter = this.providerRegistry.get(order.provider);
+    if (!adapter.acceptCancellation) throw new BadRequestException('Cancellation acceptance is unavailable for this provider.');
+    const correlationId = randomUUID();
+    const result = await adapter.acceptCancellation({
+      connection: order.connection,
+      externalOrderId: order.externalOrderId,
+      correlationId,
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: req.user.tenantId,
+        userId: req.user.sub,
+        userType: 'tenant_user',
+        action: 'marketplace.cancellation.accept',
+        resource: order.id,
+        details: { provider: order.provider, externalOrderId: order.externalOrderId, correlationId },
+      },
+    });
+    return result;
+  }
+
+  @Post('orders/:marketplaceOrderId/cancellation/deny')
+  @RequirePermissions('orders.cancel')
+  async denyFood99Cancellation(
+    @Req() req: TenantRequest,
+    @Param('marketplaceOrderId') marketplaceOrderId: string,
+    @Body() body: { reason?: string },
+  ) {
+    const reason = body.reason?.trim();
+    if (!reason) throw new BadRequestException('Cancellation denial reason and code are required.');
+    const order = await this.prisma.marketplaceOrder.findFirst({
+      where: { id: marketplaceOrderId, tenantId: req.user.tenantId },
+      include: { connection: true },
+    });
+    if (!order) throw new BadRequestException('Marketplace order not found.');
+    const adapter = this.providerRegistry.get(order.provider);
+    if (!adapter.denyCancellation) throw new BadRequestException('Cancellation denial is unavailable for this provider.');
+    const correlationId = randomUUID();
+    const result = await adapter.denyCancellation({
+      connection: order.connection,
+      externalOrderId: order.externalOrderId,
+      reason,
+      correlationId,
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: req.user.tenantId,
+        userId: req.user.sub,
+        userType: 'tenant_user',
+        action: 'marketplace.cancellation.deny',
+        resource: order.id,
+        details: { provider: order.provider, externalOrderId: order.externalOrderId, correlationId },
+      },
+    });
+    return result;
   }
 }

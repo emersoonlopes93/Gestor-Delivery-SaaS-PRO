@@ -10,6 +10,7 @@ import { MARKETPLACE_EVENT_QUEUE } from './marketplace.constants';
 import { MarketplaceWebhookController } from './controllers/marketplace-webhook.controller';
 import { MarketplaceTenantController } from './controllers/marketplace-tenant.controller';
 import { IfoodProvider } from './providers/ifood.provider';
+import { Food99Provider } from './providers/food99.provider';
 import { MarketplaceProviderRegistryService } from './services/marketplace-provider-registry.service';
 import { MarketplaceConnectionService } from './services/marketplace-connection.service';
 import { MarketplaceEventInboxService } from './services/marketplace-event-inbox.service';
@@ -23,6 +24,9 @@ import { MarketplaceDivergenceService } from './services/marketplace-divergence.
 import { MarketplaceReconciliationService } from './services/marketplace-reconciliation.service';
 import { MarketplaceAdminOperationsService } from './services/marketplace-admin-operations.service';
 import { MarketplacePollingService } from './services/marketplace-polling.service';
+import { Food99HttpClientService } from './services/food99-http-client.service';
+import { Food99TokenService } from './services/food99-token.service';
+import { Food99PollingService } from './services/food99-polling.service';
 
 const enableMarketplaceQueue =
   process.env.REDIS_ENABLED !== 'false' &&
@@ -56,9 +60,12 @@ const enableMarketplaceQueue =
   controllers: [MarketplaceWebhookController, MarketplaceTenantController],
   providers: [
     IfoodProvider,
+    Food99Provider,
     MarketplaceCredentialService,
     IfoodTokenService,
     IfoodHttpClientService,
+    Food99TokenService,
+    Food99HttpClientService,
     MarketplaceProviderRegistryService,
     MarketplaceConnectionService,
     MarketplaceEventInboxService,
@@ -68,6 +75,7 @@ const enableMarketplaceQueue =
     MarketplaceReconciliationService,
     MarketplaceAdminOperationsService,
     MarketplacePollingService,
+    Food99PollingService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),
   ],
   exports: [
@@ -79,6 +87,7 @@ const enableMarketplaceQueue =
     MarketplaceReconciliationService,
     MarketplaceAdminOperationsService,
     MarketplacePollingService,
+    Food99PollingService,
   ],
 })
 export class MarketplaceModule {}

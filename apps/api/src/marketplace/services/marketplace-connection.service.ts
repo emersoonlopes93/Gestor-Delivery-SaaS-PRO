@@ -186,6 +186,9 @@ export class MarketplaceConnectionService {
     if (provider === MarketplaceProvider.IFOOD && !externalMerchantId) {
       throw new BadRequestException('iFood merchantId is required.');
     }
+    if (provider === MarketplaceProvider.FOOD_99 && (!externalMerchantId || !externalStoreId)) {
+      throw new BadRequestException('99Food merchantId and appShopId are required.');
+    }
     return { externalMerchantId, externalStoreId };
   }
 
@@ -236,7 +239,7 @@ export class MarketplaceConnectionService {
       throw new BadRequestException('Marketplace presenceMode must be WEBHOOK, POLLING or DISABLED.');
     }
     if (pollingFallbackEnabled !== (presenceMode === 'POLLING')) {
-      throw new BadRequestException('iFood polling and presence mode must be enabled or disabled together.');
+      throw new BadRequestException('Marketplace polling and presence mode must be enabled or disabled together.');
     }
     return {
       autoConfirmOrders: record.autoConfirmOrders === true,

@@ -3,6 +3,7 @@ import {
   ExternalMarketplaceOrder,
   MarketplaceProviderOperationResult,
   MarketplaceCancellationReason,
+  MarketplacePollAcknowledgment,
   NormalizedMarketplaceOrder,
   ParsedMarketplaceEvent,
 } from '../marketplace.types';
@@ -28,6 +29,7 @@ export interface MarketplaceProviderAdapter {
   acknowledgeEvents?(input: {
     connection: MarketplaceConnection;
     eventIds: string[];
+    events?: MarketplacePollAcknowledgment[];
     correlationId: string;
   }): Promise<{ accepted: true; httpStatus: number }>;
   fetchOrderDetails(input: {
@@ -54,7 +56,38 @@ export interface MarketplaceProviderAdapter {
     externalOrderId: string;
     correlationId: string;
   }): Promise<MarketplaceProviderOperationResult>;
+  readyOrder?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
+  dispatchOrder?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
+  deliverOrder?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
+  pickUpOrder?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
   cancelOrder?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    reason: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
+  acceptCancellation?(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<MarketplaceProviderOperationResult>;
+  denyCancellation?(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
     reason: string;

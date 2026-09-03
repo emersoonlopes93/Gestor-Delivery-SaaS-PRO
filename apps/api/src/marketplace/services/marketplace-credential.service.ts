@@ -68,6 +68,15 @@ export class MarketplaceCredentialService {
     return { clientId, clientSecret };
   }
 
+  getFood99AppCredentials(): { appId: string; clientSecret: string } {
+    const appId = this.config.get<string>('MARKETPLACE_99FOOD_APP_ID')?.trim();
+    const clientSecret = this.config.get<string>('MARKETPLACE_99FOOD_CLIENT_SECRET')?.trim();
+    if (!appId || !clientSecret) {
+      throw new ServiceUnavailableException('99Food application credentials are not configured.');
+    }
+    return { appId, clientSecret };
+  }
+
   private getCurrentEncryptionKey(): { key: Buffer; version: string } {
     const version = this.config.get<string>('MARKETPLACE_CREDENTIALS_KEY_VERSION')?.trim() || 'current';
     const encoded = this.config.get<string>('MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY')?.trim();
