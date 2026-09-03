@@ -141,4 +141,35 @@ describe('PlanGatingGuard financial enforcement', () => {
       .rejects
       .toBeInstanceOf(ForbiddenException);
   });
+
+  it('passes the verified tenant subject to feature resolution before route auth guards run', async () => {
+    reflector.getAllAndOverride.mockReturnValue('ifood_marketplace');
+    tenantBillingResolver.reconcileTenantBillingStatus.mockResolvedValue({
+      subscriptionStatus: 'active',
+      trialEndsAt: null,
+      subscription: { gracePeriodEndsAt: null },
+      source: 'billing_v2',
+      allowAllModules: false,
+      includedModules: [],
+    });
+    jwtService.verify.mockReturnValue({ type: 'tenant', tenantId: 'tenant-1', sub: 'tenant-user-1' });
+    const context = {
+      getHandler: jest.fn(),
+      getClass: jest.fn(),
+      switchToHttp: () => ({
+        getRequest: () => ({
+          headers: { authorization: 'Bearer signed-token' },
+          method: 'POST',
+          originalUrl: '/api/v1/marketplaces/ifood/connect/manual',
+        }),
+      }),
+    };
+
+    await expect(makeGuard().canActivate(context as never)).resolves.toBe(true);
+    expect(featureControlService.resolveTenantFeature).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      featureKey: 'ifood_marketplace',
+      userId: 'tenant-user-1',
+    });
+  });
 });

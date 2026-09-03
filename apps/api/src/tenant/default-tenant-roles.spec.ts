@@ -24,7 +24,7 @@ describe('default tenant roles', () => {
       }),
     );
     const upsertPermission = jest.fn().mockResolvedValue(undefined);
-    const upsertRolePermission = jest.fn().mockResolvedValue(undefined);
+    const createManyRolePermissions = jest.fn().mockResolvedValue({ count: 1 });
 
     const prisma = {
       tenantPermission: {
@@ -41,7 +41,7 @@ describe('default tenant roles', () => {
         upsert: upsertRole,
       },
       tenantRolePermission: {
-        upsert: upsertRolePermission,
+        createMany: createManyRolePermissions,
       },
     };
 
@@ -58,6 +58,8 @@ describe('default tenant roles', () => {
         },
       }),
     );
-    expect(upsertRolePermission).toHaveBeenCalled();
+    expect(createManyRolePermissions).toHaveBeenCalledWith(expect.objectContaining({
+      skipDuplicates: true,
+    }));
   });
 });

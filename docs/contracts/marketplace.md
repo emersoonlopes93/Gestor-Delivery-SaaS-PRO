@@ -229,6 +229,12 @@ ACK usa lotes conservadores de até 2.000 IDs e só ocorre após commit da nova 
 
 Polling bem-sucedido é o heartbeat oficial. `presenceMode` aceita `WEBHOOK`, `POLLING` ou `DISABLED`; a API rejeita combinação contraditória entre polling e presença. Polling sem heartbeat não se aplica ao contrato iFood vigente. O modo nunca é alterado automaticamente em produção. Detalhes operacionais: [runbook de homologação](../operations/runbooks/ifood-homologation.md).
 
-## 18. Criptografia e rotação
+## 18. E2E local multi-iFood
+
+Com PostgreSQL local efêmero, API em `http://127.0.0.1:3333/api/v1` e configuração explicitamente fake/local, execute `pnpm --filter @gestor/api e2e:multi-ifood-v1`. O harness recusa URLs de banco ou API que não sejam locais e nunca chama o iFood real. Para a camada visual, inicie o web-tenant local e execute `MULTI_IFOOD_E2E_RUN_ID=<run-id> pnpm e2e:multi-ifood-web-tenant`; a evidência é gravada em `qa-artifacts/multi-ifood-e2e-v1/`.
+
+Os seams de polling e OAuth existem somente para tornar falha, retry e isolamento deterministas. Eles não constituem homologação do provider. Mudanças de status usadas no smoke KDS removem temporariamente, apenas no banco efêmero, o vínculo outbound do pedido marketplace para não enfileirar operação contra iFood; o vínculo é restaurado antes do encerramento.
+
+## 19. Criptografia e rotação
 
 Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 bytes e auth tag obrigatória. `enc:v1` continua legível apenas com a chave atual para migração; plaintext falha fechado. A leitura aceita somente a versão atual e uma versão anterior explicitamente configurada. O endpoint administrativo recifra tokens sem retornar plaintext, token ou ciphertext.

@@ -50,7 +50,7 @@ export class PlanGatingGuard implements CanActivate {
         const decision = await this.featureControlService.resolveTenantFeature({
           tenantId,
           featureKey: requiredFeature,
-          userId: request.user?.type === 'tenant' ? request.user.sub ?? request.user.id : undefined,
+          userId: this.resolveTenantUserId(request),
         });
 
         if (decision.enabled) {
@@ -155,6 +155,30 @@ export class PlanGatingGuard implements CanActivate {
       const payload = this.jwtService.verify<{ type?: string; tenantId?: string }>(token);
       if (payload.type === 'tenant' && payload.tenantId) {
         return payload.tenantId;
+      }
+    } catch {
+      return undefined;
+    }
+
+    return undefined;
+  }
+
+  private resolveTenantUserId(request: RequestWithTenant): string | undefined {
+    if (request.user?.type === 'tenant') {
+      return request.user.sub ?? request.user.id;
+    }
+
+    const authorization = request.headers.authorization;
+    const rawAuthorization = Array.isArray(authorization) ? authorization[0] : authorization;
+    const token = rawAuthorization?.startsWith('Bearer ') ? rawAuthorization.slice('Bearer '.length).trim() : '';
+    if (!token) {
+      return undefined;
+    }
+
+    try {
+      const payload = this.jwtService.verify<{ type?: string; sub?: string; id?: string }>(token);
+      if (payload.type === 'tenant') {
+        return payload.sub ?? payload.id;
       }
     } catch {
       return undefined;

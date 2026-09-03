@@ -1,3 +1,14 @@
+## Multi-iFood E2E Hardening V1 (2026-09-02)
+
+- Objetivo: validar localmente a fundacao multi-iFood promovida em `3ae47f570ffd22965e104016449d6337865a854b`, sem provider real, deploy ou banco remoto.
+- Bugs objetivos corrigidos: o `PlanGatingGuard` agora extrai tambem o subject do JWT verificado antes dos guards de rota, permitindo que a resolucao de feature avalie a permissao real do usuario; a criacao dos papeis default passou a inserir os vinculos de permissao em lote/idempotentemente, evitando expirar a transacao de signup com o catalogo completo.
+- Harness API `e2e:multi-ifood-v1`: PostgreSQL real + HTTP Nest + seams fake do iFood cobrem Alpha A/B, Beta C, unicidade global merchant/store, isolamento cross-tenant, polling/falha por conexao, refresh token isolado, mesmo `order-001` em duas conexoes, replay, merchant desconhecido, redacao de headers, KDS preparing-only/retry, dispatch e desconexao independente.
+- Harness web `e2e:multi-ifood-web-tenant`: navegador Playwright autenticado valida listagem/status A/B, ausencia de tokens/ciphertext e inclusao de uma terceira loja; evidencia em `qa-artifacts/multi-ifood-e2e-v1/multi-ifood-connections.png`.
+- Banco: PostgreSQL 16 local recebeu 65 migrations do zero e seed canonico. Redis/BullMQ nao foram necessarios porque polling/OAuth usaram seams deterministicas e o KDS foi exercitado sem operacao outbound. A repeticao do caminho de upgrade foi tentada, mas o Docker Desktop deixou de expor o engine; nenhum resultado foi inferido. O hardening nao altera schema/migration.
+- Validacao: E2E API `MULTI_IFOOD_E2E_PASS`; E2E web `WEB_TENANT_MULTI_IFOOD_E2E_PASS`; API completa em quatro shards com 119 suites/553 testes aprovados e 5 suites/10 testes ignorados; web-tenant 39 arquivos/140 testes; lint, typecheck global e dos harnesses, no-any, features, boundaries, theme, builds API/web-tenant e diff check aprovados. O lint preserva 17 warnings preexistentes do web-storefront, sem erros.
+- Limitacao visual: a CLI `agent-browser` instalou Chromium, mas nao conseguiu inicializar uma sessao CDP no host Windows; a evidencia visual aceita e versionada e a execucao Playwright real, nao uma inferencia por source.
+- Fora de escopo preservado: iFood real, credenciais reais, pagamentos, routing V2, catalogo amplo, Dokploy, producao e bancos remotos.
+
 ## Multi-iFood Foundation V1 (2026-09-01)
 
 - Objetivo: remover a suposição `1 tenant = 1 iFood` preservando o agregado e a operação marketplace já existentes.
