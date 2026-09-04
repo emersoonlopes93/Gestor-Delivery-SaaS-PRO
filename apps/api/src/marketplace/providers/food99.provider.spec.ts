@@ -1,5 +1,5 @@
 import { MarketplaceProvider } from '@prisma/client';
-import { createHmac } from 'crypto';
+import { createHash } from 'crypto';
 import { Food99Provider } from './food99.provider';
 
 describe('Food99Provider', () => {
@@ -12,15 +12,49 @@ describe('Food99Provider', () => {
     getFood99AppCredentials: jest.fn().mockReturnValue({ appId: 'app', clientSecret: 'secret' }),
   };
   const provider = new Food99Provider(client as never, credentials as never);
+  const signWebhook = (rawBody: Buffer) => createHash('md5')
+    .update(rawBody)
+    .update('secret', 'utf8')
+    .digest('hex');
 
-  it('validates the official raw-body HMAC-SHA256 signature', async () => {
+  it('accepts the official MD5 signature of raw body plus app secret', async () => {
     const rawBody = Buffer.from('{"eventId":"evt-1"}');
-    const signature = createHmac('sha256', 'secret').update(rawBody).digest('hex');
     await expect(provider.validateWebhook({
-      headers: { 'x-app-signature': signature }, rawBody, body: {},
+      headers: { 'DiDi-HeAdEr-SiGn': signWebhook(rawBody) }, rawBody, body: {},
+    })).resolves.toBe(true);
+  });
+
+  it('rejects an invalid or missing signature', async () => {
+    const rawBody = Buffer.from('{"eventId":"evt-1"}');
+    await expect(provider.validateWebhook({
+      headers: { 'didi-header-sign': '0'.repeat(32) }, rawBody, body: {},
+    })).resolves.toBe(false);
+    await expect(provider.validateWebhook({
+      headers: {}, rawBody, body: {},
+    })).resolves.toBe(false);
+  });
+
+  it('rejects a signature after any raw-body byte changes', async () => {
+    const signedBody = Buffer.from('{"eventId":"evt-1","orderId":"order-1"}');
+    const equivalentParsedBody = Buffer.from('{ "orderId": "order-1", "eventId": "evt-1" }');
+    await expect(provider.validateWebhook({
+      headers: { 'didi-header-sign': signWebhook(signedBody) },
+      rawBody: equivalentParsedBody,
+      body: { eventId: 'evt-1', orderId: 'order-1' },
+    })).resolves.toBe(false);
+  });
+
+  it('signs UTF-8 accents and a trailing newline as their original bytes', async () => {
+    const rawBody = Buffer.from('{"customer":"João","note":"ação"}\n', 'utf8');
+    await expect(provider.validateWebhook({
+      headers: { 'didi-header-sign': signWebhook(rawBody).toUpperCase() },
+      rawBody,
+      body: { customer: 'João', note: 'ação' },
     })).resolves.toBe(true);
     await expect(provider.validateWebhook({
-      headers: { 'x-app-signature': '0'.repeat(64) }, rawBody, body: {},
+      headers: { 'didi-header-sign': signWebhook(rawBody) },
+      rawBody: Buffer.from('{"customer":"João","note":"ação"}', 'utf8'),
+      body: { customer: 'João', note: 'ação' },
     })).resolves.toBe(false);
   });
 

@@ -110,6 +110,13 @@ Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
 - UI tenant: 99Food não aparece mais como “Em breve”; a ação de autorização abre a URL oficial e exibe erro explícito quando as credenciais não estão configuradas. Admin continua consumindo as estruturas genéricas já existentes de conexões, operações e divergências.
 - Validação Sandbox: indisponível porque não há App ID/Client Secret Sandbox no ambiente. Permanecem pendentes OAuth real, evento assinado real, polling/ACK, importação de pedido e lifecycle completo. Decisão de promoção: `READY_FOR_SANDBOX_VALIDATION`; não promover para `main-copy` antes dessas evidências.
 
+### Correção focada da assinatura do callback (2026-09-04)
+
+- O callback real alcançava `POST /api/v1/webhooks/marketplaces/99food`, mas era rejeitado antes do merchant mapping porque o verifier usava o contrato Open Delivery (`X-App-Signature`, HMAC-SHA256) em vez do contrato de webhook do protocolo 99Food recomendado.
+- O verifier agora exige `didi-header-sign` e compara, em tempo constante, o MD5 dos bytes exatos do corpo bruto concatenados ao App Secret. Assinaturas ausentes, malformadas ou inválidas continuam falhando fechadas.
+- O log de rejeição inclui somente nomes de headers, presença/comprimento/categoria do formato, metadados HTTP, tamanho e SHA-256 do corpo bruto; assinatura, corpo, tokens e secrets não são registrados.
+- Merchant/store mapping, conexão, snapshot, ingestão, lifecycle, logística, pagamentos, routing e UI não foram alterados. A validação de um webhook real após deploy permanece um gate separado.
+
 ---
 
 ## Compatibilidade light/dark do web-tenant (2026-08-27)

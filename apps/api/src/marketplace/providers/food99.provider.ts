@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import type { MarketplaceProviderAdapter } from './marketplace-provider.interface';
 import type {
   ExternalMarketplaceOrder,
@@ -32,10 +32,13 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     } catch {
       return false;
     }
-    const signature = this.header(input.headers, 'x-app-signature');
-    if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+    const signature = this.header(input.headers, 'didi-header-sign');
+    if (!signature || !/^[a-f0-9]{32}$/i.test(signature)) return false;
     const rawBody = typeof input.rawBody === 'string' ? Buffer.from(input.rawBody) : input.rawBody;
-    const expected = createHmac('sha256', clientSecret).update(rawBody).digest();
+    const expected = createHash('md5')
+      .update(rawBody)
+      .update(clientSecret, 'utf8')
+      .digest();
     const supplied = Buffer.from(signature, 'hex');
     return supplied.length === expected.length && timingSafeEqual(expected, supplied);
   }
