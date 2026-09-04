@@ -41,6 +41,9 @@ export class MarketplaceEventInboxService {
       this.logger.warn({
         message: 'marketplace_webhook_signature_invalid',
         provider: input.provider,
+        ...(input.provider === MarketplaceProvider.FOOD_99
+          ? this.food99SignatureDiagnostics(input.headers, input.rawBody)
+          : {}),
       });
       throw new BadRequestException('Invalid marketplace webhook signature.');
     }
@@ -236,6 +239,33 @@ export class MarketplaceEventInboxService {
         masked.has(key.toLowerCase()) ? '***' : value,
       ]),
     );
+  }
+
+  private food99SignatureDiagnostics(
+    headers: Record<string, string | string[] | undefined>,
+    rawBody: Buffer | string,
+  ) {
+    const headerValue = (name: string): string | undefined => {
+      const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === name);
+      const value = entry?.[1];
+      return (Array.isArray(value) ? value[0] : value)?.trim() || undefined;
+    };
+    const signature = headerValue('didi-header-sign');
+    const rawBodyBuffer = typeof rawBody === 'string' ? Buffer.from(rawBody) : rawBody;
+    return {
+      receivedHeaderNames: Object.keys(headers).map((name) => name.toLowerCase()).sort(),
+      expectedSignatureHeader: 'didi-header-sign',
+      signaturePresent: Boolean(signature),
+      signatureLength: signature?.length ?? 0,
+      signatureFormat: !signature
+        ? 'missing'
+        : /^[a-f0-9]{32}$/i.test(signature) ? 'hex32' : 'other',
+      contentType: headerValue('content-type') ?? null,
+      contentLength: headerValue('content-length') ?? null,
+      rawBodyByteLength: rawBodyBuffer.byteLength,
+      rawBodySha256: createHash('sha256').update(rawBodyBuffer).digest('hex'),
+      userAgent: headerValue('user-agent') ?? null,
+    };
   }
 
   private async dispatchInbox(inbox: MarketplaceEventInbox): Promise<void> {

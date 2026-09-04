@@ -205,7 +205,7 @@ describe('MarketplaceEventInboxService', () => {
       undefined,
     );
     await expect(service.receiveWebhook({
-      provider: MarketplaceProvider.IFOOD,
+      provider: MarketplaceProvider.FOOD_99,
       headers: {},
       rawBody: Buffer.from('{}'),
       body: {},
