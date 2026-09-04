@@ -58,14 +58,64 @@ describe('Food99Provider', () => {
     })).resolves.toBe(false);
   });
 
-  it('parses webhook identity without trusting an order snapshot from the event', async () => {
+  it('parses the official single orderNew callback and preserves 64-bit identifiers', async () => {
+    const rawBody = Buffer.from('{"app_id":5764607584567296012,"app_shop_id":"kigula_delivery_01","timestamp":1615432308,"type":"orderNew","data":{"order_id":1152921547153933576,"order_info":{"shop":{"shop_id":5764607688097661019}}}}');
     const parsed = await provider.parseWebhookEvent({
-      headers: { 'x-app-merchantid': 'merchant-1' },
-      body: { eventId: 'evt-1', eventType: 'CREATED', orderId: 'order-1', createdAt: '2026-09-03T12:00:00Z' },
+      headers: {},
+      rawBody,
+      body: JSON.parse(rawBody.toString('utf8')),
     });
     expect(parsed).toMatchObject({
       provider: MarketplaceProvider.FOOD_99,
-      eventId: 'evt-1', externalMerchantId: 'merchant-1', externalOrderId: 'order-1', orderPayload: null,
+      eventId: expect.stringMatching(/^food99:[a-f0-9]{64}$/),
+      topic: 'orderNew',
+      externalMerchantId: '5764607688097661019',
+      externalStoreId: 'kigula_delivery_01',
+      externalOrderId: '1152921547153933576',
+      eventCreatedAt: new Date('2021-03-11T03:11:48.000Z'),
+      orderPayload: null,
+    });
+    expect((parsed.rawPayload.data as Record<string, unknown>).order_id)
+      .toBe('1152921547153933576');
+    const duplicate = await provider.parseWebhookEvent({ headers: {}, rawBody, body: {} });
+    expect(duplicate.eventId).toBe(parsed.eventId);
+  });
+
+  it('parses lifecycle callbacks by app_shop_id without inventing an internal shop id', async () => {
+    const rawBody = Buffer.from('{"app_id":5764607772295955723,"app_shop_id":"kigula_delivery_01","type":"orderReady","timestamp":1768815260,"data":{"order_id":5764656197621845665}}');
+    const parsed = await provider.parseWebhookEvent({ headers: {}, rawBody, body: {} });
+    expect(parsed).toMatchObject({
+      eventId: expect.stringMatching(/^food99:[a-f0-9]{64}$/),
+      topic: 'orderReady',
+      externalMerchantId: null,
+      externalStoreId: 'kigula_delivery_01',
+      externalOrderId: '5764656197621845665',
+    });
+  });
+
+  it('leaves mandatory identifiers null for an unsupported or incomplete payload', async () => {
+    const parsed = await provider.parseWebhookEvent({
+      headers: {}, rawBody: Buffer.from('{"type":"orderNew","data":{}}'), body: {},
+    });
+    expect(parsed).toMatchObject({
+      eventId: null,
+      externalMerchantId: null,
+      externalStoreId: null,
+      externalOrderId: null,
+    });
+  });
+
+  it('keeps the existing Open Delivery polling event parser unchanged', async () => {
+    await expect(provider.parsePollingEvent({
+      eventId: 'poll-event-1',
+      eventType: 'CREATED',
+      orderId: 'poll-order-1',
+      createdAt: '2026-09-04T12:00:00Z',
+    })).resolves.toMatchObject({
+      eventId: 'poll-event-1',
+      topic: 'CREATED',
+      externalOrderId: 'poll-order-1',
+      eventCreatedAt: new Date('2026-09-04T12:00:00Z'),
     });
   });
 

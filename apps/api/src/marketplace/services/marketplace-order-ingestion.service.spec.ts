@@ -124,15 +124,16 @@ describe('MarketplaceOrderIngestionService', () => {
   });
 
   it('keeps an event retryable when the merchant mapping is unknown', async () => {
+    const connectionResolver = { resolveConnection: jest.fn().mockResolvedValue(null) };
     const prisma = {
       marketplaceEventInbox: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'inbox-1',
-          provider: MarketplaceProvider.IFOOD,
+          provider: MarketplaceProvider.FOOD_99,
           status: MarketplaceEventStatus.QUEUED,
           connection: null,
-          externalMerchantId: 'unknown-merchant',
-          externalStoreId: null,
+          externalMerchantId: null,
+          externalStoreId: 'unknown-app-shop',
         }),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -140,7 +141,7 @@ describe('MarketplaceOrderIngestionService', () => {
     const service = new MarketplaceOrderIngestionService(
       prisma as never,
       {} as never,
-      { resolveConnection: jest.fn().mockResolvedValue(null) } as never,
+      connectionResolver as never,
       {} as never,
       {} as never,
       {} as never,
@@ -151,6 +152,11 @@ describe('MarketplaceOrderIngestionService', () => {
     expect(prisma.marketplaceEventInbox.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: MarketplaceEventStatus.FAILED }),
     }));
+    expect(connectionResolver.resolveConnection).toHaveBeenCalledWith({
+      provider: MarketplaceProvider.FOOD_99,
+      externalMerchantId: null,
+      externalStoreId: 'unknown-app-shop',
+    });
   });
 
   it('suppresses a lower-precedence event with the same createdAt', async () => {

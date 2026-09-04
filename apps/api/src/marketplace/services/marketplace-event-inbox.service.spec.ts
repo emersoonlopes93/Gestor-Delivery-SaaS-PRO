@@ -73,6 +73,41 @@ describe('MarketplaceEventInboxService', () => {
       }),
     }));
     expect(ingestionService.processInboxEvent).toHaveBeenCalledWith('inbox-1');
+    expect(provider.parseWebhookEvent).toHaveBeenCalledWith(expect.objectContaining({
+      rawBody: expect.any(Buffer),
+    }));
+  });
+
+  it('resolves a 99Food callback by its official app shop identifier', async () => {
+    provider.parseWebhookEvent.mockResolvedValueOnce({
+      provider: MarketplaceProvider.FOOD_99,
+      eventId: 'food99:event-1',
+      topic: 'orderNew',
+      externalMerchantId: 'merchant-99',
+      externalStoreId: 'kigula_delivery_01',
+      externalOrderId: 'order-99',
+      rawPayload: { app_shop_id: 'kigula_delivery_01', data: { order_id: 'order-99' } },
+    });
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce({ id: 'inbox-99' });
+    const service = new MarketplaceEventInboxService(
+      prisma as never,
+      registry as never,
+      connectionService as never,
+      ingestionService as never,
+      undefined,
+    );
+
+    await expect(service.receiveWebhook({
+      provider: MarketplaceProvider.FOOD_99,
+      headers: {},
+      rawBody: Buffer.from('{}'),
+      body: {},
+    })).resolves.toEqual({ accepted: true, duplicate: true, inboxId: 'inbox-99' });
+    expect(connectionService.resolveConnection).toHaveBeenCalledWith({
+      provider: MarketplaceProvider.FOOD_99,
+      externalMerchantId: 'merchant-99',
+      externalStoreId: 'kigula_delivery_01',
+    });
   });
 
   it('does not duplicate an already persisted webhook event', async () => {

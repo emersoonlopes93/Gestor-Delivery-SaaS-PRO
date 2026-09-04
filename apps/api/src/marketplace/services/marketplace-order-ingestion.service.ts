@@ -59,6 +59,7 @@ export class MarketplaceOrderIngestionService {
       this.logger.error({
         message: 'marketplace_merchant_mapping_failure',
         merchantId: this.maskExternalIdentifier(inbox.externalMerchantId),
+        storeId: this.maskExternalIdentifier(inbox.externalStoreId),
         externalOrderId: inbox.externalOrderId,
         eventId: inbox.eventId,
         correlationId: inbox.correlationId,

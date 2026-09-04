@@ -17,6 +17,7 @@ export interface MarketplaceProviderAdapter {
   }): Promise<boolean>;
   parseWebhookEvent(input: {
     headers: Record<string, string | string[] | undefined>;
+    rawBody?: Buffer | string;
     body: unknown;
   }): Promise<ParsedMarketplaceEvent>;
   parsePollingEvent?(body: Record<string, unknown>): Promise<ParsedMarketplaceEvent>;

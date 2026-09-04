@@ -45,14 +45,40 @@ export class Food99Provider implements MarketplaceProviderAdapter {
 
   async parseWebhookEvent(input: {
     headers: Record<string, string | string[] | undefined>;
+    rawBody?: Buffer | string;
     body: unknown;
   }): Promise<ParsedMarketplaceEvent> {
-    const payload = this.asRecord(input.body) ?? {};
-    return this.parseEvent(payload, this.header(input.headers, 'x-app-merchantid'));
+    const payload = this.parseNativeWebhookPayload(input.rawBody, input.body);
+    const data = this.asRecord(payload.data);
+    const orderInfo = this.asRecord(data?.order_info);
+    const shop = this.asRecord(orderInfo?.shop);
+    const appId = this.readIdentifier(payload, ['app_id']);
+    const appShopId = this.readIdentifier(payload, ['app_shop_id']);
+    const eventType = this.readString(payload, ['type']);
+    const timestamp = this.readIdentifier(payload, ['timestamp']);
+    const externalOrderId = this.readIdentifier(data, ['order_id']);
+    const externalMerchantId = this.readIdentifier(shop, ['shop_id']);
+    const eventId = appId && appShopId && eventType && timestamp && externalOrderId
+      ? `food99:${createHash('sha256')
+        .update(JSON.stringify([appId, appShopId, eventType, timestamp, externalOrderId]))
+        .digest('hex')}`
+      : null;
+    return {
+      provider: MarketplaceProvider.FOOD_99,
+      eventId,
+      topic: eventType,
+      externalMerchantId,
+      externalStoreId: appShopId,
+      externalOrderId,
+      eventCreatedAt: this.unixTimestamp(timestamp),
+      eventSequence: null,
+      orderPayload: null,
+      rawPayload: payload,
+    };
   }
 
   async parsePollingEvent(body: Record<string, unknown>): Promise<ParsedMarketplaceEvent> {
-    return this.parseEvent(body, null);
+    return this.parseOpenDeliveryEvent(body);
   }
 
   pollEvents(input: {
@@ -202,12 +228,12 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     return this.client.denyCancellation(input.connection, input.externalOrderId, input.reason, input.correlationId);
   }
 
-  private parseEvent(payload: Record<string, unknown>, externalMerchantId: string | null): ParsedMarketplaceEvent {
+  private parseOpenDeliveryEvent(payload: Record<string, unknown>): ParsedMarketplaceEvent {
     return {
       provider: MarketplaceProvider.FOOD_99,
       eventId: this.readString(payload, ['eventId']),
       topic: this.readString(payload, ['eventType']),
-      externalMerchantId,
+      externalMerchantId: null,
       externalStoreId: null,
       externalOrderId: this.readString(payload, ['orderId']),
       eventCreatedAt: this.readDate(payload, ['createdAt']),
@@ -309,6 +335,45 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     if (!value) return null;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private readIdentifier(record: Record<string, unknown> | null, keys: string[]): string | null {
+    if (!record) return null;
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'number' && Number.isSafeInteger(value)) return String(value);
+    }
+    return null;
+  }
+
+  private unixTimestamp(value: string | null): Date | null {
+    if (!value || !/^\d+$/.test(value)) return null;
+    const seconds = Number(value);
+    if (!Number.isSafeInteger(seconds)) return null;
+    const date = new Date(seconds * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private parseNativeWebhookPayload(
+    rawBody: Buffer | string | undefined,
+    fallbackBody: unknown,
+  ): Record<string, unknown> {
+    if (rawBody !== undefined) {
+      const source = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
+      try {
+        const identifiersPreserved = source.replace(
+          /("(?:app_id|order_id|shop_id)"\s*:\s*)(-?\d+)/g,
+          '$1"$2"',
+        );
+        const parsed: unknown = JSON.parse(identifiersPreserved);
+        const record = this.asRecord(parsed);
+        if (record) return record;
+      } catch {
+        // The signed payload remains fail-closed at connection resolution when its JSON is invalid.
+      }
+    }
+    return this.asRecord(fallbackBody) ?? {};
   }
 
   private header(headers: Record<string, string | string[] | undefined>, name: string): string | null {
