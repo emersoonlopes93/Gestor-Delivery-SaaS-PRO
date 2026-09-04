@@ -24,10 +24,10 @@ describe('SmartDispatchService', () => {
       { id: 'near', name: 'Carlos', currentLat: -23.549, currentLng: -46.63, lastLocationAt: now, dispatchQueueJoinedAt: new Date(now.getTime() - 10_000) },
     ]);
     prisma.order.findMany.mockResolvedValue([
-      { id: 'o1', deliveryAddress: { lat: -23.56, lng: -46.64 } },
-      { id: 'o2', deliveryAddress: { lat: -23.561, lng: -46.64 } },
-      { id: 'o3', deliveryAddress: { lat: -23.562, lng: -46.64 } },
-      { id: 'far-order', deliveryAddress: { lat: -23.7, lng: -46.8 } },
+      { id: 'o1', deliveryAddress: { lat: -23.56, lng: -46.64 }, marketplaceOrders: [] },
+      { id: 'o2', deliveryAddress: { lat: -23.561, lng: -46.64 }, marketplaceOrders: [] },
+      { id: 'o3', deliveryAddress: { lat: -23.562, lng: -46.64 }, marketplaceOrders: [] },
+      { id: 'far-order', deliveryAddress: { lat: -23.7, lng: -46.8 }, marketplaceOrders: [] },
     ]);
   });
 
@@ -64,6 +64,17 @@ describe('SmartDispatchService', () => {
     });
 
     await expect(service.suggestion('tenant-a')).resolves.toMatchObject({ orderIds: ['o1'] });
+  });
+
+  it('suggests native and merchant-owned orders but fails closed for provider and unknown ownership', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      { id: 'native', deliveryAddress: { lat: -23.56, lng: -46.64 }, marketplaceOrders: [] },
+      { id: 'merchant', deliveryAddress: { lat: -23.561, lng: -46.64 }, marketplaceOrders: [{ provider: 'IFOOD', deliveryOwnership: 'MERCHANT' }] },
+      { id: 'provider', deliveryAddress: { lat: -23.562, lng: -46.64 }, marketplaceOrders: [{ provider: 'IFOOD', deliveryOwnership: 'PROVIDER' }] },
+      { id: 'unknown', deliveryAddress: { lat: -23.563, lng: -46.64 }, marketplaceOrders: [{ provider: 'IFOOD', deliveryOwnership: 'UNKNOWN' }] },
+    ]);
+
+    await expect(service.suggestion('tenant-a')).resolves.toMatchObject({ orderIds: ['native', 'merchant'] });
   });
 
   it('revalidates the current suggestion before canonical route creation', async () => {

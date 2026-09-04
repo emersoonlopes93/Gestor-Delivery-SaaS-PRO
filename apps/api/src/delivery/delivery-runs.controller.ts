@@ -231,4 +231,16 @@ export class DeliveryRunsController {
     );
     return run;
   }
+
+  @Post(':id/route/recalculate')
+  @RequirePermissions('delivery.dispatch')
+  async recalculateRoute(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+    const run = await this.deliveryRunsService.recalculateRoute(req.user.tenantId, id);
+    const occurredAt = new Date().toISOString();
+    this.deliveryTrackingGateway.emitDriverRouteEvent(req.user.tenantId, run.driverId, {
+      eventId: `delivery.run_updated:${run.id}:route:${occurredAt}`,
+      type: 'delivery.run_updated', change: 'updated', runId: run.id, occurredAt,
+    });
+    return run;
+  }
 }

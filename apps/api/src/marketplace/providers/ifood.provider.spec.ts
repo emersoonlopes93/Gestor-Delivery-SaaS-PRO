@@ -1,4 +1,4 @@
-import { MarketplaceConnectionStatus, MarketplacePollingStatus, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceConnectionStatus, MarketplaceDeliveryOwnership, MarketplacePollingStatus, MarketplaceProvider } from '@prisma/client';
 import { IfoodProvider } from './ifood.provider';
 import { createHmac } from 'crypto';
 
@@ -101,6 +101,19 @@ describe('IfoodProvider', () => {
     expect(normalized.items).toHaveLength(1);
     expect(normalized.items[0].totalPrice).toBe(60);
     expect(normalized.fulfillmentType).toBe('delivery');
+    expect(normalized.deliveryOwnership).toBe(MarketplaceDeliveryOwnership.UNKNOWN);
+  });
+
+  it.each([
+    ['MERCHANT', MarketplaceDeliveryOwnership.MERCHANT],
+    ['IFOOD', MarketplaceDeliveryOwnership.PROVIDER],
+    ['THIRD_PARTY', MarketplaceDeliveryOwnership.UNKNOWN],
+  ])('maps explicit deliveredBy %s without heuristics', async (deliveredBy, expected) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'conn-1', tenantId: 'tenant-1', provider: MarketplaceProvider.IFOOD } as never,
+      externalOrder: { id: 'order-1', delivery: { deliveredBy }, items: [] },
+    });
+    expect(normalized.deliveryOwnership).toBe(expected);
   });
 
   it('maps pickup-like fulfillment aliases to pickup', async () => {

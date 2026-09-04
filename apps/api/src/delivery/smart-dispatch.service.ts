@@ -1,12 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { getLocationFreshness, type SmartDispatchSuggestionDTO } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { DeliveryRunsService } from './delivery-runs.service';
+import { evaluateOwnFleetEligibility } from './own-fleet-eligibility';
 
 const activeRunStatuses = ['PENDING_ACCEPTANCE', 'ASSIGNED', 'IN_PROGRESS', 'RETURNING'] as const;
 
 @Injectable()
 export class SmartDispatchService {
+  private readonly logger = new Logger(SmartDispatchService.name);
+
   constructor(private readonly prisma: PrismaService, private readonly runs: DeliveryRunsService) {}
 
   async suggestion(tenantId: string): Promise<SmartDispatchSuggestionDTO> {
@@ -19,8 +22,23 @@ export class SmartDispatchService {
         where: { tenantId, isActive: true, status: 'available', dispatchQueueJoinedAt: { not: null }, shifts: { some: { status: 'ACTIVE' } }, deliveryRuns: { none: { status: { in: [...activeRunStatuses] } } } },
         orderBy: [{ dispatchQueueJoinedAt: 'asc' }, { id: 'asc' }],
       }),
-      this.prisma.order.findMany({ where: { tenantId, fulfillmentType: 'delivery', status: 'ready_for_delivery', deliveryStops: { none: { run: { status: { in: [...activeRunStatuses] } } } } }, include: { deliveryAddress: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+      this.prisma.order.findMany({
+        where: { tenantId, fulfillmentType: 'delivery', status: 'ready_for_delivery', deliveryStops: { none: { run: { status: { in: [...activeRunStatuses] } } } } },
+        include: { deliveryAddress: true, marketplaceOrders: { select: { provider: true, deliveryOwnership: true } } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
     ]);
+    const eligibleOrders = orders.filter((order) => {
+      const eligibility = evaluateOwnFleetEligibility(order.marketplaceOrders);
+      if (!eligibility.eligible) {
+        this.logger.warn({
+          event: 'own_fleet_order_blocked', tenantId, orderId: order.id,
+          provider: eligibility.provider, deliveryOwnership: eligibility.deliveryOwnership,
+          reason: eligibility.reason,
+        });
+      }
+      return eligibility.eligible;
+    });
     const queue = drivers.map((driver, index) => {
       const fresh = getLocationFreshness(driver.lastLocationAt);
       const hasCoordinates = driver.currentLat !== null && driver.currentLng !== null && settings.lat !== null && settings.lng !== null;
@@ -31,7 +49,7 @@ export class SmartDispatchService {
     const candidate = queue.find((driver) => driver.status === 'eligible') ?? null;
     const orderIds = candidate
       ? nearbyOrders(
-        orders,
+        eligibleOrders,
         settings.smartDispatchAutoCarona ? settings.smartDispatchMaxStops : 1,
         settings.smartDispatchGroupingKm,
       )

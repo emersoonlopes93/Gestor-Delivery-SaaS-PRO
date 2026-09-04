@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { DeliveryRunStatus, DeliveryStopStatus } from '@prisma/client';
 import { DeliveryRunsService } from './delivery-runs.service';
 
@@ -266,10 +266,12 @@ describe('DeliveryRunsService', () => {
     tx.order.findMany.mockResolvedValue([
       {
         id: 'order-2', orderNumber: '2', customerName: 'B', customerPhone: '22',
+        marketplaceOrders: [],
         deliveryAddress: { street: 'B', number: '2', complement: null, neighborhood: 'N', city: 'C', state: 'SP', zipCode: '2', reference: null, lat: null, lng: null },
       },
       {
         id: 'order-1', orderNumber: '1', customerName: 'A', customerPhone: '11',
+        marketplaceOrders: [],
         deliveryAddress: { street: 'A', number: '1', complement: null, neighborhood: 'N', city: 'C', state: 'SP', zipCode: '1', reference: null, lat: null, lng: null },
       },
     ]);
@@ -317,6 +319,7 @@ describe('DeliveryRunsService', () => {
     }]);
     tx.order.findMany.mockResolvedValue([{
       id: 'order-a', orderNumber: '10', customerName: 'Cliente', customerPhone: '11',
+      marketplaceOrders: [],
       createdAt: new Date('2026-08-11T12:00:00.000Z'),
       deliveryAddress: { street: 'Rua A', number: '1', neighborhood: 'Centro' },
     }]);
@@ -334,6 +337,23 @@ describe('DeliveryRunsService', () => {
     }));
     expect(result.drivers[0]).not.toHaveProperty('pin');
     expect(result.orders[0].address).toContain('Rua A');
+  });
+
+  it('keeps only native and merchant-owned orders in builder data', async () => {
+    tx.deliveryDriver.findMany.mockResolvedValue([]);
+    const order = (id: string, marketplaceOrders: Array<{ provider: 'IFOOD'; deliveryOwnership: 'MERCHANT' | 'PROVIDER' | 'UNKNOWN' }>) => ({
+      id, orderNumber: id, customerName: 'Cliente', customerPhone: '11', createdAt: new Date(),
+      deliveryAddress: null, marketplaceOrders,
+    });
+    tx.order.findMany.mockResolvedValue([
+      order('native', []),
+      order('merchant', [{ provider: 'IFOOD', deliveryOwnership: 'MERCHANT' }]),
+      order('provider', [{ provider: 'IFOOD', deliveryOwnership: 'PROVIDER' }]),
+      order('unknown', [{ provider: 'IFOOD', deliveryOwnership: 'UNKNOWN' }]),
+    ]);
+
+    const result = await service.getBuilderData('tenant-a');
+    expect(result.orders.map((item) => item.id)).toEqual(['native', 'merchant']);
   });
 
   it('resolves an order route without crossing tenant boundaries', async () => {
@@ -356,9 +376,9 @@ describe('DeliveryRunsService', () => {
     tx.driverShift.findFirst.mockResolvedValue({ id: 'shift-a' });
     tx.tenantSettings.findUnique.mockResolvedValue({ deliveryRunRequiresAcceptance: true });
     tx.order.findMany.mockResolvedValue([
-      { id: 'order-c', orderNumber: '3', customerName: 'C', customerPhone: '33', deliveryAddress: null },
-      { id: 'order-a', orderNumber: '1', customerName: 'A', customerPhone: '11', deliveryAddress: null },
-      { id: 'order-b', orderNumber: '2', customerName: 'B', customerPhone: '22', deliveryAddress: null },
+      { id: 'order-c', orderNumber: '3', customerName: 'C', customerPhone: '33', deliveryAddress: null, marketplaceOrders: [] },
+      { id: 'order-a', orderNumber: '1', customerName: 'A', customerPhone: '11', deliveryAddress: null, marketplaceOrders: [] },
+      { id: 'order-b', orderNumber: '2', customerName: 'B', customerPhone: '22', deliveryAddress: null, marketplaceOrders: [] },
     ]);
     tx.deliveryRun.create.mockResolvedValue(baseRun({ assignedAt: new Date() }));
     tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
@@ -399,6 +419,39 @@ describe('DeliveryRunsService', () => {
     ]);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
+
+  it('creates a route for an explicitly merchant-owned marketplace order', async () => {
+    tx.deliveryDriver.findFirst.mockResolvedValue({ id: 'driver-a' });
+    tx.driverShift.findFirst.mockResolvedValue({ id: 'shift-a' });
+    tx.tenantSettings.findUnique.mockResolvedValue({ deliveryRunRequiresAcceptance: true });
+    tx.order.findMany.mockResolvedValue([{
+      id: 'order-a', orderNumber: '1', customerName: 'A', customerPhone: '11', deliveryAddress: null,
+      marketplaceOrders: [{ provider: 'IFOOD', deliveryOwnership: 'MERCHANT' }],
+    }]);
+    tx.deliveryRun.create.mockResolvedValue(baseRun());
+
+    await expect(service.createRun('tenant-a', 'driver-a', ['order-a'])).resolves.toEqual(baseRun());
+    expect(tx.deliveryRun.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['PROVIDER', 'UNKNOWN'] as const)(
+    'rejects %s marketplace ownership repeatedly before any run, stop, order, or driver write',
+    async (deliveryOwnership) => {
+      tx.deliveryDriver.findFirst.mockResolvedValue({ id: 'driver-a' });
+      tx.driverShift.findFirst.mockResolvedValue({ id: 'shift-a' });
+      tx.tenantSettings.findUnique.mockResolvedValue({ deliveryRunRequiresAcceptance: true });
+      tx.order.findMany.mockResolvedValue([{
+        id: 'order-a', orderNumber: '1', customerName: 'A', customerPhone: '11', deliveryAddress: null,
+        marketplaceOrders: [{ provider: 'IFOOD', deliveryOwnership }],
+      }]);
+
+      await expect(service.createAssignedRun('tenant-a', 'driver-a', ['order-a'], 'manager-a')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.createAssignedRun('tenant-a', 'driver-a', ['order-a'], 'manager-a')).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.deliveryRun.create).not.toHaveBeenCalled();
+      expect(tx.order.updateMany).not.toHaveBeenCalled();
+      expect(tx.deliveryDriver.update).not.toHaveBeenCalled();
+    },
+  );
 
   it('starts all orders atomically and selects only the first stop as current', async () => {
     const stops = [

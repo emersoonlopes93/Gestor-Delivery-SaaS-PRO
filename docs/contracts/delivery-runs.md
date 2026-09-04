@@ -64,6 +64,18 @@ Turnos e paradas carregam snapshots financeiros definidos em [`driver-earnings.m
 
 A sequência é manual. Não há provedor de rotas pago, otimização, ETA, geocoding em lote ou financeiro por corrida. O mapa é esquemático e as linhas representam somente a ordem persistida das paradas, não trajeto viário.
 
+## Routing V2 / ETA
+
+Uma rota nova recebe um snapshot versionado com provider, qualidade (`ROAD` ou `DEGRADED`), geometria mínima, distância, duração e horário do cálculo. Cada parada recebe distância e duração do trecho e ETA cumulativo. A sequência automática usa nearest-neighbor determinístico, com desempate pela sequência anterior e ID; não tenta resolver VRP global.
+
+`ROUTING_PROVIDER=osrm` e `ROUTING_OSRM_BASE_URL` habilitam rota viária. Timeout, 429, 5xx, payload inválido, ausência do provider ou coordenada ausente nunca são apresentados como rota viária: o serviço preserva a operação com Haversine rotulado como estimativa degradada, ou sinaliza rota indisponível quando nem a origem é válida. O cache em memória é chaveado por origem, paradas e provider.
+
+Recálculo e reordenação são permitidos somente antes da saída (`PENDING_ACCEPTANCE` ou `ASSIGNED`). Depois de `IN_PROGRESS`, nenhuma parada é reordenada ou recalculada silenciosamente. Mudanças publicadas reutilizam `driverRouteEvent`; o evento continua sendo apenas gatilho para buscar o DTO canônico.
+
+Pedidos nativos, sem `MarketplaceOrder`, são elegíveis para a frota própria. Pedidos marketplace só são elegíveis quando todos os vínculos persistidos declaram `deliveryOwnership=MERCHANT`. `PROVIDER` e `UNKNOWN` falham fechados no builder, Auto-Dispatch, criação manual/automática e recálculo Routing V2. O bloqueio acontece antes de qualquer criação de rota/parada ou alteração do entregador/pedido e registra apenas IDs operacionais, provider, ownership e motivo, sem PII.
+
+O E2E determinístico PostgreSQL é `routing-v2.postgres.e2e.spec.ts`. Ele só executa com `ROUTING_V2_POSTGRES_E2E=1` e recusa host de banco não local; usa provider de rota fake, três pedidos elegíveis e dois bloqueados para provar ordenação, ETA e ausência de duplicação.
+
 ## API do painel tenant
 
 As rotas abaixo exigem autenticação tenant; `tenantId` e ator são sempre derivados da sessão:

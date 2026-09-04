@@ -13,6 +13,8 @@ import { DeliveryRateController } from './delivery-rate.controller';
 import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 import { GeocodingService } from './geocoding.service';
+import { OsrmRoutingProvider } from './osrm-routing.provider';
+import { RoutingV2Service } from './routing-v2.service';
 import { LocationModule } from '../location/location.module';
 import { DeliveryRunsService } from './delivery-runs.service';
 import { DeliveryRunsController } from './delivery-runs.controller';
@@ -61,8 +63,10 @@ import { SmartDispatchService } from './smart-dispatch.service';
       useFactory: (prisma: PrismaService) => prisma.deliveryCoverageConfig,
     },
     GeocodingService,
+    OsrmRoutingProvider,
+    RoutingV2Service,
     DeliveryRateService,
   ],
-  exports: [DeliveryRateService, DriversService, DeliveryRunsService, GeocodingService, DeliveryTrackingGateway],
+  exports: [DeliveryRateService, DriversService, DeliveryRunsService, GeocodingService, DeliveryTrackingGateway, RoutingV2Service],
 })
 export class DeliveryModule {}

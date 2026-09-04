@@ -1273,6 +1273,13 @@ model DeliveryRun {
   kdsOverrideAt   DateTime?                @map("kds_override_at")
   kdsOverrideBy   String?                  @map("kds_override_by") @db.VarChar(100)
   kdsOverrideReason String?                @map("kds_override_reason") @db.VarChar(255)
+  routeProvider    String?                  @map("route_provider") @db.VarChar(40)
+  routeQuality     String?                  @map("route_quality") @db.VarChar(20)
+  routeGeometry    Json?                    @map("route_geometry")
+  routeVersion     Int                      @default(0) @map("route_version")
+  routeDistanceMeters Int?                  @map("route_distance_meters")
+  routeDurationSeconds Int?                 @map("route_duration_seconds")
+  routeCalculatedAt DateTime?               @map("route_calculated_at")
   createdAt       DateTime                 @default(now()) @map("created_at")
   updatedAt       DateTime                 @updatedAt @map("updated_at")
   tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1307,6 +1314,9 @@ model DeliveryStop {
   returnedAt            DateTime?           @map("returned_at")
   cancelledAt           DateTime?           @map("cancelled_at")
   cancellationReason    String?             @map("cancellation_reason") @db.VarChar(255)
+  routeDistanceMeters   Int?                @map("route_distance_meters")
+  routeDurationSeconds  Int?                @map("route_duration_seconds")
+  estimatedArrivalAt    DateTime?            @map("estimated_arrival_at")
   payModeSnapshot       DriverPayMode?      @map("pay_mode_snapshot")
   payBaseSnapshot       Decimal?            @map("pay_base_snapshot") @db.Decimal(10, 2)
   payPercentageSnapshot Decimal?            @map("pay_percentage_snapshot") @db.Decimal(5, 2)
@@ -2085,6 +2095,7 @@ model MarketplaceOrder {
   tenantId                  String                  @map("tenant_id")
   connectionId              String                  @map("connection_id")
   provider                  MarketplaceProvider
+  deliveryOwnership         MarketplaceDeliveryOwnership @default(UNKNOWN) @map("delivery_ownership")
   externalOrderId           String                  @map("external_order_id") @db.VarChar(120)
   externalDisplayId         String?                 @map("external_display_id") @db.VarChar(120)
   internalOrderId           String?                 @map("internal_order_id")
@@ -3937,6 +3948,12 @@ enum RevenueEventType {
 enum RevenueEventStatus {
   posted
   voided
+}
+
+enum MarketplaceDeliveryOwnership {
+  MERCHANT
+  PROVIDER
+  UNKNOWN
 }
 
 enum MarketplaceProvider {

@@ -37,6 +37,7 @@ Consulta realizada em 2026-07-16:
 - [Polling, duplicidade e ordenação](https://developer.ifood.com.br/pt-BR/docs/guides/modules/events/polling-overview)
 - [Pedidos agendados](https://developer.ifood.com.br/en-US/docs/guides/modules/order/scheduled-orders)
 - [Fundamentos e deadline de confirmação](https://developer.ifood.com.br/en-US/docs/guides/modules/order/fundamentals)
+- [Detalhes do pedido e `delivery.deliveredBy`](https://developer.ifood.com.br/en-US/docs/food/guides/modules/order/details)
 
 O código não fixa o tempo de validade de token: usa `expiresIn`, pois o valor pode mudar. O `202 Accepted` de confirmação/cancelamento significa somente aceite assíncrono; o resultado final vem por evento.
 
@@ -75,6 +76,12 @@ Registros existentes continuam válidos como a primeira conexão do tenant. A mi
 5. Evento duplicado retorna aceite idempotente e não cria outro pedido.
 6. O pedido usa unique constraint `(connectionId, provider, externalOrderId)`.
 7. Eventos finais não podem violar `ORDER_STATUS_TRANSITIONS`; divergência é registrada em log operacional.
+
+### 4.1 Ownership provider-neutral da logística
+
+`MarketplaceOrder.deliveryOwnership` persiste `MERCHANT`, `PROVIDER` ou `UNKNOWN`, com default seguro `UNKNOWN`. A normalização deve usar somente um campo explícito e documentado do provider; ausência, valor novo ou ambíguo nunca é inferido pela modalidade, endereço ou nome do canal.
+
+No iFood, `delivery.deliveredBy=MERCHANT` mapeia para `MERCHANT` e `delivery.deliveredBy=IFOOD` mapeia para `PROVIDER`; qualquer outro valor mapeia para `UNKNOWN`. A frota própria aceita somente `MERCHANT`; pedidos nativos, sem `MarketplaceOrder`, continuam elegíveis. A inclusão de 99Food deve implementar esse mesmo contrato no adapter próprio quando houver documentação oficial confiável, sem reutilizar por suposição o mapeamento do iFood.
 
 O bypass `x-marketplace-smoke` só é aceito fora de produção ou quando o smoke foi explicitamente habilitado.
 

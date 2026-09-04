@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   DeliveryRunStatus as SharedDeliveryRunStatus,
@@ -32,6 +34,8 @@ import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { DriverEarningsService } from './driver-earnings.service';
+import { RoutingV2Service } from './routing-v2.service';
+import { evaluateOwnFleetEligibility, type MarketplaceOwnershipRecord } from './own-fleet-eligibility';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -60,7 +64,9 @@ const OPEN_STOP_STATUSES: DeliveryStopStatus[] = [
 
 @Injectable()
 export class DeliveryRunsService {
-  constructor(private readonly prisma: PrismaService, private readonly earnings: DriverEarningsService) {}
+  private readonly logger = new Logger(DeliveryRunsService.name);
+
+  constructor(private readonly prisma: PrismaService, private readonly earnings: DriverEarningsService, @Optional() private readonly routing?: RoutingV2Service) {}
 
   async getBuilderData(tenantId: string): Promise<DeliveryRunBuilderDataDTO> {
     const [drivers, orders] = await Promise.all([
@@ -81,7 +87,10 @@ export class DeliveryRunsService {
           status: 'ready_for_delivery',
           deliveryStops: { none: { status: { in: OPEN_STOP_STATUSES } } },
         },
-        include: { deliveryAddress: true },
+        include: {
+          deliveryAddress: true,
+          marketplaceOrders: { select: { provider: true, deliveryOwnership: true } },
+        },
         orderBy: { createdAt: 'asc' },
       }),
     ]);
@@ -98,7 +107,7 @@ export class DeliveryRunsService {
         payRateTable: this.payRateTiers(driver.payRateTable),
         lastLocationAt: driver.lastLocationAt?.toISOString() ?? null,
       })),
-      orders: orders.map((order) => ({
+      orders: orders.filter((order) => this.isOwnFleetEligible(tenantId, order.id, order.marketplaceOrders)).map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         customerName: order.customerName,
@@ -357,7 +366,10 @@ export class DeliveryRunsService {
             fulfillmentType: 'delivery',
             status: 'ready_for_delivery',
           },
-          include: { deliveryAddress: true },
+          include: {
+            deliveryAddress: true,
+            marketplaceOrders: { select: { provider: true, deliveryOwnership: true } },
+          },
         }),
         tx.tenantSettings.findUnique({ where: { tenantId } }),
       ]);
@@ -367,6 +379,15 @@ export class DeliveryRunsService {
       if (!settings) throw new BadRequestException('ConfiguraÃ§Ã£o da loja nÃ£o encontrada.');
       if (orders.length !== orderIds.length) {
         throw new BadRequestException('Todos os pedidos devem pertencer à loja e estar prontos para entrega.');
+      }
+
+      const blockedOrder = orders.find(
+        (order) => !this.isOwnFleetEligible(tenantId, order.id, order.marketplaceOrders),
+      );
+      if (blockedOrder) {
+        throw new BadRequestException(
+          'Este pedido não pode ser atribuído à frota própria porque a logística não pertence à loja.',
+        );
       }
 
       const byId = new Map(orders.map((order) => [order.id, order]));
@@ -451,6 +472,7 @@ export class DeliveryRunsService {
       actorId,
       { assignImmediately: true },
     );
+    await this.routing?.calculate(tenantId, created.id, 'RUN_CREATED');
     return this.getTenantRunDTO(tenantId, created.id);
   }
 
@@ -462,6 +484,13 @@ export class DeliveryRunsService {
     actorId: string,
   ): Promise<DeliveryRunDTO> {
     await this.reorderStops(tenantId, runId, stopIds, expectedVersion, actorId);
+    await this.routing?.calculate(tenantId, runId, 'MANUAL_REORDER', false);
+    return this.getTenantRunDTO(tenantId, runId);
+  }
+
+  async recalculateRoute(tenantId: string, runId: string): Promise<DeliveryRunDTO> {
+    if (!this.routing) throw new ConflictException('Serviço de rotas indisponível.');
+    await this.routing.calculate(tenantId, runId, 'MANUAL_RECALCULATION');
     return this.getTenantRunDTO(tenantId, runId);
   }
 
@@ -628,7 +657,6 @@ export class DeliveryRunsService {
       const reorderableStatuses: DeliveryRunStatus[] = [
         DeliveryRunStatus.PENDING_ACCEPTANCE,
         DeliveryRunStatus.ASSIGNED,
-        DeliveryRunStatus.IN_PROGRESS,
       ];
       if (!reorderableStatuses.includes(run.status)) {
         throw new ConflictException('Esta rota não permite mais alterar a ordem das paradas.');
@@ -898,6 +926,19 @@ export class DeliveryRunsService {
       returningAt: run.returningAt?.toISOString() ?? null,
       completedAt: run.completedAt?.toISOString() ?? null,
       createdAt: run.createdAt.toISOString(),
+      route: run.routeCalculatedAt ? {
+        provider: run.routeProvider ?? 'unavailable',
+        quality: run.routeQuality === 'ROAD' ? 'ROAD' : 'DEGRADED',
+        version: run.routeVersion,
+        distanceMeters: run.routeDistanceMeters,
+        durationSeconds: run.routeDurationSeconds,
+        calculatedAt: run.routeCalculatedAt.toISOString(),
+        geometry: Array.isArray(run.routeGeometry) ? run.routeGeometry.flatMap((point) => {
+          if (!point || typeof point !== 'object' || Array.isArray(point)) return [];
+          const lat = 'lat' in point ? point.lat : null; const lng = 'lng' in point ? point.lng : null;
+          return typeof lat === 'number' && typeof lng === 'number' ? [{ lat, lng }] : [];
+        }) : [],
+      } : null,
       stops: run.stops.map((stop) => this.stopToDTO(stop)),
     };
   }
@@ -975,6 +1016,9 @@ export class DeliveryRunsService {
       cancellationReason: stop.cancellationReason,
       payAmount: stop.payAmountSnapshot ? Number(stop.payAmountSnapshot) : null,
       payCurrency: stop.payCurrencySnapshot,
+      routeDistanceMeters: stop.routeDistanceMeters,
+      routeDurationSeconds: stop.routeDurationSeconds,
+      estimatedArrivalAt: stop.estimatedArrivalAt?.toISOString() ?? null,
     };
   }
 
@@ -1032,6 +1076,25 @@ export class DeliveryRunsService {
       }
     }
     return [...previous, event];
+  }
+
+  private isOwnFleetEligible(
+    tenantId: string,
+    orderId: string,
+    marketplaceOrders: readonly MarketplaceOwnershipRecord[],
+  ): boolean {
+    const eligibility = evaluateOwnFleetEligibility(marketplaceOrders);
+    if (!eligibility.eligible) {
+      this.logger.warn({
+        event: 'own_fleet_order_blocked',
+        tenantId,
+        orderId,
+        provider: eligibility.provider,
+        deliveryOwnership: eligibility.deliveryOwnership,
+        reason: eligibility.reason,
+      });
+    }
+    return eligibility.eligible;
   }
 
   private transaction<T>(operation: (tx: TransactionClient) => Promise<T>): Promise<T> {

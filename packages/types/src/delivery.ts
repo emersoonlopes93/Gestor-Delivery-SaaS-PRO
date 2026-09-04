@@ -161,6 +161,21 @@ export interface DeliveryStopDTO {
   cancellationReason: string | null;
   payAmount: number | null;
   payCurrency: string | null;
+  routeDistanceMeters: number | null;
+  routeDurationSeconds: number | null;
+  estimatedArrivalAt: string | null;
+}
+
+export type DeliveryRouteQuality = 'ROAD' | 'DEGRADED';
+export interface DeliveryRoutePointDTO { lat: number; lng: number }
+export interface DeliveryRouteSnapshotDTO {
+  provider: string;
+  quality: DeliveryRouteQuality;
+  version: number;
+  distanceMeters: number | null;
+  durationSeconds: number | null;
+  calculatedAt: string;
+  geometry: DeliveryRoutePointDTO[];
 }
 
 /** Store/origin coordinates when the tenant has a geocoded store address. */
@@ -183,6 +198,7 @@ export interface DeliveryRunDTO {
   completedAt: string | null;
   createdAt: string;
   origin?: DeliveryRunOriginDTO | null;
+  route: DeliveryRouteSnapshotDTO | null;
   kds?: {
     blocked: boolean;
     blockingOrdersCount: number;

@@ -97,6 +97,8 @@ export function DispatchPage() {
     createRun,
     isCreating,
     reorderStops,
+    recalculateRoute,
+    isRecalculatingRoute,
     updateSettings,
     paySettings,
     isPaySettingsLoading,
@@ -592,6 +594,10 @@ export function DispatchPage() {
                 <span className={`shrink-0 rounded-md border px-2 py-1 text-[11px] font-bold ${RUN_STYLES[run.status]}`}>{RUN_LABELS[run.status]}</span>
               </div>
 
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3 text-xs">
+                <div className="text-muted-foreground"><strong className="text-foreground">{run.route?.quality === 'ROAD' ? 'Rota viária' : 'Estimativa degradada'}</strong>{run.route ? ` · ${run.route.distanceMeters === null ? 'distância indisponível' : `${(run.route.distanceMeters / 1000).toFixed(1)} km`} · ${run.route.durationSeconds === null ? 'tempo indisponível' : `${Math.ceil(run.route.durationSeconds / 60)} min`}` : ' · cálculo pendente'}</div>
+                {(run.status === 'PENDING_ACCEPTANCE' || run.status === 'ASSIGNED') && <button type="button" disabled={isRecalculatingRoute} onClick={() => void recalculateRoute(run.id).catch((error: unknown) => setFeedback(messageFrom(error)))} className="min-h-11 rounded-lg border border-border px-3 font-bold text-foreground disabled:opacity-50">Recalcular rota</button>}
+              </div>
               <ol className="relative space-y-0 px-4 py-3 before:absolute before:bottom-8 before:left-[31px] before:top-8 before:w-px before:bg-border">
                 {run.stops.map((stop) => {
                   const future = run.stops.filter((item) => item.status === 'PENDING');
@@ -611,6 +617,7 @@ export function DispatchPage() {
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-bold text-foreground">Pedido {stop.orderNumber}</p>
                             <p className="truncate text-xs text-muted-foreground">{stop.customerName}</p>
+                            <p className="mt-1 text-xs font-semibold text-muted-foreground">{stop.estimatedArrivalAt ? `ETA ${new Date(stop.estimatedArrivalAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'ETA indisponível'}</p>
                           </div>
                           {canReorder && (
                             <div className="flex shrink-0 items-center gap-1">

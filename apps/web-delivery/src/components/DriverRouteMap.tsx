@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import L from 'leaflet';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
 import type { LatLngBoundsExpression, LatLngExpression } from 'leaflet';
-import { DeliveryRunStatus, DeliveryStopStatus, type DeliveryRunOriginDTO, type DeliveryStopDTO } from '@gestor/types';
+import { DeliveryRunStatus, DeliveryStopStatus, type DeliveryRunOriginDTO, type DeliveryRouteSnapshotDTO, type DeliveryStopDTO } from '@gestor/types';
 import { ExternalLink, MapPin, Navigation, RotateCcw } from 'lucide-react';
 import { geocodedStops, navigationUrl, type NavigationProvider, type RouteCoordinate } from '../lib/routeNavigation';
 
@@ -45,6 +45,7 @@ type Props = {
   origin: DeliveryRunOriginDTO | null | undefined;
   nativePlatform: boolean;
   addressText: (address: Record<string, unknown> | null) => string;
+  route?: DeliveryRouteSnapshotDTO | null;
 };
 
 const providers: Array<{ id: NavigationProvider; label: string }> = [
@@ -53,7 +54,7 @@ const providers: Array<{ id: NavigationProvider; label: string }> = [
   { id: 'system', label: 'Sistema ou navegador' },
 ];
 
-export function DriverRouteMap({ status, stops, currentStop, currentPosition, origin, nativePlatform, addressText }: Props) {
+export function DriverRouteMap({ status, stops, currentStop, currentPosition, origin, nativePlatform, addressText, route }: Props) {
   const mappedStops = useMemo(() => geocodedStops(stops), [stops]);
   const returning = status === DeliveryRunStatus.RETURNING;
   const originPosition = origin ? { lat: origin.lat, lng: origin.lng } : null;
@@ -63,7 +64,7 @@ export function DriverRouteMap({ status, stops, currentStop, currentPosition, or
   const destinationLabel = returning ? origin?.label ?? 'Loja' : destinationStop ? `Pedido ${destinationStop.orderNumber}` : '';
   const stopPoints = mappedStops.map(({ position }) => [position.lat, position.lng] as LatLngExpression);
   // During returns only the genuine store coordinate is drawn: never suggest a customer is the destination.
-  const schematicPoints = returning ? (originPosition ? [[originPosition.lat, originPosition.lng] as LatLngExpression] : []) : [
+  const schematicPoints = returning ? (originPosition ? [[originPosition.lat, originPosition.lng] as LatLngExpression] : []) : route?.geometry.length ? route.geometry.map((point) => [point.lat, point.lng] as LatLngExpression) : [
     ...(originPosition ? [[originPosition.lat, originPosition.lng] as LatLngExpression] : []), ...stopPoints,
   ];
   const allPoints = [...(currentPosition ? [[currentPosition.lat, currentPosition.lng] as LatLngExpression] : []), ...schematicPoints];
@@ -80,7 +81,7 @@ export function DriverRouteMap({ status, stops, currentStop, currentPosition, or
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
         <InvalidateSize />
         <FitRoute points={allPoints} />
-        {schematicPoints.length > 1 && <Polyline positions={schematicPoints} pathOptions={{ color: returning ? '#d97706' : '#f97316', weight: 4, opacity: 0.82, dashArray: '8 7' }} />}
+        {schematicPoints.length > 1 && <Polyline positions={schematicPoints} pathOptions={{ color: returning ? '#d97706' : '#f97316', weight: 4, opacity: 0.82, dashArray: route?.quality === 'ROAD' ? undefined : '8 7' }} />}
         {currentPosition && <Marker position={[currentPosition.lat, currentPosition.lng]} icon={courierIcon} title="Sua posição atual" />}
         {originPosition && <Marker position={[originPosition.lat, originPosition.lng]} icon={originIcon} title={origin?.label ?? 'Loja'} />}
         {!returning && mappedStops.map(({ stop, position }) => <Marker key={stop.id} position={[position.lat, position.lng]} icon={stopIcon(stop.sequence, stop.status)} title={`Parada ${stop.sequence}: pedido ${stop.orderNumber}`} />)}
@@ -101,7 +102,7 @@ export function DriverRouteMap({ status, stops, currentStop, currentPosition, or
       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--delivery-muted-foreground)]">{returning ? 'Agora' : 'Próxima entrega'}</p>
       {returning && originPosition ? <><p className="mt-1 font-black text-[var(--delivery-foreground)]">{origin?.label ?? 'Loja'}</p><p className="mt-1 text-sm leading-5 text-[var(--delivery-muted-foreground)]">Destino de retorno confirmado pela coordenada da loja.</p></> : destinationStop ? <><p className="mt-1 font-black text-[var(--delivery-foreground)]">Pedido #{destinationStop.orderNumber}</p><p className="mt-1 text-sm leading-5 text-[var(--delivery-muted-foreground)]">{addressText(destinationStop.address)}</p></> : <p className="mt-1 text-sm font-semibold text-[var(--delivery-foreground)]">{returning ? 'Retorne à loja. A localização da loja ainda não está disponível neste mapa.' : 'Aguarde a próxima parada da rota.'}</p>}
     </div>
-      <p className="mt-3 text-xs leading-5 text-[var(--delivery-muted-foreground)]">A linha mostra somente a ordem registrada das paradas. Não representa trajeto por ruas, otimização ou previsão de chegada.</p>
+      <p className="mt-3 text-xs leading-5 text-[var(--delivery-muted-foreground)]">{route?.quality === 'ROAD' ? `Trajeto viário calculado · ${((route.distanceMeters ?? 0) / 1000).toFixed(1)} km · ${Math.ceil((route.durationSeconds ?? 0) / 60)} min.` : 'Estimativa degradada em linha reta. O trajeto e o ETA viários estão indisponíveis.'}</p>
       {destination && <details className="mt-4 rounded-xl border border-[var(--delivery-border)] bg-[var(--delivery-muted)]"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold text-[var(--delivery-foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"><span className="inline-flex items-center gap-2"><Navigation className="h-4 w-4 text-orange-600" aria-hidden="true" />Abrir navegação</span><ExternalLink className="h-4 w-4 text-[var(--delivery-muted-foreground)]" aria-hidden="true" /></summary><div className="grid gap-2 border-t border-[var(--delivery-border)] p-2" aria-label="Escolha um aplicativo de navegação">{providers.map((provider) => <a key={provider.id} href={navigationUrl(provider.id, destination, destinationLabel, nativePlatform)} target={nativePlatform ? undefined : '_blank'} rel={nativePlatform ? undefined : 'noreferrer'} className="flex min-h-11 items-center justify-between rounded-lg bg-[var(--delivery-card)] px-3 text-sm font-bold text-[var(--delivery-foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">{provider.label}<ExternalLink className="h-4 w-4 text-[var(--delivery-muted-foreground)]" aria-hidden="true" /></a>)}<p className="px-1 pb-1 text-xs text-[var(--delivery-muted-foreground)]">Opcional: você pode continuar acompanhando tudo no PedeHub.</p></div></details>}
       {returning && <p className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100"><RotateCcw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />Mantenha os pedidos de retorno com você até a confirmação na loja.</p>}
     </div>

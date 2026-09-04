@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceConnection, MarketplaceDeliveryOwnership, MarketplaceProvider } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { MarketplaceProviderAdapter } from './marketplace-provider.interface';
 import { ExternalMarketplaceOrder, NormalizedMarketplaceOrder, ParsedMarketplaceEvent } from '../marketplace.types';
@@ -110,6 +110,7 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
   }): Promise<NormalizedMarketplaceOrder> {
     const order = this.asRecord(input.externalOrder);
     const customer = this.asRecord(order.customer);
+    const deliveryDetails = this.asRecord(order.delivery);
     const delivery = this.asRecord(order.deliveryAddress) ?? this.asRecord(order.delivery_address) ?? this.asRecord(order.address);
     const items = Array.isArray(order.items) ? order.items : [];
     const orderTiming = this.readString(order, ['orderTiming', 'order_timing']);
@@ -146,6 +147,7 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       fulfillmentType: this.normalizeFulfillmentType(
         this.readString(order, ['fulfillmentType', 'fulfillment_type', 'serviceType', 'service_type']),
       ),
+      deliveryOwnership: this.normalizeDeliveryOwnership(this.readString(deliveryDetails, ['deliveredBy'])),
       customerName: this.readString(customer, ['name']) ?? 'Cliente Marketplace',
       customerPhone: this.readString(customer, ['phone', 'phoneNumber']) ?? '00000000000',
       customerEmail: this.readString(customer, ['email']),
@@ -253,6 +255,13 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     }
 
     return 'delivery';
+  }
+
+  private normalizeDeliveryOwnership(value: string | null): MarketplaceDeliveryOwnership {
+    const normalized = value?.trim().toUpperCase();
+    if (normalized === 'MERCHANT') return MarketplaceDeliveryOwnership.MERCHANT;
+    if (normalized === 'IFOOD') return MarketplaceDeliveryOwnership.PROVIDER;
+    return MarketplaceDeliveryOwnership.UNKNOWN;
   }
 
   private isSmokeModeEnabled(): boolean {

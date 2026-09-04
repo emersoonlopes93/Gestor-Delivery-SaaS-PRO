@@ -1998,3 +1998,15 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A avaliação independente da UI passou. Testes e gates finais da branch devem ser registrados no relatório/commits desta sessão; nenhum deploy, Dokploy, produção ou publicação faz parte desta entrega.
 
 ---
+## Routing V2 / ETA + Logistics Ownership - validação final local (2026-09-04)
+
+- Branch isolada `feat/routing-v2-eta`, base `a723413124b0ac7af5914eebda02396318da89ed`, em `C:\wt\pedehub\routing-v2`.
+- Implementação local adiciona adapter OSRM configurável, fallback Haversine explicitamente degradado, sequência determinística, snapshots de rota/trechos/ETA, versionamento, cache, recálculo pre-start, mapa/ETA no painel e sequência/ETA mobile do entregador.
+- Prisma recebeu as migrations aditivas `20260904090000_routing_v2_eta` e `20260904100000_marketplace_delivery_ownership`. A segunda persiste ownership provider-neutral `MERCHANT | PROVIDER | UNKNOWN`, com default fail-closed `UNKNOWN`.
+- O adapter iFood lê exclusivamente `delivery.deliveredBy`: `MERCHANT` permanece `MERCHANT`, `IFOOD` vira `PROVIDER` e qualquer ausência/valor novo vira `UNKNOWN`. Nenhuma alteração foi feita no adapter 99Food; seu ponto de extensão é o mesmo contrato normalizado quando existir documentação oficial confiável.
+- Pedidos nativos e marketplace `MERCHANT` são elegíveis. `PROVIDER` e `UNKNOWN` são removidos do builder/Auto-Dispatch e rejeitados antes de escrita na criação manual, `createAssignedRun` e defesa em profundidade do Routing V2. Logs estruturados contêm somente tenant/order/provider/ownership/reason.
+- Segurança concorrente: o compare-and-set tenant/status da rota ocorre antes das escritas de paradas dentro da transação; uma saída simultânea rejeita o recálculo sem reordenar stops.
+- PostgreSQL 16.15: 67 migrations passaram do zero; upgrade de 65 para 67 passou e preservou pedido marketplace legado com backfill `UNKNOWN`. O E2E real com provider fake passou (1/1): três pedidos native/MERCHANT, `PROVIDER` e `UNKNOWN` excluídos, ordem determinística, ETA em todas as paradas e repetição mantendo exatamente 1 run/3 stops. Containers/bases descartáveis foram removidos.
+- Mobile Playwright passou em 390x844 light e 430x932 dark: sem overflow horizontal, mapa contido, paradas 1/2/3 e ETAs legíveis, navegação acionável e estado degradado explícito. Artifacts locais ficaram em `apps/web-delivery/artifacts/mobile-layout/` e não foram versionados. A skill `agent-browser` não iniciou CDP no host Windows; o fallback Playwright real do projeto forneceu a evidência.
+- Validação final: API em quatro shards com 122 suítes/581 testes aprovados e 5 suítes/10 testes condicionais ignorados; após o hardening concorrente, shard impactado 30 suítes/168 testes e teste focado 6/6 passaram. Web-tenant 39/140 e web-delivery 15/47 passaram. Typecheck, no-any, features, boundaries, theme, lint (0 erros; 17 warnings preexistentes no storefront), builds API/web-tenant/web-delivery e diff check passaram.
+- Fora de escopo preservado: branch/adapter 99Food, provider real, deploy, Dokploy, produção, banco compartilhado, merge e promoção para `main-copy`.

@@ -14,7 +14,7 @@ vi.mock('react-leaflet', () => ({
 }));
 
 function routeStop(status: DeliveryStopStatus, sequence = 1): DeliveryStopDTO {
-  return { id: `stop-${sequence}`, orderId: `order-${sequence}`, sequence, status, attempts: 0, orderNumber: `${300 + sequence}`, customerName: `Cliente ${sequence}`, customerPhone: '', address: { street: 'Rua das Flores', number: `${sequence}`, lat: -23.55 + sequence / 1000, lng: -46.63 }, arrivedAt: null, deliveredAt: null, failedAt: null, failureReason: null, returnRequiredAt: null, returnedAt: null, cancelledAt: null, cancellationReason: null };
+  return { id: `stop-${sequence}`, orderId: `order-${sequence}`, sequence, status, attempts: 0, orderNumber: `${300 + sequence}`, customerName: `Cliente ${sequence}`, customerPhone: '', address: { street: 'Rua das Flores', number: `${sequence}`, lat: -23.55 + sequence / 1000, lng: -46.63 }, arrivedAt: null, deliveredAt: null, failedAt: null, failureReason: null, returnRequiredAt: null, returnedAt: null, cancelledAt: null, cancellationReason: null, payAmount: null, payCurrency: null, routeDistanceMeters: null, routeDurationSeconds: null, estimatedArrivalAt: null };
 }
 const addressText = (address: Record<string, unknown> | null) => address ? `${String(address.street)}, ${String(address.number)}` : 'Endereço não informado';
 
@@ -28,7 +28,7 @@ describe('DriverRouteMap', () => {
     expect(screen.getByRole('region', { name: /posição atual e paradas numeradas/ })).toBeTruthy();
     expect(screen.getByText(/Origem: Loja Centro/)).toBeTruthy();
     expect(screen.getByText('Pedido #301')).toBeTruthy();
-    expect(screen.getByText(/Não representa trajeto por ruas, otimização ou previsão/)).toBeTruthy();
+    expect(screen.getByText(/Estimativa degradada em linha reta/)).toBeTruthy();
     fireEvent.click(screen.getByText('Abrir navegação'));
     expect(screen.getByRole('link', { name: /Google Maps/ }).getAttribute('href')).toContain('https://www.google.com/maps/dir/');
     expect(screen.getByRole('link', { name: /Waze/ })).toBeTruthy();

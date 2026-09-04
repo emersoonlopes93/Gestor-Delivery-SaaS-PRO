@@ -294,6 +294,7 @@ export class MarketplaceOrderIngestionService {
           lastExternalEventTopic: event.topic ?? existing.lastExternalEventTopic,
           rawPayload: this.toInputJsonValue(normalized.rawPayload),
           normalizedPayload: this.toInputJsonValue(normalized),
+          deliveryOwnership: normalized.deliveryOwnership,
           lastSyncedAt: new Date(),
         },
       });
@@ -317,6 +318,7 @@ export class MarketplaceOrderIngestionService {
         lastExternalEventTopic: event.topic ?? null,
         rawPayload: this.toInputJsonValue(normalized.rawPayload),
         normalizedPayload: this.toInputJsonValue(normalized),
+        deliveryOwnership: normalized.deliveryOwnership,
       },
     });
   }

@@ -1,4 +1,4 @@
-import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceConnection, MarketplaceDeliveryOwnership, MarketplaceProvider } from '@prisma/client';
 
 export type ParsedMarketplaceEvent = {
   provider: MarketplaceProvider;
@@ -46,6 +46,7 @@ export type NormalizedMarketplaceOrder = {
   preparationStartAt?: Date | null;
   confirmationDeadlineAt?: Date | null;
   fulfillmentType: 'delivery' | 'pickup';
+  deliveryOwnership: MarketplaceDeliveryOwnership;
   customerName: string;
   customerPhone: string;
   customerEmail?: string | null;

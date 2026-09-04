@@ -557,6 +557,7 @@ export function ActiveDeliveryPage() {
                 origin={activeRun.origin}
                 nativePlatform={nativePlatform}
                 addressText={addressText}
+                route={activeRun.route}
               />
             )}
 
@@ -637,6 +638,7 @@ export function ActiveDeliveryPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-[var(--delivery-foreground)]">Pedido #{stop.orderNumber}</p>
                       <p className="truncate text-xs text-[var(--delivery-muted-foreground)]">{stop.customerName}</p>
+                      <p className="mt-1 text-xs font-semibold text-[var(--delivery-muted-foreground)]">{stop.estimatedArrivalAt ? `ETA ${new Date(stop.estimatedArrivalAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'ETA indisponível'}</p>
                     </div>
                     <span className="text-right text-xs font-bold text-[var(--delivery-muted-foreground)]">{stopStatus(stop)}</span>
                   </li>

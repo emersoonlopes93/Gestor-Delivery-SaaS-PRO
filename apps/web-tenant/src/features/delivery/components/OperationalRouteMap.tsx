@@ -113,7 +113,7 @@ export function OperationalRouteMap({ drivers = [], run = null, routePoints = []
         })}
       </MapContainer>
       <div className="pointer-events-none absolute bottom-3 left-3 z-[400] max-w-[calc(100%-1.5rem)] rounded-md border border-border bg-card px-3 py-2 text-[11px] font-medium text-muted-foreground shadow-md">
-        A linha conecta registros e paradas na ordem operacional. Não é rota otimizada e não informa ETA.
+        {run?.route?.quality === 'ROAD' ? 'A linha representa o trajeto viário calculado.' : 'A linha representa uma estimativa degradada em linha reta; não é ETA viário.'}
       </div>
     </div>
   );

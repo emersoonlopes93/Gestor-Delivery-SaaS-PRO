@@ -58,6 +58,10 @@ export function useDeliveryRuns() {
     },
     onSuccess: () => invalidateLogisticsQueries(queryClient),
   });
+  const recalculateRoute = useMutation({
+    mutationFn: async (runId: string) => (await api.post<DeliveryRunDTO>(`/delivery/runs/${runId}/route/recalculate`)).data,
+    onSuccess: () => invalidateLogisticsQueries(queryClient),
+  });
   const updateSettings = useMutation({
     mutationFn: async (requiresAcceptance: boolean) => {
       const response = await api.patch<DeliveryRunSettingsDTO>('/delivery/runs/settings', { requiresAcceptance });
@@ -90,6 +94,8 @@ export function useDeliveryRuns() {
     createRun: createRun.mutateAsync,
     isCreating: createRun.isPending,
     reorderStops: reorderStops.mutateAsync,
+    recalculateRoute: recalculateRoute.mutateAsync,
+    isRecalculatingRoute: recalculateRoute.isPending,
     updateSettings: updateSettings.mutateAsync,
     updatePaySettings: updatePaySettings.mutateAsync,
     isUpdatingPaySettings: updatePaySettings.isPending,

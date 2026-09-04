@@ -65,6 +65,12 @@ const baseEnvSchema = z.object({
   MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY: z.string().default(''),
   MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION: z.string().default(''),
 
+  // Delivery road routing. Disabled unless both provider and base URL are explicit.
+  ROUTING_PROVIDER: z.enum(['', 'osrm']).default(''),
+  ROUTING_OSRM_BASE_URL: z.union([z.literal(''), z.string().url()]).default(''),
+  ROUTING_TIMEOUT_MS: z.coerce.number().int().min(500).max(30000).default(4000),
+  ROUTING_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(3600000).default(300000),
+
   // Upload
   MEDIA_STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
   MEDIA_STORAGE_PROVIDER: z.enum(['local', 'r2']).optional(),
@@ -107,6 +113,9 @@ const baseEnvSchema = z.object({
 });
 
 export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
+  if (data.ROUTING_PROVIDER === 'osrm' && !data.ROUTING_OSRM_BASE_URL) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ROUTING_OSRM_BASE_URL'], message: 'ROUTING_OSRM_BASE_URL é obrigatória quando ROUTING_PROVIDER=osrm.' });
+  }
   if (data.NODE_ENV === 'production') {
     if (data.REDIS_ENABLED === 'true') {
       if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
