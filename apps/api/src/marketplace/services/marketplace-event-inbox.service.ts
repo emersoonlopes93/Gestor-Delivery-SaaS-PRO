@@ -50,8 +50,17 @@ export class MarketplaceEventInboxService {
 
     const parsed = await provider.parseWebhookEvent({
       headers: input.headers,
+      rawBody: input.rawBody,
       body: input.body,
     });
+
+    if (input.provider === MarketplaceProvider.FOOD_99
+      && (!parsed.eventId || !parsed.externalOrderId || !parsed.externalStoreId || !parsed.topic)) {
+      this.logger.warn({
+        message: 'food99_webhook_payload_unmapped',
+        payloadShape: this.food99PayloadShape(parsed.rawPayload),
+      });
+    }
 
     if (parsed.topic?.toUpperCase() === 'KEEPALIVE') {
       return {
@@ -265,6 +274,32 @@ export class MarketplaceEventInboxService {
       rawBodyByteLength: rawBodyBuffer.byteLength,
       rawBodySha256: createHash('sha256').update(rawBodyBuffer).digest('hex'),
       userAgent: headerValue('user-agent') ?? null,
+    };
+  }
+
+  private food99PayloadShape(payload: Record<string, unknown>) {
+    const asRecord = (value: unknown): Record<string, unknown> | null => (
+      typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : null
+    );
+    const data = asRecord(payload.data);
+    const orderInfo = asRecord(data?.order_info);
+    const valueType = (value: unknown): string => {
+      if (Array.isArray(value)) return 'array';
+      if (value === null) return 'null';
+      return typeof value;
+    };
+    const types = (value: Record<string, unknown> | null) => value
+      ? Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, valueType(entry)]))
+      : null;
+    return {
+      containerType: valueType(payload),
+      topLevelKeys: Object.keys(payload).sort(),
+      topLevelTypes: types(payload),
+      dataKeys: data ? Object.keys(data).sort() : null,
+      dataTypes: types(data),
+      orderInfoKeys: orderInfo ? Object.keys(orderInfo).sort() : null,
     };
   }
 

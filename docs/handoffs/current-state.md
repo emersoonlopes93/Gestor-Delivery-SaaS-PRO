@@ -117,6 +117,14 @@ Base: `origin/main-copy` / `7413cf4bb6a901d600eef574cb13cd9cfc5fb655`
 - O log de rejeição inclui somente nomes de headers, presença/comprimento/categoria do formato, metadados HTTP, tamanho e SHA-256 do corpo bruto; assinatura, corpo, tokens e secrets não são registrados.
 - Merchant/store mapping, conexão, snapshot, ingestão, lifecycle, logística, pagamentos, routing e UI não foram alterados. A validação de um webhook real após deploy permanece um gate separado.
 
+### Correção focada do payload real do callback (2026-09-04)
+
+- Depois do ajuste de assinatura, callbacks reais passaram a responder `204`, mas chegavam à ingestão com merchant, pedido e evento nulos. A causa era o parser Open Delivery camelCase aplicado ao envelope nativo 99Food em snake_case.
+- O callback nativo agora é normalizado de `app_shop_id`, `type`, `timestamp`, `data.order_id` e, em `orderNew`, `data.order_info.shop.shop_id`. A conexão é resolvida pelo AppShopID em `externalStoreId`, sem alterar valores persistidos.
+- IDs long são preservados como strings usando os bytes assinados. Como o contrato oficial não possui `eventId`, uma identidade determinística é derivada apenas de IDs técnicos, tipo e timestamp para deduplicação.
+- Payloads incompletos registram somente chaves e tipos estruturais em profundidade limitada. Nenhum valor de cliente, item, preço, assinatura, token, corpo ou secret é registrado.
+- Eventos antigos já persistidos não guardam os bytes crus e podem conter IDs long arredondados pelo parser anterior; eles não devem ser reprocessados como se fossem exatos. Um novo callback real é necessário para a validação externa.
+
 ---
 
 ## Compatibilidade light/dark do web-tenant (2026-08-27)
