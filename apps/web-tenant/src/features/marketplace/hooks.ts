@@ -3,7 +3,7 @@ import { api } from '../../lib/api-client';
 
 export type MarketplaceProvider = 'ifood' | '99food';
 export type MarketplaceConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'TOKEN_EXPIRED' | 'ERROR' | 'PAUSED';
-export type MarketplaceEventStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
+export type MarketplaceEventStatus = 'RECEIVED' | 'QUEUED' | 'PROCESSING' | 'PROCESSED' | 'FAILED' | 'IGNORED';
 
 export type MarketplaceConnectionDTO = {
   id: string;

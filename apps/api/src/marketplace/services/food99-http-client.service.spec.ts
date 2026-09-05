@@ -56,6 +56,17 @@ describe('Food99HttpClientService native V1 actions', () => {
     expect(url.searchParams.get('order_id')).toBe('5764656197621845665');
   });
 
+  it('preserves an unquoted 64-bit order_id from the native detail response', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"errno":0,"data":{"order_id":5764656197621845665,"order_items":[]}}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+
+    await expect(service.fetchOrderDetails(connection, '5764656197621845665', 'correlation-1'))
+      .resolves.toEqual({ order_id: '5764656197621845665', order_items: [] });
+  });
+
   it('posts app_id as a decimal literal when requesting the native authorization URL', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: { url: 'https://auth.99food.test/start' } }), { status: 200 }));
     const tokens = { getAccessToken: jest.fn() };

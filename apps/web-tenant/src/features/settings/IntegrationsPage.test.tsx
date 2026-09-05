@@ -86,4 +86,22 @@ describe('IntegrationsPage multi-iFood connections', () => {
     expect(html).not.toContain('accessToken');
     expect(html).not.toContain('refreshToken');
   });
+
+  it('labels a failed inbox event as a processing failure, not as an offline connection', () => {
+    vi.mocked(useMarketplaceConnections).mockReturnValue({ data: [], isLoading: false, refetch } as never);
+    vi.mocked(useMarketplaceEvents).mockReturnValue({
+      data: [{
+        id: 'event-1', tenantId: 'tenant-1', connectionId: 'connection-1', provider: '99food',
+        eventId: 'food99:event-1', externalOrderId: '5764656197621845665', externalStoreId: 'store-1',
+        status: 'FAILED', attempts: 3, lastError: 'Incomplete order detail.',
+        receivedAt: '2026-09-05T22:00:00.000Z', processedAt: null,
+      }],
+      isLoading: false,
+      refetch,
+    } as never);
+
+    const html = renderToStaticMarkup(<IntegrationsPage />);
+    expect(html).toContain('Falhou');
+    expect(html).not.toContain('Offline');
+  });
 });

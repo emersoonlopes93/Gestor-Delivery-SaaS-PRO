@@ -51,6 +51,15 @@ function statusBadge(status?: string | null) {
   return <Badge variant="info" size="sm">{status || '—'}</Badge>;
 }
 
+function eventStatusBadge(status?: string | null) {
+  const tone = String(status || '').toUpperCase();
+  if (tone === 'PROCESSED') return <Badge variant="success" size="sm">Processado</Badge>;
+  if (tone === 'PROCESSING' || tone === 'QUEUED' || tone === 'RECEIVED') return <Badge variant="warning" size="sm">Processando</Badge>;
+  if (tone === 'FAILED') return <Badge variant="destructive" size="sm">Falhou</Badge>;
+  if (tone === 'IGNORED') return <Badge variant="info" size="sm">Ignorado</Badge>;
+  return <Badge variant="info" size="sm">{status || '—'}</Badge>;
+}
+
 export function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [showManualForm, setShowManualForm] = useState(false);
@@ -467,7 +476,7 @@ export function IntegrationsPage() {
                       <div className="text-sm font-black text-foreground break-words">{event.eventId || event.externalOrderId || event.id}</div>
                       <div className="text-xs text-muted-foreground">Recebido em {formatDateTime(event.receivedAt)}</div>
                     </div>
-                    {statusBadge(event.status)}
+                    {eventStatusBadge(event.status)}
                   </div>
                   <div className="flex flex-wrap gap-2 items-center">
                     <Badge variant="info" size="sm">{event.provider}</Badge>

@@ -1,3 +1,11 @@
+## 99Food production-log contract audit (2026-09-05)
+
+- O log real do Dokploy comprovou webhook `POST /api/v1/webhooks/marketplaces/99food` com 204 e detalhe `/v1/order/order/detail` com HTTP 200; o texto `OFFLINE` era apenas o badge generico da tela aplicado ao status de inbox `FAILED`, nao uma conexao offline. Eventos agora exibem `Falhou`, `Processando`, `Processado` ou `Ignorado` separadamente do estado da conexao.
+- Causa de identidade confirmada: o detalhe nativo era lido com `response.json()`, arredondando `order_id` inteiro de 64 bits. O callback mantinha o ID exato, mas lifecycle posterior nao encontrava o `MarketplaceOrder` salvo com ID arredondado. A leitura nativa agora preserva IDs longos como strings antes do parse; requests continuam enviando o literal inteiro exigido pela Swagger.
+- O normalizador aceita o `OrderModel` direto e wrappers nativos limitados e combina detalhe remoto parcial com `data.order_info` do webhook assinado. Cliente, endereco, precos e itens do callback completam somente campos ausentes; snapshot incompleto continua fail-closed e retryable.
+- Eventos lifecycle de pedidos existentes agora persistem topico/ID/data/sequencia antes da transicao. A reconciliacao consulta callbacks terminais armazenados, inclui eventos anteriormente FAILED e repara um ID historicamente arredondado apenas quando existe uma unica correspondencia numerica na mesma conexao/tenant. O reprocessamento manual tambem tenta reparar imediatamente um pedido 99Food incompleto.
+- Validacao: 4 suites API com 41 testes, teste focado web com 2 testes, lint API/web, builds API/web, TypeScript e `check:no-any` passaram. Nenhum deploy, migration, banco remoto ou chamada manual ao provider foi executado.
+
 ## 99Food direct-detail recovery and historical lifecycle reconciliation (2026-09-05)
 
 - Causa confirmada do pedido vazio: o client HTTP já removia o envelope `StandardResponse.data` de `GET /v1/order/order/detail`, mas o normalizador reconhecia somente `data.order_info`. O `OrderModel` direto oficial caía no fallback Open Delivery e persistia `Cliente 99Food`, zero itens e total zero. O normalizador agora reconhece `order_id` na raiz antes do fallback.

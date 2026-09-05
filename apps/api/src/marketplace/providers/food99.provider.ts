@@ -98,37 +98,50 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     return this.client.acknowledgeEvents(input.connection, input.events ?? [], input.correlationId);
   }
 
-  fetchOrderDetails(input: {
+  async fetchOrderDetails(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
     eventPayload: Record<string, unknown>;
   }): Promise<ExternalMarketplaceOrder> {
-    return this.client.fetchOrderDetails(input.connection, input.externalOrderId, `event:${input.externalOrderId}`);
+    const remote = await this.client.fetchOrderDetails(input.connection, input.externalOrderId, `event:${input.externalOrderId}`);
+    const remoteOrder = this.extractNativeOrder(remote);
+    const webhookOrder = this.extractNativeOrder(input.eventPayload);
+    if (!remoteOrder) return webhookOrder ?? remote;
+    if (!webhookOrder) return remoteOrder;
+
+    const remoteAddress = this.asRecord(remoteOrder.receive_address);
+    const webhookAddress = this.asRecord(webhookOrder.receive_address);
+    const remotePrice = this.asRecord(remoteOrder.price);
+    const webhookPrice = this.asRecord(webhookOrder.price);
+    return {
+      ...webhookOrder,
+      ...remoteOrder,
+      receive_address: { ...webhookAddress, ...remoteAddress },
+      price: { ...webhookPrice, ...remotePrice },
+      order_items: Array.isArray(remoteOrder.order_items) && remoteOrder.order_items.length > 0
+        ? remoteOrder.order_items
+        : webhookOrder.order_items,
+    };
   }
 
-  fetchCurrentOrder(input: {
+  async fetchCurrentOrder(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
     correlationId: string;
   }): Promise<ExternalMarketplaceOrder> {
-    return this.client.fetchOrderDetails(input.connection, input.externalOrderId, input.correlationId);
+    const remote = await this.client.fetchOrderDetails(input.connection, input.externalOrderId, input.correlationId);
+    return this.extractNativeOrder(remote) ?? remote;
   }
 
   async normalizeOrder(input: {
     connection: MarketplaceConnection;
     externalOrder: ExternalMarketplaceOrder;
   }): Promise<NormalizedMarketplaceOrder> {
-    const snapshot = this.asRecord(input.externalOrder) ?? {};
+    const snapshot = this.recordFromUnknown(input.externalOrder) ?? {};
     // Native 99Food orderNew embeds the detail response in data.order_info.
     // The detail endpoint itself returns the same shape. Keep the Open Delivery
     // fallback below only for polling compatibility, not as the native contract.
-    const nativeEnvelopeData = this.asRecord(snapshot.data);
-    const nativeOrder = this.asRecord(nativeEnvelopeData?.order_info)
-      ?? this.asRecord(snapshot.order_info)
-      // GET /v1/order/order/detail returns the documented OrderModel directly
-      // in StandardResponse.data. requestStandard already unwraps that data.
-      ?? (this.readIdentifier(snapshot, ['order_id']) ? snapshot : null)
-      ?? (this.readIdentifier(nativeEnvelopeData, ['order_id']) ? nativeEnvelopeData : null);
+    const nativeOrder = this.extractNativeOrder(snapshot);
     if (nativeOrder) return this.normalizeNativeOrder(input.connection, nativeOrder);
 
     const order = snapshot;
@@ -372,6 +385,40 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       options.push(...this.normalizeNativeSubItems(item.sub_item_list));
     }
     return options;
+  }
+
+  private extractNativeOrder(value: unknown, depth = 0): Record<string, unknown> | null {
+    if (depth > 4) return null;
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const order = this.extractNativeOrder(entry, depth + 1);
+        if (order) return order;
+      }
+      return null;
+    }
+    const record = this.recordFromUnknown(value);
+    if (!record) return null;
+    if (this.readIdentifier(record, ['order_id'])) return record;
+    for (const key of ['order_info', 'order', 'order_detail', 'detail', 'data']) {
+      const order = this.extractNativeOrder(record[key], depth + 1);
+      if (order) return order;
+    }
+    return null;
+  }
+
+  private recordFromUnknown(value: unknown): Record<string, unknown> | null {
+    const record = this.asRecord(value);
+    if (record) return record;
+    if (typeof value !== 'string' || !value.trim().startsWith('{')) return null;
+    try {
+      const identifiersPreserved = value.replace(
+        /("(?:app_id|order_id|shop_id|uid)"\s*:\s*)(-?\d{16,})/g,
+        '$1"$2"',
+      );
+      return this.asRecord(JSON.parse(identifiersPreserved) as unknown);
+    } catch {
+      return null;
+    }
   }
 
   private paymentMethod(methods: unknown[]): NormalizedMarketplaceOrder['paymentMethod'] {

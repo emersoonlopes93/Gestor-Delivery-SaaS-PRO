@@ -12,6 +12,7 @@ describe('Food99Provider', () => {
     getFood99AppCredentials: jest.fn().mockReturnValue({ appId: 'app', clientSecret: 'secret' }),
   };
   const provider = new Food99Provider(client as never, credentials as never);
+  beforeEach(() => jest.clearAllMocks());
   const signWebhook = (rawBody: Buffer) => createHash('md5')
     .update(rawBody)
     .update('secret', 'utf8')
@@ -194,6 +195,33 @@ describe('Food99Provider', () => {
     expect(normalized).toMatchObject({
       externalOrderId: '5764656197621845665', externalDisplayId: '23', customerName: 'Marina', total: 35.99,
     });
+    expect(normalized.items).toEqual([expect.objectContaining({ name: 'Pizza', totalPrice: 35.99 })]);
+  });
+
+  it('merges a sparse detail response with the complete order_info from orderNew', async () => {
+    client.fetchOrderDetails.mockResolvedValueOnce({
+      order: { order_id: '5764656197621845665', status: 100, order_items: [] },
+    });
+    const fetched = await provider.fetchOrderDetails({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrderId: '5764656197621845665',
+      eventPayload: {
+        data: {
+          order_info: {
+            order_id: '5764656197621845665',
+            receive_address: { name: 'Marina', phone: '5511999999999' },
+            price: { order_price: 3599 },
+            order_items: [{ app_item_id: 'pizza', name: 'Pizza', amount: 1, sku_price: 3599, total_price: 3599 }],
+          },
+        },
+      },
+    });
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: fetched,
+    });
+
+    expect(normalized).toMatchObject({ externalOrderId: '5764656197621845665', customerName: 'Marina' });
     expect(normalized.items).toEqual([expect.objectContaining({ name: 'Pizza', totalPrice: 35.99 })]);
   });
 

@@ -124,6 +124,73 @@ describe('MarketplaceOrderIngestionService', () => {
     }));
   });
 
+  it('reconciles a historical terminal event against one uniquely rounded 64-bit order id', async () => {
+    const applyLifecycle = jest.fn().mockResolvedValue(undefined);
+    const prisma = {
+      marketplaceEventInbox: {
+        findMany: jest.fn().mockResolvedValue([{
+          id: 'inbox-finish', tenantId: 'tenant-1', connectionId: 'conn-1',
+          externalOrderId: '5764685421497879999', topic: 'orderFinish', eventId: 'event-finish',
+          eventCreatedAt: new Date('2026-09-05T22:40:00.000Z'), eventSequence: null,
+        }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      marketplaceOrder: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([{
+          id: 'marketplace-order-1', externalOrderId: '5764685421497880000', statusInternal: OrderStatus.confirmed,
+        }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const { service } = makeFood99LifecycleService(prisma);
+    Reflect.set(service, 'applyLifecycleForInbox', applyLifecycle);
+
+    await expect(service.reconcileStoredFood99TerminalOrders(10)).resolves.toBe(1);
+    expect(prisma.marketplaceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        externalOrderId: '5764685421497879999',
+        lastExternalEventTopic: 'orderFinish',
+      }),
+    }));
+    expect(applyLifecycle).toHaveBeenCalledWith(
+      'tenant-1', 'conn-1', '5764685421497879999', 'orderFinish',
+    );
+  });
+
+  it('persists lifecycle metadata before applying an event to an existing 99Food order', async () => {
+    const connection = { id: 'conn-1', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99 };
+    const prisma = {
+      marketplaceEventInbox: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'inbox-finish', provider: MarketplaceProvider.FOOD_99, status: MarketplaceEventStatus.QUEUED,
+          connection, externalOrderId: '5764685421497879999', eventId: 'event-finish',
+          eventCreatedAt: new Date('2026-09-05T22:40:00.000Z'), eventSequence: null,
+          topic: 'orderFinish', correlationId: 'correlation-1', rawPayload: {},
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      marketplaceOrder: {
+        findFirst: jest.fn()
+          .mockResolvedValueOnce({ lastExternalEventAt: null, lastExternalEventSequence: null, lastExternalEventTopic: 'orderConfirm' })
+          .mockResolvedValueOnce({ id: 'marketplace-order-1', internalOrderId: 'order-1', provider: MarketplaceProvider.FOOD_99 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      order: { findFirst: jest.fn().mockResolvedValue({ status: OrderStatus.completed, fulfillmentType: 'delivery' }) },
+    };
+    const statusSyncService = { reconcileExternalEvent: jest.fn().mockResolvedValue(undefined) };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never, { get: jest.fn().mockReturnValue({}) } as never, {} as never, {} as never, {} as never, {} as never,
+      statusSyncService as never, {} as never,
+    );
+
+    await expect(service.processInboxEvent('inbox-finish')).resolves.toMatchObject({ lifecycleOnly: true });
+    expect(prisma.marketplaceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ lastExternalEventTopic: 'orderFinish', lastExternalEventId: 'event-finish' }),
+    }));
+  });
+
   it('rejects reprocess for marketplace orders from another tenant', async () => {
     const prisma = {
       marketplaceOrder: {

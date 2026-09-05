@@ -248,6 +248,10 @@ Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 
 
 ## 20. 99Food Orders V1
 
+### Production response compatibility (2026-09-05)
+
+Native detail parsing preserves unquoted 64-bit identifiers as decimal strings before JSON parsing. The normalizer accepts the official direct `OrderModel` and bounded native containers (`data`, `order_info`, `order`, `order_detail`, `detail`) only when an `order_id` is present. When the remote detail is sparse, missing address, price, and item fields may be completed from the signed `data.order_info` received with `orderNew`; an incomplete merged snapshot remains retryable and is not imported as a placeholder.
+
 ### Paridade de pedido nativo (2026-09-04)
 
 A fonte normativa do callback nativo Ã© o portal 99Food: [Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1921) e [Order Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1981). Os eventos oficiais de lifecycle documentados para este fluxo sÃ£o `orderNew`, `orderConfirm`, `orderReady`, `orderCancel`, `orderPartialCancel` e `orderFinish`. NÃ£o hÃ¡ evento nativo documentado chamado `preparing`; o PedeHub nÃ£o o inventa. `orderConfirm` sincroniza para `confirmed`, `orderReady` para pronto e `orderFinish` para `completed`, sempre respeitando `ORDER_STATUS_TRANSITIONS` e a proteÃ§Ã£o contra eventos atrasados/repetidos.

@@ -147,7 +147,7 @@ export class Food99HttpClientService {
     }
     const body = input.method === 'POST' ? this.losslessOrderBody(token, input.externalOrderId) : undefined;
     const response = await this.executeNative(connection, url, input.method, body, input);
-    const payload = this.asRecord(await this.readUnknown(response));
+    const payload = this.asRecord(await this.readNativeUnknown(response));
     if (response.status !== 200 || payload?.errno !== 0) {
       this.logNativeRejection({ endpoint: input.path, correlationId: input.correlationId, httpStatus: response.status, payload });
       throw new Food99ApiError('99Food native request failed.', response.status === 429 || response.status >= 500, response.status, typeof payload?.errmsg === 'string' ? payload.errmsg : undefined);
@@ -282,6 +282,19 @@ export class Food99HttpClientService {
 
   private async readUnknown(response: Response): Promise<unknown> {
     try { return await response.json() as unknown; } catch { return {}; }
+  }
+
+  private async readNativeUnknown(response: Response): Promise<unknown> {
+    try {
+      const raw = await response.text();
+      const identifiersPreserved = raw.replace(
+        /("(?:app_id|order_id|shop_id|uid)"\s*:\s*)(-?\d{16,})/g,
+        '$1"$2"',
+      );
+      return JSON.parse(identifiersPreserved) as unknown;
+    } catch {
+      return {};
+    }
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {
