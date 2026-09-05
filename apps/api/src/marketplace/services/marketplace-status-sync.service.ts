@@ -63,7 +63,7 @@ export class MarketplaceStatusSyncService {
       // The native 99Food order contract documents the confirm endpoint, but
       // not the complete action request/response contract used by this client.
       // Never fall through to the incompatible Open Delivery implementation.
-      throw new BadRequestException('As aÃ§Ãµes deste pedido sÃ£o atualizadas pela 99Food. Aguarde a sincronizaÃ§Ã£o do marketplace.');
+      throw new BadRequestException('Acoes deste pedido sao atualizadas pela 99Food. Aguarde a sincronizacao do marketplace.');
     }
     const enabled = isFood99
       ? this.config.get<string>('MARKETPLACE_99FOOD_ENABLED') === 'true'
@@ -357,6 +357,7 @@ export class MarketplaceStatusSyncService {
     if (!topic || ![
       'CONFIRMED', 'ORDER_CONFIRMED', 'READY_FOR_PICKUP', 'READY_TO_PICKUP', 'DISPATCHED',
       'DELIVERED', 'CONCLUDED', 'COMPLETED', 'CANCELLED', 'ORDER_CANCELLED',
+      'ORDERCONFIRM', 'ORDERREADY', 'ORDERCANCEL', 'ORDERFINISH',
       'CANCELLATION_REQUEST_FAILED', 'CANCELLATION_REQUEST_DENIED',
     ].includes(topic)) return;
 
@@ -400,7 +401,7 @@ export class MarketplaceStatusSyncService {
         ? MarketplaceOperationType.READY
         : topic === 'DISPATCHED'
           ? MarketplaceOperationType.DISPATCH
-          : ['DELIVERED', 'CONCLUDED', 'COMPLETED'].includes(topic)
+          : ['DELIVERED', 'CONCLUDED', 'COMPLETED', 'ORDERFINISH'].includes(topic)
             ? MarketplaceOperationType.DELIVER
             : MarketplaceOperationType.CONFIRM;
     await this.prisma.$transaction([
