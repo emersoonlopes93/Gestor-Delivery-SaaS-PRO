@@ -433,6 +433,7 @@ export interface OrderBoardItemDTO {
 export interface MarketplaceOrderCapabilities {
   canConfirm: boolean;
   canMarkReady: boolean;
+  canDelivered: boolean;
   canCancel: boolean;
   canSync: boolean;
   unavailableMessage?: string | null;

@@ -201,8 +201,8 @@ export function useBillingPreview() {
 
 export function useFood99AuthorizationUrl() {
   return useMutation({
-    mutationFn: async () => {
-      const res = await api.post<{ url: string }>('/marketplaces/99food/authorization-url');
+    mutationFn: async (appShopId: string) => {
+      const res = await api.post<{ url: string }>('/marketplaces/99food/authorization-url', { appShopId });
       return res.data.url;
     },
   });

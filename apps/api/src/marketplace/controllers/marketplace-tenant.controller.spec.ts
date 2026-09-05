@@ -11,6 +11,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connectManual: jest.fn(),
       maskConnection: jest.fn((value: unknown) => value),
     };
+    const food99Client = { getAuthorizationUrl: jest.fn() };
     const controller = new MarketplaceTenantController(
       { parseProvider: jest.fn().mockReturnValue('IFOOD') } as never,
       connectionService as never,
@@ -18,9 +19,10 @@ describe('MarketplaceTenantController connection tenancy', () => {
       {} as never,
       {} as never,
       {} as never,
+      food99Client as never,
     );
     const request = { user: { tenantId: 'tenant-1' } } as never;
-    return { controller, connectionService, request };
+    return { controller, connectionService, food99Client, request };
   };
 
   it('lists only connections from the authenticated tenant', async () => {
@@ -54,5 +56,17 @@ describe('MarketplaceTenantController connection tenancy', () => {
     await expect(controller.connectManual(request, 'ifood', {
       externalMerchantId: 'merchant-a',
     })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('requires the 99Food app shop id before requesting an authorization URL', async () => {
+    const { controller } = makeController();
+    await expect(controller.getFood99AuthorizationUrl({})).rejects.toThrow('app shop ID is required');
+  });
+
+  it('passes the exact 99Food app shop id to the native authorization client', async () => {
+    const { controller, food99Client } = makeController();
+    food99Client.getAuthorizationUrl.mockResolvedValue('https://auth.99food.test/start');
+    await expect(controller.getFood99AuthorizationUrl({ appShopId: 'shop-99' })).resolves.toEqual({ url: 'https://auth.99food.test/start' });
+    expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String), 'shop-99');
   });
 });

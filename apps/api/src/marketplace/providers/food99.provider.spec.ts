@@ -6,7 +6,7 @@ describe('Food99Provider', () => {
   const client = {
     pollEvents: jest.fn(), acknowledgeEvents: jest.fn(), fetchOrderDetails: jest.fn(),
     confirmOrder: jest.fn(), readyOrder: jest.fn(), dispatchOrder: jest.fn(), deliverOrder: jest.fn(),
-    pickUpOrder: jest.fn(), requestCancellation: jest.fn(), acceptCancellation: jest.fn(), denyCancellation: jest.fn(),
+    pickUpOrder: jest.fn(), requestCancellation: jest.fn(),
   };
   const credentials = {
     getFood99AppCredentials: jest.fn().mockReturnValue({ appId: 'app', clientSecret: 'secret' }),
@@ -170,7 +170,7 @@ describe('Food99Provider', () => {
     expect(normalized).toMatchObject({
       externalOrderId: '5764656197621845665', itemsSubtotal: 35.99, total: 6.18,
       discountTotal: 37.79, deliveryFee: 6.99, serviceFee: 0.99,
-      notes: 'Sem cebola', deliveryOwnership: 'UNKNOWN', isPrepaid: true,
+      notes: 'Sem cebola', deliveryOwnership: 'MERCHANT', isPrepaid: true,
     });
     expect(normalized.items[0]).toMatchObject({ name: 'HambÃºrguer', notes: 'Bem passado', totalPrice: 35.99 });
     expect(normalized.items[0].options).toEqual(expect.arrayContaining([
@@ -178,5 +178,18 @@ describe('Food99Provider', () => {
       expect.objectContaining({ name: 'Molho especial' }),
       expect.objectContaining({ name: 'Pimenta' }),
     ]));
+  });
+
+  it.each([
+    [1, 'PROVIDER'],
+    [2, 'MERCHANT'],
+    [9, 'UNKNOWN'],
+    [undefined, 'UNKNOWN'],
+  ])('maps native delivery_type %s to %s', async (deliveryType, deliveryOwnership) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: { data: { order_id: '5764656197621845665', delivery_type: deliveryType, order_items: [], price: {} } },
+    });
+    expect(normalized.deliveryOwnership).toBe(deliveryOwnership);
   });
 });

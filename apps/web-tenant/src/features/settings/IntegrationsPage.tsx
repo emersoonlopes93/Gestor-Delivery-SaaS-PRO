@@ -350,8 +350,13 @@ export function IntegrationsPage() {
                       type="button"
                       disabled={food99Authorization.isPending}
                       onClick={async () => {
+                        const appShopId = manualForm.externalStoreId.trim();
+                        if (!appShopId) {
+                          toast.error('Informe o Store ID da 99Food antes de autorizar.');
+                          return;
+                        }
                         try {
-                          const url = await food99Authorization.mutateAsync();
+                          const url = await food99Authorization.mutateAsync(appShopId);
                           window.open(url, '_blank', 'noopener,noreferrer');
                           toast.success('Autorizacao 99Food aberta em uma nova aba.');
                         } catch (error) {

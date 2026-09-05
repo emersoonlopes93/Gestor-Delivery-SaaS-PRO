@@ -131,29 +131,33 @@ describe('MarketplaceStatusSyncService', () => {
     }));
   });
 
-  it('does not send a native 99Food action through the Open Delivery client', async () => {
+  it('queues a native 99Food confirmation through its official operation path', async () => {
     const { service, prisma, queue } = makeService();
     prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
       ...marketplaceOrder,
       provider: MarketplaceProvider.FOOD_99,
-      normalizedPayload: { logisticsOwnership: 'merchant', fulfillmentType: 'delivery' },
+      deliveryOwnership: 'MERCHANT',
+      normalizedPayload: { fulfillmentType: 'delivery' },
     });
     await expect(service.handleInternalStatusChanged({
-      tenantId: 'tenant-1', orderId: 'order-1', status: 'ready_for_delivery',
-    })).rejects.toThrow('Confirme este pedido pela 99Food.');
-    expect(queue?.add).not.toHaveBeenCalled();
+      tenantId: 'tenant-1', orderId: 'order-1', status: 'confirmed',
+    })).resolves.toEqual({ deferred: true, operationId: 'operation-1' });
+    expect(queue?.add).toHaveBeenCalledWith('order-status-sync', expect.objectContaining({
+      operation: MarketplaceOperationType.CONFIRM,
+    }), expect.objectContaining({ jobId: expect.stringContaining('food_99-confirm-tenant-1') }));
   });
 
-  it('blocks native 99Food dispatch until its official outbound contract is available', async () => {
+  it('allows delivered only for a merchant-owned 99Food delivery', async () => {
     const { service, prisma, queue } = makeService();
     prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
       ...marketplaceOrder,
       provider: MarketplaceProvider.FOOD_99,
-      normalizedPayload: { logisticsOwnership: 'provider', fulfillmentType: 'delivery' },
+      deliveryOwnership: 'PROVIDER',
+      normalizedPayload: { fulfillmentType: 'delivery' },
     });
     await expect(service.handleInternalStatusChanged({
-      tenantId: 'tenant-1', orderId: 'order-1', status: 'out_for_delivery',
-    })).rejects.toThrow('Confirme este pedido pela 99Food.');
+      tenantId: 'tenant-1', orderId: 'order-1', status: 'completed',
+    })).rejects.toThrow('somente para entregas pr');
     expect(queue?.add).not.toHaveBeenCalled();
   });
 });

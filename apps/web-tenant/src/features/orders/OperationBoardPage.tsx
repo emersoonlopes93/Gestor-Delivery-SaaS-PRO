@@ -18,13 +18,18 @@ import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 
-function hasUnsupportedMarketplaceActions(order: OrderBoardItemDTO): boolean {
+function supportsMarketplaceAction(order: OrderBoardItemDTO, nextStatus: OrderStatus): boolean {
   const capabilities = order.marketplaceCapabilities;
-  return Boolean(capabilities && !capabilities.canConfirm && !capabilities.canMarkReady && !capabilities.canCancel);
+  if (!capabilities) return true;
+  if (nextStatus === 'confirmed') return capabilities.canConfirm;
+  if (nextStatus === 'ready_for_delivery' || nextStatus === 'ready_for_pickup') return capabilities.canMarkReady;
+  if (nextStatus === 'completed') return capabilities.canDelivered;
+  if (nextStatus === 'cancelled') return capabilities.canCancel;
+  return false;
 }
 
-function getMarketplaceActionsDisabledReason(order: OrderBoardItemDTO): string | null {
-  return hasUnsupportedMarketplaceActions(order)
+function getMarketplaceActionsDisabledReason(order: OrderBoardItemDTO, nextStatus: OrderStatus | null): string | null {
+  return nextStatus && !supportsMarketplaceAction(order, nextStatus)
     ? order.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.'
     : null;
 }
@@ -274,7 +279,7 @@ export function OperationBoardPage() {
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
     if (updatingId) return;
     const marketplaceOrder = orders.find((order) => order.id === orderId);
-    if (marketplaceOrder && hasUnsupportedMarketplaceActions(marketplaceOrder)) {
+    if (marketplaceOrder && !supportsMarketplaceAction(marketplaceOrder, newStatus)) {
       toast(marketplaceOrder.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.', { duration: 4000 });
       return;
     }
@@ -394,11 +399,6 @@ export function OperationBoardPage() {
 
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    if (hasUnsupportedMarketplaceActions(order)) {
-      toast(order.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.', { duration: 4000 });
-      return;
-    }
-
     // Discover the mapped status for the target column
     let newStatus: OrderStatus | null = null;
     if (targetColId === 'entry') newStatus = 'confirmed';
@@ -592,7 +592,7 @@ export function OperationBoardPage() {
               nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
               totalLabel={fmt(activeDragOrder.sourceChannel === 'marketplace_99food' ? activeDragOrder.itemsSubtotal : activeDragOrder.total)}
-              actionsDisabledReason={getMarketplaceActionsDisabledReason(activeDragOrder)}
+              actionsDisabledReason={getMarketplaceActionsDisabledReason(activeDragOrder, getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType))}
             />
           ) : null}
         </DragOverlay>

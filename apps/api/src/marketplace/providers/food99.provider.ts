@@ -124,7 +124,8 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     // fallback below only for polling compatibility, not as the native contract.
     const nativeEnvelopeData = this.asRecord(snapshot.data);
     const nativeOrder = this.asRecord(nativeEnvelopeData?.order_info)
-      ?? this.asRecord(snapshot.order_info);
+      ?? this.asRecord(snapshot.order_info)
+      ?? (this.readIdentifier(nativeEnvelopeData, ['order_id']) ? nativeEnvelopeData : null);
     if (nativeOrder) return this.normalizeNativeOrder(input.connection, nativeOrder);
 
     const order = snapshot;
@@ -221,14 +222,6 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     return this.client.requestCancellation(input.connection, input.externalOrderId, input.reason, input.correlationId);
   }
 
-  acceptCancellation(input: { connection: MarketplaceConnection; externalOrderId: string; correlationId: string }) {
-    return this.client.acceptCancellation(input.connection, input.externalOrderId, input.correlationId);
-  }
-
-  denyCancellation(input: { connection: MarketplaceConnection; externalOrderId: string; reason: string; correlationId: string }) {
-    return this.client.denyCancellation(input.connection, input.externalOrderId, input.reason, input.correlationId);
-  }
-
   private parseOpenDeliveryEvent(payload: Record<string, unknown>): ParsedMarketplaceEvent {
     return {
       provider: MarketplaceProvider.FOOD_99,
@@ -300,10 +293,12 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       externalCreatedAt: this.unixTimestamp(this.readIdentifier(order, ['create_time'])),
       preparationStartAt: this.unixTimestamp(this.readIdentifier(order, ['shop_confirm_time'])),
       confirmationDeadlineAt: null,
-      fulfillmentType: deliveryType === 1 ? 'pickup' : 'delivery',
-      // The native detail contract does not define merchant-vs-provider
-      // ownership. Routing V2 must therefore fail closed for every 99Food order.
-      deliveryOwnership: MarketplaceDeliveryOwnership.UNKNOWN,
+      fulfillmentType: 'delivery',
+      deliveryOwnership: deliveryType === 1
+        ? MarketplaceDeliveryOwnership.PROVIDER
+        : deliveryType === 2
+          ? MarketplaceDeliveryOwnership.MERCHANT
+          : MarketplaceDeliveryOwnership.UNKNOWN,
       customerName: this.readString(address, ['name']) ?? 'Cliente 99Food',
       customerPhone: this.readString(address, ['phone', 'virtual_phone_number']) ?? '',
       customerEmail: null,

@@ -2055,8 +2055,8 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 ## 99Food native lifecycle reconciliation (2026-09-05)
 
-- The 99Food integration is rebuilt on current `origin/main-copy` with Routing V2 preserved. It always stores `deliveryOwnership=UNKNOWN`, so Auto-Dispatch and the own fleet stay fail-closed.
-- Native outbound confirmation remains unavailable: the public official source does not expose the full `/order/order/confirm` request and response contract. The tenant sees a human message to confirm in 99Food; no provider call is guessed.
+- Official Swagger contract applied on `integrate/99food-orders-v1-main-copy`: token get/refresh, authorization page, native detail, confirm, ready and merchant-owned delivered now use the documented V1 endpoints and StandardResponse (`errno=0`) semantics. IDs above JavaScript safe integer range remain decimal strings end-to-end.
+- `delivery_type=1` maps to `PROVIDER`, `2` to `MERCHANT`, otherwise `UNKNOWN`. Confirm and ready are exposed through the queue without optimistic local state; delivered is blocked unless ownership is `MERCHANT`. Cancellation, dispatch, and cancellation accept/deny remain unavailable because official labeled cancellation reasons are not available.
 - `ORDERCONFIRM` reaches `confirmed` then `preparing` through the canonical idempotent KDS entry. Missing-confirm `ORDERREADY` reaches ready without a late KDS ticket. `ORDERFINISH` and `ORDERCANCEL` reconcile terminal state with an audit timeline and no retroactive KDS, own-fleet, or financial side effects.
-- Focused local validation passed: 6 suites / 41 tests, including the operation-board exclusion of terminal orders. No remote database, provider, Dokploy, deploy, merge, or promotion was performed.
+- Focused local validation passed: 5 suites / 37 tests for native token/client/provider/status/controller, API and web-tenant TypeScript, anti-any, API build, web-tenant build, and diff check. No remote database, provider, Dokploy, deploy, migration, merge, or promotion was performed. State: READY_FOR_REAL_RETEST.
 - Fora de escopo preservado: branch/adapter 99Food, provider real, deploy, Dokploy, produção, banco compartilhado, merge e promoção para `main-copy`.

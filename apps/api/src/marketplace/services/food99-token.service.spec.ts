@@ -5,32 +5,51 @@ describe('Food99TokenService', () => {
   const originalFetch = global.fetch;
   afterEach(() => { global.fetch = originalFetch; jest.restoreAllMocks(); });
 
-  it('requests a per-shop token and persists only encrypted material', async () => {
-    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ access_token: 'token-value', expires_in: 3600 }), {
-      status: 200, headers: { 'content-type': 'application/json' },
-    }));
+  function makeService() {
     const prisma = { marketplaceConnection: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
     const credentials = {
-      getFood99AppCredentials: jest.fn().mockReturnValue({ appId: 'app-id', clientSecret: 'client-secret' }),
+      getFood99AppCredentials: jest.fn().mockReturnValue({ appId: '5764607523034234881', clientSecret: 'secret-value' }),
       encrypt: jest.fn().mockReturnValue('encrypted-token'), decrypt: jest.fn(),
     };
-    const service = new Food99TokenService(
-      prisma as never,
-      { get: jest.fn((key: string) => key === 'MARKETPLACE_99FOOD_API_BASE_URL' ? 'https://food99.test' : undefined) } as never,
-      credentials as never,
-    );
-    const token = await service.getAccessToken({
+    const service = new Food99TokenService(prisma as never, {
+      get: jest.fn((key: string) => key === 'MARKETPLACE_99FOOD_API_BASE_URL' ? 'https://food99.test' : undefined),
+    } as never, credentials as never);
+    const connection = {
       id: 'connection-1', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99,
-      externalStoreId: 'shop-1', accessTokenEnc: null, tokenExpiresAt: null,
-    } as never);
-    expect(token).toBe('token-value');
-    expect(global.fetch).toHaveBeenCalledWith('https://food99.test/v4/opendelivery/oauth/token', expect.objectContaining({ method: 'POST' }));
-    const request = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
-    expect(String(request.body)).toContain('client_id=app-id_shop-1');
+      externalStoreId: '5764607523034234882', accessTokenEnc: null, tokenExpiresAt: null,
+    } as never;
+    return { service, prisma, credentials, connection };
+  }
+
+  it('gets and persists a native per-shop auth token without exposing secrets in logs', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+      errno: 0,
+      data: { auth_token: 'token-value', token_expiration_time: 1_900_000_000, app_id: '5764607523034234881', app_shop_id: '5764607523034234882' },
+    }), { status: 200 }));
+    const { service, prisma, credentials, connection } = makeService();
+
+    await expect(service.getAccessToken(connection)).resolves.toBe('token-value');
+    const requestedUrl = new URL(String((global.fetch as jest.Mock).mock.calls[0][0]));
+    expect(requestedUrl.pathname).toBe('/v1/auth/authtoken/get');
+    expect(requestedUrl.searchParams.get('app_id')).toBe('5764607523034234881');
+    expect(requestedUrl.searchParams.get('app_shop_id')).toBe('5764607523034234882');
     expect(credentials.encrypt).toHaveBeenCalledWith('token-value');
     expect(prisma.marketplaceConnection.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'connection-1', tenantId: 'tenant-1' },
-      data: expect.objectContaining({ accessTokenEnc: 'encrypted-token' }),
+      data: expect.objectContaining({ authType: 'food99_shop_auth_token' }),
     }));
+  });
+
+  it('refreshes then gets a new token and shares one concurrent refresh per connection', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 0, data: {} }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 0, data: { auth_token: 'token-next', token_expiration_time: 1_900_000_000 } }), { status: 200 }));
+    const { service, connection } = makeService();
+    await expect(Promise.all([
+      service.getAccessToken(connection, true),
+      service.getAccessToken(connection, true),
+    ])).resolves.toEqual(['token-next', 'token-next']);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(new URL(String((global.fetch as jest.Mock).mock.calls[0][0])).pathname).toBe('/v1/auth/authtoken/refresh');
+    expect(new URL(String((global.fetch as jest.Mock).mock.calls[1][0])).pathname).toBe('/v1/auth/authtoken/get');
   });
 });

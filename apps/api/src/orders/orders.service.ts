@@ -796,7 +796,7 @@ export class OrdersService {
         items: true,
         deliveryDriver: true,
         table: { select: { id: true, name: true } },
-        marketplaceOrders: { select: { provider: true } },
+        marketplaceOrders: { select: { provider: true, deliveryOwnership: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -823,13 +823,14 @@ export class OrdersService {
     }));
   }
 
-  private getMarketplaceCapabilities(marketplaceOrders: Array<{ provider: string }>) {
+  private getMarketplaceCapabilities(marketplaceOrders: Array<{ provider: string; deliveryOwnership: string }>) {
     const marketplaceOrder = marketplaceOrders[0];
     if (!marketplaceOrder) return null;
     if (marketplaceOrder.provider === 'FOOD_99') {
       return {
-        canConfirm: false,
-        canMarkReady: false,
+        canConfirm: true,
+        canMarkReady: true,
+        canDelivered: marketplaceOrder.deliveryOwnership === 'MERCHANT',
         canCancel: false,
         canSync: true,
         unavailableMessage: 'Confirme este pedido pela 99Food.',
@@ -838,6 +839,7 @@ export class OrdersService {
     return {
       canConfirm: true,
       canMarkReady: true,
+      canDelivered: true,
       canCancel: true,
       canSync: true,
       unavailableMessage: null,

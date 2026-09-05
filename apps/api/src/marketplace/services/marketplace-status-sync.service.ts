@@ -58,16 +58,16 @@ export class MarketplaceStatusSyncService {
     });
     if (!marketplaceOrder) return { deferred: false };
     const isFood99 = marketplaceOrder.provider === MarketplaceProvider.FOOD_99;
-    if (isFood99) {
-      // The native 99Food order contract documents the confirm endpoint, but
-      // not the complete action request/response contract used by this client.
-      // Never fall through to the incompatible Open Delivery implementation.
-      throw new BadRequestException('Confirme este pedido pela 99Food.');
-    }
     const enabled = isFood99
       ? this.config.get<string>('MARKETPLACE_99FOOD_ENABLED') === 'true'
       : this.config.get<string>('MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED') === 'true';
     if (!enabled) throw new ServiceUnavailableException('Marketplace bidirectional operations are disabled in this environment.');
+    if (isFood99 && !['confirmed', 'ready_for_delivery', 'ready_for_pickup', 'completed'].includes(input.status)) {
+      throw new BadRequestException('Esta ação não é suportada pela integração 99Food.');
+    }
+    if (isFood99 && input.status === 'completed' && marketplaceOrder.deliveryOwnership !== 'MERCHANT') {
+      throw new BadRequestException('A finalização da entrega é permitida somente para entregas próprias da loja.');
+    }
     if (!isFood99 && !['confirmed', 'cancelled'].includes(input.status)) return { deferred: false };
     const capability = await this.featureControl.resolveTenantFeature({
       tenantId: input.tenantId,

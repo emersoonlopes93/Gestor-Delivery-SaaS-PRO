@@ -33,8 +33,10 @@ export class MarketplaceTenantController {
 
   @Post('99food/authorization-url')
   @RequirePermissions('settings.manage')
-  async getFood99AuthorizationUrl() {
-    return { url: await this.food99Client.getAuthorizationUrl(randomUUID()) };
+  async getFood99AuthorizationUrl(@Body() body: { appShopId?: string }) {
+    const appShopId = body.appShopId?.trim();
+    if (!appShopId) throw new BadRequestException('99Food app shop ID is required.');
+    return { url: await this.food99Client.getAuthorizationUrl(randomUUID(), appShopId) };
   }
 
   @Get('connections')
