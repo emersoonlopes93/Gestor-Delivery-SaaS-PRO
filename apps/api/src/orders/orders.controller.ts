@@ -74,6 +74,7 @@ export class OrdersController {
   // TENANT INTERNAL: Operational Board
   // ----------------------------------------------------------------
   @Get('operation/board')
+  @Header('Cache-Control', 'no-store, private')
   @RequirePermissions('orders.use_kanban')
   async getBoardOrders(
     @Request() req: TenantRequest,
@@ -81,6 +82,18 @@ export class OrdersController {
   ) {
     const tenantId = req.user.tenantId;
     return this.ordersService.getBoardOrders(tenantId, fulfillmentType);
+  }
+
+  // ----------------------------------------------------------------
+  // TENANT INTERNAL: Read-only compatibility status lookup
+  // ----------------------------------------------------------------
+  @Get(':id/status')
+  @RequirePermissions('orders.read')
+  async getOrderStatus(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.getOrderDetail(id, req.user.tenantId);
   }
 
   // ----------------------------------------------------------------

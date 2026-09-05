@@ -62,7 +62,7 @@ const baseEnvSchema = z.object({
   MARKETPLACE_IFOOD_POLLING_GROUPS: z.string().default(''),
   MARKETPLACE_99FOOD_APP_ID: z.string().default(''),
   MARKETPLACE_99FOOD_CLIENT_SECRET: z.string().default(''),
-  MARKETPLACE_99FOOD_API_BASE_URL: z.string().url().default('https://openapi.99food.com'),
+  MARKETPLACE_99FOOD_API_BASE_URL: z.string().url().default('https://openapi.didi-food.com'),
   MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
   MARKETPLACE_99FOOD_ENABLED: z.enum(['true', 'false']).default('false'),
   MARKETPLACE_99FOOD_POLLING_ENABLED: z.enum(['true', 'false']).default('false'),

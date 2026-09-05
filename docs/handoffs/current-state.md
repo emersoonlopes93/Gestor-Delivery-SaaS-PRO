@@ -1,3 +1,9 @@
+## 99Food Kanban freshness and legacy status lookup (2026-09-05)
+
+- The operational board now sends a refresh nonce and the API response is explicitly `Cache-Control: no-store, private`, preventing an intermediary or browser cache from keeping an older 99Food state in Entrada while the order list is fresh.
+- `GET /orders/:id/status` is a tenant-scoped, read-only compatibility lookup for an older tenant bundle that requested it and received 404. Status changes remain exclusively `PATCH /orders/:id/status`; no GET can confirm or mutate an order.
+- The official Swagger host is aligned in validation and examples as `https://openapi.didi-food.com`. No real provider call, Dokploy action, deployment, migration, or `main-copy` promotion was performed.
+
 ## 99Food Live Order Parity Fix (2026-09-04)
 
 - Follow-up lifecycle: eventos 99Food jÃ¡ `PROCESSED` eram bloqueados como duplicatas e eventos terminales tentavam buscar snapshot antes de aplicar a transiÃ§Ã£o. O reprocessamento agora reaplica com seguranÃ§a somente `orderConfirm`, `orderReady`, `orderCancel` e `orderFinish`, sem reimportar o pedido ou chamar o provider. Eventos futuros de lifecycle de pedido existente aplicam a transiÃ§Ã£o antes do snapshot. O reprocessamento de um `MarketplaceOrder` jÃ¡ importado tambÃ©m reaplica seu Ãºltimo lifecycle nativo quando cabÃ­vel.

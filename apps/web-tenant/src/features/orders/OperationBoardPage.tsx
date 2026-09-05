@@ -207,7 +207,7 @@ export function OperationBoardPage() {
 
   const fetchBoard = useCallback(async () => {
     try {
-      const res = await api.get<OrderBoardItemDTO[]>('/orders/operation/board');
+      const res = await api.get<OrderBoardItemDTO[]>(`/orders/operation/board?refresh=${Date.now()}`);
       setOrders(res.data || []);
       setError(null);
     } catch (err) {
