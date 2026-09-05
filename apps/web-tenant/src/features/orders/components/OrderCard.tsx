@@ -78,10 +78,11 @@ export interface OrderCardProps {
   nextStatus: OrderStatus | null;
   elapsedMin: number;
   totalLabel: string;
+  actionsDisabledReason?: string | null;
 }
 
 export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
-  const { order, compact, updating, onAdvance, onClick, onPrint, onEdit, nextStatus, elapsedMin, totalLabel } = props;
+  const { order, compact, updating, onAdvance, onClick, onPrint, onEdit, nextStatus, elapsedMin, totalLabel, actionsDisabledReason } = props;
 
   const {
     attributes,
@@ -199,7 +200,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
 
         {/* 5. Toolbar de Ações Rápidas */}
         <div className="mt-2 md:mt-2.5 xl:mt-3 pt-2 md:pt-2.5 border-t border-border/40 flex items-center gap-2">
-          {nextStatus ? (
+          {nextStatus && !actionsDisabledReason ? (
             <button
               type="button"
               onClick={(e) => {
@@ -221,7 +222,9 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
               <ArrowRight className="w-3 h-3" />
             </button>
           ) : (
-            <div className="flex-1 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center">Finalizado</div>
+            <div className="flex-1 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center" title={actionsDisabledReason ?? undefined}>
+              {actionsDisabledReason ?? 'Finalizado'}
+            </div>
           )}
 
           <div className="flex items-center gap-1.5 shrink-0">

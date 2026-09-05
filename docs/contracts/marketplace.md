@@ -248,6 +248,18 @@ Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 
 
 ## 20. 99Food Orders V1
 
+### Paridade de pedido nativo (2026-09-04)
+
+A fonte normativa do callback nativo Ã© o portal 99Food: [Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1921) e [Order Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1981). Os eventos oficiais de lifecycle documentados para este fluxo sÃ£o `orderNew`, `orderConfirm`, `orderReady`, `orderCancel`, `orderPartialCancel` e `orderFinish`. NÃ£o hÃ¡ evento nativo documentado chamado `preparing`; o PedeHub nÃ£o o inventa. `orderConfirm` sincroniza para `confirmed`, `orderReady` para pronto e `orderFinish` para `completed`, sempre respeitando `ORDER_STATUS_TRANSITIONS` e a proteÃ§Ã£o contra eventos atrasados/repetidos.
+
+O snapshot nativo usa `order_info.order_items` e a Ã¡rvore `sub_item_list`; seus preÃ§os inteiros sÃ£o centavos. A importaÃ§Ã£o preserva esses subitens como linhas legÃ­veis de complemento, incluindo quantidade, e mantÃ©m `remark` como observaÃ§Ã£o. JSON de opÃ§Ãµes nÃ£o Ã© exibido ao operador, KDS ou impressÃ£o.
+
+Os valores oficiais consumidos sÃ£o `price.order_price` (venda operacional dos produtos), `price.customer_need_paying_money` (valor pago pelo cliente), `price.items_discount`, `price.delivery_discount`, `price.others_fees.coupon_discount`, `price.delivery_price` e `price.others_fees.service_price`. O snapshot nÃ£o entrega, nesse contrato, um recebÃ­vel/repasse do restaurante; ele nunca Ã© deduzido. Pedidos prÃ©-pagos exibem “Pago na 99Food”, e o Kanban destaca a venda dos produtos, nÃ£o o valor pago apÃ³s subsÃ­dios.
+
+`delivery_type` distingue entrega de retirada, mas o contrato consultado nÃ£o declara um campo normativo para ownership merchant/provider. Portanto `99FOOD_LOGISTICS_OWNERSHIP_SOURCE=UNAVAILABLE_IN_NATIVE_ORDER_DETAIL_CONTRACT`; a integraÃ§Ã£o de Routing V2 nÃ£o Ã© alterada.
+
+O documento de `orderNew` exige confirmaÃ§Ã£o em `/order/order/confirm`, mas o contrato completo de parÃ¢metros/resposta da aÃ§Ã£o ainda nÃ£o foi obtido. Enquanto isso, o cliente nÃ£o deve executar os endpoints Open Delivery v4 como se fossem a API nativa: as aÃ§Ãµes 99Food ficam indisponÃ­veis ao tenant com mensagem operacional, nunca com erro tÃ©cnico nem bypass de feature/billing.
+
 A integração 99Food usa o protocolo Open Delivery v4 e permanece desligada por padrão. Cada `MarketplaceConnection` representa uma loja e exige `externalMerchantId` e `externalStoreId` (`AppShopId`). O OAuth `client_credentials` usa `client_id=<AppID>_<AppShopId>`; o access token é armazenado exclusivamente com a criptografia versionada existente. App ID e Client Secret são configurações de ambiente e nunca retornam pela API.
 
 O callback 99Food valida `didi-header-sign` como o digest MD5 hexadecimal de 32 caracteres dos bytes exatos do corpo bruto concatenados diretamente ao App Secret (`MD5(raw POST body + app_secret)`). Não há ordenação de JSON, timestamp, nonce, path ou query na mensagem assinada. A comparação usa buffers e `timingSafeEqual`; assinatura ausente, malformada ou incorreta falha fechada. O App Secret vem de `MARKETPLACE_99FOOD_CLIENT_SECRET`, sem valor registrado em logs.

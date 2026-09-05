@@ -141,4 +141,42 @@ describe('Food99Provider', () => {
     });
     expect(normalized.items[0].options).toHaveLength(1);
   });
+
+  it('normalizes native order items, nested complements, remarks and cent values', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        data: {
+          order_info: {
+            order_id: '5764656197621845665', order_index: 42, status: 100,
+            create_time: 1768815200, delivery_type: 2, remark: 'Sem cebola',
+            price: {
+              order_price: 3599, customer_need_paying_money: 618,
+              items_discount: 3000, delivery_discount: 500, delivery_price: 699,
+              others_fees: { coupon_discount: 279, service_price: 99 },
+            },
+            receive_address: { name: 'JoÃ£o', phone: '5511999999999', city: 'SÃ£o Paulo', district: 'Centro', poi_address: 'Rua A' },
+            order_items: [{
+              app_item_id: 'burger', name: 'HambÃºrguer', amount: 1, sku_price: 3000, total_price: 3599, remark: 'Bem passado',
+              sub_item_list: [
+                { app_item_id: 'cheese', name: 'Queijo', amount: 2, sku_price: 150, total_price: 300 },
+                { app_item_id: 'sauce', name: 'Molho especial', amount: 1, sku_price: 0, total_price: 0, sub_item_list: [{ app_item_id: 'pepper', name: 'Pimenta', amount: 1, sku_price: 0, total_price: 0 }] },
+              ],
+            }],
+          },
+        },
+      },
+    });
+    expect(normalized).toMatchObject({
+      externalOrderId: '5764656197621845665', itemsSubtotal: 35.99, total: 6.18,
+      discountTotal: 37.79, deliveryFee: 6.99, serviceFee: 0.99,
+      notes: 'Sem cebola', logisticsOwnership: 'unknown', isPrepaid: true,
+    });
+    expect(normalized.items[0]).toMatchObject({ name: 'HambÃºrguer', notes: 'Bem passado', totalPrice: 35.99 });
+    expect(normalized.items[0].options).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Queijo', quantity: 2, totalPrice: 3 }),
+      expect.objectContaining({ name: 'Molho especial' }),
+      expect.objectContaining({ name: 'Pimenta' }),
+    ]));
+  });
 });

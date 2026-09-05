@@ -1,3 +1,12 @@
+## 99Food Live Order Parity Fix (2026-09-04)
+
+- Objetivo: corrigir a paridade operacional de pedido nativo 99Food sem promover a feature ou tocar Routing V2, pagamentos, Pix, DRE, WhatsApp ou `main-copy`.
+- A causa do lifecycle parado era o adapter aceitar o webhook nativo `orderConfirm`/`orderReady`/`orderFinish` mas o mapper reconhecer somente nomes Open Delivery. O mapper agora aplica os nomes oficiais, preservando dedupe, ordenaÃ§Ã£o e `ORDER_STATUS_TRANSITIONS`; nÃ£o inventa um evento `preparing` que o contrato nativo nÃ£o documenta.
+- A causa de itens/valores errados era normalizar o snapshot como Open Delivery. O adapter agora reconhece `data.order_info`, `order_items`, `sub_item_list`, `remark` e valores em centavos. Complementos chegam como linhas legÃ­veis no pedido, KDS e impressÃ£o; o Kanban destaca a venda dos produtos e o drawer identifica pedido prÃ©-pago como “Pago na 99Food”. RecebÃ­vel do restaurante permanece indisponÃ­vel, nunca inferido.
+- SeguranÃ§a: o contrato nativo documenta `/order/order/confirm`, mas nÃ£o foi obtido o contrato completo de request/response para a chamada. A UI e o endpoint impedem aÃ§Ãµes 99Food com mensagem operacional, em vez de enviar aÃ§Ãµes para o cliente Open Delivery incompatÃ­vel ou expor erro tÃ©cnico. Inbound webhook continua sujeito Ã  connection/tenant e feature existentes.
+- Fonte normativa: 99Food [Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1921) e [Order Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1981). `delivery_type` diferencia entrega/retirada, mas ownership merchant/provider nÃ£o aparece nesse contrato: `99FOOD_LOGISTICS_OWNERSHIP_SOURCE=UNAVAILABLE_IN_NATIVE_ORDER_DETAIL_CONTRACT`.
+- ValidaÃ§Ã£o: 4 suites API/33 testes (provider, ingestÃ£o, status sync e KDS) passaram; typecheck, no-any, features, boundaries, theme, lint (17 warnings preexistentes do storefront), builds API/web-tenant e diff check passaram. O filtro web focado nÃ£o encontrou arquivo de teste para `OrderItemsSection`. Nenhum deploy, Dokploy, provider, banco remoto, migration ou pedido real pÃ³s-fix foi executado.
+
 ## Multi-iFood E2E Hardening V1 (2026-09-02)
 
 - Objetivo: validar localmente a fundacao multi-iFood promovida em `3ae47f570ffd22965e104016449d6337865a854b`, sem provider real, deploy ou banco remoto.

@@ -6,6 +6,26 @@ interface OrderItemsSectionProps {
   items: OrderResponseDTO['items'];
 }
 
+function compositionLines(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const options = (parsed as { options?: unknown }).options;
+      if (Array.isArray(options)) {
+        return options.flatMap((option) => {
+          if (typeof option !== 'object' || option === null || Array.isArray(option)) return [];
+          const record = option as { name?: unknown; quantity?: unknown };
+          if (typeof record.name !== 'string' || !record.name.trim()) return [];
+          return [`+ ${typeof record.quantity === 'number' && record.quantity > 1 ? `${record.quantity}x ` : ''}${record.name.trim()}`];
+        });
+      }
+    }
+  } catch {
+    // New marketplace snapshots are already line-based and readable.
+  }
+  return value.split('\n').map((line) => line.trim()).filter(Boolean);
+}
+
 export const OrderItemsSection = memo(function OrderItemsSection({ items }: OrderItemsSectionProps) {
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -36,11 +56,11 @@ export const OrderItemsSection = memo(function OrderItemsSection({ items }: Orde
                 </div>
 
                 {/* Composição / Detalhes do Produto */}
-                {item.snapshotComposition && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1 italic">
-                    {item.snapshotComposition}
+                {item.snapshotComposition && compositionLines(item.snapshotComposition).map((line, index) => (
+                  <p key={`${item.id}-composition-${index}`} className="text-[11px] text-muted-foreground mt-0.5 italic">
+                    {line}
                   </p>
-                )}
+                ))}
 
 
 

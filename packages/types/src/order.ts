@@ -415,6 +415,7 @@ export interface OrderBoardItemDTO {
   fulfillmentType: FulfillmentType;
   customerName: string;
   total: number;
+  itemsSubtotal: number;
   itemCount: number;
   itemsSummary: string; // Ex: "1x Pizza Calabresa, 2x Coca Cola"
   sourceChannel?: string;

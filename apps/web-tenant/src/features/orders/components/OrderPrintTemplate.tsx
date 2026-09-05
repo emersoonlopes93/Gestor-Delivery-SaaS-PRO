@@ -48,7 +48,10 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
               
               {(() => {
                 const options = (item.snapshotCatalogV2Json as { optionItems?: Array<{ snapshotName: string; snapshotPrice: number }> })?.optionItems || [];
-                if (options.length === 0) return null;
+                const marketplaceComposition = item.snapshotComposition
+                  ? item.snapshotComposition.split('\n').map((line) => line.trim()).filter(Boolean)
+                  : [];
+                if (options.length === 0 && marketplaceComposition.length === 0) return null;
                 return (
                   <div className="pl-4 text-xs">
                     {options.map((o, idx: number) => (
@@ -56,6 +59,9 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
                         <span>+ {o.snapshotName}</span>
                         {o.snapshotPrice > 0 && <span>{fmt(o.snapshotPrice)}</span>}
                       </div>
+                    ))}
+                    {marketplaceComposition.map((line, idx) => (
+                      <div key={`marketplace-${idx}`}>{line}</div>
                     ))}
                   </div>
                 );
