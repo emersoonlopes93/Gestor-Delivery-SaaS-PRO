@@ -180,6 +180,23 @@ describe('Food99Provider', () => {
     ]));
   });
 
+  it('normalizes the direct OrderModel returned by the official detail endpoint', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', order_index: 23, status: 100, create_time: 1768815200,
+        price: { order_price: 3599, customer_need_paying_money: 3599 },
+        receive_address: { name: 'Marina', phone: '5511999999999', poi_address: 'Rua A', city: 'Sao Paulo', district: 'Centro' },
+        order_items: [{ app_item_id: 'pizza', name: 'Pizza', amount: 1, sku_price: 3599, total_price: 3599 }],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      externalOrderId: '5764656197621845665', externalDisplayId: '23', customerName: 'Marina', total: 35.99,
+    });
+    expect(normalized.items).toEqual([expect.objectContaining({ name: 'Pizza', totalPrice: 35.99 })]);
+  });
+
   it.each([
     [1, 'PROVIDER'],
     [2, 'MERCHANT'],

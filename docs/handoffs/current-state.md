@@ -1,3 +1,10 @@
+## 99Food direct-detail recovery and historical lifecycle reconciliation (2026-09-05)
+
+- Causa confirmada do pedido vazio: o client HTTP já removia o envelope `StandardResponse.data` de `GET /v1/order/order/detail`, mas o normalizador reconhecia somente `data.order_info`. O `OrderModel` direto oficial caía no fallback Open Delivery e persistia `Cliente 99Food`, zero itens e total zero. O normalizador agora reconhece `order_id` na raiz antes do fallback.
+- Novas importacoes 99Food recusam snapshots sem `order_id`, sem cliente ou sem itens, mantendo o inbox retryable em vez de criar outro pedido placeholder. A reconciliacao a cada minuto reconsulta somente pedidos 99Food existentes com cliente fallback ou sem itens e substitui somente os dados comerciais/endereco/itens; o status do pedido nao e alterado por essa reparacao.
+- Historicos ativos sao encerrados/cancelados somente quando o ultimo webhook persistido e `orderFinish`/`orderCancel`; a implementacao nao deduz lifecycle a partir do `status` numerico nao documentado pela Swagger. A mesma reconciliacao e idempotente e continua sujeita a `MARKETPLACE_99FOOD_ENABLED` e fila marketplace ja existentes.
+- Validacao local: TypeScript API, `check:no-any`, 3 suites marketplace/99Food com 31 testes e `git diff --check` passaram. Nenhum deploy, Dokploy, chamada real a 99Food, migration, banco remoto ou promocao de `main-copy` foi executado.
+
 ## 99Food Kanban freshness and legacy status lookup (2026-09-05)
 
 - The operational board now sends a refresh nonce and the API response is explicitly `Cache-Control: no-store, private`, preventing an intermediary or browser cache from keeping an older 99Food state in Entrada while the order list is fresh.

@@ -46,6 +46,7 @@ describe('MarketplaceReconciliationService', () => {
     const prisma = {
       marketplaceOperation: {
         findFirst: jest.fn().mockResolvedValue(operation),
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
@@ -61,11 +62,16 @@ describe('MarketplaceReconciliationService', () => {
       record: jest.fn().mockResolvedValue({}),
       resolveForOperation: jest.fn().mockResolvedValue(undefined),
     };
+    const ingestion = {
+      reconcileStoredFood99TerminalOrders: jest.fn().mockResolvedValue(0),
+      repairIncompleteFood99Orders: jest.fn().mockResolvedValue(0),
+    };
     const service = new MarketplaceReconciliationService(
       prisma as never,
       providers as never,
       ordersService as never,
       divergences as never,
+      ingestion as never,
       new ConfigService({ MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: 'false' }),
       undefined,
     );
@@ -91,6 +97,18 @@ describe('MarketplaceReconciliationService', () => {
       'operation-1',
       expect.stringContaining('CONFIRMED'),
     );
+  });
+
+  it('reapplies persisted terminal 99Food events during the scheduled reconciliation batch', async () => {
+    const { service } = makeService();
+    const ingestion: {
+      reconcileStoredFood99TerminalOrders: jest.Mock;
+      repairIncompleteFood99Orders: jest.Mock;
+    } = Reflect.get(service, 'ingestion') as never;
+
+    await expect(service.reconcileBatch(10)).resolves.toEqual({ inspected: 0, resolved: 0, alerted: 0 });
+    expect(ingestion.reconcileStoredFood99TerminalOrders).toHaveBeenCalledWith(10);
+    expect(ingestion.repairIncompleteFood99Orders).toHaveBeenCalledWith(10);
   });
 
   it('keeps a non-conclusive operation pending without replaying it', async () => {

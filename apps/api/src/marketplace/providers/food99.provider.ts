@@ -125,6 +125,9 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const nativeEnvelopeData = this.asRecord(snapshot.data);
     const nativeOrder = this.asRecord(nativeEnvelopeData?.order_info)
       ?? this.asRecord(snapshot.order_info)
+      // GET /v1/order/order/detail returns the documented OrderModel directly
+      // in StandardResponse.data. requestStandard already unwraps that data.
+      ?? (this.readIdentifier(snapshot, ['order_id']) ? snapshot : null)
       ?? (this.readIdentifier(nativeEnvelopeData, ['order_id']) ? nativeEnvelopeData : null);
     if (nativeOrder) return this.normalizeNativeOrder(input.connection, nativeOrder);
 

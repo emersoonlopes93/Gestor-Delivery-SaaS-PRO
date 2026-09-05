@@ -24,6 +24,7 @@ import { OrdersService } from '../../orders/orders.service';
 import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
+import { MarketplaceOrderIngestionService } from './marketplace-order-ingestion.service';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
 import type { MarketplaceStatusJob } from './marketplace-status-sync.service';
 
@@ -43,6 +44,7 @@ export class MarketplaceReconciliationService implements OnModuleInit {
     private readonly providers: MarketplaceProviderRegistryService,
     private readonly ordersService: OrdersService,
     private readonly divergences: MarketplaceDivergenceService,
+    private readonly ingestion: MarketplaceOrderIngestionService,
     private readonly config: ConfigService,
     @Optional() @InjectQueue(MARKETPLACE_EVENT_QUEUE) private readonly queue?: Queue,
   ) {}
@@ -92,11 +94,15 @@ export class MarketplaceReconciliationService implements OnModuleInit {
         if (outcome.alerted) alerted += 1;
       }
     }
+    const lifecycleReconciled = await this.ingestion.reconcileStoredFood99TerminalOrders(safeLimit);
+    const incompleteOrdersRepaired = await this.ingestion.repairIncompleteFood99Orders(safeLimit);
     this.logger.log({
       message: 'marketplace_reconciliation_batch_completed',
       inspected,
       resolved,
       alerted,
+      lifecycleReconciled,
+      incompleteOrdersRepaired,
       correlationId: randomUUID(),
     });
     return { inspected, resolved, alerted };
