@@ -116,13 +116,19 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
 
               {(() => {
                 const options = (item.snapshotCatalogV2Json as { optionItems?: Array<{ snapshotName: string }> })?.optionItems || [];
-                if (options.length === 0) return null;
+                const marketplaceComposition = item.snapshotComposition
+                  ? item.snapshotComposition.split('\n').map((line) => line.trim()).filter(Boolean)
+                  : [];
+                if (options.length === 0 && marketplaceComposition.length === 0) return null;
                 return (
                   <div className="pl-6 mt-1.5 text-xs text-muted-foreground font-medium space-y-0.5">
                     {options.map((o, idx: number) => (
                       <div key={idx} className="flex justify-between">
                         <span>+ {o.snapshotName}</span>
                       </div>
+                    ))}
+                    {marketplaceComposition.map((line, idx) => (
+                      <div key={`marketplace-${idx}`}>{line}</div>
                     ))}
                   </div>
                 );

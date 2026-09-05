@@ -59,6 +59,12 @@ export class MarketplaceStatusSyncService {
     });
     if (!marketplaceOrder) return { deferred: false };
     const isFood99 = marketplaceOrder.provider === MarketplaceProvider.FOOD_99;
+    if (isFood99) {
+      // The native 99Food order contract documents the confirm endpoint, but
+      // not the complete action request/response contract used by this client.
+      // Never fall through to the incompatible Open Delivery implementation.
+      throw new BadRequestException('As aÃ§Ãµes deste pedido sÃ£o atualizadas pela 99Food. Aguarde a sincronizaÃ§Ã£o do marketplace.');
+    }
     const enabled = isFood99
       ? this.config.get<string>('MARKETPLACE_99FOOD_ENABLED') === 'true'
       : this.config.get<string>('MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED') === 'true';

@@ -101,7 +101,8 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
                   onEdit={onEdit}
                   nextStatus={nextActionStatus as OrderStatus | null}
                   elapsedMin={elapsed}
-                  totalLabel={fmt(order.total)}
+                  totalLabel={fmt(order.sourceChannel === 'marketplace_99food' ? order.itemsSubtotal : order.total)}
+                  actionsDisabledReason={order.sourceChannel === 'marketplace_99food' ? 'Atualizado pela 99Food' : null}
                 />
               );
             })}

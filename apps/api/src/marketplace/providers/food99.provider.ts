@@ -118,7 +118,16 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     connection: MarketplaceConnection;
     externalOrder: ExternalMarketplaceOrder;
   }): Promise<NormalizedMarketplaceOrder> {
-    const order = this.asRecord(input.externalOrder) ?? {};
+    const snapshot = this.asRecord(input.externalOrder) ?? {};
+    // Native 99Food orderNew embeds the detail response in data.order_info.
+    // The detail endpoint itself returns the same shape. Keep the Open Delivery
+    // fallback below only for polling compatibility, not as the native contract.
+    const nativeEnvelopeData = this.asRecord(snapshot.data);
+    const nativeOrder = this.asRecord(nativeEnvelopeData?.order_info)
+      ?? this.asRecord(snapshot.order_info);
+    if (nativeOrder) return this.normalizeNativeOrder(input.connection, nativeOrder);
+
+    const order = snapshot;
     const customer = this.asRecord(order.customer);
     const phone = this.asRecord(customer?.phone);
     const delivery = this.asRecord(order.delivery);
@@ -271,6 +280,110 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     };
   }
 
+  private normalizeNativeOrder(
+    connection: MarketplaceConnection,
+    order: Record<string, unknown>,
+  ): NormalizedMarketplaceOrder {
+    const price = this.asRecord(order.price);
+    const address = this.asRecord(order.receive_address);
+    const deliveryType = this.numberValue(order.delivery_type);
+    const items = Array.isArray(order.order_items) ? order.order_items : [];
+    const normalizedItems = items.map((item, index) => this.normalizeNativeItem(item, index));
+    const customerPaid = this.minorMoney(price?.customer_need_paying_money);
+    const itemDiscount = this.minorMoney(price?.items_discount) ?? 0;
+    const deliveryDiscount = this.minorMoney(price?.delivery_discount) ?? 0;
+    const otherFees = this.asRecord(price?.others_fees);
+    const couponDiscount = this.minorMoney(otherFees?.coupon_discount) ?? 0;
+    const orderPrice = this.minorMoney(price?.order_price);
+    const realPrice = this.minorMoney(price?.real_price);
+    const itemsSubtotal = orderPrice
+      ?? normalizedItems.reduce((sum, item) => this.roundMoney(sum + item.totalPrice), 0);
+
+    return {
+      provider: MarketplaceProvider.FOOD_99,
+      connection,
+      externalOrderId: this.readIdentifier(order, ['order_id']) ?? 'unknown-order',
+      externalDisplayId: this.readIdentifier(order, ['order_index']),
+      externalStatus: this.readIdentifier(order, ['status']),
+      externalCreatedAt: this.unixTimestamp(this.readIdentifier(order, ['create_time'])),
+      preparationStartAt: this.unixTimestamp(this.readIdentifier(order, ['shop_confirm_time'])),
+      confirmationDeadlineAt: null,
+      fulfillmentType: deliveryType === 1 ? 'pickup' : 'delivery',
+      // Native detail exposes delivery_type, but the public contract available to
+      // this integration does not define a merchant-vs-provider ownership value.
+      logisticsOwnership: deliveryType === 1 ? 'not_applicable' : 'unknown',
+      customerName: this.readString(address, ['name']) ?? 'Cliente 99Food',
+      customerPhone: this.readString(address, ['phone', 'virtual_phone_number']) ?? '',
+      customerEmail: null,
+      notes: this.readString(order, ['remark']),
+      paymentMethod: 'other',
+      isPrepaid: customerPaid !== null,
+      amountDue: 0,
+      changeFor: this.minorMoney(order.change_for),
+      // The documented price values are integer centavos. `order_price` is kept
+      // as the operational sale value; customer_need_paying_money is the amount
+      // paid on 99Food. No restaurant receivable is inferred.
+      itemsSubtotal,
+      discountTotal: this.roundMoney(itemDiscount + deliveryDiscount + couponDiscount),
+      deliveryFee: this.minorMoney(price?.delivery_price) ?? 0,
+      serviceFee: this.minorMoney(otherFees?.service_price) ?? 0,
+      total: customerPaid ?? realPrice ?? itemsSubtotal,
+      scheduledFor: null,
+      items: normalizedItems,
+      deliveryAddress: address
+        ? {
+            street: this.readString(address, ['street_name', 'poi_address']) ?? 'Nao informado',
+            number: this.readString(address, ['street_number', 'house_number']) ?? 'S/N',
+            complement: this.readString(address, ['complement']),
+            neighborhood: this.readString(address, ['district']) ?? 'Nao informado',
+            city: this.readString(address, ['city']) ?? 'Nao informado',
+            state: this.readString(address, ['state']) ?? 'NA',
+            zipCode: this.readString(address, ['postalCode']) ?? '00000000',
+            reference: this.readString(address, ['reference']),
+            lat: this.numberValue(address.poi_lat),
+            lng: this.numberValue(address.poi_lng),
+          }
+        : null,
+      rawPayload: order,
+    };
+  }
+
+  private normalizeNativeItem(value: unknown, index: number): NormalizedMarketplaceOrderItem {
+    const item = this.asRecord(value) ?? {};
+    const quantity = Math.max(1, this.numberValue(item.amount) ?? 1);
+    const unitPrice = this.minorMoney(item.sku_price) ?? 0;
+    const totalPrice = this.minorMoney(item.total_price) ?? this.roundMoney(unitPrice * quantity);
+    return {
+      externalItemId: this.readIdentifier(item, ['item_id', 'app_item_id']),
+      name: this.readString(item, ['name']) ?? `Item ${index + 1}`,
+      quantity,
+      unitPrice,
+      totalPrice,
+      notes: this.readString(item, ['remark']),
+      productId: null,
+      options: this.normalizeNativeSubItems(item.sub_item_list),
+    };
+  }
+
+  private normalizeNativeSubItems(value: unknown): NormalizedMarketplaceOrderItem['options'] {
+    if (!Array.isArray(value)) return [];
+    const options: NonNullable<NormalizedMarketplaceOrderItem['options']> = [];
+    for (const entry of value) {
+      const item = this.asRecord(entry) ?? {};
+      const quantity = Math.max(1, this.numberValue(item.amount) ?? 1);
+      const unitPrice = this.minorMoney(item.sku_price) ?? 0;
+      options.push({
+        externalOptionId: this.readString(item, ['app_item_id', 'app_content_id']),
+        name: this.readString(item, ['name']) ?? 'Complemento',
+        quantity,
+        unitPrice,
+        totalPrice: this.minorMoney(item.total_price) ?? this.roundMoney(unitPrice * quantity),
+      });
+      options.push(...this.normalizeNativeSubItems(item.sub_item_list));
+    }
+    return options;
+  }
+
   private paymentMethod(methods: unknown[]): NormalizedMarketplaceOrder['paymentMethod'] {
     const methodNames = methods
       .map((value) => this.readString(this.asRecord(value), ['method'])?.toUpperCase())
@@ -306,6 +419,11 @@ export class Food99Provider implements MarketplaceProviderAdapter {
   private moneyValue(value: unknown): number | null {
     const number = this.numberValue(value);
     return number === null ? null : this.roundMoney(number);
+  }
+
+  private minorMoney(value: unknown): number | null {
+    const number = this.numberValue(value);
+    return number === null ? null : this.roundMoney(number / 100);
   }
 
   private roundMoney(value: number): number {

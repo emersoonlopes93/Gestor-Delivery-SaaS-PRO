@@ -262,6 +262,11 @@ export function OperationBoardPage() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
     if (updatingId) return;
+    const marketplaceOrder = orders.find((order) => order.id === orderId);
+    if (marketplaceOrder?.sourceChannel === 'marketplace_99food') {
+      toast('Este pedido Ã© atualizado pela 99Food. Aguarde a sincronizaÃ§Ã£o do marketplace.', { duration: 4000 });
+      return;
+    }
 
     // If delivery and going to out_for_delivery, check if driver is assigned
     if (newStatus === 'out_for_delivery') {
@@ -378,6 +383,10 @@ export function OperationBoardPage() {
 
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
+    if (order.sourceChannel === 'marketplace_99food') {
+      toast('Este pedido Ã© atualizado pela 99Food. Aguarde a sincronizaÃ§Ã£o do marketplace.', { duration: 4000 });
+      return;
+    }
 
     // Discover the mapped status for the target column
     let newStatus: OrderStatus | null = null;
@@ -570,7 +579,8 @@ export function OperationBoardPage() {
               onEdit={() => { }}
               nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
-              totalLabel={fmt(activeDragOrder.total)}
+              totalLabel={fmt(activeDragOrder.sourceChannel === 'marketplace_99food' ? activeDragOrder.itemsSubtotal : activeDragOrder.total)}
+              actionsDisabledReason={activeDragOrder.sourceChannel === 'marketplace_99food' ? 'Atualizado pela 99Food' : null}
             />
           ) : null}
         </DragOverlay>

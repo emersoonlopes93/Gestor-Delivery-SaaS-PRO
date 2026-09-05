@@ -292,6 +292,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 serviceFee={order.serviceFee}
                 discountTotal={order.discountTotal}
                 total={order.total}
+                sourceChannel={order.sourceChannel}
                 paymentMethod={order.paymentMethod}
                 changeFor={order.changeFor}
                 couponCode={order.couponId} // Backend DTO has couponId as string, could be code

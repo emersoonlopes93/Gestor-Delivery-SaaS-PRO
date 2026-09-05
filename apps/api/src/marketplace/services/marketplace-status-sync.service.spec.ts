@@ -131,7 +131,7 @@ describe('MarketplaceStatusSyncService', () => {
     }));
   });
 
-  it('queues the 99Food ready lifecycle with provider-specific backoff', async () => {
+  it('does not send a native 99Food action through the Open Delivery client', async () => {
     const { service, prisma, queue } = makeService();
     prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
       ...marketplaceOrder,
@@ -140,15 +140,8 @@ describe('MarketplaceStatusSyncService', () => {
     });
     await expect(service.handleInternalStatusChanged({
       tenantId: 'tenant-1', orderId: 'order-1', status: 'ready_for_delivery',
-    })).resolves.toEqual({ deferred: true, operationId: 'operation-1' });
-    expect(queue?.add).toHaveBeenCalledWith(
-      'order-status-sync',
-      expect.objectContaining({ operation: MarketplaceOperationType.READY }),
-      expect.objectContaining({
-        jobId: expect.stringContaining('food_99-ready-tenant-1'),
-        backoff: { type: 'food99-retry-after', delay: 5000 },
-      }),
-    );
+    })).rejects.toThrow('atualizadas pela 99Food');
+    expect(queue?.add).not.toHaveBeenCalled();
   });
 
   it('blocks internal dispatch for provider-owned 99Food logistics', async () => {
@@ -160,7 +153,7 @@ describe('MarketplaceStatusSyncService', () => {
     });
     await expect(service.handleInternalStatusChanged({
       tenantId: 'tenant-1', orderId: 'order-1', status: 'out_for_delivery',
-    })).rejects.toThrow('pertence a 99Food');
+    })).rejects.toThrow('atualizadas pela 99Food');
     expect(queue?.add).not.toHaveBeenCalled();
   });
 });

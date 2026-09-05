@@ -807,6 +807,7 @@ export class OrdersService {
       fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       customerName: o.customerName,
       total: Number(o.total),
+      itemsSubtotal: Number(o.itemsSubtotal),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
       sourceChannel: o.sourceChannel,

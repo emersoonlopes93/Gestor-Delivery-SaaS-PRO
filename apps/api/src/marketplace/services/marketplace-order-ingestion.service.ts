@@ -346,6 +346,10 @@ export class MarketplaceOrderIngestionService {
     if (normalized === 'CFM') return 20;
     if (normalized === 'PLC') return 10;
     if (normalized.includes('CANCEL')) return 70;
+    if (normalized === 'ORDERCANCEL') return 70;
+    if (normalized === 'ORDERFINISH') return 60;
+    if (normalized === 'ORDERREADY') return 40;
+    if (normalized === 'ORDERCONFIRM') return 20;
     if (normalized.includes('CONCLUD') || normalized.includes('COMPLET')) return 60;
     if (normalized.includes('DISPATCH')) return 50;
     if (normalized.includes('READY')) return 40;
@@ -438,7 +442,7 @@ export class MarketplaceOrderIngestionService {
             snapshotBasePrice: item.unitPrice,
             snapshotExtrasTotal: 0,
             snapshotComposition: item.options?.length
-              ? JSON.stringify({ options: item.options })
+              ? item.options.map((option) => `+ ${option.quantity}x ${option.name}`).join('\n')
               : undefined,
           },
         });
@@ -512,16 +516,16 @@ export class MarketplaceOrderIngestionService {
     topic?: string | null,
   ): Promise<void> {
     const normalizedTopic = topic?.trim().toUpperCase();
-    const lifecycleKind = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED'
+    const lifecycleKind = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED' || normalizedTopic === 'ORDERCONFIRM'
       ? 'confirmed'
-      : normalizedTopic === 'READY_FOR_PICKUP' || normalizedTopic === 'READY_TO_PICKUP'
+      : normalizedTopic === 'READY_FOR_PICKUP' || normalizedTopic === 'READY_TO_PICKUP' || normalizedTopic === 'ORDERREADY'
         ? 'ready'
         : normalizedTopic === 'DISPATCHED'
           ? 'dispatched'
-      : normalizedTopic === 'CANCELLED' || normalizedTopic === 'ORDER_CANCELLED'
+      : normalizedTopic === 'CANCELLED' || normalizedTopic === 'ORDER_CANCELLED' || normalizedTopic === 'ORDERCANCEL'
         ? OrderStatus.cancelled
-        : normalizedTopic === 'COMPLETED' || normalizedTopic === 'ORDER_COMPLETED'
-          || normalizedTopic === 'CONCLUDED' || normalizedTopic === 'DELIVERED'
+      : normalizedTopic === 'COMPLETED' || normalizedTopic === 'ORDER_COMPLETED'
+          || normalizedTopic === 'CONCLUDED' || normalizedTopic === 'DELIVERED' || normalizedTopic === 'ORDERFINISH'
           ? 'completed'
           : null;
     if (!lifecycleKind) return;
