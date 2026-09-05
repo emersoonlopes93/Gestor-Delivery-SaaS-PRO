@@ -2050,4 +2050,13 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Mobile Playwright passou em 390x844 light e 430x932 dark: sem overflow horizontal, mapa contido, paradas 1/2/3 e ETAs legíveis, navegação acionável e estado degradado explícito. Artifacts locais ficaram em `apps/web-delivery/artifacts/mobile-layout/` e não foram versionados. A skill `agent-browser` não iniciou CDP no host Windows; o fallback Playwright real do projeto forneceu a evidência.
 - Validação final: API em quatro shards com 122 suítes/581 testes aprovados e 5 suítes/10 testes condicionais ignorados; após o hardening concorrente, shard impactado 30 suítes/168 testes e teste focado 6/6 passaram. Web-tenant 39/140 e web-delivery 15/47 passaram. Typecheck, no-any, features, boundaries, theme, lint (0 erros; 17 warnings preexistentes no storefront), builds API/web-tenant/web-delivery e diff check passaram.
 - Implementação consolidada em `bbc31a809568b78cc1bf1d2d5d5274b6a006066b` e publicada por push normal somente em `origin/feat/routing-v2-eta`. Após `git fetch`, `origin/main-copy` permanecia em `a723413124b0ac7af5914eebda02396318da89ed`.
+
+---
+
+## 99Food native lifecycle reconciliation (2026-09-05)
+
+- The 99Food integration is rebuilt on current `origin/main-copy` with Routing V2 preserved. It always stores `deliveryOwnership=UNKNOWN`, so Auto-Dispatch and the own fleet stay fail-closed.
+- Native outbound confirmation remains unavailable: the public official source does not expose the full `/order/order/confirm` request and response contract. The tenant sees a human message to confirm in 99Food; no provider call is guessed.
+- `ORDERCONFIRM` reaches `confirmed` then `preparing` through the canonical idempotent KDS entry. Missing-confirm `ORDERREADY` reaches ready without a late KDS ticket. `ORDERFINISH` and `ORDERCANCEL` reconcile terminal state with an audit timeline and no retroactive KDS, own-fleet, or financial side effects.
+- Focused local validation passed: 5 suites / 40 tests. No remote database, provider, Dokploy, deploy, merge, or promotion was performed.
 - Fora de escopo preservado: branch/adapter 99Food, provider real, deploy, Dokploy, produção, banco compartilhado, merge e promoção para `main-copy`.

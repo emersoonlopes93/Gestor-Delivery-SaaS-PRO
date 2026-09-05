@@ -9,7 +9,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { allowsInternalDeliveryAssignment } from '../marketplace/marketplace-logistics';
+import { evaluateOwnFleetEligibility } from '../delivery/own-fleet-eligibility';
 import { OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
@@ -796,6 +796,7 @@ export class OrdersService {
         items: true,
         deliveryDriver: true,
         table: { select: { id: true, name: true } },
+        marketplaceOrders: { select: { provider: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -813,12 +814,34 @@ export class OrdersService {
       sourceChannel: o.sourceChannel,
       scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
       isScheduled: o.isScheduled ?? false,
+      marketplaceCapabilities: this.getMarketplaceCapabilities(o.marketplaceOrders),
       createdAt: o.createdAt.toISOString(),
       notes: o.notes,
       deliveryDriverId: o.deliveryDriverId || undefined,
       deliveryDriverName: o.deliveryDriver?.name || undefined,
       deliveryDriverStatus: o.deliveryDriver?.status || undefined,
     }));
+  }
+
+  private getMarketplaceCapabilities(marketplaceOrders: Array<{ provider: string }>) {
+    const marketplaceOrder = marketplaceOrders[0];
+    if (!marketplaceOrder) return null;
+    if (marketplaceOrder.provider === 'FOOD_99') {
+      return {
+        canConfirm: false,
+        canMarkReady: false,
+        canCancel: false,
+        canSync: true,
+        unavailableMessage: 'Confirme este pedido pela 99Food.',
+      };
+    }
+    return {
+      canConfirm: true,
+      canMarkReady: true,
+      canCancel: true,
+      canSync: true,
+      unavailableMessage: null,
+    };
   }
 
   async getKdsOrders(tenantId: string): Promise<OrderKdsItemDTO[]> {
@@ -1798,7 +1821,7 @@ export class OrdersService {
       where: { id: orderId, tenantId },
       include: {
         deliveryDriver: true,
-        marketplaceOrders: { select: { provider: true, normalizedPayload: true } },
+        marketplaceOrders: { select: { provider: true, deliveryOwnership: true } },
       },
     });
 
@@ -1808,7 +1831,7 @@ export class OrdersService {
       throw new BadRequestException('Somente pedidos de entrega podem receber entregador.');
     }
 
-    if (driverId && !allowsInternalDeliveryAssignment(order.marketplaceOrders)) {
+    if (driverId && !evaluateOwnFleetEligibility(order.marketplaceOrders).eligible) {
       throw new BadRequestException('A logistica deste pedido pertence ao marketplace e nao pode receber entregador interno.');
     }
 

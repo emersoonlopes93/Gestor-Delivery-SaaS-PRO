@@ -427,6 +427,15 @@ export interface OrderBoardItemDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  marketplaceCapabilities?: MarketplaceOrderCapabilities | null;
+}
+
+export interface MarketplaceOrderCapabilities {
+  canConfirm: boolean;
+  canMarkReady: boolean;
+  canCancel: boolean;
+  canSync: boolean;
+  unavailableMessage?: string | null;
 }
 
 export interface OrderKdsItemDTO {

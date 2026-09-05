@@ -1,7 +1,129 @@
-import { MarketplaceConnectionStatus, MarketplaceEventStatus, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceConnectionStatus, MarketplaceEventStatus, MarketplaceProvider, OrderStatus } from '@prisma/client';
 import { MarketplaceOrderIngestionService } from './marketplace-order-ingestion.service';
 
+type Food99LifecycleInput = {
+    tenantId: string;
+    marketplaceOrderId: string;
+    internalOrderId: string;
+    externalOrderId: string;
+    topic?: string;
+    currentStatus: OrderStatus;
+    fulfillmentType: string;
+  };
+
+function reconcileFood99Lifecycle(service: MarketplaceOrderIngestionService, input: Food99LifecycleInput): Promise<void> {
+  const candidate: unknown = Reflect.get(service, 'reconcileFood99Lifecycle');
+  if (typeof candidate !== 'function') throw new Error('99Food lifecycle reconciler is unavailable.');
+  return (candidate as (request: Food99LifecycleInput) => Promise<void>).call(service, input);
+};
+
+function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersService = { updateOrderStatus: jest.fn() }) {
+  return {
+    service: new MarketplaceOrderIngestionService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      ordersService as never,
+      {} as never,
+      {} as never,
+    ),
+    ordersService,
+  };
+}
+
+const food99LifecycleInput = {
+  tenantId: 'tenant-1',
+  marketplaceOrderId: 'marketplace-order-1',
+  internalOrderId: 'order-1',
+  externalOrderId: 'external-1',
+  fulfillmentType: 'delivery',
+};
+
 describe('MarketplaceOrderIngestionService', () => {
+  it('advances orderConfirm through preparing exactly once for the canonical KDS entry point', async () => {
+    const prisma = { marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+    const { service, ordersService } = makeFood99LifecycleService(prisma);
+
+    await reconcileFood99Lifecycle(service, {
+      ...food99LifecycleInput,
+      topic: 'ORDERCONFIRM',
+      currentStatus: OrderStatus.pending,
+    });
+
+    expect(ordersService.updateOrderStatus).toHaveBeenCalledTimes(2);
+    expect(ordersService.updateOrderStatus).toHaveBeenNthCalledWith(1, 'order-1', 'tenant-1',
+      expect.objectContaining({ status: OrderStatus.confirmed }), undefined, { marketplaceEvent: true });
+    expect(ordersService.updateOrderStatus).toHaveBeenNthCalledWith(2, 'order-1', 'tenant-1',
+      expect.objectContaining({ status: OrderStatus.preparing }), undefined, { marketplaceEvent: true });
+  });
+
+  it('reconciles orderReady from pending without creating a late KDS ticket', async () => {
+    const tx = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = {
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    };
+    const { service, ordersService } = makeFood99LifecycleService(prisma);
+
+    await reconcileFood99Lifecycle(service, {
+      ...food99LifecycleInput,
+      topic: 'ORDERREADY',
+      currentStatus: OrderStatus.pending,
+    });
+
+    expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+    expect(tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: OrderStatus.ready_for_delivery },
+    }));
+  });
+
+  it.each([
+    ['ORDERFINISH', OrderStatus.completed],
+    ['ORDERCANCEL', OrderStatus.cancelled],
+  ] as const)('reconciles %s from pending as an authoritative terminal state', async (topic, targetStatus) => {
+    const tx = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = {
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    };
+    const { service, ordersService } = makeFood99LifecycleService(prisma);
+
+    await reconcileFood99Lifecycle(service, {
+      ...food99LifecycleInput,
+      topic,
+      currentStatus: OrderStatus.pending,
+    });
+
+    expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+    expect(tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: targetStatus } }));
+  });
+
+  it('does not reopen a terminal 99Food order when an older confirmation is replayed', async () => {
+    const prisma = { marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+    const { service, ordersService } = makeFood99LifecycleService(prisma);
+
+    await reconcileFood99Lifecycle(service, {
+      ...food99LifecycleInput,
+      topic: 'ORDERCONFIRM',
+      currentStatus: OrderStatus.completed,
+    });
+
+    expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+    expect(prisma.marketplaceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ statusInternal: OrderStatus.completed }),
+    }));
+  });
+
   it('rejects reprocess for marketplace orders from another tenant', async () => {
     const prisma = {
       marketplaceOrder: {

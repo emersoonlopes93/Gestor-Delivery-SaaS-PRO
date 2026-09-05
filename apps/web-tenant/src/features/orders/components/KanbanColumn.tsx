@@ -33,13 +33,14 @@ interface KanbanColumnProps {
   getNextAction: (status: OrderStatus, fulfillmentType: string) => OrderStatus | null;
   fmt: (v: number) => string;
   getElapsedMin: (createdAt: string) => number;
+  getActionsDisabledReason: (order: OrderBoardItemDTO) => string | null;
   viewMode: BoardViewMode;
 }
 
 export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps) {
   const {
     column, orders, compact, updatingId, elapsedMinById,
-    onAdvance, onClickCard, onPrint, onEdit, getNextAction, fmt, getElapsedMin, viewMode,
+    onAdvance, onClickCard, onPrint, onEdit, getNextAction, fmt, getElapsedMin, getActionsDisabledReason, viewMode,
   } = props;
 
   const Icon = column.icon;
@@ -102,7 +103,7 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
                   nextStatus={nextActionStatus as OrderStatus | null}
                   elapsedMin={elapsed}
                   totalLabel={fmt(order.sourceChannel === 'marketplace_99food' ? order.itemsSubtotal : order.total)}
-                  actionsDisabledReason={order.sourceChannel === 'marketplace_99food' ? 'Atualizado pela 99Food' : null}
+                  actionsDisabledReason={getActionsDisabledReason(order)}
                 />
               );
             })}

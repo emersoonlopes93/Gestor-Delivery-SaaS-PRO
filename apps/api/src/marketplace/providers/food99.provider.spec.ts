@@ -136,7 +136,7 @@ describe('Food99Provider', () => {
     });
     expect(normalized).toMatchObject({
       provider: MarketplaceProvider.FOOD_99,
-      externalOrderId: 'order-1', logisticsOwnership: 'provider', isPrepaid: true,
+      externalOrderId: 'order-1', deliveryOwnership: 'UNKNOWN', isPrepaid: true,
       paymentMethod: 'pix', itemsSubtotal: 35, total: 35,
     });
     expect(normalized.items[0].options).toHaveLength(1);
@@ -170,7 +170,7 @@ describe('Food99Provider', () => {
     expect(normalized).toMatchObject({
       externalOrderId: '5764656197621845665', itemsSubtotal: 35.99, total: 6.18,
       discountTotal: 37.79, deliveryFee: 6.99, serviceFee: 0.99,
-      notes: 'Sem cebola', logisticsOwnership: 'unknown', isPrepaid: true,
+      notes: 'Sem cebola', deliveryOwnership: 'UNKNOWN', isPrepaid: true,
     });
     expect(normalized.items[0]).toMatchObject({ name: 'HambÃºrguer', notes: 'Bem passado', totalPrice: 35.99 });
     expect(normalized.items[0].options).toEqual(expect.arrayContaining([

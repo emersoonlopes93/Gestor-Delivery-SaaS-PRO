@@ -18,6 +18,17 @@ import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 
+function hasUnsupportedMarketplaceActions(order: OrderBoardItemDTO): boolean {
+  const capabilities = order.marketplaceCapabilities;
+  return Boolean(capabilities && !capabilities.canConfirm && !capabilities.canMarkReady && !capabilities.canCancel);
+}
+
+function getMarketplaceActionsDisabledReason(order: OrderBoardItemDTO): string | null {
+  return hasUnsupportedMarketplaceActions(order)
+    ? order.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.'
+    : null;
+}
+
 /* ─── Kanban columns spec ───────────────────────────────────── */
 
 const KANBAN_COLUMNS: KanbanColumnSpec[] = [
@@ -263,8 +274,8 @@ export function OperationBoardPage() {
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
     if (updatingId) return;
     const marketplaceOrder = orders.find((order) => order.id === orderId);
-    if (marketplaceOrder?.sourceChannel === 'marketplace_99food') {
-      toast('Este pedido e atualizado pela 99Food. Aguarde a sincronizacao do marketplace.', { duration: 4000 });
+    if (marketplaceOrder && hasUnsupportedMarketplaceActions(marketplaceOrder)) {
+      toast(marketplaceOrder.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.', { duration: 4000 });
       return;
     }
 
@@ -383,8 +394,8 @@ export function OperationBoardPage() {
 
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    if (order.sourceChannel === 'marketplace_99food') {
-      toast('Este pedido e atualizado pela 99Food. Aguarde a sincronizacao do marketplace.', { duration: 4000 });
+    if (hasUnsupportedMarketplaceActions(order)) {
+      toast(order.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.', { duration: 4000 });
       return;
     }
 
@@ -559,6 +570,7 @@ export function OperationBoardPage() {
                       getNextAction={getNextAction}
                       fmt={fmt}
                       getElapsedMin={getElapsedMin}
+                      getActionsDisabledReason={getMarketplaceActionsDisabledReason}
                       viewMode={viewMode}
                     />
                   </div>
@@ -580,7 +592,7 @@ export function OperationBoardPage() {
               nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
               totalLabel={fmt(activeDragOrder.sourceChannel === 'marketplace_99food' ? activeDragOrder.itemsSubtotal : activeDragOrder.total)}
-              actionsDisabledReason={activeDragOrder.sourceChannel === 'marketplace_99food' ? 'Atualizado pela 99Food' : null}
+              actionsDisabledReason={getMarketplaceActionsDisabledReason(activeDragOrder)}
             />
           ) : null}
         </DragOverlay>

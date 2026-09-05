@@ -590,6 +590,18 @@ export class MarketplaceOrderIngestionService {
       select: { status: true, fulfillmentType: true },
     });
     if (!order) return;
+    if (marketplaceOrder.provider === MarketplaceProvider.FOOD_99) {
+      await this.reconcileFood99Lifecycle({
+        tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        externalOrderId,
+        topic: normalizedTopic,
+        currentStatus: order.status,
+        fulfillmentType: order.fulfillmentType,
+      });
+      return;
+    }
     const targetStatus = lifecycleKind === 'confirmed'
       ? OrderStatus.confirmed
       : lifecycleKind === 'ready'
@@ -675,6 +687,137 @@ export class MarketplaceOrderIngestionService {
     await this.prisma.marketplaceOrder.updateMany({
       where: { id: marketplaceOrder.id, tenantId },
       data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
+    });
+  }
+
+  private async reconcileFood99Lifecycle(input: {
+    tenantId: string;
+    marketplaceOrderId: string;
+    internalOrderId: string;
+    externalOrderId: string;
+    topic?: string;
+    currentStatus: OrderStatus;
+    fulfillmentType: string;
+  }): Promise<void> {
+    const topic = input.topic;
+    if (!topic || !this.isNativeFood99LifecycleTopic(MarketplaceProvider.FOOD_99, topic)) return;
+
+    if (input.currentStatus === OrderStatus.completed || input.currentStatus === OrderStatus.cancelled) {
+      await this.syncFood99InternalStatus(input.tenantId, input.marketplaceOrderId, input.currentStatus);
+      return;
+    }
+
+    if (topic === 'ORDERCONFIRM') {
+      await this.advanceFood99OperationalOrder(input, [OrderStatus.confirmed, OrderStatus.preparing]);
+      return;
+    }
+
+    const readyStatus = input.fulfillmentType === 'pickup'
+      ? OrderStatus.ready_for_pickup
+      : OrderStatus.ready_for_delivery;
+    if (topic === 'ORDERREADY') {
+      // A missed confirmation means the restaurant has already completed its
+      // kitchen work. Reconcile the authoritative ready state without creating
+      // a late KDS ticket. A known confirmation is still advanced through
+      // preparing, which creates the one canonical KDS job.
+      if (input.currentStatus === OrderStatus.pending) {
+        await this.reconcileFood99AuthoritativeStatus(input, readyStatus, '99Food informou pedido pronto sem confirmação local.');
+        return;
+      }
+      await this.advanceFood99OperationalOrder(input, [OrderStatus.preparing, readyStatus]);
+      return;
+    }
+
+    if (topic === 'ORDERFINISH') {
+      await this.reconcileFood99AuthoritativeStatus(input, OrderStatus.completed, '99Food confirmou a conclusão do pedido.');
+      return;
+    }
+
+    if (topic === 'ORDERCANCEL') {
+      await this.reconcileFood99AuthoritativeStatus(input, OrderStatus.cancelled, '99Food confirmou o cancelamento do pedido.');
+    }
+  }
+
+  private async advanceFood99OperationalOrder(
+    input: {
+      tenantId: string;
+      marketplaceOrderId: string;
+      internalOrderId: string;
+      externalOrderId: string;
+      topic?: string;
+      currentStatus: OrderStatus;
+      fulfillmentType: string;
+    },
+    statuses: OrderStatus[],
+  ): Promise<void> {
+    let currentStatus = input.currentStatus;
+    for (const nextStatus of statuses) {
+      if (currentStatus === nextStatus) continue;
+      if (currentStatus === OrderStatus.completed || currentStatus === OrderStatus.cancelled) break;
+      if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(nextStatus)) {
+        // The external source may legitimately be ahead of the PedeHub
+        // operational board. Do not move an already-ready order backwards.
+        break;
+      }
+      await this.ordersService.updateOrderStatus(
+        input.internalOrderId,
+        input.tenantId,
+        { status: nextStatus, note: `Status operacional reconciliado pela 99Food (${input.topic}).` },
+        undefined,
+        { marketplaceEvent: true },
+      );
+      currentStatus = nextStatus;
+    }
+    await this.syncFood99InternalStatus(input.tenantId, input.marketplaceOrderId, currentStatus);
+  }
+
+  private async reconcileFood99AuthoritativeStatus(
+    input: {
+      tenantId: string;
+      marketplaceOrderId: string;
+      internalOrderId: string;
+      externalOrderId: string;
+      topic?: string;
+      currentStatus: OrderStatus;
+      fulfillmentType: string;
+    },
+    targetStatus: OrderStatus,
+    note: string,
+  ): Promise<void> {
+    if (input.currentStatus === targetStatus) {
+      await this.syncFood99InternalStatus(input.tenantId, input.marketplaceOrderId, targetStatus);
+      return;
+    }
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.order.updateMany({
+        where: { id: input.internalOrderId, tenantId: input.tenantId, status: input.currentStatus },
+        data: { status: targetStatus },
+      });
+      if (updated.count === 0) return;
+      await tx.orderTimeline.create({
+        data: {
+          tenantId: input.tenantId,
+          orderId: input.internalOrderId,
+          status: targetStatus,
+          note,
+          actorId: null,
+        },
+      });
+      await tx.marketplaceOrder.updateMany({
+        where: { id: input.marketplaceOrderId, tenantId: input.tenantId },
+        data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
+      });
+    });
+  }
+
+  private async syncFood99InternalStatus(
+    tenantId: string,
+    marketplaceOrderId: string,
+    status: OrderStatus,
+  ): Promise<void> {
+    await this.prisma.marketplaceOrder.updateMany({
+      where: { id: marketplaceOrderId, tenantId },
+      data: { statusInternal: status, lastSyncedAt: new Date() },
     });
   }
 

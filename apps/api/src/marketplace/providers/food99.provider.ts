@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceConnection, MarketplaceDeliveryOwnership, MarketplaceProvider } from '@prisma/client';
 import { createHash, timingSafeEqual } from 'crypto';
 import type { MarketplaceProviderAdapter } from './marketplace-provider.interface';
 import type {
@@ -141,14 +141,6 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       : Array.isArray(order.otherFees) ? order.otherFees : [];
     const discounts = Array.isArray(order.discounts) ? order.discounts : [];
     const fulfillmentType = this.readString(order, ['type'])?.toUpperCase() === 'TAKEOUT' ? 'pickup' : 'delivery';
-    const deliveredBy = this.readString(delivery, ['deliveredBy'])?.toUpperCase();
-    const logisticsOwnership = fulfillmentType === 'pickup'
-      ? 'not_applicable' as const
-      : deliveredBy === 'MERCHANT'
-        ? 'merchant' as const
-        : deliveredBy === 'MARKETPLACE'
-          ? 'provider' as const
-          : 'unknown' as const;
     const normalizedItems = (Array.isArray(order.items) ? order.items : []).map((value, index) => (
       this.normalizeItem(value, index)
     ));
@@ -168,7 +160,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       preparationStartAt: this.readDate(order, ['preparationStartDateTime']),
       confirmationDeadlineAt: null,
       fulfillmentType,
-      logisticsOwnership,
+      deliveryOwnership: MarketplaceDeliveryOwnership.UNKNOWN,
       customerName: this.readString(customer, ['name']) ?? 'Cliente 99Food',
       customerPhone: this.readString(phone, ['number', 'phoneNumber'])
         ?? this.readString(customer, ['phoneNumber'])
@@ -309,9 +301,9 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       preparationStartAt: this.unixTimestamp(this.readIdentifier(order, ['shop_confirm_time'])),
       confirmationDeadlineAt: null,
       fulfillmentType: deliveryType === 1 ? 'pickup' : 'delivery',
-      // Native detail exposes delivery_type, but the public contract available to
-      // this integration does not define a merchant-vs-provider ownership value.
-      logisticsOwnership: deliveryType === 1 ? 'not_applicable' : 'unknown',
+      // The native detail contract does not define merchant-vs-provider
+      // ownership. Routing V2 must therefore fail closed for every 99Food order.
+      deliveryOwnership: MarketplaceDeliveryOwnership.UNKNOWN,
       customerName: this.readString(address, ['name']) ?? 'Cliente 99Food',
       customerPhone: this.readString(address, ['phone', 'virtual_phone_number']) ?? '',
       customerEmail: null,

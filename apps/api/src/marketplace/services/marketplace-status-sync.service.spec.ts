@@ -140,11 +140,11 @@ describe('MarketplaceStatusSyncService', () => {
     });
     await expect(service.handleInternalStatusChanged({
       tenantId: 'tenant-1', orderId: 'order-1', status: 'ready_for_delivery',
-    })).rejects.toThrow('atualizadas pela 99Food');
+    })).rejects.toThrow('Confirme este pedido pela 99Food.');
     expect(queue?.add).not.toHaveBeenCalled();
   });
 
-  it('blocks internal dispatch for provider-owned 99Food logistics', async () => {
+  it('blocks native 99Food dispatch until its official outbound contract is available', async () => {
     const { service, prisma, queue } = makeService();
     prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
       ...marketplaceOrder,
@@ -153,7 +153,7 @@ describe('MarketplaceStatusSyncService', () => {
     });
     await expect(service.handleInternalStatusChanged({
       tenantId: 'tenant-1', orderId: 'order-1', status: 'out_for_delivery',
-    })).rejects.toThrow('atualizadas pela 99Food');
+    })).rejects.toThrow('Confirme este pedido pela 99Food.');
     expect(queue?.add).not.toHaveBeenCalled();
   });
 });

@@ -18,7 +18,6 @@ import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
-import { allowsInternalDeliveryAssignment } from '../marketplace-logistics';
 
 export type MarketplaceStatusJob = {
   tenantId: string;
@@ -63,7 +62,7 @@ export class MarketplaceStatusSyncService {
       // The native 99Food order contract documents the confirm endpoint, but
       // not the complete action request/response contract used by this client.
       // Never fall through to the incompatible Open Delivery implementation.
-      throw new BadRequestException('Acoes deste pedido sao atualizadas pela 99Food. Aguarde a sincronizacao do marketplace.');
+      throw new BadRequestException('Confirme este pedido pela 99Food.');
     }
     const enabled = isFood99
       ? this.config.get<string>('MARKETPLACE_99FOOD_ENABLED') === 'true'
@@ -104,11 +103,6 @@ export class MarketplaceStatusSyncService {
           : input.status === 'completed'
             ? MarketplaceOperationType.DELIVER
             : MarketplaceOperationType.CANCEL;
-    if (isFood99
-      && (operation === MarketplaceOperationType.DISPATCH || operation === MarketplaceOperationType.DELIVER)
-      && !allowsInternalDeliveryAssignment([{ provider: marketplaceOrder.provider, normalizedPayload: marketplaceOrder.normalizedPayload }])) {
-      throw new BadRequestException('A logistica deste pedido pertence a 99Food; despacho interno nao e permitido.');
-    }
     const reason = input.reason?.trim() || null;
     if (operation === MarketplaceOperationType.CANCEL && !reason) {
       throw new BadRequestException('A marketplace cancellation reason code is required.');
