@@ -39,6 +39,7 @@ describe('MarketplaceEventInboxService', () => {
 
   const ingestionService = {
     processInboxEvent: jest.fn().mockResolvedValue(undefined),
+    reapplyProcessedLifecycleEvent: jest.fn().mockResolvedValue({ reapplied: false, reason: 'not_replayable_lifecycle_event' }),
   };
 
   beforeEach(() => {
@@ -248,7 +249,7 @@ describe('MarketplaceEventInboxService', () => {
     expect(prisma.marketplaceEventInbox.create).not.toHaveBeenCalled();
   });
 
-  it('does not re-run effects for an already processed inbox row', async () => {
+  it('only reapplies a processed inbox row when it is a known lifecycle event', async () => {
     prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce({
       id: 'inbox-1',
       status: MarketplaceEventStatus.PROCESSED,
@@ -263,8 +264,23 @@ describe('MarketplaceEventInboxService', () => {
     await expect(service.reprocessEventInbox('inbox-1', 'tenant-1')).resolves.toEqual({
       success: true,
       skipped: true,
-      reason: 'already_processed',
+      reason: 'not_replayable_lifecycle_event',
     });
+    expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
+  });
+
+  it('reapplies a processed 99Food lifecycle event without reimporting its order', async () => {
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce({
+      id: 'inbox-finish', status: MarketplaceEventStatus.PROCESSED,
+    });
+    ingestionService.reapplyProcessedLifecycleEvent.mockResolvedValueOnce({ reapplied: true, reason: 'lifecycle_reapplied' });
+    const service = new MarketplaceEventInboxService(
+      prisma as never, registry as never, connectionService as never, ingestionService as never, undefined,
+    );
+    await expect(service.reprocessEventInbox('inbox-finish', 'tenant-1')).resolves.toEqual({
+      success: true, skipped: false, reason: 'lifecycle_reapplied',
+    });
+    expect(ingestionService.reapplyProcessedLifecycleEvent).toHaveBeenCalledWith('inbox-finish', 'tenant-1');
     expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
   });
 

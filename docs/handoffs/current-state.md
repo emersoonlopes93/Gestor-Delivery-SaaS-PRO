@@ -1,5 +1,9 @@
 ## 99Food Live Order Parity Fix (2026-09-04)
 
+- Follow-up lifecycle: eventos 99Food jÃ¡ `PROCESSED` eram bloqueados como duplicatas e eventos terminales tentavam buscar snapshot antes de aplicar a transiÃ§Ã£o. O reprocessamento agora reaplica com seguranÃ§a somente `orderConfirm`, `orderReady`, `orderCancel` e `orderFinish`, sem reimportar o pedido ou chamar o provider. Eventos futuros de lifecycle de pedido existente aplicam a transiÃ§Ã£o antes do snapshot. O reprocessamento de um `MarketplaceOrder` jÃ¡ importado tambÃ©m reaplica seu Ãºltimo lifecycle nativo quando cabÃ­vel.
+- As mensagens 99Food do endpoint e do Kanban foram regravadas em ASCII para eliminar os caracteres mojibake observados no tenant.
+- ValidaÃ§Ã£o do follow-up: inbox 10/10, ingestÃ£o/status 13/13, typecheck global, build web-tenant e `git diff --check` passaram. Nenhum deploy/Dokploy/provider/banco remoto foi acessado.
+
 - Objetivo: corrigir a paridade operacional de pedido nativo 99Food sem promover a feature ou tocar Routing V2, pagamentos, Pix, DRE, WhatsApp ou `main-copy`.
 - A causa do lifecycle parado era o adapter aceitar o webhook nativo `orderConfirm`/`orderReady`/`orderFinish` mas o mapper reconhecer somente nomes Open Delivery. O mapper agora aplica os nomes oficiais, preservando dedupe, ordenaÃ§Ã£o e `ORDER_STATUS_TRANSITIONS`; nÃ£o inventa um evento `preparing` que o contrato nativo nÃ£o documenta.
 - A causa de itens/valores errados era normalizar o snapshot como Open Delivery. O adapter agora reconhece `data.order_info`, `order_items`, `sub_item_list`, `remark` e valores em centavos. Complementos chegam como linhas legÃ­veis no pedido, KDS e impressÃ£o; o Kanban destaca a venda dos produtos e o drawer identifica pedido prÃ©-pago como “Pago na 99Food”. RecebÃ­vel do restaurante permanece indisponÃ­vel, nunca inferido.

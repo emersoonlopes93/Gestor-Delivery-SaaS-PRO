@@ -264,7 +264,7 @@ export function OperationBoardPage() {
     if (updatingId) return;
     const marketplaceOrder = orders.find((order) => order.id === orderId);
     if (marketplaceOrder?.sourceChannel === 'marketplace_99food') {
-      toast('Este pedido Ã© atualizado pela 99Food. Aguarde a sincronizaÃ§Ã£o do marketplace.', { duration: 4000 });
+      toast('Este pedido e atualizado pela 99Food. Aguarde a sincronizacao do marketplace.', { duration: 4000 });
       return;
     }
 
@@ -384,7 +384,7 @@ export function OperationBoardPage() {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
     if (order.sourceChannel === 'marketplace_99food') {
-      toast('Este pedido Ã© atualizado pela 99Food. Aguarde a sincronizaÃ§Ã£o do marketplace.', { duration: 4000 });
+      toast('Este pedido e atualizado pela 99Food. Aguarde a sincronizacao do marketplace.', { duration: 4000 });
       return;
     }
 

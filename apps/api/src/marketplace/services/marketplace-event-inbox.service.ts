@@ -214,7 +214,8 @@ export class MarketplaceEventInboxService {
     });
     if (!inbox) throw new BadRequestException('Marketplace event inbox not found.');
     if (inbox.status === MarketplaceEventStatus.PROCESSED) {
-      return { success: true, skipped: true, reason: 'already_processed' };
+      const replay = await this.ingestionService.reapplyProcessedLifecycleEvent(inbox.id, tenantId);
+      return { success: true, skipped: !replay.reapplied, reason: replay.reason };
     }
 
     await this.prisma.marketplaceEventInbox.update({

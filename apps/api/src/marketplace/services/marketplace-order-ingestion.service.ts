@@ -120,6 +120,12 @@ export class MarketplaceOrderIngestionService {
         return { processed: true, ignored: true, reason: 'out_of_order' };
       }
 
+      if (existingOrder && this.isNativeFood99LifecycleTopic(inbox.provider, inbox.topic)) {
+        await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic);
+        await this.markInboxProcessed(inbox.id);
+        return { processed: true, lifecycleOnly: true };
+      }
+
       const externalOrder = await provider.fetchOrderDetails({
         connection,
         externalOrderId,
@@ -212,23 +218,9 @@ export class MarketplaceOrderIngestionService {
         }
       }
 
-      await this.statusSyncService.reconcileExternalEvent({
-        tenantId: connection.tenantId,
-        connectionId: connection.id,
-        externalOrderId,
-        topic: inbox.topic,
-      });
-      await this.applyExternalLifecycleEvent(connection.tenantId, connection.id, externalOrderId, inbox.topic);
+      await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic);
 
-      await this.prisma.marketplaceEventInbox.update({
-        where: { id: inbox.id },
-        data: {
-          status: MarketplaceEventStatus.PROCESSED,
-          processedAt: new Date(),
-          processingStartedAt: null,
-          lastError: null,
-        },
-      });
+      await this.markInboxProcessed(inbox.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown marketplace ingestion error.';
       await this.failInbox(inbox.id, message);
@@ -244,6 +236,15 @@ export class MarketplaceOrderIngestionService {
     if (!record) throw new BadRequestException('Marketplace order not found.');
 
     if (record.internalOrderId) {
+      if (this.isNativeFood99LifecycleTopic(record.provider, record.lastExternalEventTopic)) {
+        await this.applyLifecycleForInbox(
+          tenantId,
+          record.connectionId,
+          record.externalOrderId,
+          record.lastExternalEventTopic,
+        );
+        return { success: true, skipped: true, reason: 'already_imported_lifecycle_reapplied', internalOrderId: record.internalOrderId };
+      }
       return { success: true, skipped: true, reason: 'already_imported', internalOrderId: record.internalOrderId };
     }
 
@@ -264,6 +265,53 @@ export class MarketplaceOrderIngestionService {
     });
 
     return { success: true, internalOrderId };
+  }
+
+  async reapplyProcessedLifecycleEvent(eventInboxId: string, tenantId?: string): Promise<{ reapplied: boolean; reason: string }> {
+    const inbox = await this.prisma.marketplaceEventInbox.findFirst({
+      where: { id: eventInboxId, ...(tenantId ? { tenantId } : {}) },
+      select: {
+        provider: true,
+        connectionId: true,
+        tenantId: true,
+        externalOrderId: true,
+        topic: true,
+      },
+    });
+    if (!inbox) throw new BadRequestException('Marketplace event inbox not found.');
+    if (!inbox.connectionId || !inbox.tenantId || !inbox.externalOrderId
+      || !this.isNativeFood99LifecycleTopic(inbox.provider, inbox.topic)) {
+      return { reapplied: false, reason: 'not_replayable_lifecycle_event' };
+    }
+    await this.applyLifecycleForInbox(inbox.tenantId, inbox.connectionId, inbox.externalOrderId, inbox.topic);
+    return { reapplied: true, reason: 'lifecycle_reapplied' };
+  }
+
+  private async applyLifecycleForInbox(
+    tenantId: string,
+    connectionId: string,
+    externalOrderId: string,
+    topic?: string | null,
+  ): Promise<void> {
+    await this.statusSyncService.reconcileExternalEvent({ tenantId, connectionId, externalOrderId, topic });
+    await this.applyExternalLifecycleEvent(tenantId, connectionId, externalOrderId, topic);
+  }
+
+  private async markInboxProcessed(inboxId: string): Promise<void> {
+    await this.prisma.marketplaceEventInbox.update({
+      where: { id: inboxId },
+      data: {
+        status: MarketplaceEventStatus.PROCESSED,
+        processedAt: new Date(),
+        processingStartedAt: null,
+        lastError: null,
+      },
+    });
+  }
+
+  private isNativeFood99LifecycleTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
+    if (provider !== MarketplaceProvider.FOOD_99) return false;
+    return ['ORDERCONFIRM', 'ORDERREADY', 'ORDERCANCEL', 'ORDERFINISH'].includes(topic?.trim().toUpperCase() ?? '');
   }
 
   private async upsertMarketplaceOrder(
