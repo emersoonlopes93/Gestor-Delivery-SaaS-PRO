@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX } from 'lucide-react';
+import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX, Search, SlidersHorizontal } from 'lucide-react';
 import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderOperationalAction, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
@@ -18,6 +18,7 @@ import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 import { resolveKanbanDropAction } from './operational-actions';
+import { matchesBoardFilter, matchesBoardSearch, ORDER_TIME_THRESHOLDS_MINUTES, type BoardFilter } from './order-presenters';
 
 /* ─── Kanban columns spec ───────────────────────────────────── */
 
@@ -60,6 +61,18 @@ const KANBAN_COLUMNS: KanbanColumnSpec[] = [
   },
 ];
 
+const BOARD_FILTERS: { id: BoardFilter; label: string; core?: boolean }[] = [
+  { id: 'all', label: 'Todos', core: true },
+  { id: 'PEDEHUB', label: 'PedeHub', core: true },
+  { id: 'IFOOD', label: 'iFood', core: true },
+  { id: 'FOOD_99', label: '99Food' },
+  { id: 'action', label: 'Aguardando ação', core: true },
+  { id: 'delayed', label: 'Atrasados' },
+  { id: 'sync_failed', label: 'Falha de sincronização' },
+  { id: 'merchant', label: 'Entrega própria' },
+  { id: 'provider', label: 'Entrega marketplace' },
+];
+
 /* ─── Segmented Control ─────────────────────────────────────── */
 
 const SegmentedControl = memo(function SegmentedControl(props: {
@@ -68,15 +81,15 @@ const SegmentedControl = memo(function SegmentedControl(props: {
 }) {
   const { value, onChange } = props;
 
-  const items: { id: BoardViewMode; label: string }[] = [
-    { id: 'compact', label: 'Compacto' },
-    { id: 'standard', label: 'Padrão' },
-    { id: 'focus_production', label: 'Foco Cozinha' },
+  const items: { id: BoardViewMode; label: string; mobileLabel: string }[] = [
+    { id: 'compact', label: 'Compacto', mobileLabel: 'Compacto' },
+    { id: 'standard', label: 'Padrão', mobileLabel: 'Padrão' },
+    { id: 'focus_production', label: 'Foco Cozinha', mobileLabel: 'Cozinha' },
   ];
 
   return (
     <div
-      className="inline-flex items-center p-1 rounded-xl gap-1"
+      className="grid w-full grid-cols-3 items-center gap-1 rounded-xl p-1"
       style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
     >
       {items.map((item) => {
@@ -86,12 +99,12 @@ const SegmentedControl = memo(function SegmentedControl(props: {
             key={item.id}
             type="button"
             onClick={() => onChange(item.id)}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none ${active
+            className={`min-w-0 truncate rounded-lg px-1.5 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none sm:px-3 ${active
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
               }`}
           >
-            {item.label}
+            <span className="sm:hidden">{item.mobileLabel}</span><span className="hidden sm:inline">{item.label}</span>
           </button>
         );
       })}
@@ -109,6 +122,9 @@ export function OperationBoardPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<BoardViewMode>('standard');
   const [activeColumn, setActiveColumn] = useState<KanbanColumnSpec['id']>('entry');
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<BoardFilter>('all');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
@@ -225,7 +241,6 @@ export function OperationBoardPage() {
 
   // Delayed order detection — checks every 60 seconds
   useEffect(() => {
-    const DELAY_THRESHOLD_MIN = 30;
     const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'preparing'];
 
     const check = () => {
@@ -233,7 +248,7 @@ export function OperationBoardPage() {
       for (const order of orders) {
         if (!ACTIVE_STATUSES.includes(order.status as OrderStatus)) continue;
         const elapsedMin = Math.floor((now - new Date(order.createdAt).getTime()) / 60000);
-        if (elapsedMin >= DELAY_THRESHOLD_MIN && !alreadyAlertedDelayed.current.has(order.id)) {
+        if (elapsedMin >= ORDER_TIME_THRESHOLDS_MINUTES.delayed && !alreadyAlertedDelayed.current.has(order.id)) {
           alreadyAlertedDelayed.current.add(order.id);
           toast(`⏰ Pedido #${order.orderNumber} está atrasado (${elapsedMin}m)`, {
             duration: 10000,
@@ -348,13 +363,18 @@ export function OperationBoardPage() {
     return map;
   }, [orders]);
 
+  const visibleOrders = useMemo(
+    () => orders.filter((order) => matchesBoardSearch(order, search) && matchesBoardFilter(order, activeFilter)),
+    [activeFilter, orders, search],
+  );
+
   const ordersByColumnId = useMemo(() => {
     const out: Record<KanbanColumnSpec['id'], OrderBoardItemDTO[]> = {
       entry: [],
       production: [],
       delivery: [],
     };
-    for (const o of orders) {
+    for (const o of visibleOrders) {
       const s = o.status as OrderStatus;
       if (s === 'pending' || s === 'confirmed') out.entry.push(o);
       else if (s === 'preparing') out.production.push(o);
@@ -366,7 +386,7 @@ export function OperationBoardPage() {
         out.delivery.push(o);
     }
     return out;
-  }, [orders]);
+  }, [visibleOrders]);
 
   const compact = viewMode === 'compact';
 
@@ -401,42 +421,34 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
+    <div className="box-border flex min-h-[100dvh] w-full max-w-[1600px] flex-col space-y-4 overflow-hidden bg-background p-4 pt-[calc(68px+var(--safe-area-top))] md:h-[calc(100dvh-64px)] md:min-h-0 md:p-6 md:pt-6 mx-auto">
       {/* ── Toolbar / Header Premium ── */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
-        <div className="flex items-center justify-between sm:block">
+      <header className="sticky top-[calc(52px+var(--safe-area-top))] z-20 -mx-4 flex shrink-0 flex-col gap-3 border-b border-border bg-background px-4 pb-4 md:static md:z-auto md:mx-0 md:bg-transparent md:px-0">
+        <div className="min-w-0">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
-              <span className="w-2.5 h-6 rounded-md bg-primary block" />
               <span>Painel de Operações</span>
             </h1>
             <p className="text-[11px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">
-              Sincronização Ativa (15s)
+              {orders.length} ativos · {orders.filter((order) => order.operational.primaryAction).length} aguardando ação · atualização a cada 15s
             </p>
           </div>
-          <button
-            onClick={fetchBoard}
-            disabled={loading}
-            className="sm:hidden btn-icon w-9 h-9 bg-muted border border-border rounded-xl flex items-center justify-center active:scale-95 transition-all"
-            title="Atualizar agora"
-            type="button"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-          <div className="shrink-0">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_40px_40px] items-center gap-2">
+          <div className="min-w-0">
             <SegmentedControl value={viewMode} onChange={setViewMode} />
           </div>
 
           <button
             onClick={enableAudio}
-            className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${isAudioEnabled
+            className={`h-10 w-10 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${isAudioEnabled
               ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
               : 'bg-card text-muted-foreground border-border hover:bg-muted'
               }`}
             title={isAudioEnabled ? 'Sons Ativados' : 'Ativar Sons (Clique aqui)'}
+            aria-label={isAudioEnabled ? 'Sons de novos pedidos ativados' : 'Ativar sons de novos pedidos'}
+            type="button"
           >
             {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
@@ -444,8 +456,9 @@ export function OperationBoardPage() {
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="hidden sm:flex w-10 h-10 rounded-xl bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm shrink-0"
+            className="flex h-10 w-10 rounded-xl bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm"
             title="Atualizar agora"
+            aria-label="Atualizar quadro agora"
             type="button"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -453,14 +466,36 @@ export function OperationBoardPage() {
         </div>
       </header>
 
-      {/* ── Mobile Tabs Selector ── */}
-      <div className="md:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl mb-4 shrink-0">
+      <section aria-label="Busca e filtros do quadro" className="shrink-0 space-y-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+        <div className="relative">
+          <label htmlFor="orders-board-search" className="sr-only">Buscar pedido por número, cliente, telefone ou motoboy</label>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input id="orders-board-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar número, cliente, telefone ou motoboy" className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary" />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtros rápidos">
+          {BOARD_FILTERS.map((filter) => (
+            <button key={filter.id} type="button" onClick={() => setActiveFilter(filter.id)} className={`${!filter.core && !showMoreFilters ? 'hidden sm:inline-flex' : 'inline-flex'} min-h-9 items-center rounded-lg border px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeFilter === filter.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`} aria-pressed={activeFilter === filter.id}>
+              {filter.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => setShowMoreFilters((value) => !value)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:hidden" aria-expanded={showMoreFilters}>
+            <SlidersHorizontal className="h-3.5 w-3.5" /> Mais filtros
+          </button>
+        </div>
+      </section>
+
+      {/* ── Mobile and tablet Tabs Selector ── */}
+      <div role="tablist" aria-label="Colunas do quadro" className="xl:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl shrink-0">
         {KANBAN_COLUMNS.map((col) => {
           const isActive = activeColumn === col.id;
           const count = ordersByColumnId[col.id]?.length || 0;
           return (
             <button
               key={col.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`orders-column-${col.id}`}
               onClick={() => setActiveColumn(col.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${isActive
                 ? 'bg-background shadow-sm text-foreground'
@@ -484,11 +519,11 @@ export function OperationBoardPage() {
 
       {/* ── Erro ── */}
       {error && (
-        <div className="alert-danger rounded-2xl p-4 mb-4 flex items-start gap-3">
-          <span className="text-lg leading-none">⚠</span>
+        <div role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-amber-800 dark:text-amber-300">
+          <span className="text-lg leading-none" aria-hidden="true">⚠</span>
           <div className="flex-1">
-            <h3 className="text-sm font-black mb-1">Erro ao carregar quadro de pedidos</h3>
-            <p className="text-sm opacity-80">{error}</p>
+            <h3 className="text-sm font-black mb-1">Atualização temporariamente indisponível</h3>
+            <p className="text-xs opacity-80">Os últimos pedidos válidos continuam visíveis. {error}</p>
             <button
               onClick={fetchBoard}
               className="mt-2 text-xs font-black underline opacity-80 hover:opacity-100"
@@ -516,8 +551,13 @@ export function OperationBoardPage() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        {!error && (
+        {(orders.length > 0 || !loading) && (
           <div className="grow min-h-0 flex flex-col">
+            {visibleOrders.length === 0 && (search.trim() || activeFilter !== 'all') ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">
+                Nenhum pedido corresponde aos filtros
+              </div>
+            ) : (
             <div
               className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 overflow-x-auto no-scrollbar`}
             >
@@ -535,8 +575,10 @@ export function OperationBoardPage() {
                 return (
                   <div
                     key={column.id}
-                    className={`h-full min-h-0 flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
-                      } w-full md:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]`}
+                    id={`orders-column-${column.id}`}
+                    role="tabpanel"
+                    className={`h-full min-h-0 flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden xl:flex'
+                      } w-full xl:w-[calc(33.333%-11px)]`}
                   >
                     <KanbanColumn
                       column={column}
@@ -549,11 +591,13 @@ export function OperationBoardPage() {
                       fmt={fmt}
                       getElapsedMin={getElapsedMin}
                       viewMode={viewMode}
+                      isActive={activeColumn === column.id}
                     />
                   </div>
                 );
               })}
             </div>
+            )}
           </div>
         )}
         <DragOverlay>

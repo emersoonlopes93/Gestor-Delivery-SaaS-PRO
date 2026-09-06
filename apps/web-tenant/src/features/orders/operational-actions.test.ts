@@ -37,7 +37,7 @@ function createOrder(actions: OrderOperationalAction[]): OrderBoardItemDTO {
   };
   return {
     id: 'order-1', orderNumber: '101', status: 'pending', fulfillmentType: 'delivery',
-    customerName: 'Cliente', total: 30, itemsSubtotal: 25, itemCount: 1,
+    customerName: 'Cliente', customerPhone: '11999990000', total: 30, itemsSubtotal: 25, itemCount: 1,
     itemsSummary: '1x Item', createdAt: new Date(0).toISOString(), operational,
   };
 }

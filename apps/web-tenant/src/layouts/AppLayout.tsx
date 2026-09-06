@@ -935,7 +935,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="app-main flex-1 overflow-auto bg-background safe-bottom">
+        <main className="app-main min-w-0 flex-1 overflow-auto bg-background safe-bottom">
           <div key={location.pathname} className="h-full">
             <Outlet />
           </div>

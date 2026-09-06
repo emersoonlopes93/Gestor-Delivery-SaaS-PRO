@@ -399,6 +399,7 @@ export interface OrderListItemDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  operational?: OrderOperationalViewModel;
 }
 
 export class UpdateOrderStatusDTO {
@@ -415,6 +416,7 @@ export interface OrderBoardItemDTO {
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
   customerName: string;
+  customerPhone: string;
   total: number;
   itemsSubtotal: number;
   itemCount: number;
