@@ -29,7 +29,7 @@ describe('OrdersService MAIN printing producer', () => {
       {} as never,
       {} as never,
       { notifyOrderStatus: jest.fn() } as never,
-      { emitOrderStatusUpdated: jest.fn() } as never,
+      { emitOrderStatusUpdated: jest.fn(), emitOrderChanged: jest.fn() } as never,
       kdsService as never,
       printingService as never,
       {} as never,

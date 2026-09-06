@@ -36,6 +36,7 @@ import { runSerializableTransactionWithRetry } from '../database/serializable-tr
 import { DriverEarningsService } from './driver-earnings.service';
 import { RoutingV2Service } from './routing-v2.service';
 import { evaluateOwnFleetEligibility, type MarketplaceOwnershipRecord } from './own-fleet-eligibility';
+import { OrdersGateway } from '../orders/orders.gateway';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -66,7 +67,12 @@ const OPEN_STOP_STATUSES: DeliveryStopStatus[] = [
 export class DeliveryRunsService {
   private readonly logger = new Logger(DeliveryRunsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly earnings: DriverEarningsService, @Optional() private readonly routing?: RoutingV2Service) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly earnings: DriverEarningsService,
+    @Optional() private readonly routing?: RoutingV2Service,
+    @Optional() private readonly ordersGateway?: OrdersGateway,
+  ) {}
 
   async getBuilderData(tenantId: string): Promise<DeliveryRunBuilderDataDTO> {
     const [drivers, orders] = await Promise.all([
@@ -472,6 +478,9 @@ export class DeliveryRunsService {
       { assignImmediately: true },
     );
     await this.routing?.calculate(tenantId, created.id, 'RUN_CREATED');
+    for (const orderId of orderIds) {
+      this.ordersGateway?.emitOrderChanged(tenantId, orderId, 'driver');
+    }
     return this.getTenantRunDTO(tenantId, created.id);
   }
 
@@ -494,7 +503,7 @@ export class DeliveryRunsService {
   }
 
   async assignRun(tenantId: string, runId: string, actorId?: string) {
-    return this.transaction(async (tx) => {
+    const updated = await this.transaction(async (tx) => {
       const run = await this.getRun(tx, tenantId, runId);
       if (run.assignedAt) return run;
       if (run.status !== DeliveryRunStatus.PENDING_ACCEPTANCE) {
@@ -524,6 +533,10 @@ export class DeliveryRunsService {
         include: { stops: { orderBy: { sequence: 'asc' } } },
       });
     });
+    for (const stop of updated.stops) {
+      this.ordersGateway?.emitOrderChanged(tenantId, stop.orderId, 'driver');
+    }
+    return updated;
   }
 
   async acceptRun(tenantId: string, runId: string, driverId: string) {
@@ -551,7 +564,7 @@ export class DeliveryRunsService {
 
   async rejectRun(tenantId: string, runId: string, driverId: string, reason: string) {
     if (!reason.trim()) throw new BadRequestException('Informe o motivo da recusa.');
-    return this.transaction(async (tx) => {
+    const updated = await this.transaction(async (tx) => {
       const run = await this.getDriverRun(tx, tenantId, runId, driverId);
       if (run.status !== DeliveryRunStatus.PENDING_ACCEPTANCE || !run.assignedAt) {
         throw new ConflictException('Esta rota não está aguardando aceite.');
@@ -579,10 +592,14 @@ export class DeliveryRunsService {
         include: { stops: { orderBy: { sequence: 'asc' } } },
       });
     });
+    for (const stop of updated.stops) {
+      this.ordersGateway?.emitOrderChanged(tenantId, stop.orderId, 'driver');
+    }
+    return updated;
   }
 
   async startRun(tenantId: string, runId: string, driverId: string) {
-    return this.transaction(async (tx) => {
+    const updated = await this.transaction(async (tx) => {
       const run = await this.getDriverRun(tx, tenantId, runId, driverId);
       if (run.status === DeliveryRunStatus.IN_PROGRESS || run.status === DeliveryRunStatus.RETURNING) return run;
       if (run.status !== DeliveryRunStatus.ASSIGNED) {
@@ -633,6 +650,10 @@ export class DeliveryRunsService {
         include: { stops: { orderBy: { sequence: 'asc' } } },
       });
     });
+    for (const stop of updated.stops) {
+      this.ordersGateway?.emitOrderChanged(tenantId, stop.orderId, 'status');
+    }
+    return updated;
   }
 
   async overrideKdsLock(tenantId: string, runId: string, actorId: string, reason: string): Promise<DeliveryRunDTO> {
@@ -726,7 +747,7 @@ export class DeliveryRunsService {
   }
 
   async completeStop(tenantId: string, runId: string, stopId: string, driverId: string) {
-    return this.transaction(async (tx) => {
+    const updated = await this.transaction(async (tx) => {
       const run = await this.getDriverRun(tx, tenantId, runId, driverId);
       const stop = run.stops.find((item) => item.id === stopId);
       if (stop?.status === DeliveryStopStatus.DELIVERED) return run;
@@ -770,6 +791,11 @@ export class DeliveryRunsService {
       await this.advanceOrFinalize(tx, run, stop.id, deliveredAt, 'STOP_DELIVERED');
       return this.getRun(tx, tenantId, runId);
     });
+    const completedStop = updated.stops.find((stop) => stop.id === stopId);
+    if (completedStop) {
+      this.ordersGateway?.emitOrderChanged(tenantId, completedStop.orderId, 'status');
+    }
+    return updated;
   }
 
   async markFailedAttempt(

@@ -216,6 +216,7 @@ export class MarketplaceOrderIngestionService {
           ...orderDetail,
           itemCount: orderDetail.items.length,
         });
+        this.ordersGateway.emitOrderChanged(connection.tenantId, internalOrderId, 'created');
 
         const initialStatus = this.resolveInitialStatus(connection);
         if (initialStatus !== OrderStatus.pending) {
@@ -962,6 +963,7 @@ export class MarketplaceOrderIngestionService {
         },
       });
     });
+    this.ordersGateway.emitOrderChanged(tenantId, internalOrderId, 'marketplace');
   }
 
   private async reconcileFood99Lifecycle(input: {
@@ -1082,6 +1084,7 @@ export class MarketplaceOrderIngestionService {
         data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
       });
     });
+    this.ordersGateway.emitOrderChanged(input.tenantId, input.internalOrderId, 'status');
   }
 
   private async syncFood99InternalStatus(

@@ -7,6 +7,27 @@ export interface OrderBoardUpdatedEvent {
   updatedAt: string;
 }
 
+export type OrderChangedReason =
+  | 'created'
+  | 'status'
+  | 'cancelled'
+  | 'ready'
+  | 'auto_accepted'
+  | 'edited'
+  | 'driver'
+  | 'marketplace';
+
+/**
+ * Tenant-room reconciliation hint. The order detail endpoint remains the
+ * source of truth; consumers must never apply this payload as order state.
+ */
+export interface OrderChangedEvent {
+  eventId: string;
+  orderId: string;
+  occurredAt: string;
+  reason: OrderChangedReason;
+}
+
 export interface DriverLocationUpdatedEvent {
   tenantId: string;
   driverId: string;

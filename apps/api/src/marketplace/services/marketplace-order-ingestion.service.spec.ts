@@ -27,6 +27,10 @@ function isCompleteFood99Snapshot(service: MarketplaceOrderIngestionService, inp
   return (candidate as (snapshot: typeof input) => boolean).call(service, input);
 }
 
+function ordersGatewayStub() {
+  return { emitOrderChanged: jest.fn() };
+}
+
 function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersService = { updateOrderStatus: jest.fn() }) {
   return {
     service: new MarketplaceOrderIngestionService(
@@ -34,7 +38,7 @@ function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersServi
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      ordersGatewayStub() as never,
       ordersService as never,
       {} as never,
       {} as never,
@@ -201,7 +205,7 @@ describe('MarketplaceOrderIngestionService', () => {
     };
     const statusSyncService = { reconcileExternalEvent: jest.fn().mockResolvedValue(undefined) };
     const service = new MarketplaceOrderIngestionService(
-      prisma as never, { get: jest.fn().mockReturnValue({}) } as never, {} as never, {} as never, {} as never, {} as never,
+      prisma as never, { get: jest.fn().mockReturnValue({}) } as never, {} as never, {} as never, ordersGatewayStub() as never, {} as never,
       statusSyncService as never, {} as never,
     );
 
@@ -223,7 +227,7 @@ describe('MarketplaceOrderIngestionService', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      ordersGatewayStub() as never,
       {} as never,
       {} as never,
       {} as never,
@@ -270,7 +274,7 @@ describe('MarketplaceOrderIngestionService', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      ordersGatewayStub() as never,
       {} as never,
       {} as never,
       {} as never,
@@ -316,7 +320,7 @@ describe('MarketplaceOrderIngestionService', () => {
       { get: jest.fn().mockReturnValue(provider) } as never,
       {} as never,
       {} as never,
-      {} as never,
+      ordersGatewayStub() as never,
       {} as never,
       {} as never,
       {} as never,
@@ -352,7 +356,7 @@ describe('MarketplaceOrderIngestionService', () => {
       {} as never,
       connectionResolver as never,
       {} as never,
-      {} as never,
+      ordersGatewayStub() as never,
       {} as never,
       {} as never,
       {} as never,
@@ -401,7 +405,7 @@ describe('MarketplaceOrderIngestionService', () => {
       { get: jest.fn().mockReturnValue(provider) } as never,
       {} as never,
       {} as never,
-      {} as never,
+      ordersGatewayStub() as never,
       {} as never,
       {} as never,
       {} as never,

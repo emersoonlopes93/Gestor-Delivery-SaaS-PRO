@@ -12,6 +12,8 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import {
   OrderListItemDTO,
+  type OrderChangedEvent,
+  type OrderChangedReason,
   OrderStatusUpdatedEvent,
   OrderStatus,
   type NotificationDomainEvent,
@@ -151,6 +153,21 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       order,
       timestamp,
     });
+  }
+
+  emitOrderChanged(tenantId: string, orderId: string, reason: OrderChangedReason) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitOrderChanged.');
+      return;
+    }
+    const occurredAt = new Date().toISOString();
+    const event: OrderChangedEvent = {
+      eventId: `order.changed:${orderId}:${reason}:${occurredAt}`,
+      orderId,
+      reason,
+      occurredAt,
+    };
+    this.server.to(`tenant:${tenantId}`).emit('order.changed', event);
   }
 
   emitOrderAutoAccepted(

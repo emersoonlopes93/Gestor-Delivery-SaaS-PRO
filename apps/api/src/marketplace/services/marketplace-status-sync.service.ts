@@ -18,6 +18,7 @@ import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
+import { OrdersGateway } from '../../orders/orders.gateway';
 
 export type MarketplaceStatusJob = {
   tenantId: string;
@@ -40,6 +41,7 @@ export class MarketplaceStatusSyncService {
     private readonly config: ConfigService,
     private readonly divergenceService: MarketplaceDivergenceService,
     @Optional() @InjectQueue(MARKETPLACE_EVENT_QUEUE) private readonly queue?: Queue,
+    @Optional() private readonly ordersGateway?: OrdersGateway,
   ) {}
 
   async handleInternalStatusChanged(input: {
@@ -189,6 +191,7 @@ export class MarketplaceStatusSyncService {
       where: { id: record.id, tenantId: input.tenantId },
       data: { status: MarketplaceOperationStatus.QUEUED, lastError: null, enqueuedAt },
     });
+    this.ordersGateway?.emitOrderChanged(input.tenantId, input.orderId, 'marketplace');
     return { deferred: true, operationId: record.id };
   }
 
@@ -247,6 +250,7 @@ export class MarketplaceStatusSyncService {
         lastError: null,
       },
     });
+    this.ordersGateway?.emitOrderChanged(input.tenantId, input.orderId, 'marketplace');
 
     const provider = this.providerRegistry.get(record.provider);
     try {
@@ -283,6 +287,7 @@ export class MarketplaceStatusSyncService {
           providerCode: result.providerCode ?? null,
         },
       });
+      this.ordersGateway?.emitOrderChanged(input.tenantId, input.orderId, 'marketplace');
       this.logger.log({
         message: 'marketplace_operation_accepted',
         tenantId: record.tenantId,
@@ -307,6 +312,7 @@ export class MarketplaceStatusSyncService {
           lastError: apiError.message.slice(0, 500),
         },
       });
+      this.ordersGateway?.emitOrderChanged(input.tenantId, input.orderId, 'marketplace');
       if (!apiError.retryable) {
         await this.divergenceService.record({
           tenantId: record.tenantId,

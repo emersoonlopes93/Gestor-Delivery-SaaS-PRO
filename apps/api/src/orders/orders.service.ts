@@ -536,6 +536,9 @@ export class OrdersService {
         itemCount: orderDetail.items.length,
       });
     }
+    if (!autoAcceptDecision.allowed) {
+      this.ordersGateway.emitOrderChanged(tenantId, order.id, 'created');
+    }
     
     // Se pagamento for PIX, gerar QR code
     if (dto.payment.method === 'pix') {
@@ -1475,6 +1478,16 @@ export class OrdersService {
       }
     }
 
+    this.ordersGateway.emitOrderChanged(
+      tenantId,
+      orderId,
+      nextStatus === 'cancelled'
+        ? 'cancelled'
+        : nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery'
+          ? 'ready'
+          : 'status',
+    );
+
     return updated;
   }
 
@@ -1556,6 +1569,7 @@ export class OrdersService {
         .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, OrderStatus.confirmed, tenant.name)
         .catch((error: Error) => this.logger.warn(`WhatsApp notification failed: ${error.message}`));
     }
+    this.ordersGateway.emitOrderChanged(tenantId, orderId, 'status');
   }
 
   async updateOrderNotes(orderId: string, tenantId: string, dto: UpdateOrderNotesDTO, actorId?: string) {
@@ -1565,7 +1579,7 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { notes: dto.notes || null },
@@ -1587,6 +1601,8 @@ export class OrdersService {
 
       return updated;
     });
+    this.ordersGateway.emitOrderChanged(tenantId, orderId, 'edited');
+    return updated;
   }
 
   async editOrder(orderId: string, tenantId: string, dto: EditOrderDTO, actorId?: string) {
@@ -1788,11 +1804,7 @@ export class OrdersService {
       });
     }, { timeout: 20000 });
 
-    // Notify sockets
-    this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderUpdated', {
-      orderId: order.id, 
-      orderNumber: order.orderNumber 
-    });
+    this.ordersGateway.emitOrderChanged(tenantId, order.id, 'edited');
 
     return this.getOrderDetail(order.id, tenantId);
   }
