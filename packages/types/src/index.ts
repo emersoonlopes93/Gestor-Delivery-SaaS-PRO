@@ -75,6 +75,18 @@ export type {
   OrderBoardItemDTO,
   OrderListItemDTO,
   OrderDispatchItemDTO,
+  OrderOperationalViewModel,
+  OrderOperationalAction,
+  OrderOperationalActionType,
+  OrderOperationalActionMode,
+  OrderOperationalCapabilities,
+  OrderOperationalCapability,
+  OrderMarketplaceOperationSummary,
+  OrderFinancialSummary,
+  OrderDeliverySummary,
+  OrderProductionSummary,
+  OrderOrigin,
+  OrderDeliveryOwnership,
 } from './order';
 
 export {

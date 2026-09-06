@@ -379,6 +379,7 @@ export interface OrderResponseDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  operational?: OrderOperationalViewModel;
 }
 
 export interface OrderListItemDTO {
@@ -427,16 +428,95 @@ export interface OrderBoardItemDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
-  marketplaceCapabilities?: MarketplaceOrderCapabilities | null;
+  operational: OrderOperationalViewModel;
 }
 
-export interface MarketplaceOrderCapabilities {
+export type OrderOrigin = 'PEDEHUB' | 'IFOOD' | 'FOOD_99' | 'MARKETPLACE';
+export type OrderDeliveryOwnership = 'MERCHANT' | 'PROVIDER' | 'UNKNOWN';
+export type OrderOperationalActionType =
+  | 'CONFIRM'
+  | 'START_PREPARATION'
+  | 'MARK_READY'
+  | 'CANCEL'
+  | 'ASSIGN_DRIVER'
+  | 'DISPATCH'
+  | 'RECALCULATE_ROUTE'
+  | 'COMPLETE'
+  | 'PRINT'
+  | 'EDIT'
+  | 'OPEN_DETAILS';
+export type OrderOperationalActionMode = 'LOCAL' | 'PROVIDER_ASYNC' | 'PROVIDER_SYNC' | 'DISABLED';
+
+export interface OrderOperationalCapability {
+  enabled: boolean;
+  mode: OrderOperationalActionMode;
+  reason?: string | null;
+}
+
+export interface OrderOperationalCapabilities {
   canConfirm: boolean;
+  canStartPreparation: boolean;
   canMarkReady: boolean;
-  canDelivered: boolean;
   canCancel: boolean;
-  canSync: boolean;
-  unavailableMessage?: string | null;
+  canAssignDriver: boolean;
+  canDispatch: boolean;
+  canRecalculateRoute: boolean;
+  canComplete: boolean;
+  canPrint: boolean;
+  canEdit: boolean;
+}
+
+export interface OrderOperationalAction {
+  type: OrderOperationalActionType;
+  label: string;
+  mode: OrderOperationalActionMode;
+  enabled: boolean;
+  targetStatus?: OrderStatus;
+  reason?: string | null;
+}
+
+export interface OrderMarketplaceOperationSummary {
+  state: 'NONE' | 'PENDING' | 'FAILED';
+  action?: OrderOperationalActionType | null;
+  provider?: string | null;
+  friendlyMessage?: string | null;
+}
+
+export interface OrderFinancialSummary {
+  operationalValue: number;
+  operationalValueLabel: string;
+  saleAmount: number;
+  customerPaid: number | null;
+  paymentState: 'UNKNOWN' | 'PENDING' | 'PAID';
+  paymentLabel: string;
+}
+
+export interface OrderDeliverySummary {
+  ownership: OrderDeliveryOwnership;
+  label: string;
+  driverName?: string | null;
+}
+
+export interface OrderProductionSummary {
+  state: 'NOT_SENT' | 'IN_PRODUCTION' | 'READY' | 'UNKNOWN';
+  label: string;
+}
+
+export interface OrderOperationalViewModel {
+  origin: OrderOrigin;
+  provider: string | null;
+  displayChannel: string;
+  deliveryOwnership: OrderDeliveryOwnership;
+  fulfillmentMode: FulfillmentType;
+  capabilities: OrderOperationalCapabilities;
+  availableActions: OrderOperationalAction[];
+  marketplaceOperation: OrderMarketplaceOperationSummary;
+  syncState: 'NONE' | 'PENDING' | 'FAILED';
+  financialSummary: OrderFinancialSummary;
+  deliverySummary: OrderDeliverySummary;
+  productionSummary: OrderProductionSummary;
+  primaryAction: OrderOperationalAction | null;
+  secondaryActions: OrderOperationalAction[];
 }
 
 export interface OrderKdsItemDTO {

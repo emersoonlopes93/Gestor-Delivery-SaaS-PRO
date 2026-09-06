@@ -60,6 +60,7 @@ import {
   assertOrderIdempotencyPayload,
   isPrismaUniqueConstraintError,
 } from './order-idempotency.util';
+import { getOrderOperationalViewModel } from './order-operational-view-model';
 
 @Injectable()
 export class OrdersService {
@@ -796,7 +797,17 @@ export class OrdersService {
         items: true,
         deliveryDriver: true,
         table: { select: { id: true, name: true } },
-        marketplaceOrders: { select: { provider: true, deliveryOwnership: true } },
+        marketplaceOrders: {
+          select: {
+            provider: true,
+            deliveryOwnership: true,
+            operations: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { operation: true, status: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -814,36 +825,23 @@ export class OrdersService {
       sourceChannel: o.sourceChannel,
       scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
       isScheduled: o.isScheduled ?? false,
-      marketplaceCapabilities: this.getMarketplaceCapabilities(o.marketplaceOrders),
+      operational: getOrderOperationalViewModel({
+        status: o.status as OrderStatus,
+        fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
+        sourceChannel: o.sourceChannel,
+        total: Number(o.total),
+        itemsSubtotal: Number(o.itemsSubtotal),
+        deliveryDriverName: o.deliveryDriver?.name,
+        provider: o.marketplaceOrders[0]?.provider,
+        deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+        latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
+      }),
       createdAt: o.createdAt.toISOString(),
       notes: o.notes,
       deliveryDriverId: o.deliveryDriverId || undefined,
       deliveryDriverName: o.deliveryDriver?.name || undefined,
       deliveryDriverStatus: o.deliveryDriver?.status || undefined,
     }));
-  }
-
-  private getMarketplaceCapabilities(marketplaceOrders: Array<{ provider: string; deliveryOwnership: string }>) {
-    const marketplaceOrder = marketplaceOrders[0];
-    if (!marketplaceOrder) return null;
-    if (marketplaceOrder.provider === 'FOOD_99') {
-      return {
-        canConfirm: true,
-        canMarkReady: true,
-        canDelivered: marketplaceOrder.deliveryOwnership === 'MERCHANT',
-        canCancel: false,
-        canSync: true,
-        unavailableMessage: 'Confirme este pedido pela 99Food.',
-      };
-    }
-    return {
-      canConfirm: true,
-      canMarkReady: true,
-      canDelivered: true,
-      canCancel: true,
-      canSync: true,
-      unavailableMessage: null,
-    };
   }
 
   async getKdsOrders(tenantId: string): Promise<OrderKdsItemDTO[]> {
@@ -897,6 +895,17 @@ export class OrdersService {
         deliveryDriver: true,
         table: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
+        marketplaceOrders: {
+          select: {
+            provider: true,
+            deliveryOwnership: true,
+            operations: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { operation: true, status: true },
+            },
+          },
+        },
       },
     });
 
@@ -1073,12 +1082,19 @@ export class OrdersService {
       createdAt: Date;
       metadata: Prisma.JsonValue | null;
     }>;
+    marketplaceOrders?: Array<{
+      provider: string;
+      deliveryOwnership: string;
+      operations: Array<{ operation: string; status: string }>;
+    }>;
   }): OrderResponseDTO {
+    const fulfillmentType = this.mapFulfillmentType(order.fulfillmentType);
+    const marketplaceOrder = order.marketplaceOrders?.[0];
     return {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status as OrderStatus,
-      fulfillmentType: order.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
@@ -1094,6 +1110,19 @@ export class OrdersService {
       changeFor: order.changeFor ? Number(order.changeFor) : null,
       scheduledFor: order.scheduledFor ? order.scheduledFor.toISOString() : null,
       isScheduled: order.isScheduled ?? false,
+      ...(order.marketplaceOrders ? {
+        operational: getOrderOperationalViewModel({
+          status: order.status as OrderStatus,
+          fulfillmentType,
+          sourceChannel: order.sourceChannel,
+          total: Number(order.total),
+          itemsSubtotal: Number(order.itemsSubtotal),
+          deliveryDriverName: order.deliveryDriver?.name,
+          provider: marketplaceOrder?.provider,
+          deliveryOwnership: marketplaceOrder?.deliveryOwnership,
+          latestMarketplaceOperation: marketplaceOrder?.operations[0] ?? null,
+        }),
+      } : {}),
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,

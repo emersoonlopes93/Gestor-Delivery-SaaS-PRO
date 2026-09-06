@@ -90,6 +90,17 @@ duplicados. Não usar lock somente em memória como substituto da constraint.
 
 ## 5. WebSockets e UI Reactiva
 
+### 5.1 View model operacional do tenant
+
+O board e o detalhe autenticado recebem o mesmo `OrderOperationalViewModel`, derivado no backend sem alterar a máquina de estados. Esse contrato expõe origem, ownership da entrega, capabilities, ações válidas para o status atual, operação marketplace pendente/falha e resumos financeiro, logístico e de produção.
+
+- Card, drawer e drag-and-drop devem executar somente ações retornadas em `availableActions`.
+- `PROVIDER` e `UNKNOWN` nunca habilitam frota própria; o backend continua sendo a barreira fail-closed.
+- Operações iFood/99Food marcadas como `PROVIDER_ASYNC` permanecem pendentes até o evento autoritativo.
+- O drag-and-drop não pode executar cancelamento ou conclusão e não converte coluna diretamente em status.
+- O resumo financeiro usa `Venda`/valor do pedido e não infere pagamento ou recebível do lojista.
+- O resumo de produção é derivado apenas do status canônico; não inventa estado de KDS.
+
 O painel administrativo e o storefront reagem a mudanças através do WebSocket (namespace principal).
 Quando a API processa a transição, ela emite:
 - Evento: `orderStatusUpdated`
