@@ -8,6 +8,26 @@
 - O cliente nunca escolhe `tenantId` ou `driverId` para uma sala privada.
 - A revogação de uma sessão desconecta somente sockets associados ao respectivo `sid`.
 
+## Reconciliação operacional de pedidos
+
+O namespace autenticado `/orders` publica `order.changed` na sala derivada
+`tenant:<tenantId>`. O `OrderChangedEvent` contém somente `eventId`, `orderId`,
+`occurredAt` e `reason`; ele é um hint e nunca uma segunda fonte de verdade.
+
+- o painel considera realtime pronto somente depois de `joinedTenant`;
+- o socket já montado para notificações publica o hint em um bus tipado no navegador;
+- Kanban e drawer reconciliam apenas `GET /orders/:id`, com cache busting;
+- pedidos terminais saem do Kanban, mas continuam disponíveis na Lista;
+- a Lista mantém busca, filtros, página e drawer e pede confirmação explícita em
+  `Há atualizações` antes de reordenar resultados;
+- polling completo é fallback sem sobreposição: 90 segundos conectado e 30
+  segundos desconectado/reconectando; após 120 segundos sem confirmação o
+  snapshot é apresentado como possivelmente desatualizado.
+
+Mudanças de criação, status, edição, responsável pela entrega e operação
+marketplace emitem o hint somente depois da escrita bem-sucedida. O payload não
+carrega estado do pedido nem identidade tenant escolhida pelo cliente.
+
 ## Eventos canônicos de rota do entregador
 
 O servidor publica `driverRouteEvent` somente na sala privada derivada `driver:<tenantId>:<driverId>`. O contrato `DriverRouteEvent` é um gatilho leve de reconciliação e contém `eventId`, `type`, `change`, `runId`, `occurredAt` e, quando aplicável, `stopId`. A identidade do entregador não é aceita no payload: ela permanece derivada da sala autenticada.

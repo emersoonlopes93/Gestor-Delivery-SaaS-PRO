@@ -108,3 +108,8 @@ Quando a API processa a transição, ela emite:
 - Room: `tenant_${tenantId}`
 
 Frontends devem confiar nos eventos socket e realizar re-fetch apenas do pedido específico (ou revalidar cache), não de listas gigantescas.
+
+No painel tenant, o evento canônico para essa reconciliação é `order.changed`
+na sala autenticada `tenant:<tenantId>`. A UI busca `GET /orders/:id` e reaplica
+o `OrderOperationalViewModel`; durante drag-and-drop, o hint do pedido arrastado
+é adiado e uma leitura autoritativa precede qualquer transição.

@@ -1,3 +1,14 @@
+## Gestor de Pedidos UX V2 — Slice 3 (2026-09-06)
+
+- O socket `/orders` já montado por notificações agora publica um bus interno tipado; conexão só é considerada pronta após `joinedTenant`, sem criar SSE ou conexão adicional.
+- `order.changed` é um hint tenant-scoped com ID/motivo/data. Kanban e drawer reconciliam somente `GET /orders/:id`; terminal sai do board, inserção preserva `createdAt` e troca de coluna não reordena os demais cards.
+- Durante DnD, hints do pedido arrastado são acumulados e a leitura autoritativa antecede a ação. Conflitos 400/404/409 também reconciliam o pedido.
+- Polling completo do Kanban é fallback sem sobreposição: 90s conectado e 30s desconectado/reconectando; 120s sem confirmação ativa o aviso discreto de snapshot antigo. Builder de entrega só acompanha reconciliação lenta ou motivo de driver.
+- A Lista não se reordena por socket: exibe `Há atualizações` e só refaz a consulta por ação explícita, preservando busca, filtros, página e drawer. O drawer aberto atualiza silenciosamente apenas quando seu próprio ID muda.
+- Backend aditivo emite hints após criação/status/edição, estados marketplace e alterações de rota/driver; sem schema, migration, adapter ou lifecycle novo.
+- Harness determinístico cobre 1440x900, 1024x768, 768x1024 e 390x844, conexão/reconexão, realtime por pedido, filtros ativos, drawer aberto e contadores de requests. Screenshots continuam temporários fora do Git.
+- Slice 3 concluída localmente: typecheck, no-any, features, boundaries, theme, lint, builds API/web-tenant, 165 testes web, 4 shards API (644 testes, 10 skips) e E2E responsivo passaram. Avaliação visual independente aprovou; observações não bloqueantes: toast de atraso pode sobrepor drawer e screenshot full-page 1024px pode aparentar recorte de card. Nenhum deploy, produção, banco remoto ou schema/migration foi executado.
+
 ## Gestor de Pedidos UX V2 — Slice 2 (2026-09-06)
 
 - Objetivo: transformar a fundação segura da Slice 1 em um cockpit operacional responsivo para Kanban e Lista, sem alterar schema, lifecycle, adapters marketplace, Routing V2, KDS, pagamentos ou realtime.

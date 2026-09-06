@@ -48,15 +48,38 @@ const orderDetail = {
   ...boardOrder, customerEmail: null, deliveryFee: 4, normalDeliveryFee: 4, serviceFee: 0, discountTotal: 0, paymentMethod: 'pix', changeFor: null, couponId: null, cashbackUsed: null, deliveryAddress: { street: 'Rua das Flores', number: '42', neighborhood: 'Centro', city: 'São Paulo', state: 'SP', zipCode: '01000-000' }, timeline: [{ id: 't-1', status: 'pending', note: 'Pedido recebido', createdAt: '2026-09-06T12:00:00.000Z' }], items: [{ id: 'item-1', quantity: 2, snapshotName: 'Pizza especial', snapshotComposition: '{"options":[{"name":"Bacon"}]}', notes: 'Sem cebola', lineTotal: 38 }],
 };
 
+type RequestCounters = { board: number; list: number; detail: number; builder: number };
+type HarnessOperational = Omit<typeof operational, 'marketplaceOperation' | 'syncState' | 'productionSummary'> & {
+  marketplaceOperation: { state: string; friendlyMessage?: string };
+  syncState: string;
+  productionSummary: { state: string; label: string };
+};
+type HarnessOrderDetail = Omit<typeof orderDetail, 'operational'> & {
+  operational: HarnessOperational;
+  updatedAt?: string;
+};
+type HarnessState = { detail: HarnessOrderDetail; requests: RequestCounters };
+
+function createHarnessState(): HarnessState {
+  return {
+    detail: structuredClone(orderDetail),
+    requests: { board: 0, list: 0, detail: 0, builder: 0 },
+  };
+}
+
 function envelope(data: unknown) { return { success: true, data }; }
 
-async function fulfillApi(route: Route) {
+async function fulfillApi(route: Route, state: HarnessState) {
   const pathname = new URL(route.request().url()).pathname;
+  if (pathname.includes('/orders/operation/board')) state.requests.board += 1;
+  else if (/^\/api\/v1\/orders\/?$/.test(pathname)) state.requests.list += 1;
+  else if (/\/orders\/order-\d+$/.test(pathname)) state.requests.detail += 1;
+  else if (pathname.endsWith('/delivery/runs/builder')) state.requests.builder += 1;
   const payload = pathname.endsWith('/auth/tenant/me')
     ? { userId: 'user-1', tenantId: 'tenant-1', email: 'qa@example.test', name: 'QA', roles: ['owner'], permissions: ['orders.read', 'orders.use_kanban'], enabledModules: ['orders'], onboardingCompletedAt: '2026-09-01T12:00:00.000Z', tenant: { id: 'tenant-1', name: 'Pizzaria QA', slug: 'qa', status: 'active' } }
     : pathname.includes('/orders/operation/board') ? boardOrders
       : /^\/api\/v1\/orders\/?$/.test(pathname) ? { items: boardOrders, total: boardOrders.length }
-        : pathname.endsWith('/orders/order-1') ? orderDetail
+        : pathname.endsWith('/orders/order-1') ? state.detail
           : pathname.endsWith('/delivery/runs/order/order-1') ? { id: 'run-1', driverId: 'driver-1', driverName: 'Mário', status: 'IN_PROGRESS', version: 1, assignedAt: null, acceptedAt: null, startedAt: '2026-09-06T12:00:00.000Z', returningAt: null, completedAt: null, createdAt: '2026-09-06T12:00:00.000Z', route: { provider: 'fallback', quality: 'DEGRADED', version: 1, distanceMeters: 2200, durationSeconds: 660, calculatedAt: '2026-09-06T12:00:00.000Z', geometry: [] }, stops: [{ id: 'stop-1', orderId: 'order-1', sequence: 1, status: 'PENDING', attempts: 0, orderNumber: '1042', customerName: 'Ana Souza', customerPhone: '11999990000', address: null, arrivedAt: null, deliveredAt: null, failedAt: null, failureReason: null, returnRequiredAt: null, returnedAt: null, cancelledAt: null, cancellationReason: null, payAmount: null, payCurrency: null, routeDistanceMeters: 2200, routeDurationSeconds: 660, estimatedArrivalAt: '2026-09-06T12:20:00.000Z' }] }
             : pathname.endsWith('/delivery/runs/builder') ? { drivers: [] }
               : {};
@@ -93,7 +116,13 @@ async function expectVisible(page: Page, name: RegExp) {
   }
 }
 
-async function capturePage(page: Page, label: string, route: '/orders' | '/orders/board') {
+async function emitRealtime(page: Page, detail: object) {
+  await page.evaluate((eventDetail) => {
+    window.dispatchEvent(new CustomEvent('tenant:orders-realtime-event', { detail: eventDetail }));
+  }, detail);
+}
+
+async function capturePage(page: Page, state: HarnessState, label: string, route: '/orders' | '/orders/board') {
   await page.goto(`${webBase}${route}`, { waitUntil: 'domcontentloaded' });
   await expectVisible(page, route === '/orders' ? /Pedidos/i : /Painel de Operações/i);
   const notificationBannerClose = page.getByRole('button', { name: /Fechar notifica/i });
@@ -115,7 +144,7 @@ async function capturePage(page: Page, label: string, route: '/orders' | '/order
     await assertFullyVisible(page, page.getByRole('button', { name: /Sons de novos pedidos/i }), `${label}: audio control`);
     await assertFullyVisible(page, page.getByRole('button', { name: /Atualizar quadro agora/i }), `${label}: refresh control`);
     await assertFullyVisible(page, page.getByText(/Precisa confirmar/i), `${label}: priority band`);
-    await assertFullyVisible(page, page.getByText(/há \d+ min/i), `${label}: time band`);
+    await assertFullyVisible(page, page.getByText(/(?:há|atrasado) \d+ min/i), `${label}: time band`);
     await assertFullyVisible(page, page.getByText('#1042', { exact: true }), `${label}: identity band`);
     await assertFullyVisible(page, page.getByText(/Novo — precisa confirmar/i), `${label}: status band`);
     if ((await page.viewportSize())!.width >= 1280) {
@@ -132,6 +161,35 @@ async function capturePage(page: Page, label: string, route: '/orders' | '/order
   const primary = page.getByRole('button', { name: /Confirmar pedido/i }).first();
   const box = await primary.boundingBox();
   assert.ok(box && box.y < (await page.viewportSize())!.height, `${label}-${route}: primary drawer action is not visible`);
+  const requestsBeforeRealtime = { ...state.requests };
+  state.detail = {
+    ...state.detail,
+    status: 'preparing',
+    updatedAt: '2026-09-06T12:33:00.000Z',
+    operational: {
+      ...state.detail.operational,
+      marketplaceOperation: { state: 'PENDING', friendlyMessage: 'Sincronizando com iFood…' },
+      syncState: 'PENDING',
+      productionSummary: { state: 'PREPARING', label: 'Em preparo na cozinha' },
+    },
+  };
+  await emitRealtime(page, { type: 'connection', state: 'connected', occurredAt: '2026-09-06T12:33:00.000Z' });
+  await emitRealtime(page, { type: 'order.changed', hint: { eventId: `${label}:${route}:event-1`, orderId: 'order-1', occurredAt: '2026-09-06T12:33:00.000Z', reason: 'marketplace' } });
+  await expectVisible(page, /Tempo real ativo/i);
+  await page.getByRole('dialog').waitFor();
+  assert.equal(state.requests.board, requestsBeforeRealtime.board, `${label}-${route}: realtime triggered a full board fetch`);
+  assert.equal(state.requests.list, requestsBeforeRealtime.list, `${label}-${route}: realtime triggered a list fetch`);
+  if (route === '/orders') {
+    await expectVisible(page, /Há atualizações/i);
+    assert.equal(await page.getByLabel(/Buscar por número/i).inputValue(), '1042');
+    await page.getByLabel('Fechar detalhes do pedido').click();
+    await page.getByLabel('Atualizações disponíveis').getByRole('button', { name: 'Atualizar', exact: true }).click();
+    assert.equal(await page.getByLabel(/Buscar por número/i).inputValue(), '1042');
+  } else {
+    assert.equal(await page.getByLabel(/Buscar pedido/i).inputValue(), 'Ana');
+  }
+  await emitRealtime(page, { type: 'connection', state: 'reconnecting', occurredAt: '2026-09-06T12:34:00.000Z' });
+  await expectVisible(page, /Reconectando/i);
   await assertNoPageOverflow(page, `${label}-${route}-drawer`);
   await page.screenshot({ path: join(artifacts, `${label}-${route.replaceAll('/', '-')}-drawer.png`), fullPage: true });
 }
@@ -147,14 +205,17 @@ async function main() {
       await context.addInitScript((selectedTheme) => {
         localStorage.setItem('accessToken', 'orders-ux-v2-deterministic-token');
         localStorage.setItem('gestor-delivery:tenant-panel-theme', selectedTheme);
+        Date.now = () => new Date('2026-09-06T12:32:00.000Z').getTime();
       }, theme);
-      await context.route('**/api/v1/**', fulfillApi);
+      const state = createHarnessState();
+      await context.route('**/api/v1/**', (route) => fulfillApi(route, state));
       const page = await context.newPage();
       const label = `${viewport.width}x${viewport.height}-${theme}`;
-      await capturePage(page, label, '/orders/board');
-      await capturePage(page, label, '/orders');
+      await capturePage(page, state, label, '/orders/board');
+      state.detail = structuredClone(orderDetail);
+      await capturePage(page, state, label, '/orders');
       await context.close();
-      console.log(`PASS ${label}`);
+      console.log(`PASS ${label} requests=${JSON.stringify(state.requests)}`);
       }
     }
   } finally { await browser.close(); }
