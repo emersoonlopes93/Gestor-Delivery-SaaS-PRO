@@ -387,7 +387,8 @@ export class MarketplaceOrderIngestionService {
         internalOrder: {
           is: {
             OR: [
-              { customerName: 'Cliente 99Food' },
+              { customerName: { equals: 'privacy protection', mode: 'insensitive' } },
+              { customerName: { equals: 'privacy protected', mode: 'insensitive' } },
               { items: { none: {} } },
             ],
           },
@@ -406,7 +407,7 @@ export class MarketplaceOrderIngestionService {
     let repaired = 0;
     for (const candidate of candidates) {
       const internalOrder = candidate.internalOrder;
-      if (!internalOrder || (internalOrder.customerName !== 'Cliente 99Food' && internalOrder._count.items > 0)) continue;
+      if (!internalOrder || (!this.isPrivacyProtectedCustomerName(internalOrder.customerName) && internalOrder._count.items > 0)) continue;
       try {
         const provider = this.providerRegistry.get(MarketplaceProvider.FOOD_99);
         const persistedPayload = this.asRecord(candidate.rawPayload) ?? {};
@@ -884,8 +885,12 @@ export class MarketplaceOrderIngestionService {
 
   private isCompleteFood99Snapshot(normalized: NormalizedMarketplaceOrder): boolean {
     return normalized.externalOrderId !== 'unknown-order'
-      && normalized.customerName !== 'Cliente 99Food'
       && normalized.items.length > 0;
+  }
+
+  private isPrivacyProtectedCustomerName(value: string): boolean {
+    const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+    return normalized === 'privacy protection' || normalized === 'privacy protected';
   }
 
   private async replaceIncompleteFood99Order(

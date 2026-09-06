@@ -178,7 +178,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       confirmationDeadlineAt: null,
       fulfillmentType,
       deliveryOwnership: MarketplaceDeliveryOwnership.UNKNOWN,
-      customerName: this.readString(customer, ['name']) ?? 'Cliente 99Food',
+      customerName: this.customerName(customer, ['firstName', 'first_name'], ['lastName', 'last_name']),
       customerPhone: this.readString(phone, ['number', 'phoneNumber'])
         ?? this.readString(customer, ['phoneNumber'])
         ?? '',
@@ -315,7 +315,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
         : deliveryType === 2
           ? MarketplaceDeliveryOwnership.MERCHANT
           : MarketplaceDeliveryOwnership.UNKNOWN,
-      customerName: this.readString(address, ['name']) ?? 'Cliente 99Food',
+      customerName: this.customerName(address, ['first_name', 'firstName'], ['last_name', 'lastName']),
       customerPhone: this.readString(address, ['phone', 'virtual_phone_number']) ?? '',
       customerEmail: null,
       notes: this.readString(order, ['remark']),
@@ -483,6 +483,26 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       if (typeof value === 'string' && value.trim()) return value.trim();
     }
     return null;
+  }
+
+  private customerName(
+    record: Record<string, unknown> | null,
+    firstNameKeys: string[],
+    lastNameKeys: string[],
+  ): string {
+    const fullName = this.readString(record, ['name']);
+    if (fullName && !this.isPrivacyProtectedName(fullName)) return fullName;
+
+    const nameParts = [
+      this.readString(record, firstNameKeys),
+      this.readString(record, lastNameKeys),
+    ].filter((value): value is string => value !== null && !this.isPrivacyProtectedName(value));
+    return nameParts.join(' ').trim() || 'Cliente 99Food';
+  }
+
+  private isPrivacyProtectedName(value: string): boolean {
+    const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+    return normalized === 'privacy protection' || normalized === 'privacy protected';
   }
 
   private readDate(record: Record<string, unknown> | null, keys: string[]): Date | null {

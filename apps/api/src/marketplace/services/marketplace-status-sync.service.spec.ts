@@ -48,7 +48,7 @@ describe('MarketplaceStatusSyncService', () => {
     const queue = withQueue ? { add: jest.fn().mockResolvedValue({}) } : undefined;
     const divergenceService = { record: jest.fn().mockResolvedValue({}), resolveForOperation: jest.fn().mockResolvedValue(undefined) };
     return {
-      prisma, provider, queue,
+      prisma, provider, queue, featureControl,
       service: new MarketplaceStatusSyncService(
         prisma as never,
         registry as never,
@@ -76,6 +76,16 @@ describe('MarketplaceStatusSyncService', () => {
     expect(queue?.add).toHaveBeenCalledWith('order-status-sync', expect.objectContaining({
       tenantId: 'tenant-1', orderId: 'order-1', externalOrderId: 'external-1', payloadVersion: 1,
     }), expect.objectContaining({ jobId: expect.stringContaining('ifood-confirm-tenant-1') }));
+  });
+
+  it('keeps the iFood tenant feature entitlement mandatory', async () => {
+    const { service, featureControl, queue } = makeService();
+    featureControl.resolveTenantFeature.mockResolvedValueOnce({ enabled: false });
+
+    await expect(service.handleInternalStatusChanged({
+      tenantId: 'tenant-1', orderId: 'order-1', status: 'confirmed',
+    })).rejects.toThrow('Marketplace feature is disabled for this tenant.');
+    expect(queue?.add).not.toHaveBeenCalled();
   });
 
   it('rejects a tampered cross-tenant job before calling the provider', async () => {
@@ -132,7 +142,8 @@ describe('MarketplaceStatusSyncService', () => {
   });
 
   it('queues a native 99Food confirmation through its official operation path', async () => {
-    const { service, prisma, queue } = makeService();
+    const { service, prisma, queue, featureControl } = makeService();
+    featureControl.resolveTenantFeature.mockResolvedValueOnce({ enabled: false });
     prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
       ...marketplaceOrder,
       provider: MarketplaceProvider.FOOD_99,
@@ -145,6 +156,26 @@ describe('MarketplaceStatusSyncService', () => {
     expect(queue?.add).toHaveBeenCalledWith('order-status-sync', expect.objectContaining({
       operation: MarketplaceOperationType.CONFIRM,
     }), expect.objectContaining({ jobId: expect.stringContaining('food_99-confirm-tenant-1') }));
+    expect(featureControl.resolveTenantFeature).not.toHaveBeenCalled();
+  });
+
+  it('queues a native 99Food ready action without the generic marketplace preset', async () => {
+    const { service, prisma, queue, featureControl } = makeService();
+    featureControl.resolveTenantFeature.mockResolvedValueOnce({ enabled: false });
+    prisma.marketplaceOrder.findFirst.mockResolvedValueOnce({
+      ...marketplaceOrder,
+      provider: MarketplaceProvider.FOOD_99,
+      deliveryOwnership: 'MERCHANT',
+      normalizedPayload: { fulfillmentType: 'delivery' },
+    });
+
+    await expect(service.handleInternalStatusChanged({
+      tenantId: 'tenant-1', orderId: 'order-1', status: 'ready_for_delivery',
+    })).resolves.toEqual({ deferred: true, operationId: 'operation-1' });
+    expect(queue?.add).toHaveBeenCalledWith('order-status-sync', expect.objectContaining({
+      operation: MarketplaceOperationType.READY,
+    }), expect.objectContaining({ jobId: expect.stringContaining('food_99-ready-tenant-1') }));
+    expect(featureControl.resolveTenantFeature).not.toHaveBeenCalled();
   });
 
   it('allows delivered only for a merchant-owned 99Food delivery', async () => {

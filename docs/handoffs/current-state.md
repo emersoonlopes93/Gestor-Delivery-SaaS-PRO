@@ -1,3 +1,10 @@
+## 99Food native actions and privacy-name correction (2026-09-05)
+
+- Confirmed that the order endpoint already enforces `orders.update_status`, the provider environment switch, a tenant-scoped `CONNECTED` connection and BullMQ. Removed only the duplicate `marketplace_orders` beta-preset gate from 99Food native actions; the iFood feature and entitlement gate remains unchanged.
+- The 99Food normalizer no longer persists the provider marker `privacy protection` as a customer name. It prefers documented first/last name fields and otherwise stores the neutral `Cliente 99Food` label without inventing identity data.
+- Complete 99Food snapshots now require an exact external order ID and at least one item, not a disclosed customer name. The repair scan targets already-persisted privacy markers and empty historical orders, and stops retrying valid privacy-masked orders indefinitely.
+- No schema, migration, secret, deployment, production database or provider call was changed.
+
 ## 99Food production-log contract audit (2026-09-05)
 
 - O log real do Dokploy comprovou webhook `POST /api/v1/webhooks/marketplaces/99food` com 204 e detalhe `/v1/order/order/detail` com HTTP 200; o texto `OFFLINE` era apenas o badge generico da tela aplicado ao status de inbox `FAILED`, nao uma conexao offline. Eventos agora exibem `Falhou`, `Processando`, `Processado` ou `Ignorado` separadamente do estado da conexao.

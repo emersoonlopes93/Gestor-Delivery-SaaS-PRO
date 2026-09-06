@@ -17,6 +17,16 @@ function reconcileFood99Lifecycle(service: MarketplaceOrderIngestionService, inp
   return (candidate as (request: Food99LifecycleInput) => Promise<void>).call(service, input);
 };
 
+function isCompleteFood99Snapshot(service: MarketplaceOrderIngestionService, input: {
+  externalOrderId: string;
+  customerName: string;
+  items: unknown[];
+}): boolean {
+  const candidate: unknown = Reflect.get(service, 'isCompleteFood99Snapshot');
+  if (typeof candidate !== 'function') throw new Error('99Food completeness validator is unavailable.');
+  return (candidate as (snapshot: typeof input) => boolean).call(service, input);
+}
+
 function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersService = { updateOrderStatus: jest.fn() }) {
   return {
     service: new MarketplaceOrderIngestionService(
@@ -42,6 +52,16 @@ const food99LifecycleInput = {
 };
 
 describe('MarketplaceOrderIngestionService', () => {
+  it('accepts a complete 99Food snapshot even when the provider withholds the customer name', () => {
+    const { service } = makeFood99LifecycleService({});
+
+    expect(isCompleteFood99Snapshot(service, {
+      externalOrderId: '5764656197621845665',
+      customerName: 'Cliente 99Food',
+      items: [{ name: 'Pizza' }],
+    })).toBe(true);
+  });
+
   it('advances orderConfirm through preparing exactly once for the canonical KDS entry point', async () => {
     const prisma = { marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
     const { service, ordersService } = makeFood99LifecycleService(prisma);

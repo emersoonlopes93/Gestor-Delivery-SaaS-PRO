@@ -198,6 +198,36 @@ describe('Food99Provider', () => {
     expect(normalized.items).toEqual([expect.objectContaining({ name: 'Pizza', totalPrice: 35.99 })]);
   });
 
+  it('replaces the 99Food privacy placeholder with documented name parts when available', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665',
+        receive_address: {
+          name: 'privacy protection', first_name: 'Marina', last_name: 'Silva', phone: '5511999999999',
+        },
+        price: { order_price: 3599 },
+        order_items: [{ app_item_id: 'pizza', name: 'Pizza', amount: 1, sku_price: 3599, total_price: 3599 }],
+      },
+    });
+
+    expect(normalized.customerName).toBe('Marina Silva');
+  });
+
+  it('uses a neutral customer label when 99Food masks every available name field', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665',
+        receive_address: { name: 'privacy protection', first_name: 'privacy protected' },
+        price: { order_price: 3599 },
+        order_items: [{ app_item_id: 'pizza', name: 'Pizza', amount: 1, sku_price: 3599, total_price: 3599 }],
+      },
+    });
+
+    expect(normalized.customerName).toBe('Cliente 99Food');
+  });
+
   it('merges a sparse detail response with the complete order_info from orderNew', async () => {
     client.fetchOrderDetails.mockResolvedValueOnce({
       order: { order_id: '5764656197621845665', status: 100, order_items: [] },

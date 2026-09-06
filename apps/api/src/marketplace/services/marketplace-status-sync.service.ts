@@ -69,11 +69,17 @@ export class MarketplaceStatusSyncService {
       throw new BadRequestException('A finalização da entrega é permitida somente para entregas próprias da loja.');
     }
     if (!isFood99 && !['confirmed', 'cancelled'].includes(input.status)) return { deferred: false };
-    const capability = await this.featureControl.resolveTenantFeature({
-      tenantId: input.tenantId,
-      featureKey: isFood99 ? 'marketplace_orders' : 'ifood_marketplace',
-    });
-    if (!capability.enabled) throw new BadRequestException('Marketplace feature is disabled for this tenant.');
+    // A connected 99Food store plus the provider-specific environment switch is
+    // the explicit tenant opt-in for native order actions. `marketplace_orders`
+    // controls the generic marketplace management UI and must not independently
+    // block the normal orders status endpoint used by the operational board.
+    if (!isFood99) {
+      const capability = await this.featureControl.resolveTenantFeature({
+        tenantId: input.tenantId,
+        featureKey: 'ifood_marketplace',
+      });
+      if (!capability.enabled) throw new BadRequestException('Marketplace feature is disabled for this tenant.');
+    }
     if (marketplaceOrder.connection.status !== MarketplaceConnectionStatus.CONNECTED) {
       throw new ServiceUnavailableException('Marketplace connection is not operational.');
     }

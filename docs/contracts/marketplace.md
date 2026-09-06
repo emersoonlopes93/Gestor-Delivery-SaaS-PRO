@@ -252,6 +252,12 @@ Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 
 
 Native detail parsing preserves unquoted 64-bit identifiers as decimal strings before JSON parsing. The normalizer accepts the official direct `OrderModel` and bounded native containers (`data`, `order_info`, `order`, `order_detail`, `detail`) only when an `order_id` is present. When the remote detail is sparse, missing address, price, and item fields may be completed from the signed `data.order_info` received with `orderNew`; an incomplete merged snapshot remains retryable and is not imported as a placeholder.
 
+### Native action activation and privacy-protected names (2026-09-05)
+
+99Food actions initiated from the operational order board require `orders.update_status`, a tenant-scoped `CONNECTED` 99Food connection, `MARKETPLACE_99FOOD_ENABLED=true`, and operational BullMQ. The connected store is the tenant's explicit opt-in for these native actions. The generic beta `marketplace_orders` preset controls marketplace-management surfaces and does not independently block the normal order-status endpoint; iFood retains its provider-specific feature and entitlement gate.
+
+The provider may return `receive_address.name="privacy protection"`. This value is a privacy marker, not a customer name. The normalizer discards it, prefers documented `first_name` and `last_name` values when available, and otherwise uses the neutral `Cliente 99Food` label. A deliberately withheld customer name does not invalidate a snapshot with an exact order ID and items. The repair scan includes historical orders that persisted the literal marker, without repeatedly fetching already-complete privacy-masked orders.
+
 ### Paridade de pedido nativo (2026-09-04)
 
 A fonte normativa do callback nativo Ã© o portal 99Food: [Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1921) e [Order Webhooks](https://openplatform-portal-food.99app.com/docs/v1/node/nodedataget?id=1981). Os eventos oficiais de lifecycle documentados para este fluxo sÃ£o `orderNew`, `orderConfirm`, `orderReady`, `orderCancel`, `orderPartialCancel` e `orderFinish`. NÃ£o hÃ¡ evento nativo documentado chamado `preparing`; o PedeHub nÃ£o o inventa. `orderConfirm` sincroniza para `confirmed`, `orderReady` para pronto e `orderFinish` para `completed`, sempre respeitando `ORDER_STATUS_TRANSITIONS` e a proteÃ§Ã£o contra eventos atrasados/repetidos.
