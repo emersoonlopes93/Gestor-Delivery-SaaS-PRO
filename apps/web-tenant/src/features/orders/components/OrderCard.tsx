@@ -57,13 +57,13 @@ export const OrderCard = memo(function OrderCard({
         {...listeners}
       />
 
-      <div className={compact ? 'pointer-events-none relative p-3' : 'pointer-events-none relative p-4'}>
-        <div className="flex items-start justify-between gap-2 border-b border-border pb-3">
-          <div className="min-w-0 space-y-2">
-            <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${priorityStyles[priority.level]}`}>
+      <div className={compact ? 'pointer-events-none relative p-3 [@media(max-height:650px)]:p-1' : 'pointer-events-none relative p-4 [@media(max-height:650px)]:p-1'}>
+        <div className="flex items-start justify-between gap-2 border-b border-border pb-3 [@media(max-height:650px)]:pb-1">
+          <div className="min-w-0 space-y-2 [@media(max-height:650px)]:space-y-1">
+            <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide [@media(max-height:650px)]:py-0.5 ${priorityStyles[priority.level]}`}>
               <PriorityIcon level={priority.level} /><span>{priority.label}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground [@media(max-height:650px)]:text-[11px]">
               <Clock3 className="h-3.5 w-3.5" /><span>{time.label}</span>
             </div>
           </div>
@@ -73,10 +73,10 @@ export const OrderCard = memo(function OrderCard({
           </div>
         </div>
 
-        <div className="space-y-2.5 border-b border-border py-3">
+        <div className="space-y-2.5 border-b border-border py-3 [@media(max-height:650px)]:space-y-1 [@media(max-height:650px)]:py-1.5">
           <OrderStatusBadge status={order.status} />
           <h3 className="flex items-center gap-2 text-sm font-black text-foreground"><User className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="truncate">{order.customerName}</span></h3>
-          <div className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+          <div className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground [@media(max-height:650px)]:hidden">
             <ShoppingBag className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <p className="line-clamp-2"><strong className="text-foreground">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</strong> · {order.itemsSummary}</p>
           </div>
@@ -87,10 +87,10 @@ export const OrderCard = memo(function OrderCard({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-border py-3 text-xs">
+        <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-border py-3 text-xs [@media(max-height:650px)]:py-1">
           <div>
             <p className="font-black text-foreground">{deliveryStatement(operational, order.fulfillmentType)}</p>
-            {operational.productionSummary.state !== 'UNKNOWN' ? <p className="mt-1 font-medium text-muted-foreground">KDS · {operational.productionSummary.label}</p> : null}
+            {operational.productionSummary.state !== 'UNKNOWN' ? <p className="mt-1 font-medium text-muted-foreground [@media(max-height:650px)]:hidden">KDS · {operational.productionSummary.label}</p> : null}
           </div>
           <p className="self-center whitespace-nowrap font-black text-foreground">Venda: {formattedValue}</p>
         </div>
@@ -99,13 +99,13 @@ export const OrderCard = memo(function OrderCard({
           <div className={`mt-3 rounded-lg border px-3 py-2 text-xs font-bold ${operational.marketplaceOperation.state === 'FAILED' ? priorityStyles.critical : priorityStyles.info}`}>{operational.marketplaceOperation.friendlyMessage}</div>
         ) : null}
 
-        <div className="pointer-events-auto relative mt-3 flex items-center gap-2">
+        <div className="pointer-events-auto relative mt-3 flex items-center gap-2 [@media(max-height:650px)]:mt-1">
           {primaryAction ? (
-            <button type="button" onClick={() => onAction(order.id, primaryAction)} disabled={updating} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60">
+            <button type="button" onClick={() => onAction(order.id, primaryAction)} disabled={updating} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60 [@media(max-height:650px)]:min-h-9">
               {primaryAction.label}<ArrowRight className="h-3.5 w-3.5" />
             </button>
           ) : (
-            <button type="button" onClick={() => onClick(order.id)} className="min-h-10 flex-1 rounded-lg border border-border bg-muted px-3 text-xs font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Abrir detalhes</button>
+            <button type="button" onClick={() => onClick(order.id)} className="min-h-10 flex-1 rounded-lg border border-border bg-muted px-3 text-xs font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [@media(max-height:650px)]:min-h-9">Abrir detalhes</button>
           )}
           <OrderActionMenu label="Abrir ações secundárias" actions={operational.secondaryActions} onAction={(action) => onAction(order.id, action)} />
         </div>

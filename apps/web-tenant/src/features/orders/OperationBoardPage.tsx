@@ -536,27 +536,29 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="box-border flex min-h-[100dvh] w-full max-w-[1600px] flex-col space-y-4 overflow-hidden bg-background p-4 pt-[calc(68px+var(--safe-area-top))] md:h-[calc(100dvh-64px)] md:min-h-0 md:p-6 md:pt-6 mx-auto">
+    <div className="box-border flex min-h-[100dvh] w-full max-w-[1600px] flex-col gap-4 overflow-hidden bg-background p-4 pt-[calc(68px+var(--safe-area-top))] [@media(max-height:650px)]:gap-2 [@media(max-height:650px)]:p-3 [@media(max-height:650px)]:pt-3 [@media(min-height:651px)_and_(max-height:800px)]:gap-2 [@media(min-height:651px)_and_(max-height:800px)]:p-4 [@media(min-height:651px)_and_(max-height:800px)]:pt-4 md:h-[calc(100dvh-64px)] md:min-h-0 md:p-6 md:pt-6 mx-auto">
       {/* ── Toolbar / Header Premium ── */}
-      <header className="sticky top-[calc(52px+var(--safe-area-top))] z-20 -mx-4 flex shrink-0 flex-col gap-3 border-b border-border bg-background px-4 pb-4 md:static md:z-auto md:mx-0 md:bg-transparent md:px-0">
+      <header className="sticky top-[calc(52px+var(--safe-area-top))] z-20 -mx-4 flex shrink-0 flex-col gap-3 border-b border-border bg-background px-4 pb-4 [@media(max-height:650px)]:gap-2 [@media(max-height:650px)]:pb-2 [@media(min-height:651px)_and_(max-height:800px)]:gap-2 [@media(min-height:651px)_and_(max-height:800px)]:pb-2 md:static md:z-auto md:mx-0 md:flex-row md:items-start md:justify-between md:bg-transparent md:px-0">
         <div className="min-w-0">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
               <span>Painel de Operações</span>
             </h1>
-            <p className="text-[11px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground [@media(max-height:800px)]:hidden md:text-xs">
               {orders.length} ativos · {orders.filter((order) => order.operational.primaryAction).length} aguardando ação
             </p>
-            <OrdersFreshnessStatus
-              connectionState={realtime.connectionState}
-              isStale={realtime.isStale}
-              lastConfirmedAt={lastConfirmedAt}
-              now={realtime.now}
-            />
+            <div className="[@media(max-height:800px)]:hidden">
+              <OrdersFreshnessStatus
+                connectionState={realtime.connectionState}
+                isStale={realtime.isStale}
+                lastConfirmedAt={lastConfirmedAt}
+                now={realtime.now}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_40px_40px] items-center gap-2">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_40px_40px] items-center gap-2 md:w-[380px] md:shrink-0">
           <div className="min-w-0">
             <SegmentedControl value={viewMode} onChange={setViewMode} />
           </div>
@@ -587,15 +589,15 @@ export function OperationBoardPage() {
         </div>
       </header>
 
-      <section aria-label="Busca e filtros do quadro" className="shrink-0 space-y-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+      <section aria-label="Busca e filtros do quadro" className="shrink-0 space-y-3 rounded-2xl border border-border bg-card p-3 shadow-sm [@media(max-height:650px)]:space-y-2 [@media(max-height:650px)]:p-2 [@media(min-height:651px)_and_(max-height:800px)]:space-y-2 [@media(min-height:651px)_and_(max-height:800px)]:p-2">
         <div className="relative">
           <label htmlFor="orders-board-search" className="sr-only">Buscar pedido por número, cliente, telefone ou motoboy</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input id="orders-board-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar número, cliente, telefone ou motoboy" className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary" />
+          <input id="orders-board-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar número, cliente, telefone ou motoboy" className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary [@media(max-height:650px)]:h-9" />
         </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtros rápidos">
+        <div className="flex flex-wrap gap-2 md:flex-nowrap md:overflow-x-auto md:pb-0.5" role="group" aria-label="Filtros rápidos">
           {BOARD_FILTERS.map((filter) => (
-            <button key={filter.id} type="button" onClick={() => setActiveFilter(filter.id)} className={`${!filter.core && !showMoreFilters ? 'hidden sm:inline-flex' : 'inline-flex'} min-h-9 items-center rounded-lg border px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeFilter === filter.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`} aria-pressed={activeFilter === filter.id}>
+            <button key={filter.id} type="button" onClick={() => setActiveFilter(filter.id)} className={`${!filter.core && !showMoreFilters ? 'hidden sm:inline-flex' : 'inline-flex'} min-h-9 shrink-0 items-center rounded-lg border px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [@media(max-height:650px)]:min-h-8 ${activeFilter === filter.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`} aria-pressed={activeFilter === filter.id}>
               {filter.label}
             </button>
           ))}
@@ -606,7 +608,7 @@ export function OperationBoardPage() {
       </section>
 
       {/* ── Mobile and tablet Tabs Selector ── */}
-      <div role="tablist" aria-label="Colunas do quadro" className="xl:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl shrink-0">
+      <div role="tablist" aria-label="Colunas do quadro" className="xl:hidden flex items-center gap-1.5 rounded-xl bg-muted p-1 shrink-0 [@media(max-height:650px)]:gap-1 [@media(max-height:650px)]:p-0.5 [@media(min-height:651px)_and_(max-height:800px)]:gap-1 [@media(min-height:651px)_and_(max-height:800px)]:p-0.5">
         {KANBAN_COLUMNS.map((col) => {
           const isActive = activeColumn === col.id;
           const count = ordersByColumnId[col.id]?.length || 0;
@@ -618,7 +620,7 @@ export function OperationBoardPage() {
               aria-selected={isActive}
               aria-controls={`orders-column-${col.id}`}
               onClick={() => setActiveColumn(col.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${isActive
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 transition-all duration-200 [@media(max-height:650px)]:gap-1 [@media(max-height:650px)]:py-1 [@media(min-height:651px)_and_(max-height:800px)]:gap-1 [@media(min-height:651px)_and_(max-height:800px)]:py-1 ${isActive
                 ? 'bg-background shadow-sm text-foreground'
                 : 'text-muted-foreground'
                 }`}
@@ -673,14 +675,14 @@ export function OperationBoardPage() {
         onDragEnd={handleDragEnd}
       >
         {(orders.length > 0 || !loading) && (
-          <div className="grow min-h-0 flex flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">
             {visibleOrders.length === 0 && (search.trim() || activeFilter !== 'all') ? (
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">
                 Nenhum pedido corresponde aos filtros
               </div>
             ) : (
             <div
-              className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 overflow-x-auto no-scrollbar`}
+              className="flex min-h-0 flex-1 flex-row items-stretch gap-4 overflow-x-auto no-scrollbar"
             >
               {KANBAN_COLUMNS.map((column) => {
                 const colOrders = ordersByColumnId[column.id] ?? [];
