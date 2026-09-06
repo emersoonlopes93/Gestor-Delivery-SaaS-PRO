@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Package, type LucideIcon } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderStatus } from '@gestor/types';
+import type { OrderBoardItemDTO, OrderOperationalAction, OrderStatus } from '@gestor/types';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { OrderCard } from './OrderCard';
@@ -26,21 +26,17 @@ interface KanbanColumnProps {
   compact: boolean;
   updatingId: string | null;
   elapsedMinById: Map<string, number>;
-  onAdvance: (orderId: string, nextStatus: OrderStatus) => void;
+  onAction: (orderId: string, action: OrderOperationalAction) => void;
   onClickCard: (orderId: string) => void;
-  onPrint: (orderId: string) => void;
-  onEdit: (orderId: string) => void;
-  getNextAction: (status: OrderStatus, fulfillmentType: string) => OrderStatus | null;
   fmt: (v: number) => string;
   getElapsedMin: (createdAt: string) => number;
-  getActionsDisabledReason: (order: OrderBoardItemDTO, nextStatus: OrderStatus | null) => string | null;
   viewMode: BoardViewMode;
 }
 
 export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps) {
   const {
     column, orders, compact, updatingId, elapsedMinById,
-    onAdvance, onClickCard, onPrint, onEdit, getNextAction, fmt, getElapsedMin, getActionsDisabledReason, viewMode,
+    onAction, onClickCard, fmt, getElapsedMin, viewMode,
   } = props;
 
   const Icon = column.icon;
@@ -88,7 +84,6 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
         ) : (
           <SortableContext items={orders.map(o => o.id)} strategy={verticalListSortingStrategy}>
             {orders.map((order) => {
-              const nextActionStatus = getNextAction(order.status as OrderStatus, order.fulfillmentType);
               const elapsed = elapsedMinById.get(order.id) ?? getElapsedMin(order.createdAt);
               return (
                 <OrderCard
@@ -96,14 +91,10 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
                   order={order}
                   compact={compact}
                   updating={updatingId === order.id}
-                  onAdvance={onAdvance}
+                  onAction={onAction}
                   onClick={onClickCard}
-                  onPrint={onPrint}
-                  onEdit={onEdit}
-                  nextStatus={nextActionStatus as OrderStatus | null}
                   elapsedMin={elapsed}
-                  totalLabel={fmt(order.sourceChannel === 'marketplace_99food' ? order.itemsSubtotal : order.total)}
-                  actionsDisabledReason={getActionsDisabledReason(order, nextActionStatus as OrderStatus | null)}
+                  formattedValue={fmt(order.operational.financialSummary.operationalValue)}
                 />
               );
             })}

@@ -1,3 +1,14 @@
+## Gestor de Pedidos UX V2 — Slice 1 (2026-09-06)
+
+- Objetivo: corrigir segurança operacional do Kanban sem redesign amplo, schema, migration, lifecycle, adapters marketplace, Routing V2, pagamentos ou realtime.
+- O backend passou a entregar `OrderOperationalViewModel` aditivo e único para board/detalhe, com origem provider-neutral, `MERCHANT`/`PROVIDER`/`UNKNOWN`, capabilities, ações contextuais, estado de operação marketplace e resumos financeiro/logístico/produção.
+- Card, drawer e DnD consomem `availableActions`; 99Food mantém confirmação/pronto outbound e não oferece cancelamento outbound. Provider/unknown não abrem atribuição ou despacho de frota própria.
+- O card mantém uma ação dominante e move ações secundárias para overflow. O drawer ganhou policy compartilhada, diálogo modal, Escape, focus trap e restauração de foco. Falha de refresh preserva o último snapshot do board.
+- O DnD resolve somente `CONFIRM`, `START_PREPARATION` ou `MARK_READY` quando há uma ação inequívoca; cancelamento, conclusão e dispatch nunca são executados silenciosamente por drop.
+- Contratos afetados: DTO autenticado de pedidos e apresentação operacional. Sem alteração de persistência ou do contrato público de tracking.
+- Validação concluída: resolver/board/marketplace/ownership API com 4 suites e 27 testes; web-tenant focado com 2 arquivos e 11 testes; web-tenant completo com 41 arquivos e 152 testes; API completa em quatro shards com 129 suites/642 testes aprovados e 5 suites/10 testes ignorados. `typecheck`, `check:no-any`, `check:features`, `check:boundaries`, `check:theme`, lint, builds API/web-tenant e `git diff --check` passaram. O lint preserva 17 warnings preexistentes do web-storefront, sem erros.
+- Risco residual: pagamento permanece explicitamente `UNKNOWN` quando não existe fonte autoritativa no agregado; cancelamento iFood continua oculto até um fluxo com seleção de motivo reutilizar o contrato oficial já existente.
+
 ## 99Food native actions and privacy-name correction (2026-09-05)
 
 - Confirmed that the order endpoint already enforces `orders.update_status`, the provider environment switch, a tenant-scoped `CONNECTED` connection and BullMQ. Removed only the duplicate `marketplace_orders` beta-preset gate from 99Food native actions; the iFood feature and entitlement gate remains unchanged.

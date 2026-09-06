@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { CreditCard, Wallet, Banknote, Ticket, Sparkles, type LucideIcon } from 'lucide-react';
+import type { OrderFinancialSummary } from '@gestor/types';
 
 interface OrderPaymentSectionProps {
   itemsSubtotal: number;
@@ -11,7 +12,7 @@ interface OrderPaymentSectionProps {
   changeFor?: number | null;
   couponCode?: string | null;
   cashbackUsed?: number | null;
-  sourceChannel?: string | null;
+  financialSummary?: OrderFinancialSummary;
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: LucideIcon; color: string }> = {
@@ -33,13 +34,12 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
   changeFor,
   couponCode,
   cashbackUsed,
-  sourceChannel,
+  financialSummary,
 }: OrderPaymentSectionProps) {
   
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
   const payment = PAYMENT_METHOD_LABELS[paymentMethod] || { label: paymentMethod, icon: Wallet, color: 'text-muted-foreground bg-muted dark:bg-slate-800 dark:text-muted-foreground' };
   const Icon = payment.icon;
-  const is99Food = sourceChannel === 'marketplace_99food';
   return (
     <section>
       <h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-3">Pagamento e Totais</h3>
@@ -48,7 +48,7 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
         {/* Detalhamento de Valores */}
         <div className="space-y-2.5 mb-5">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground font-medium">{is99Food ? 'Venda dos produtos' : 'Subtotal'}</span>
+            <span className="text-muted-foreground font-medium">Venda dos produtos</span>
             <span className="text-foreground font-bold">{fmt(itemsSubtotal)}</span>
           </div>
           
@@ -70,7 +70,7 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
             <div className="flex justify-between text-sm">
               <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                 <Ticket className="w-3.5 h-3.5" />
-                <span className="font-medium">{is99Food ? 'Descontos 99Food' : `Descontos ${couponCode ? `(${couponCode})` : ''}`}</span>
+                <span className="font-medium">Descontos {couponCode ? `(${couponCode})` : ''}</span>
               </div>
               <span className="text-emerald-600 dark:text-emerald-400 font-black">-{fmt(discountTotal)}</span>
             </div>
@@ -87,8 +87,11 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
           )}
 
           <div className="pt-4 border-t border-border flex justify-between items-center">
-            <span className="text-sm font-black text-foreground uppercase tracking-tight">{is99Food ? 'Pago na 99Food' : 'Total a Pagar'}</span>
-            <span className="text-xl font-black text-foreground">{fmt(total)}</span>
+            <div>
+              <span className="text-sm font-black text-foreground uppercase tracking-tight">{financialSummary?.operationalValueLabel ?? 'Valor do pedido'}</span>
+              <p className="mt-1 text-[10px] font-bold text-muted-foreground">{financialSummary?.paymentLabel ?? 'Pagamento não confirmado'}</p>
+            </div>
+            <span className="text-xl font-black text-foreground">{fmt(financialSummary?.operationalValue ?? total)}</span>
           </div>
         </div>
 

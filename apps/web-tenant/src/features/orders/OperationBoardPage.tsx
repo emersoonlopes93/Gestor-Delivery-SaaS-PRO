@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX } from 'lucide-react';
-import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
+import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderOperationalAction, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
@@ -17,22 +17,7 @@ import { printTicketViaPrimaryBluetooth } from '../../lib/bluetooth';
 import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
-
-function supportsMarketplaceAction(order: OrderBoardItemDTO, nextStatus: OrderStatus): boolean {
-  const capabilities = order.marketplaceCapabilities;
-  if (!capabilities) return true;
-  if (nextStatus === 'confirmed') return capabilities.canConfirm;
-  if (nextStatus === 'ready_for_delivery' || nextStatus === 'ready_for_pickup') return capabilities.canMarkReady;
-  if (nextStatus === 'completed') return capabilities.canDelivered;
-  if (nextStatus === 'cancelled') return capabilities.canCancel;
-  return false;
-}
-
-function getMarketplaceActionsDisabledReason(order: OrderBoardItemDTO, nextStatus: OrderStatus | null): string | null {
-  return nextStatus && !supportsMarketplaceAction(order, nextStatus)
-    ? order.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.'
-    : null;
-}
+import { resolveKanbanDropAction } from './operational-actions';
 
 /* ─── Kanban columns spec ───────────────────────────────────── */
 
@@ -214,7 +199,6 @@ export function OperationBoardPage() {
       console.error('[OperationBoardPage] Erro ao buscar board:', err);
       const msg = err instanceof ApiError ? err.message : 'Erro ao carregar quadro de pedidos';
       setError(msg);
-      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -276,18 +260,24 @@ export function OperationBoardPage() {
     return () => clearInterval(interval);
   }, [orders]);
 
-  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
+  const handleOperationalAction = async (orderId: string, action: OrderOperationalAction, driverId?: string) => {
     if (updatingId) return;
-    const marketplaceOrder = orders.find((order) => order.id === orderId);
-    if (marketplaceOrder && !supportsMarketplaceAction(marketplaceOrder, newStatus)) {
-      toast(marketplaceOrder.marketplaceCapabilities?.unavailableMessage ?? 'Ação indisponível para este marketplace.', { duration: 4000 });
+    const order = orders.find((candidate) => candidate.id === orderId);
+    if (!order) return;
+    if (!action.enabled) {
+      toast(action.reason ?? 'Ação indisponível para este pedido.', { duration: 4000 });
       return;
     }
+    if (action.type === 'OPEN_DETAILS') { setActiveOrderId(orderId); return; }
+    if (action.type === 'PRINT') { await handlePrintOrder(orderId); return; }
+    if (action.type === 'EDIT') { await handleEditOrder(orderId); return; }
 
-    // If delivery and going to out_for_delivery, check if driver is assigned
-    if (newStatus === 'out_for_delivery') {
-      const order = orders.find(o => o.id === orderId);
-      if (order?.fulfillmentType === 'delivery' && !order.deliveryDriverId && !driverId) {
+    if ((action.type === 'DISPATCH' || action.type === 'ASSIGN_DRIVER') && !driverId) {
+      if (order.operational.deliveryOwnership !== 'MERCHANT') {
+        toast(order.operational.deliverySummary.label, { duration: 4000 });
+        return;
+      }
+      if (action.type === 'ASSIGN_DRIVER' || !order.deliveryDriverId) {
         setOrderToDispatch(orderId);
         setIsDriverModalOpen(true);
         return;
@@ -307,7 +297,8 @@ export function OperationBoardPage() {
         return;
       }
 
-      const body: UpdateOrderStatusDTO = { status: newStatus };
+      if (!action.targetStatus) return;
+      const body: UpdateOrderStatusDTO = { status: action.targetStatus };
       const res = await api.patch(`/orders/${orderId}/status`, body);
       if (res.success) {
         await fetchBoard();
@@ -315,7 +306,12 @@ export function OperationBoardPage() {
         invalidateLogisticsQueries(queryClient);
         setIsDriverModalOpen(false);
         setOrderToDispatch(null);
-        toast.success(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, { duration: 3000 });
+        toast.success(
+          action.mode === 'PROVIDER_ASYNC'
+            ? `Solicitação enviada. Sincronizando com ${order.operational.displayChannel}.`
+            : `${action.label} concluído.`,
+          { duration: 4000 },
+        );
       }
     } catch (err) {
       console.error('[OperationBoardPage] Erro ao atualizar status:', err);
@@ -328,7 +324,9 @@ export function OperationBoardPage() {
 
   const handleDriverSelect = (driverId: string) => {
     if (orderToDispatch) {
-      handleStatusUpdate(orderToDispatch, 'out_for_delivery', driverId);
+      const order = orders.find((candidate) => candidate.id === orderToDispatch);
+      const dispatchAction = order?.operational.availableActions.find((candidate) => candidate.type === 'DISPATCH');
+      if (dispatchAction) handleOperationalAction(orderToDispatch, dispatchAction, driverId);
     }
   };
 
@@ -370,16 +368,6 @@ export function OperationBoardPage() {
     return out;
   }, [orders]);
 
-  const getNextAction = (status: OrderStatus, fulfillmentType: string): OrderStatus | null => {
-    if (status === 'pending') return 'confirmed';
-    if (status === 'confirmed') return 'preparing';
-    if (status === 'preparing')
-      return fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
-    if (status === 'ready_for_delivery') return 'out_for_delivery';
-    if (status === 'out_for_delivery' || status === 'ready_for_pickup') return 'completed';
-    return null;
-  };
-
   const compact = viewMode === 'compact';
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -395,28 +383,21 @@ export function OperationBoardPage() {
     if (!over) return;
 
     const orderId = active.id as string;
-    const targetColId = over.id as KanbanColumnSpec['id'];
-
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    // Discover the mapped status for the target column
-    let newStatus: OrderStatus | null = null;
-    if (targetColId === 'entry') newStatus = 'confirmed';
-    else if (targetColId === 'production') {
-      if (order.status === 'pending') {
-        alert('O pedido está pendente! Por favor, confirme-o primeiro antes de enviar para a produção.');
-        return;
-      }
-      newStatus = 'preparing';
-    }
-    else if (targetColId === 'delivery') {
-      // Fix: delivery orders should go to ready_for_delivery to await dispatch, not out_for_delivery immediately
-      newStatus = order.fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
-    }
+    const directColumn = KANBAN_COLUMNS.find((column) => column.id === over.id)?.id;
+    const overOrder = orders.find((candidate) => candidate.id === over.id);
+    const targetColumn = directColumn ?? KANBAN_COLUMNS.find((column) =>
+      overOrder && column.statuses.includes(overOrder.status),
+    )?.id;
+    if (!targetColumn) return;
 
-    if (newStatus && newStatus !== order.status) {
-      handleStatusUpdate(orderId, newStatus);
+    const resolution = resolveKanbanDropAction(order, targetColumn);
+    if (!resolution.action) {
+      toast(resolution.message ?? 'Movimento indisponível.', { duration: 4000 });
+      return;
     }
+    handleOperationalAction(orderId, resolution.action);
   };
 
   return (
@@ -563,14 +544,10 @@ export function OperationBoardPage() {
                       compact={compact}
                       updatingId={updatingId}
                       elapsedMinById={elapsedMinById}
-                      onAdvance={handleStatusUpdate}
+                      onAction={handleOperationalAction}
                       onClickCard={setActiveOrderId}
-                      onPrint={handlePrintOrder}
-                      onEdit={handleEditOrder}
-                      getNextAction={getNextAction}
                       fmt={fmt}
                       getElapsedMin={getElapsedMin}
-                      getActionsDisabledReason={getMarketplaceActionsDisabledReason}
                       viewMode={viewMode}
                     />
                   </div>
@@ -585,14 +562,10 @@ export function OperationBoardPage() {
               order={activeDragOrder}
               compact={compact}
               updating={false}
-              onAdvance={handleStatusUpdate}
+              onAction={handleOperationalAction}
               onClick={() => { }}
-              onPrint={() => { }}
-              onEdit={() => { }}
-              nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
-              totalLabel={fmt(activeDragOrder.sourceChannel === 'marketplace_99food' ? activeDragOrder.itemsSubtotal : activeDragOrder.total)}
-              actionsDisabledReason={getMarketplaceActionsDisabledReason(activeDragOrder, getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType))}
+              formattedValue={fmt(activeDragOrder.operational.financialSummary.operationalValue)}
             />
           ) : null}
         </DragOverlay>

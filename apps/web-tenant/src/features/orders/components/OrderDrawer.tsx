@@ -1,7 +1,7 @@
-import { memo, useEffect, useState, useCallback } from 'react';
+import { memo, useEffect, useState, useCallback, useRef } from 'react';
 import { MapPinned, X, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { SOURCE_CHANNEL_LABELS, type DeliveryRunBuilderDataDTO, type DeliveryRunDTO, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
+import type { DeliveryRunBuilderDataDTO, DeliveryRunDTO, OrderOperationalAction, OrderResponseDTO, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
@@ -39,13 +39,52 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const trackingRunQuery = useQuery({
     queryKey: ['delivery-run', 'order', order?.id],
     enabled: Boolean(order?.id && order.fulfillmentType === 'delivery' && order.deliveryDriverId),
     queryFn: async () => (await api.get<DeliveryRunDTO | null>(`/delivery/runs/order/${order?.id}`)).data ?? null,
   });
   const canTrackOrder = Boolean(order && orderBelongsToRun(order, trackingRunQuery.data));
+  const assignDriverAction = order?.operational?.availableActions.find((candidate) => candidate.type === 'ASSIGN_DRIVER' && candidate.enabled);
   const closeTracking = useCallback(() => setIsTrackingOpen(false), []);
+
+  useEffect(() => {
+    if (!orderId) return;
+    const restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      queueMicrotask(() => restoreFocus?.focus());
+    };
+  }, [onClose, orderId]);
 
   const fetchDetail = useCallback(async (quiet = false) => {
     if (!orderId) return;
@@ -84,11 +123,20 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     }
   };
 
-  const handleStatusUpdate = async (newStatus: OrderStatus, driverId?: string) => {
+  const handleOperationalAction = async (action: OrderOperationalAction, driverId?: string) => {
     if (!order || isUpdating) return;
+    if (!action.enabled) {
+      toast(action.reason ?? 'Ação indisponível para este pedido.');
+      return;
+    }
+    if (action.type === 'PRINT') { await handlePrint(); return; }
+    if (action.type === 'EDIT') { setIsEditModalOpen(true); return; }
 
-    // Se for despacho e não tiver entregador, abre modal
-    if (newStatus === 'out_for_delivery' && order.fulfillmentType === 'delivery' && !order.deliveryDriverId && !driverId) {
+    if ((action.type === 'ASSIGN_DRIVER' || action.type === 'DISPATCH') && !driverId) {
+      if (order.operational?.deliveryOwnership !== 'MERCHANT') {
+        toast(order.operational?.deliverySummary.label ?? 'A entrega não permite frota própria.');
+        return;
+      }
       await fetchDrivers();
       setIsDriverModalOpen(true);
       return;
@@ -104,11 +152,16 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
         return;
       }
 
-      const body: UpdateOrderStatusDTO = { status: newStatus };
+      if (!action.targetStatus) return;
+      const body: UpdateOrderStatusDTO = { status: action.targetStatus };
       const res = await api.patch<OrderResponseDTO>(`/orders/${order.id}/status`, body);
       
       if (res.success) {
-        toast.success(`Pedido ${newStatus === 'cancelled' ? 'cancelado' : 'atualizado'}!`);
+        toast.success(
+          action.mode === 'PROVIDER_ASYNC'
+            ? `Solicitação enviada. Sincronizando com ${order.operational?.displayChannel ?? 'marketplace'}.`
+            : `${action.label} concluído.`,
+        );
         await fetchDetail(true);
         onUpdated();
       }
@@ -119,20 +172,6 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
       setIsUpdating(false);
       setIsDriverModalOpen(false);
     }
-  };
-
-  const handleAdvance = () => {
-    if (!order) return;
-    const { status, fulfillmentType } = order;
-    
-    let next: OrderStatus | null = null;
-    if (status === 'pending') next = 'confirmed';
-    else if (status === 'confirmed') next = 'preparing';
-    else if (status === 'preparing') next = fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
-    else if (status === 'ready_for_delivery') next = 'out_for_delivery';
-    else if (status === 'ready_for_pickup' || status === 'out_for_delivery') next = 'completed';
-
-    if (next) handleStatusUpdate(next);
   };
 
   const handlePrint = async () => {
@@ -159,7 +198,8 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   };
 
   const handleDriverSelect = (driverId: string) => {
-    handleStatusUpdate('out_for_delivery', driverId);
+    const dispatchAction = order?.operational?.availableActions.find((candidate) => candidate.type === 'DISPATCH');
+    if (dispatchAction) handleOperationalAction(dispatchAction, driverId);
   };
 
   if (!orderId) return null;
@@ -172,8 +212,13 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
         <div 
           className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${orderId ? 'opacity-100' : 'opacity-0'}`} 
           onClick={onClose}
+          aria-hidden="true"
         />
         <div 
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="order-drawer-title"
           className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-card shadow-2xl flex flex-col safe-sheet transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-border`}
         >
           {/* Mobile Handle */}
@@ -184,14 +229,14 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-border bg-muted/50 dark:bg-muted/50 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-black text-foreground tracking-tight">
+              <h2 id="order-drawer-title" className="text-xl font-black text-foreground tracking-tight">
                 Pedido #{order?.orderNumber || '...'}
               </h2>
               {order && <OrderStatusBadge status={order.status} />}
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                {order ? `Canal: ${SOURCE_CHANNEL_LABELS[order.sourceChannel as keyof typeof SOURCE_CHANNEL_LABELS] || order.sourceChannel}` : 'Carregando...'}
+                {order ? `Canal: ${order.operational?.displayChannel ?? order.sourceChannel}` : 'Carregando...'}
               </span>
               {isValidating && (
                 <span className="flex items-center gap-1 text-[10px] font-black text-primary-500 uppercase animate-pulse">
@@ -201,8 +246,10 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             </div>
           </div>
           <button 
+            ref={closeButtonRef}
             onClick={onClose} 
             className="p-2.5 hover:bg-muted rounded-2xl transition-all active:scale-90"
+            aria-label="Fechar detalhes do pedido"
           >
             <X className="w-6 h-6 text-muted-foreground" />
           </button>
@@ -259,17 +306,23 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
               {/* Entregador (se for entrega) */}
               {order.fulfillmentType === 'delivery' && (
                 <div className="space-y-3">
-                  <OrderDriverSection
-                    fulfillmentType={order.fulfillmentType}
-                    driverId={order.deliveryDriverId}
-                    driverName={order.deliveryDriverName}
-                    driverPhone={order.deliveryDriverPhone}
-                    driverStatus={order.deliveryDriverStatus}
-                    onAssignDriver={async () => {
-                      await fetchDrivers();
-                      setIsDriverModalOpen(true);
-                    }}
-                  />
+                  {order.operational?.deliveryOwnership === 'MERCHANT' && (order.deliveryDriverId || assignDriverAction) ? (
+                    <OrderDriverSection
+                      fulfillmentType={order.fulfillmentType}
+                      driverId={order.deliveryDriverId}
+                      driverName={order.deliveryDriverName}
+                      driverPhone={order.deliveryDriverPhone}
+                      driverStatus={order.deliveryDriverStatus}
+                      onAssignDriver={async () => {
+                        if (assignDriverAction) await handleOperationalAction(assignDriverAction);
+                      }}
+                    />
+                  ) : (
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Logística</p>
+                      <p className="mt-2 text-sm font-bold text-foreground">{order.operational?.deliverySummary.label}</p>
+                    </div>
+                  )}
                   {canTrackOrder ? (
                     <button
                       type="button"
@@ -292,7 +345,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 serviceFee={order.serviceFee}
                 discountTotal={order.discountTotal}
                 total={order.total}
-                sourceChannel={order.sourceChannel}
+                financialSummary={order.operational?.financialSummary}
                 paymentMethod={order.paymentMethod}
                 changeFor={order.changeFor}
                 couponCode={order.couponId} // Backend DTO has couponId as string, could be code
@@ -306,13 +359,10 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
         </div>
 
         {/* Footer Actions */}
-        {order && (
+        {order?.operational && (
           <OrderActionsBar 
-            status={order.status}
-            onAdvance={handleAdvance}
-            onCancel={() => handleStatusUpdate('cancelled')}
-            onPrint={handlePrint}
-            onEdit={() => setIsEditModalOpen(true)}
+            operational={order.operational}
+            onAction={handleOperationalAction}
             onRefresh={() => fetchDetail(true)}
             isUpdating={isUpdating}
             isValidating={isValidating}
