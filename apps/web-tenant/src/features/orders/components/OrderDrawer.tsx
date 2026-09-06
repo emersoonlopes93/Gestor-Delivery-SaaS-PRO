@@ -1,5 +1,5 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { MapPinned, X, RefreshCw } from 'lucide-react';
+import { AlertCircle, Clock3, MapPinned, Route, X, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type { DeliveryRunBuilderDataDTO, DeliveryRunDTO, OrderOperationalAction, OrderResponseDTO, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
@@ -20,6 +20,7 @@ import { Capacitor } from '@capacitor/core';
 import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
 import { printThermalText } from '../../../lib/thermal-print';
 import toast from 'react-hot-toast';
+import { buildRoutingSummary, presentOrderTime, providerLabel, resolveOrderPriority } from '../order-presenters';
 
 export interface OrderDrawerProps {
   orderId: string | null;
@@ -43,11 +44,23 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const trackingRunQuery = useQuery({
     queryKey: ['delivery-run', 'order', order?.id],
-    enabled: Boolean(order?.id && order.fulfillmentType === 'delivery' && order.deliveryDriverId),
+    enabled: Boolean(order?.id && order.fulfillmentType === 'delivery' && order.operational?.deliveryOwnership === 'MERCHANT'),
     queryFn: async () => (await api.get<DeliveryRunDTO | null>(`/delivery/runs/order/${order?.id}`)).data ?? null,
   });
+  const routingSummary = order ? buildRoutingSummary(trackingRunQuery.data, order.id) : null;
   const canTrackOrder = Boolean(order && orderBelongsToRun(order, trackingRunQuery.data));
   const assignDriverAction = order?.operational?.availableActions.find((candidate) => candidate.type === 'ASSIGN_DRIVER' && candidate.enabled);
+  const primaryAction = order?.operational?.primaryAction ?? null;
+  const priority = order?.operational
+    ? resolveOrderPriority({
+      status: order.status,
+      createdAt: order.createdAt,
+      isScheduled: order.isScheduled ?? false,
+      deliveryDriverName: order.deliveryDriverName ?? undefined,
+      operational: order.operational,
+    })
+    : null;
+  const orderTime = order ? presentOrderTime(order.createdAt) : null;
   const closeTracking = useCallback(() => setIsTrackingOpen(false), []);
 
   useEffect(() => {
@@ -226,7 +239,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             <div className="w-12 h-1.5 bg-muted rounded-full" />
           </div>
 
-          <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-border bg-muted/50 dark:bg-muted/50 shrink-0">
+          <header className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-5 border-b border-border bg-muted/50 dark:bg-muted/50 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <h2 id="order-drawer-title" className="text-xl font-black text-foreground tracking-tight">
@@ -234,10 +247,12 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
               </h2>
               {order && <OrderStatusBadge status={order.status} />}
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                {order ? `Canal: ${order.operational?.displayChannel ?? order.sourceChannel}` : 'Carregando...'}
+                {order?.operational ? providerLabel(order.operational) : order?.sourceChannel ?? 'Carregando...'}
               </span>
+              {orderTime ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"><Clock3 className="h-3 w-3" />{orderTime.label}</span> : null}
+              {priority ? <span className="text-xs font-black text-foreground">{priority.label}</span> : null}
               {isValidating && (
                 <span className="flex items-center gap-1 text-[10px] font-black text-primary-500 uppercase animate-pulse">
                   <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Sincronizando
@@ -255,7 +270,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 bg-card">
+        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 bg-card p-4 sm:space-y-8 sm:p-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 gap-4">
               <div className="w-12 h-12 rounded-full border-2 border-primary-600/20 border-t-primary-600 animate-spin" />
@@ -273,6 +288,18 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             </div>
           ) : order ? (
             <>
+              {order.operational && order.operational.marketplaceOperation.state !== 'NONE' ? (
+                <div role="status" className={`flex gap-3 rounded-xl border p-4 ${order.operational.marketplaceOperation.state === 'FAILED' ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-primary/30 bg-primary/10 text-primary'}`}>
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p className="text-sm font-bold">{order.operational.marketplaceOperation.friendlyMessage}</p>
+                </div>
+              ) : null}
+              {primaryAction ? (
+                <button type="button" onClick={() => handleOperationalAction(primaryAction)} disabled={isUpdating} className="flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
+                  {isUpdating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {primaryAction.label}
+                </button>
+              ) : null}
               {/* Alerta de Agendamento */}
               {order.isScheduled && order.scheduledFor && (
                 <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-4 flex items-center justify-center gap-3 animate-pulse">
@@ -296,7 +323,14 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 notes={order.notes}
               />
 
+              <OrderItemsSection items={order.items} />
+
               {/* Entrega / Fulfillment */}
+              <section className="rounded-xl border border-border bg-background p-4" aria-label="Produção">
+                <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Produção</p>
+                <p className="mt-1 text-sm font-bold text-foreground">{order.operational?.productionSummary.label ?? 'Estado da produção não confirmado'}</p>
+              </section>
+
               <OrderFulfillmentSection 
                 fulfillmentType={order.fulfillmentType}
                 deliveryAddress={order.deliveryAddress}
@@ -323,20 +357,24 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                       <p className="mt-2 text-sm font-bold text-foreground">{order.operational?.deliverySummary.label}</p>
                     </div>
                   )}
-                  {canTrackOrder ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsTrackingOpen(true)}
-                      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-black text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <MapPinned className="h-4 w-4" /> Ver no mapa
-                    </button>
-                  ) : null}
-                </div>
+                   {routingSummary ? (
+                    <div className="rounded-xl border border-border bg-muted/35 p-4 text-sm">
+                      <p className="flex items-center gap-2 font-black text-foreground"><Route className="h-4 w-4 text-primary" />{routingSummary.stopPosition} · {routingSummary.runState}</p>
+                      <p className="mt-1 font-semibold text-muted-foreground">{routingSummary.driver}{routingSummary.eta ? ` · chegada ${routingSummary.eta}` : ''}{routingSummary.metrics ? ` · ${routingSummary.metrics}` : ''}</p>
+                      {routingSummary.qualityMessage ? <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">{routingSummary.qualityMessage}</p> : null}
+                     </div>
+                   ) : null}
+                   {canTrackOrder ? (
+                     <button
+                       type="button"
+                       onClick={() => setIsTrackingOpen(true)}
+                       className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-black text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                     >
+                       <MapPinned className="h-4 w-4" /> Ver no mapa
+                     </button>
+                   ) : null}
+                 </div>
               )}
-
-              {/* Itens */}
-              <OrderItemsSection items={order.items} />
 
               {/* Pagamento e Totais */}
               <OrderPaymentSection 
@@ -366,6 +404,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             onRefresh={() => fetchDetail(true)}
             isUpdating={isUpdating}
             isValidating={isValidating}
+            showPrimary={false}
           />
         )}
       </div>
@@ -384,7 +423,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
         />
       )}
 
-      {isDriverModalOpen && (
+       {isDriverModalOpen && (
         <DriverSelectionModal 
           isOpen={isDriverModalOpen}
           onClose={() => setIsDriverModalOpen(false)}
@@ -392,13 +431,13 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           drivers={drivers}
           isSubmitting={isUpdating}
         />
-      )}
+       )}
 
-      {isTrackingOpen && order && canTrackOrder ? (
-        <OrderTrackingDialog order={order} initialRun={trackingRunQuery.data ?? undefined} onClose={closeTracking} />
-      ) : null}
+       {isTrackingOpen && order && canTrackOrder ? (
+         <OrderTrackingDialog order={order} initialRun={trackingRunQuery.data ?? undefined} onClose={closeTracking} />
+       ) : null}
 
-      {/* Template de Impressão (invisível na tela, visível no print) */}
+       {/* Template de Impressão (invisível na tela, visível no print) */}
       {isPrinting && order && (
         <div className="hidden print:block">
           <OrderPrintTemplate order={order} />

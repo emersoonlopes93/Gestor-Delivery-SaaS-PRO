@@ -6,6 +6,7 @@ const card = readFileSync(resolve(process.cwd(), 'src/features/orders/components
 const drawer = readFileSync(resolve(process.cwd(), 'src/features/orders/components/OrderDrawer.tsx'), 'utf8');
 const actionsBar = readFileSync(resolve(process.cwd(), 'src/features/orders/components/OrderActionsBar.tsx'), 'utf8');
 const board = readFileSync(resolve(process.cwd(), 'src/features/orders/OperationBoardPage.tsx'), 'utf8');
+const list = readFileSync(resolve(process.cwd(), 'src/features/orders/OrdersListPage.tsx'), 'utf8');
 
 describe('orders operational UI contract', () => {
   it('uses the backend operational policy for card, drawer and action bar', () => {
@@ -17,7 +18,7 @@ describe('orders operational UI contract', () => {
   });
 
   it('keeps one dominant card action and secondary actions in overflow', () => {
-    expect(card).toContain('aria-label="Abrir ações secundárias"');
+    expect(card).toContain('label="Abrir ações secundárias"');
     expect(card).toContain('primaryAction.label');
     expect(card).not.toContain('marketplace_99food');
   });
@@ -44,8 +45,23 @@ describe('orders operational UI contract', () => {
   });
 
   it('allows opening cards with the keyboard', () => {
-    expect(card).toContain('tabIndex={0}');
-    expect(card).toContain("event.key === 'Enter'");
+    expect(card).toContain('type="button"');
     expect(card).toContain('aria-label={`Abrir detalhes do pedido');
+  });
+
+  it('keeps marketplace alerts, routing summary and textual secondary actions in the drawer', () => {
+    expect(drawer).toContain('marketplaceOperation.state');
+    expect(drawer).toContain('buildRoutingSummary');
+    expect(actionsBar).toContain('OrderActionMenu');
+    expect(drawer).toContain('Ver no mapa');
+  });
+
+  it('keeps the consultation list on the shared operational language and drawer', () => {
+    expect(list).toContain('providerLabel(operational)');
+    expect(list).toContain('deliveryStatement(operational, order.fulfillmentType)');
+    expect(list).toContain('operational?.financialSummary.operationalValue');
+    expect(list).toContain('<OrderDrawer');
+    expect(list).toContain("value: 'completed'");
+    expect(list).toContain("value: 'cancelled'");
   });
 });

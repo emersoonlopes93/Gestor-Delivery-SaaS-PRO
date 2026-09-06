@@ -609,13 +609,47 @@ export class OrdersService {
     channel?: string,
     startDate?: string,
     endDate?: string,
+    search?: string,
+    fulfillmentType?: string,
+    origin?: string,
+    ownership?: string,
   ): Promise<{ items: OrderListItemDTO[]; total: number }> {
     const skip = (page - 1) * limit;
+    const operationalFilters: Prisma.OrderWhereInput[] = [];
+
+    if (origin === 'PEDEHUB') {
+      operationalFilters.push({ marketplaceOrders: { none: {} } });
+    } else if (origin === 'IFOOD' || origin === 'FOOD_99') {
+      operationalFilters.push({ marketplaceOrders: { some: { provider: origin } } });
+    }
+
+    if (ownership === 'MERCHANT') {
+      operationalFilters.push({
+        OR: [
+          { marketplaceOrders: { none: {} } },
+          { marketplaceOrders: { some: { deliveryOwnership: 'MERCHANT' } } },
+        ],
+      });
+    } else if (ownership === 'PROVIDER' || ownership === 'UNKNOWN') {
+      operationalFilters.push({ marketplaceOrders: { some: { deliveryOwnership: ownership } } });
+    }
 
     const where: Prisma.OrderWhereInput = {
       tenantId,
       ...(status ? { status } : {}),
       ...(channel ? { sourceChannel: channel } : {}),
+      ...(fulfillmentType ? { fulfillmentType: fulfillmentType as FulfillmentType } : {}),
+      ...(search?.trim()
+        ? {
+            OR: [
+              { orderNumber: { contains: search.trim(), mode: 'insensitive' } },
+              { customerName: { contains: search.trim(), mode: 'insensitive' } },
+              { customerPhone: { contains: search.trim() } },
+              { deliveryDriver: { name: { contains: search.trim(), mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+      ...(operationalFilters.length > 0 ? { AND: operationalFilters } : {}),
       ...(startDate || endDate
         ? {
             createdAt: {
@@ -635,6 +669,18 @@ export class OrdersService {
           orderBy: { createdAt: 'desc' },
           include: {
             _count: { select: { items: true } },
+            deliveryDriver: { select: { name: true } },
+            marketplaceOrders: {
+              select: {
+                provider: true,
+                deliveryOwnership: true,
+                operations: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: { operation: true, status: true },
+                },
+              },
+            },
           },
         }),
         this.prisma.order.count({ where }),
@@ -655,6 +701,17 @@ export class OrdersService {
           isScheduled: o.isScheduled ?? false,
           sourceChannel: o.sourceChannel,
           createdAt: o.createdAt.toISOString(),
+          operational: getOrderOperationalViewModel({
+            status: o.status as OrderStatus,
+            fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
+            sourceChannel: o.sourceChannel,
+            total: Number(o.total),
+            itemsSubtotal: Number(o.itemsSubtotal),
+            deliveryDriverName: o.deliveryDriver?.name,
+            provider: o.marketplaceOrders[0]?.provider,
+            deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+            latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
+          }),
         })),
         total,
       };
@@ -818,6 +875,7 @@ export class OrdersService {
       status: o.status as OrderStatus,
       fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       customerName: o.customerName,
+      customerPhone: o.customerPhone,
       total: Number(o.total),
       itemsSubtotal: Number(o.itemsSubtotal),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),

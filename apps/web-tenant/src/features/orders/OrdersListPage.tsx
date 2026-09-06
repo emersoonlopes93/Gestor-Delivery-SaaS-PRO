@@ -1,307 +1,153 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Package, Clock, ChevronRight, RefreshCw, Filter, ShoppingBag } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { ChevronRight, Clock3, Package, RefreshCw, Search, ShoppingBag, Truck } from 'lucide-react';
+import type { FulfillmentType, OrderDeliveryOwnership, OrderListItemDTO, OrderOrigin, OrderStatus } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
-import { SOURCE_CHANNEL_LABELS, type OrderListItemDTO } from '@gestor/types';
-import { OrderDrawer } from './components/OrderDrawer';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { Card } from '../../components/ui/Card';
+import { OrderDrawer } from './components/OrderDrawer';
+import { OrderStatusBadge } from './components/OrderStatusBadge';
+import { deliveryStatement, providerLabel } from './order-presenters';
 
-// Bypass persistent build error by defining locally
-type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready_for_pickup' | 'ready_for_delivery' | 'out_for_delivery' | 'completed' | 'cancelled' | 'draft';
+type PeriodFilter = 'today' | 'yesterday' | 'last7' | 'all';
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: 'Pendente',
-  confirmed: 'Confirmado',
-  preparing: 'Preparando',
-  ready_for_pickup: 'Pronto p/ Retirada',
-  ready_for_delivery: 'Pronto p/ Entrega',
-  out_for_delivery: 'Saiu p/ Entrega',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-  draft: 'Rascunho',
-};
+const STATUS_OPTIONS: { value: OrderStatus | ''; label: string }[] = [
+  { value: '', label: 'Todos os status' },
+  { value: 'pending', label: 'Novos' },
+  { value: 'confirmed', label: 'Confirmados' },
+  { value: 'preparing', label: 'Em produção' },
+  { value: 'ready_for_pickup', label: 'Prontos para retirada' },
+  { value: 'ready_for_delivery', label: 'Prontos para entrega' },
+  { value: 'out_for_delivery', label: 'Em rota' },
+  { value: 'completed', label: 'Concluídos' },
+  { value: 'cancelled', label: 'Cancelados' },
+];
 
-const CHANNEL_LABELS: Record<string, string> = {
-  ...SOURCE_CHANNEL_LABELS,
-};
-
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: 'status-badge-pending',
-  confirmed: 'status-badge-confirmed',
-  preparing: 'status-badge-preparing',
-  ready_for_pickup: 'status-badge-success',
-  ready_for_delivery: 'status-badge-success',
-  out_for_delivery: 'status-badge-confirmed',
-  completed: 'status-badge-neutral',
-  cancelled: 'status-badge-danger',
-  draft: 'status-badge-neutral',
-};
+const selectClass = 'h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export function OrdersListPage() {
   const [orders, setOrders] = useState<OrderListItemDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
-  const [channelFilter, setChannelFilter] = useState<string>('');
-  const [dateFilter, setDateFilter] = useState<'hoje' | 'ontem' | 'ultimos7' | 'todos'>('hoje');
+  const [status, setStatus] = useState<OrderStatus | ''>('');
+  const [origin, setOrigin] = useState<OrderOrigin | ''>('');
+  const [period, setPeriod] = useState<PeriodFilter>('today');
+  const [fulfillment, setFulfillment] = useState<FulfillmentType | ''>('');
+  const [ownership, setOwnership] = useState<OrderDeliveryOwnership | ''>('');
+  const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => { setSearchQuery(search.trim()); setPage(1); }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
-    setError(null);
-    
     try {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
-      if (statusFilter) params.set('status', statusFilter);
-      if (channelFilter) params.set('channel', channelFilter);
-
+      if (status) params.set('status', status);
+      if (origin) params.set('origin', origin);
+      if (fulfillment) params.set('fulfillmentType', fulfillment);
+      if (ownership) params.set('ownership', ownership);
+      if (searchQuery) params.set('search', searchQuery);
       const now = new Date();
-      if (dateFilter === 'hoje') {
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        params.set('startDate', start.toISOString());
-      } else if (dateFilter === 'ontem') {
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-        params.set('startDate', start.toISOString());
-        params.set('endDate', end.toISOString());
-      } else if (dateFilter === 'ultimos7') {
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-        params.set('startDate', start.toISOString());
+      if (period === 'today') params.set('startDate', new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString());
+      if (period === 'yesterday') {
+        params.set('startDate', new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString());
+        params.set('endDate', new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999).toISOString());
       }
-
-      const res = await api.get<{ items: OrderListItemDTO[]; total: number }>(
-        `/orders?${params.toString()}`
-      );
-
-      setOrders(res.data.items);
-      setTotal(res.data.total);
-    } catch (err) {
-      console.error('[OrdersListPage] Erro ao buscar pedidos:', err);
-      const msg = err instanceof ApiError ? err.message : 'Erro ao carregar pedidos';
-      setError(msg);
-      setOrders([]);
-      setTotal(0);
+      if (period === 'last7') params.set('startDate', new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString());
+      const response = await api.get<{ items: OrderListItemDTO[]; total: number }>(`/orders?${params}`);
+      setOrders(response.data.items);
+      setTotal(response.data.total);
+      setError(null);
+    } catch (cause) {
+      console.error('[OrdersListPage] Erro ao buscar pedidos:', cause);
+      setError(cause instanceof ApiError ? cause.message : 'Erro ao carregar pedidos');
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, channelFilter, dateFilter]);
+  }, [fulfillment, origin, ownership, page, period, searchQuery, status]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { void fetchOrders(); }, [fetchOrders]);
 
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-  const fmtDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const fmt = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  const fmtDate = (value: string) => new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const resetPage = () => setPage(1);
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+    <main className="mx-auto max-w-[1440px] space-y-5 p-4 md:p-6">
       <PageHeader
-        title="Gestor de Pedidos"
-        description={`${total} pedidos registrados na base`}
+        title="Pedidos"
+        description={`${total} pedidos disponíveis para consulta e histórico`}
         icon={ShoppingBag}
-        action={
-          <button
-            onClick={fetchOrders}
-            disabled={loading}
-            className="btn-icon bg-card text-foreground hover:bg-muted border border-border w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-sm shrink-0"
-            title="Atualizar Pedidos"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        action={(
+          <button type="button" onClick={() => void fetchOrders()} disabled={loading} aria-label="Atualizar lista de pedidos" className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-        }
+        )}
       />
 
-      {/* Error */}
-      {error && (
-        <div className="alert-danger rounded-2xl p-4 flex items-start gap-3 border border-destructive/20 bg-destructive/10">
-          <span className="text-lg leading-none font-black text-destructive">⚠</span>
-          <div className="flex-1">
-            <h3 className="text-sm font-black mb-1 text-destructive">Erro ao carregar pedidos</h3>
-            <p className="text-sm text-destructive opacity-90">{error}</p>
-            <button
-              onClick={fetchOrders}
-              className="mt-2 text-xs font-black underline text-destructive hover:opacity-100"
-            >
-              Tentar novamente
-            </button>
-          </div>
+      <section aria-label="Filtros da lista de pedidos" className="space-y-3 border-y border-border bg-card py-4">
+        <div className="relative">
+          <label htmlFor="orders-list-search" className="sr-only">Buscar por número, cliente ou telefone</label>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input id="orders-list-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar número, cliente ou telefone" className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary" />
         </div>
-      )}
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
+          <label className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Status<select value={status} onChange={(event) => { setStatus(event.target.value as OrderStatus | ''); resetPage(); }} className={`mt-1 ${selectClass}`}>{STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <label className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Origem<select value={origin} onChange={(event) => { setOrigin(event.target.value as OrderOrigin | ''); resetPage(); }} className={`mt-1 ${selectClass}`}><option value="">Todas</option><option value="PEDEHUB">PedeHub</option><option value="IFOOD">iFood</option><option value="FOOD_99">99Food</option></select></label>
+          <label className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Período<select value={period} onChange={(event) => { setPeriod(event.target.value as PeriodFilter); resetPage(); }} className={`mt-1 ${selectClass}`}><option value="today">Hoje</option><option value="yesterday">Ontem</option><option value="last7">Últimos 7 dias</option><option value="all">Todo período</option></select></label>
+          <label className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Atendimento<select value={fulfillment} onChange={(event) => { setFulfillment(event.target.value as FulfillmentType | ''); resetPage(); }} className={`mt-1 ${selectClass}`}><option value="">Todos</option><option value="delivery">Entrega</option><option value="pickup">Retirada</option><option value="dine_in">Salão</option><option value="table">Mesa</option></select></label>
+          <label className="col-span-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground md:col-span-1">Responsável pela entrega<select value={ownership} onChange={(event) => { setOwnership(event.target.value as OrderDeliveryOwnership | ''); resetPage(); }} className={`mt-1 ${selectClass}`}><option value="">Todos</option><option value="MERCHANT">Loja</option><option value="PROVIDER">Marketplace</option><option value="UNKNOWN">Não confirmado</option></select></label>
+        </div>
+      </section>
 
-      {/* Filtros Premium */}
-      <Card variant="default" className="p-5 md:p-6 shadow-sm border border-border rounded-3xl">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-foreground font-black text-xs uppercase tracking-widest opacity-80">
-            <Filter className="w-4 h-4 text-primary" />
-            <span>Filtros e Status</span>
+      {error ? (
+        <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-800 dark:text-amber-300">
+          <div><p className="text-sm font-black">Atualização temporariamente indisponível</p><p className="text-xs">A última lista válida continua visível. {error}</p></div>
+          <button type="button" onClick={() => void fetchOrders()} className="text-xs font-black underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Tentar novamente</button>
+        </div>
+      ) : null}
+
+      {loading && orders.length === 0 ? (
+        <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-muted-foreground"><RefreshCw className="h-6 w-6 animate-spin" /><p className="text-sm font-bold">Carregando pedidos…</p></div>
+      ) : orders.length === 0 ? (
+        <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card p-8 text-center"><Package className="h-7 w-7 text-muted-foreground" /><p className="font-black text-foreground">Nenhum pedido corresponde aos filtros</p><p className="text-sm text-muted-foreground">Ajuste a busca, período ou origem para ampliar a consulta.</p></div>
+      ) : (
+        <section aria-label="Resultados da lista de pedidos" className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="hidden grid-cols-[130px_minmax(180px,1.2fr)_minmax(180px,1fr)_minmax(180px,1fr)_140px_44px] gap-4 border-b border-border bg-muted/50 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground xl:grid">
+            <span>Pedido</span><span>Cliente</span><span>Estado</span><span>Entrega</span><span className="text-right">Valor</span><span />
           </div>
-
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 border-b border-border/60">
-            <button
-              onClick={() => { setStatusFilter(''); setPage(1); }}
-              disabled={loading}
-              className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed ${
-                statusFilter === ''
-                  ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                  : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              Todos
-            </button>
-            {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((status) => (
-              <button
-                key={status}
-                onClick={() => { setStatusFilter(status); setPage(1); }}
-                disabled={loading}
-                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed ${
-                  statusFilter === status
-                    ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                    : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                {STATUS_LABELS[status]}
+          <div className="divide-y divide-border">
+            {orders.map((order) => {
+              const operational = order.operational;
+              return (
+              <button key={order.id} type="button" aria-label={`Abrir detalhes do pedido ${order.orderNumber}`} onClick={() => setSelectedOrderId(order.id)} className="group grid w-full gap-3 p-4 text-left transition hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary md:grid-cols-[1fr_1fr] xl:grid-cols-[130px_minmax(180px,1.2fr)_minmax(180px,1fr)_minmax(180px,1fr)_140px_44px] xl:items-center xl:gap-4">
+                <div><p className="text-base font-black text-foreground">#{order.orderNumber}</p><p className="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground"><Clock3 className="h-3.5 w-3.5" />{fmtDate(order.createdAt)}</p></div>
+                <div className="min-w-0"><p className="truncate text-sm font-black text-foreground">{order.customerName}</p><p className="mt-1 truncate text-xs text-muted-foreground">{order.customerPhone}</p><span className="mt-1 inline-flex rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-black text-foreground">{operational ? providerLabel(operational) : order.sourceChannel}</span></div>
+                <div className="space-y-1.5"><OrderStatusBadge status={order.status} />{operational && operational.syncState !== 'NONE' ? <p className={`text-xs font-bold ${operational.syncState === 'FAILED' ? 'text-destructive' : 'text-primary'}`}>{operational.marketplaceOperation.friendlyMessage}</p> : null}</div>
+                <div className="flex items-start gap-2 text-sm"><Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span className="font-semibold text-foreground">{operational ? deliveryStatement(operational, order.fulfillmentType) : order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}</span></div>
+                <div className="border-t border-border pt-3 md:border-0 md:pt-0 xl:text-right"><p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{operational?.financialSummary.operationalValueLabel ?? 'Venda'}</p><p className="text-base font-black text-foreground">{fmt(operational?.financialSummary.operationalValue ?? order.total)}</p><p className="text-xs text-muted-foreground">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p></div>
+                <div className="flex items-center justify-end"><span className="mr-2 text-xs font-bold text-muted-foreground xl:sr-only">Abrir detalhes</span><ChevronRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" /></div>
               </button>
-            ))}
+              );
+            })}
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div>
-              <label className="block text-[10px] font-black uppercase text-muted-foreground mb-1.5 tracking-wider">Período de Visualização</label>
-              <select
-                value={dateFilter}
-                onChange={(e) => { setDateFilter(e.target.value as 'hoje' | 'ontem' | 'ultimos7' | 'todos'); setPage(1); }}
-                disabled={loading}
-                className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-bold text-foreground outline-none focus:border-primary transition-colors focus:ring-1 focus:ring-primary/20"
-              >
-                <option value="hoje">Hoje</option>
-                <option value="ontem">Ontem</option>
-                <option value="ultimos7">Últimos 7 dias</option>
-                <option value="todos">Todo período</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-black uppercase text-muted-foreground mb-1.5 tracking-wider">Canal de Venda / Origem</label>
-              <select
-                value={channelFilter}
-                onChange={(e) => { setChannelFilter(e.target.value); setPage(1); }}
-                disabled={loading}
-                className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm font-bold text-foreground outline-none focus:border-primary transition-colors focus:ring-1 focus:ring-primary/20"
-              >
-                <option value="">Todos os canais</option>
-                {Object.entries(CHANNEL_LABELS).map(([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Sincronizando Pedidos...</p>
-        </div>
+        </section>
       )}
 
-      {/* Lista de Pedidos */}
-      {!loading && !error && (
-        orders.length === 0 ? (
-          <div className="text-center py-20 bg-card border border-border rounded-3xl flex flex-col items-center justify-center gap-4 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-              <Package className="w-8 h-8 text-muted-foreground opacity-60" />
-            </div>
-            <div>
-              <p className="text-foreground font-black text-base uppercase tracking-wider mb-1">Nenhum pedido</p>
-              <p className="text-muted-foreground text-sm">Não há pedidos registrados para os filtros selecionados.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {orders.map((order) => (
-              <button
-                key={order.id}
-                onClick={() => setSelectedOrderId(order.id)}
-                className="w-full bg-card border border-border rounded-2xl p-5 flex flex-col md:grid md:grid-cols-[72px_minmax(200px,1fr)_minmax(250px,1.2fr)_150px_56px] md:items-center gap-4 text-left group hover:bg-muted/30 hover:scale-[1.005] hover:shadow-md transition-all duration-200 outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                {/* 1. Coluna do pedido: badge #0005 */}
-                <div className="shrink-0 flex items-center">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-muted border border-border font-black text-foreground text-base shadow-sm">
-                    #{order.orderNumber}
-                  </div>
-                </div>
+      {total > 20 ? (
+        <nav aria-label="Paginação da lista" className="flex items-center justify-center gap-3 pt-2">
+          <button type="button" disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="min-h-10 rounded-lg border border-border bg-card px-4 text-xs font-black text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">Anterior</button>
+          <span className="text-xs font-bold text-muted-foreground">Página {page}</span>
+          <button type="button" disabled={page * 20 >= total} onClick={() => setPage((value) => value + 1)} className="min-h-10 rounded-lg border border-border bg-card px-4 text-xs font-black text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">Próxima</button>
+        </nav>
+      ) : null}
 
-                {/* 2. Coluna cliente: nome em destaque e metadados de entrega */}
-                <div className="min-w-0">
-                  <h3 className="font-black text-foreground text-base truncate leading-tight">{order.customerName}</h3>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-foreground border border-border font-bold shadow-sm">
-                      {order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Coluna status/metadados: status, canal, horário */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`badge-premium ${STATUS_COLORS[order.status]} text-[10px] font-black uppercase tracking-wider py-1 px-2 rounded-lg`}>
-                    {STATUS_LABELS[order.status]}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground border border-border/50 font-bold">
-                    {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-bold flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-primary" />
-                    {fmtDate(order.createdAt)}
-                  </span>
-                </div>
-
-                {/* 4. Coluna valor: Total Geral */}
-                <div className="text-left md:text-right">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground leading-none mb-1">Total Geral</p>
-                  <span className="font-black text-foreground text-xl leading-none">{fmt(order.total)}</span>
-                  <p className="text-[10px] font-bold text-muted-foreground mt-1">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
-                </div>
-
-                {/* 5. Coluna ação: Chevron */}
-                <div className="flex items-center justify-between md:justify-center border-t md:border-t-0 border-border pt-4 md:pt-0 mt-4 md:mt-0">
-                  <span className="md:hidden text-xs font-bold text-muted-foreground">Ver detalhes do pedido</span>
-                  <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-200">
-                    <ChevronRight className="w-5 h-5" />
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )
-      )}
-
-      {/* Pagination */}
-      {total > 20 && (
-        <div className="flex justify-center items-center gap-2 mt-8 pt-4">
-          <button
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-card border border-border text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
-          >
-            Anterior
-          </button>
-          <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-muted-foreground">Página {page}</span>
-          <button
-            disabled={page * 20 >= total}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-card border border-border text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
-          >
-            Próxima
-          </button>
-        </div>
-      )}
-
-      <OrderDrawer 
-        orderId={selectedOrderId} 
-        onClose={() => setSelectedOrderId(null)} 
-        onUpdated={fetchOrders}
-      />
-    </div>
+      <OrderDrawer orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} onUpdated={fetchOrders} />
+    </main>
   );
 }

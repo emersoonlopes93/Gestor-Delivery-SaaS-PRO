@@ -92,9 +92,10 @@ duplicados. Não usar lock somente em memória como substituto da constraint.
 
 ### 5.1 View model operacional do tenant
 
-O board e o detalhe autenticado recebem o mesmo `OrderOperationalViewModel`, derivado no backend sem alterar a máquina de estados. Esse contrato expõe origem, ownership da entrega, capabilities, ações válidas para o status atual, operação marketplace pendente/falha e resumos financeiro, logístico e de produção.
+O board, a lista e o detalhe autenticado recebem o mesmo `OrderOperationalViewModel`, derivado no backend sem alterar a máquina de estados. Esse contrato expõe origem, ownership da entrega, capabilities, ações válidas para o status atual, operação marketplace pendente/falha e resumos financeiro, logístico e de produção.
 
 - Card, drawer e drag-and-drop devem executar somente ações retornadas em `availableActions`.
+- A lista é uma superfície de consulta, inclui estados terminais e reutiliza os mesmos labels de provider, ownership e financeiro; seus filtros e busca permanecem tenant-scoped no backend.
 - `PROVIDER` e `UNKNOWN` nunca habilitam frota própria; o backend continua sendo a barreira fail-closed.
 - Operações iFood/99Food marcadas como `PROVIDER_ASYNC` permanecem pendentes até o evento autoritativo.
 - O drag-and-drop não pode executar cancelamento ou conclusão e não converte coluna diretamente em status.

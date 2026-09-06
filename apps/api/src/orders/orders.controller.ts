@@ -65,9 +65,16 @@ export class OrdersController {
     @Query('channel') channel?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+    @Query('fulfillmentType') fulfillmentType?: string,
+    @Query('origin') origin?: string,
+    @Query('ownership') ownership?: string,
   ) {
     const tenantId = req.user.tenantId;
-    return this.ordersService.listOrders(tenantId, page, limit, status, channel, startDate, endDate);
+    return this.ordersService.listOrders(
+      tenantId, page, limit, status, channel, startDate, endDate, search,
+      fulfillmentType, origin, ownership,
+    );
   }
 
   // ----------------------------------------------------------------

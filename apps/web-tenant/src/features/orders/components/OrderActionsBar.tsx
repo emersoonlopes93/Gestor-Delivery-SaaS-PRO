@@ -1,9 +1,10 @@
 import { memo } from 'react';
 import {
-  Ban, Printer, Edit2, CheckCircle2, ChefHat, Truck, PackageCheck,
-  RefreshCw, UserPlus, type LucideIcon,
+  CheckCircle2, ChefHat, Truck, PackageCheck, RefreshCw, UserPlus, Printer, Edit2, Ban,
+  type LucideIcon,
 } from 'lucide-react';
 import type { OrderOperationalAction, OrderOperationalActionType, OrderOperationalViewModel } from '@gestor/types';
+import { OrderActionMenu } from './OrderActionMenu';
 
 interface OrderActionsBarProps {
   operational: OrderOperationalViewModel;
@@ -11,6 +12,7 @@ interface OrderActionsBarProps {
   onRefresh: () => void;
   isUpdating: boolean;
   isValidating: boolean;
+  showPrimary?: boolean;
 }
 
 const ACTION_ICONS: Record<OrderOperationalActionType, LucideIcon> = {
@@ -28,21 +30,15 @@ const ACTION_ICONS: Record<OrderOperationalActionType, LucideIcon> = {
 };
 
 export const OrderActionsBar = memo(function OrderActionsBar({
-  operational, onAction, onRefresh, isUpdating, isValidating,
+  operational, onAction, onRefresh, isUpdating, isValidating, showPrimary = true,
 }: OrderActionsBarProps) {
   const primary = operational.primaryAction;
   const secondary = operational.secondaryActions.filter((candidate) => candidate.type !== 'OPEN_DETAILS');
   const PrimaryIcon = primary ? ACTION_ICONS[primary.type] : null;
 
   return (
-    <footer className="p-4 border-t border-border bg-card flex flex-col gap-3 shrink-0">
-      {operational.marketplaceOperation.state !== 'NONE' && (
-        <p className={`rounded-xl border px-3 py-2 text-center text-xs font-bold ${operational.marketplaceOperation.state === 'FAILED' ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-primary/30 bg-primary/10 text-primary'}`}>
-          {operational.marketplaceOperation.friendlyMessage}
-        </p>
-      )}
-
-      {primary && PrimaryIcon && (
+    <footer className="flex shrink-0 flex-col gap-2 border-t border-border bg-card p-3 sm:gap-3 sm:p-4">
+      {showPrimary && primary && PrimaryIcon && (
         <button
           type="button"
           onClick={() => onAction(primary)}
@@ -54,26 +50,13 @@ export const OrderActionsBar = memo(function OrderActionsBar({
         </button>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        {secondary.map((candidate) => {
-          const Icon = ACTION_ICONS[candidate.type];
-          return (
-            <button
-              key={candidate.type}
-              type="button"
-              onClick={() => onAction(candidate)}
-              disabled={isUpdating}
-              className={`py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 border transition-colors ${candidate.type === 'CANCEL' ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-muted text-foreground border-border hover:bg-muted/80'}`}
-            >
-              <Icon className="w-4 h-4" />{candidate.label}
-            </button>
-          );
-        })}
+      <div className="flex items-center justify-between gap-2">
+        {secondary.length > 0 ? <OrderActionMenu actions={secondary} onAction={onAction} /> : <span />}
         <button
           type="button"
           onClick={onRefresh}
           disabled={isValidating}
-          className="py-2.5 bg-muted text-foreground rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 border border-border"
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border bg-muted px-3 text-xs font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <RefreshCw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />Atualizar
         </button>

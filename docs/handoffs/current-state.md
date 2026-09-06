@@ -1,3 +1,14 @@
+## Gestor de Pedidos UX V2 — Slice 2 (2026-09-06)
+
+- Objetivo: transformar a fundação segura da Slice 1 em um cockpit operacional responsivo para Kanban e Lista, sem alterar schema, lifecycle, adapters marketplace, Routing V2, KDS, pagamentos ou realtime.
+- O Kanban ganhou hierarquia visual por prioridade/tempo, busca por número/cliente/telefone/motoboy, filtros rápidos provider-neutral, uma única ação dominante e menu acessível para ações secundárias. Tablet usa abas de coluna sem ocultar pedidos e o último snapshot permanece visível em falha de refresh.
+- A Lista passou a consumir a mesma projeção `OrderOperationalViewModel`, os mesmos presenters de status/provider/ownership/financeiro e o mesmo `OrderDrawer`; estados `completed` e `cancelled` continuam consultáveis. Busca e filtros de status, origem, período, atendimento e ownership são aplicados pela API com `tenantId` obrigatório e combinação segura entre filtros relacionais.
+- O drawer foi reorganizado por fluxo operacional: prioridade/tempo, alerta marketplace, ação principal, cliente, itens, produção/KDS, logística/ownership/rota, financeiro e histórico. O resumo de rota diferencia `ROAD` de `DEGRADED`; “Ver no mapa” só aparece após confirmar membership no run tenant-scoped existente.
+- Contratos afetados: DTO autenticado de lista/board e documentação do view model operacional. Sem migration ou alteração de persistência.
+- Validação: testes focados API 3 suítes/14 testes; web focado 3 arquivos/17 testes; web completo 42 arquivos/158 testes; API completa em quatro shards com 130 suítes/643 testes aprovados e 5 suítes/10 testes ignorados. `typecheck`, lint, `check:no-any`, `check:boundaries`, `check:features`, `check:theme`, builds API/web-tenant e `git diff --check` passaram. O lint mantém 17 warnings preexistentes do web-storefront, sem erros.
+- E2E Playwright determinístico passou em 1440x900 e 390x844 claro/escuro, além de 1024x768 e 768x1024 claro, cobrindo board, lista e drawer com PedeHub/iFood/99Food e estados marketplace pending/failed. Artefatos temporários: `C:\wt\pedehub\pedehub-orders-ux-v2-artifacts`.
+- Riscos residuais: o contrato de lista mantém `operational` opcional para compatibilidade tipada com consumidores legados, embora a API autenticada agora sempre o projete; ausência de dados autoritativos continua apresentada como desconhecida, nunca como valor financeiro ou ETA preciso.
+
 ## Gestor de Pedidos UX V2 — Slice 1 (2026-09-06)
 
 - Objetivo: corrigir segurança operacional do Kanban sem redesign amplo, schema, migration, lifecycle, adapters marketplace, Routing V2, pagamentos ou realtime.
