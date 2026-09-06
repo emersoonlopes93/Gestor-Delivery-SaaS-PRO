@@ -21,6 +21,7 @@ import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
 import { printThermalText } from '../../../lib/thermal-print';
 import toast from 'react-hot-toast';
 import { buildRoutingSummary, presentOrderTime, providerLabel, resolveOrderPriority } from '../order-presenters';
+import { subscribeOrdersRealtimeEvents } from '../../../notifications/ordersRealtimeEvents';
 
 export interface OrderDrawerProps {
   orderId: string | null;
@@ -106,7 +107,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     
     setError('');
     try {
-      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
+      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}?detail=${Date.now()}`);
       if (res.data) setOrder(res.data);
     } catch (err: unknown) {
       const msg = err instanceof ApiError ? err.message : 'Erro ao carregar detalhes';
@@ -126,6 +127,12 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
       setError('');
     }
   }, [orderId, fetchDetail]);
+
+  useEffect(() => subscribeOrdersRealtimeEvents((event) => {
+    if (event.type === 'order.changed' && event.hint.orderId === orderId) {
+      void fetchDetail(true);
+    }
+  }), [fetchDetail, orderId]);
 
   const fetchDrivers = async () => {
     try {

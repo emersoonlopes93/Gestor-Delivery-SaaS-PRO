@@ -6,6 +6,9 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { OrderDrawer } from './components/OrderDrawer';
 import { OrderStatusBadge } from './components/OrderStatusBadge';
 import { deliveryStatement, providerLabel } from './order-presenters';
+import { subscribeOrdersRealtimeEvents } from '../../notifications/ordersRealtimeEvents';
+import { OrdersFreshnessStatus } from './components/OrdersFreshnessStatus';
+import { useOrdersRealtimeState } from './hooks/useOrdersRealtimeState';
 
 type PeriodFilter = 'today' | 'yesterday' | 'last7' | 'all';
 
@@ -37,6 +40,9 @@ export function OrdersListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
+  const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
+  const realtime = useOrdersRealtimeState(lastConfirmedAt);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => { setSearchQuery(search.trim()); setPage(1); }, 250);
@@ -62,6 +68,8 @@ export function OrdersListPage() {
       const response = await api.get<{ items: OrderListItemDTO[]; total: number }>(`/orders?${params}`);
       setOrders(response.data.items);
       setTotal(response.data.total);
+      setLastConfirmedAt(Date.now());
+      setHasPendingUpdates(false);
       setError(null);
     } catch (cause) {
       console.error('[OrdersListPage] Erro ao buscar pedidos:', cause);
@@ -72,6 +80,10 @@ export function OrdersListPage() {
   }, [fulfillment, origin, ownership, page, period, searchQuery, status]);
 
   useEffect(() => { void fetchOrders(); }, [fetchOrders]);
+
+  useEffect(() => subscribeOrdersRealtimeEvents((event) => {
+    if (event.type === 'order.changed') setHasPendingUpdates(true);
+  }), []);
 
   const fmt = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   const fmtDate = (value: string) => new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -90,6 +102,15 @@ export function OrdersListPage() {
         )}
       />
 
+      <div className="-mt-3">
+        <OrdersFreshnessStatus
+          connectionState={realtime.connectionState}
+          isStale={realtime.isStale}
+          lastConfirmedAt={lastConfirmedAt}
+          now={realtime.now}
+        />
+      </div>
+
       <section aria-label="Filtros da lista de pedidos" className="space-y-3 border-y border-border bg-card py-4">
         <div className="relative">
           <label htmlFor="orders-list-search" className="sr-only">Buscar por número, cliente ou telefone</label>
@@ -104,6 +125,23 @@ export function OrdersListPage() {
           <label className="col-span-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground md:col-span-1">Responsável pela entrega<select value={ownership} onChange={(event) => { setOwnership(event.target.value as OrderDeliveryOwnership | ''); resetPage(); }} className={`mt-1 ${selectClass}`}><option value="">Todos</option><option value="MERCHANT">Loja</option><option value="PROVIDER">Marketplace</option><option value="UNKNOWN">Não confirmado</option></select></label>
         </div>
       </section>
+
+      {hasPendingUpdates ? (
+        <section aria-label="Atualizações disponíveis" className="flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-primary">
+          <div className="min-w-0">
+            <p className="text-sm font-black">Há atualizações</p>
+            <p className="text-xs font-semibold opacity-80">Atualize quando terminar sua consulta; filtros e página serão mantidos.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void fetchOrders()}
+            disabled={loading}
+            className="min-h-10 shrink-0 rounded-lg border border-primary/30 bg-background px-4 text-xs font-black text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+          >
+            Atualizar
+          </button>
+        </section>
+      ) : null}
 
       {error ? (
         <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-800 dark:text-amber-300">

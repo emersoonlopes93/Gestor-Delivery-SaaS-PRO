@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX, Search, SlidersHorizontal } from 'lucide-react';
-import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderOperationalAction, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
+import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderChangedEvent, OrderOperationalAction, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
@@ -19,6 +19,16 @@ import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 import { resolveKanbanDropAction } from './operational-actions';
 import { matchesBoardFilter, matchesBoardSearch, ORDER_TIME_THRESHOLDS_MINUTES, type BoardFilter } from './order-presenters';
+import { subscribeOrdersRealtimeEvents } from '../../notifications/ordersRealtimeEvents';
+import { OrdersFreshnessStatus } from './components/OrdersFreshnessStatus';
+import { useOrdersRealtimeState } from './hooks/useOrdersRealtimeState';
+import {
+  latestHintForOrder,
+  orderDetailToBoardItem,
+  ORDERS_CONNECTED_RECONCILIATION_MS,
+  ORDERS_DISCONNECTED_RECONCILIATION_MS,
+  reconcileBoardOrder,
+} from './order-reconciliation';
 
 /* ─── Kanban columns spec ───────────────────────────────────── */
 
@@ -125,6 +135,13 @@ export function OperationBoardPage() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<BoardFilter>('all');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
+  const boardRequestRef = useRef<Promise<void> | null>(null);
+  const driversRequestRef = useRef<Promise<void> | null>(null);
+  const orderReconcileChainsRef = useRef<Map<string, Promise<OrderBoardItemDTO | null>>>(new Map());
+  const deferredHintsRef = useRef<Map<string, OrderChangedEvent>>(new Map());
+  const draggingOrderIdRef = useRef<string | null>(null);
+  const ordersRef = useRef<OrderBoardItemDTO[]>([]);
 
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
@@ -135,6 +152,11 @@ export function OperationBoardPage() {
   const [orderToPrint, setOrderToPrint] = useState<OrderResponseDTO | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<OrderResponseDTO | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const realtime = useOrdersRealtimeState(lastConfirmedAt);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
 
   const handlePrintOrder = async (orderId: string) => {
     setIsPrinting(true);
@@ -206,38 +228,117 @@ export function OperationBoardPage() {
     })
   );
 
-  const fetchBoard = useCallback(async () => {
-    try {
-      const res = await api.get<OrderBoardItemDTO[]>(`/orders/operation/board?refresh=${Date.now()}`);
-      setOrders(res.data || []);
-      setError(null);
-    } catch (err) {
-      console.error('[OperationBoardPage] Erro ao buscar board:', err);
-      const msg = err instanceof ApiError ? err.message : 'Erro ao carregar quadro de pedidos';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
+  const fetchBoard = useCallback((): Promise<void> => {
+    if (boardRequestRef.current) return boardRequestRef.current;
+    const request = (async () => {
+      try {
+        const res = await api.get<OrderBoardItemDTO[]>(`/orders/operation/board?refresh=${Date.now()}`);
+        const nextOrders = res.data || [];
+        ordersRef.current = nextOrders;
+        setOrders(nextOrders);
+        setLastConfirmedAt(Date.now());
+        setError(null);
+      } catch (err) {
+        console.error('[OperationBoardPage] Erro ao buscar board:', err);
+        const msg = err instanceof ApiError ? err.message : 'Erro ao carregar quadro de pedidos';
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    })().finally(() => {
+      boardRequestRef.current = null;
+    });
+    boardRequestRef.current = request;
+    return request;
   }, []);
 
-  const fetchDrivers = useCallback(async () => {
-    try {
-      const res = await api.get<DeliveryRunBuilderDataDTO>('/delivery/runs/builder');
-      setDrivers(res.data?.drivers || []);
-    } catch (err) {
-      console.error('[OperationBoardPage] Erro ao buscar entregadores:', err);
-    }
+  const fetchDrivers = useCallback((): Promise<void> => {
+    if (driversRequestRef.current) return driversRequestRef.current;
+    const request = (async () => {
+      try {
+        const res = await api.get<DeliveryRunBuilderDataDTO>('/delivery/runs/builder');
+        setDrivers(res.data?.drivers || []);
+      } catch (err) {
+        console.error('[OperationBoardPage] Erro ao buscar entregadores:', err);
+      }
+    })().finally(() => {
+      driversRequestRef.current = null;
+    });
+    driversRequestRef.current = request;
+    return request;
   }, []);
+
+  const reconcileOrderById = useCallback((
+    orderId: string,
+    cacheKey: string,
+    refreshDrivers = false,
+  ): Promise<OrderBoardItemDTO | null> => {
+    const previous = orderReconcileChainsRef.current.get(orderId) ?? Promise.resolve(null);
+    const request = previous.catch(() => null).then(async () => {
+      try {
+        const response = await api.get<OrderResponseDTO>(`/orders/${orderId}?reconcile=${encodeURIComponent(cacheKey)}`);
+        const item = response.data ? orderDetailToBoardItem(response.data) : null;
+        setOrders((current) => {
+          const reconciled = reconcileBoardOrder(current, orderId, item);
+          ordersRef.current = reconciled;
+          return reconciled;
+        });
+        setLastConfirmedAt(Date.now());
+        setError(null);
+        if (refreshDrivers) await fetchDrivers();
+        return item;
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 404) {
+          setOrders((current) => {
+            const reconciled = reconcileBoardOrder(current, orderId, null);
+            ordersRef.current = reconciled;
+            return reconciled;
+          });
+          setLastConfirmedAt(Date.now());
+          return null;
+        }
+        console.error('[OperationBoardPage] Erro ao reconciliar pedido:', cause);
+        return ordersRef.current.find((order) => order.id === orderId) ?? null;
+      }
+    }).finally(() => {
+      if (orderReconcileChainsRef.current.get(orderId) === request) {
+        orderReconcileChainsRef.current.delete(orderId);
+      }
+    });
+    orderReconcileChainsRef.current.set(orderId, request);
+    return request;
+  }, [fetchDrivers]);
 
   useEffect(() => {
-    fetchBoard();
-    fetchDrivers();
-    const interval = setInterval(() => {
-      fetchBoard();
-      fetchDrivers();
-    }, 15000);
-    return () => clearInterval(interval);
+    void fetchBoard();
+    void fetchDrivers();
   }, [fetchBoard, fetchDrivers]);
+
+  useEffect(() => {
+    const intervalMs = realtime.connectionState === 'connected'
+      ? ORDERS_CONNECTED_RECONCILIATION_MS
+      : ORDERS_DISCONNECTED_RECONCILIATION_MS;
+    const interval = window.setInterval(() => {
+      void Promise.all([fetchBoard(), fetchDrivers()]);
+    }, intervalMs);
+    return () => window.clearInterval(interval);
+  }, [fetchBoard, fetchDrivers, realtime.connectionState]);
+
+  useEffect(() => subscribeOrdersRealtimeEvents((event) => {
+    if (event.type !== 'order.changed') return;
+    if (draggingOrderIdRef.current === event.hint.orderId) {
+      deferredHintsRef.current.set(
+        event.hint.orderId,
+        latestHintForOrder(deferredHintsRef.current.get(event.hint.orderId), event.hint),
+      );
+      return;
+    }
+    void reconcileOrderById(
+      event.hint.orderId,
+      event.hint.eventId,
+      event.hint.reason === 'driver',
+    );
+  }), [reconcileOrderById]);
 
   // Delayed order detection — checks every 60 seconds
   useEffect(() => {
@@ -277,7 +378,7 @@ export function OperationBoardPage() {
 
   const handleOperationalAction = async (orderId: string, action: OrderOperationalAction, driverId?: string) => {
     if (updatingId) return;
-    const order = orders.find((candidate) => candidate.id === orderId);
+    const order = ordersRef.current.find((candidate) => candidate.id === orderId);
     if (!order) return;
     if (!action.enabled) {
       toast(action.reason ?? 'Ação indisponível para este pedido.', { duration: 4000 });
@@ -303,8 +404,7 @@ export function OperationBoardPage() {
     try {
       if (driverId) {
         await api.post('/delivery/runs', { driverId, orderIds: [orderId] });
-        await fetchBoard();
-        await fetchDrivers();
+        await reconcileOrderById(orderId, `driver:${Date.now()}`, true);
         invalidateLogisticsQueries(queryClient);
         setIsDriverModalOpen(false);
         setOrderToDispatch(null);
@@ -316,8 +416,7 @@ export function OperationBoardPage() {
       const body: UpdateOrderStatusDTO = { status: action.targetStatus };
       const res = await api.patch(`/orders/${orderId}/status`, body);
       if (res.success) {
-        await fetchBoard();
-        await fetchDrivers();
+        await reconcileOrderById(orderId, `action:${Date.now()}`, action.targetStatus === 'out_for_delivery');
         invalidateLogisticsQueries(queryClient);
         setIsDriverModalOpen(false);
         setOrderToDispatch(null);
@@ -332,6 +431,9 @@ export function OperationBoardPage() {
       console.error('[OperationBoardPage] Erro ao atualizar status:', err);
       const msg = err instanceof ApiError ? err.message : 'Erro ao atualizar pedido';
       toast.error(msg, { duration: 5000 });
+      if (err instanceof ApiError && [400, 404, 409].includes(err.status)) {
+        await reconcileOrderById(orderId, `conflict:${Date.now()}`);
+      }
     } finally {
       setUpdatingId(null);
     }
@@ -339,7 +441,7 @@ export function OperationBoardPage() {
 
   const handleDriverSelect = (driverId: string) => {
     if (orderToDispatch) {
-      const order = orders.find((candidate) => candidate.id === orderToDispatch);
+      const order = ordersRef.current.find((candidate) => candidate.id === orderToDispatch);
       const dispatchAction = order?.operational.availableActions.find((candidate) => candidate.type === 'DISPATCH');
       if (dispatchAction) handleOperationalAction(orderToDispatch, dispatchAction, driverId);
     }
@@ -393,20 +495,33 @@ export function OperationBoardPage() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const order = orders.find(o => o.id === active.id);
-    if (order) setActiveDragOrder(order);
+    if (order) {
+      draggingOrderIdRef.current = order.id;
+      setActiveDragOrder(order);
+    }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragOrder(null);
-
-    if (!over) return;
-
     const orderId = active.id as string;
-    const order = orders.find(o => o.id === orderId);
+    draggingOrderIdRef.current = null;
+    const deferredHint = deferredHintsRef.current.get(orderId);
+    deferredHintsRef.current.delete(orderId);
+
+    if (!over) {
+      if (deferredHint) await reconcileOrderById(orderId, deferredHint.eventId, deferredHint.reason === 'driver');
+      return;
+    }
+
+    const order = await reconcileOrderById(
+      orderId,
+      deferredHint?.eventId ?? `dnd-preflight:${Date.now()}`,
+      deferredHint?.reason === 'driver',
+    );
     if (!order) return;
     const directColumn = KANBAN_COLUMNS.find((column) => column.id === over.id)?.id;
-    const overOrder = orders.find((candidate) => candidate.id === over.id);
+    const overOrder = ordersRef.current.find((candidate) => candidate.id === over.id);
     const targetColumn = directColumn ?? KANBAN_COLUMNS.find((column) =>
       overOrder && column.statuses.includes(overOrder.status),
     )?.id;
@@ -417,7 +532,7 @@ export function OperationBoardPage() {
       toast(resolution.message ?? 'Movimento indisponível.', { duration: 4000 });
       return;
     }
-    handleOperationalAction(orderId, resolution.action);
+    await handleOperationalAction(orderId, resolution.action);
   };
 
   return (
@@ -430,8 +545,14 @@ export function OperationBoardPage() {
               <span>Painel de Operações</span>
             </h1>
             <p className="text-[11px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">
-              {orders.length} ativos · {orders.filter((order) => order.operational.primaryAction).length} aguardando ação · atualização a cada 15s
+              {orders.length} ativos · {orders.filter((order) => order.operational.primaryAction).length} aguardando ação
             </p>
+            <OrdersFreshnessStatus
+              connectionState={realtime.connectionState}
+              isStale={realtime.isStale}
+              lastConfirmedAt={lastConfirmedAt}
+              now={realtime.now}
+            />
           </div>
         </div>
 
@@ -629,7 +750,9 @@ export function OperationBoardPage() {
       <OrderDrawer
         orderId={activeOrderId}
         onClose={() => setActiveOrderId(null)}
-        onUpdated={fetchBoard}
+        onUpdated={() => {
+          if (activeOrderId) void reconcileOrderById(activeOrderId, `drawer:${Date.now()}`, true);
+        }}
       />
 
       {orderToEdit && (
@@ -638,7 +761,7 @@ export function OperationBoardPage() {
           onClose={() => setOrderToEdit(null)}
           onSaved={() => {
             setOrderToEdit(null);
-            fetchBoard();
+            void reconcileOrderById(orderToEdit.id, `edit:${Date.now()}`);
           }}
         />
       )}

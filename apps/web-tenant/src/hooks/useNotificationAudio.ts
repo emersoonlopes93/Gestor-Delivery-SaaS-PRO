@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { TenantNotificationEventPayload } from '@gestor/types';
+import type { OrderChangedEvent, TenantNotificationEventPayload } from '@gestor/types';
 import { requestNotificationPermission } from '../lib/notification-support';
 import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
@@ -12,6 +12,7 @@ import {
   connectionIssueCopy,
   type ConnectivityIssue,
 } from '../notifications/connectivityState';
+import { emitOrdersRealtimeEvent } from '../notifications/ordersRealtimeEvents';
 
 export function useNotificationAudio(
   tenantId: string | undefined,
@@ -39,6 +40,7 @@ export function useNotificationAudio(
       reconnectionDelay: 1000,
       reconnectionDelayMax: 4000,
     });
+    emitOrdersRealtimeEvent({ type: 'connection', state: 'connecting', occurredAt: new Date().toISOString() });
     let disposed = false;
     let appActive = document.visibilityState !== 'hidden';
     let activeIssue: ConnectivityIssue | null = null;
@@ -113,16 +115,24 @@ export function useNotificationAudio(
     };
 
     socket.on('connect', () => {
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'reconnecting', occurredAt: new Date().toISOString() });
       socket.emit('joinTenant', { tenantId });
       clearAlertTimer();
       emitRestored();
     });
 
+    socket.on('joinedTenant', (data: { tenantId?: string }) => {
+      if (data.tenantId !== tenantId) return;
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'connected', occurredAt: new Date().toISOString() });
+    });
+
     socket.on('connect_error', () => {
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'reconnecting', occurredAt: new Date().toISOString() });
       scheduleConnectionCheck();
     });
 
     socket.on('disconnect', () => {
+      emitOrdersRealtimeEvent({ type: 'connection', state: socket.active ? 'reconnecting' : 'disconnected', occurredAt: new Date().toISOString() });
       scheduleConnectionCheck();
     });
 
@@ -332,6 +342,17 @@ export function useNotificationAudio(
       emitOrderReady(data);
     });
 
+    socket.on('order.changed', (data: OrderChangedEvent) => {
+      if (
+        !data
+        || typeof data.eventId !== 'string'
+        || typeof data.orderId !== 'string'
+        || typeof data.occurredAt !== 'string'
+        || typeof data.reason !== 'string'
+      ) return;
+      emitOrdersRealtimeEvent({ type: 'order.changed', hint: data });
+    });
+
     socketRef.current = socket;
 
     return () => {
@@ -341,6 +362,7 @@ export function useNotificationAudio(
       window.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       socket.disconnect();
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'disconnected', occurredAt: new Date().toISOString() });
       if (socketRef.current === socket) {
         socketRef.current = null;
       }
