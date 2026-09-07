@@ -127,6 +127,7 @@ model Tenant {
   purchases                      Purchase[]
   quickReplies                   QuickReply[]
   revenueEvents                  RevenueEvent[]
+  financialProjections           FinancialProjection[]
   scheduledOrders                ScheduledOrder[]
   schedulingSettings             SchedulingSettings?
   schedulingWindows              SchedulingWindow[]
@@ -1108,6 +1109,7 @@ model Order {
   waiter                 TenantUser?                  @relation("WaiterOrders", fields: [waiterId], references: [id])
   printJobs              PrintJob[]
   revenueEvents          RevenueEvent[]
+  financialProjections   FinancialProjection[]
   scheduledOrders        ScheduledOrder[]
   stockMovements         StockMovement[]
 
@@ -1734,6 +1736,52 @@ model RevenueEvent {
   @@index([tenantId, occurredAt])
   @@index([tenantId, billingPeriodYear, billingPeriodMonth], map: "revenue_events_tenant_id_billing_period_year_billing_period_mon")
   @@map("revenue_events")
+}
+
+model FinancialProjection {
+  id                       String                          @id @default(uuid())
+  tenantId                 String                          @map("tenant_id")
+  orderId                  String                          @map("order_id")
+  source                   FinancialProjectionSource
+  projectionVersion        Int                             @default(1) @map("projection_version")
+  occurredAt               DateTime                        @map("occurred_at")
+  recognizedAt             DateTime?                       @map("recognized_at")
+  paymentObservedAt        DateTime?                       @map("payment_observed_at")
+  saleGross                Decimal?                        @map("sale_gross") @db.Decimal(12, 2)
+  saleGrossState           FinancialProjectionValueState   @map("sale_gross_state")
+  discountTotal            Decimal?                        @map("discount_total") @db.Decimal(12, 2)
+  discountTotalState       FinancialProjectionValueState   @map("discount_total_state")
+  discountMerchant         Decimal?                        @map("discount_merchant") @db.Decimal(12, 2)
+  discountMerchantState    FinancialProjectionValueState   @map("discount_merchant_state")
+  discountPlatform         Decimal?                        @map("discount_platform") @db.Decimal(12, 2)
+  discountPlatformState    FinancialProjectionValueState   @map("discount_platform_state")
+  deliveryCharged          Decimal?                        @map("delivery_charged") @db.Decimal(12, 2)
+  deliveryChargedState     FinancialProjectionValueState   @map("delivery_charged_state")
+  serviceCharged           Decimal?                        @map("service_charged") @db.Decimal(12, 2)
+  serviceChargedState      FinancialProjectionValueState   @map("service_charged_state")
+  customerPaid             Decimal?                        @map("customer_paid") @db.Decimal(12, 2)
+  customerPaidState        FinancialProjectionValueState   @map("customer_paid_state")
+  paymentMethod            PaymentMethod?                  @map("payment_method")
+  paymentChannel           String?                         @map("payment_channel") @db.VarChar(80)
+  marketplaceFee           Decimal?                        @map("marketplace_fee") @db.Decimal(12, 2)
+  marketplaceFeeState      FinancialProjectionValueState   @map("marketplace_fee_state")
+  merchantReceivable       Decimal?                        @map("merchant_receivable") @db.Decimal(12, 2)
+  merchantReceivableState  FinancialProjectionValueState   @map("merchant_receivable_state")
+  refundAmount             Decimal?                        @map("refund_amount") @db.Decimal(12, 2)
+  refundState              FinancialProjectionValueState   @map("refund_state")
+  cogsSnapshot             Decimal?                        @map("cogs_snapshot") @db.Decimal(12, 2)
+  cogsState                FinancialProjectionValueState   @map("cogs_state")
+  sourceFieldProvenance    Json                            @map("source_field_provenance")
+  sourcePayloadReference   String?                         @map("source_payload_reference") @db.VarChar(160)
+  createdAt                DateTime                        @default(now()) @map("created_at")
+  updatedAt                DateTime                        @updatedAt @map("updated_at")
+  tenant                   Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order                    Order                           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, orderId, projectionVersion])
+  @@index([tenantId, source, occurredAt])
+  @@index([tenantId, orderId])
+  @@map("financial_projections")
 }
 
 model SubscriptionStatusHistory {
@@ -3869,6 +3917,19 @@ enum PaymentMethod {
   debit_card
   other
   card_on_delivery
+}
+
+enum FinancialProjectionSource {
+  PEDEHUB
+  POS
+  IFOOD
+  FOOD_99
+}
+
+enum FinancialProjectionValueState {
+  KNOWN
+  UNKNOWN
+  NOT_APPLICABLE
 }
 
 enum BillingCycle {

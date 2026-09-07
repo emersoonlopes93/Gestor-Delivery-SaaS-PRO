@@ -2130,3 +2130,21 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - `ORDERCONFIRM` reaches `confirmed` then `preparing` through the canonical idempotent KDS entry. Missing-confirm `ORDERREADY` reaches ready without a late KDS ticket. `ORDERFINISH` and `ORDERCANCEL` reconcile terminal state with an audit timeline and no retroactive KDS, own-fleet, or financial side effects.
 - Focused local validation passed: 5 suites / 37 tests for native token/client/provider/status/controller, API and web-tenant TypeScript, anti-any, API build, web-tenant build, and diff check. No remote database, provider, Dokploy, deploy, migration, merge, or promotion was performed. State: READY_FOR_REAL_RETEST.
 - Fora de escopo preservado: branch/adapter 99Food, provider real, deploy, Dokploy, produção, banco compartilhado, merge e promoção para `main-copy`.
+---
+
+## Financial Projection V1 foundation (2026-09-07)
+
+- Isolated branch `feat/financial-projection-v1`, based on `origin/main-copy` / `6f11b9482f73c39154a1d0cac6529f00245dd556`, in `C:\wt\pedehub\finproj-v1`.
+- Additive migration `20260907120000_financial_projection_v1` creates `FinancialProjection`, the provider-neutral `FinancialProjectionSource` and `FinancialProjectionValueState` enums, tenant/order relations, logical uniqueness `(tenant_id, order_id, projection_version)`, and read indexes. No backfill exists.
+- `FinancialProjectionService` provides direct-only `projectOrder`, `reprojectOrder`, and `getProjection`, all with an explicit tenant filter. Writes use the logical-key upsert; there is no endpoint, automatic hook, or order mutation.
+- The projection stores value plus `KNOWN | UNKNOWN | NOT_APPLICABLE` state for gross, discounts, delivery, service, received amount, marketplace fee/receivable, refund, and COGS. It records field provenance and a `MarketplaceOrder` reference when present. A cancelled order does not prove a refund.
+- PedeHub and POS use only persisted facts; a declared payment method is not payment evidence. POS may observe `CashMovement.sale` without writing Cash. iFood keeps fees, receivable, and payment unknown without persisted financial facts. 99Food reads only `normalizedPayload`: `itemsSubtotal` (from `order_price`) for gross and `total` only when `isPrepaid` for payment; it does not reparse raw payloads or convert IDs to `number`. COGS is known only from `theoretical_depletion` movements with persisted `unitCost`.
+- Scope preserved: no change to Cash, manual Finance, Analytics, frontend, iFood/99Food adapters, feature flags, dependencies, lockfile, remote database, production, Dokploy, or deploy.
+
+### Validation
+
+- `prisma generate`, `prisma validate`, `prisma migrate diff --from-empty --to-schema-datamodel`, and `git diff --check`: PASS.
+- Focused tests: `financial-projection.service.spec.ts`, 7/7 PASS; covers tenant scope, idempotent reprocessing, PedeHub, POS, iFood, 99Food, COGS, and cancellation without inferred refund.
+- Global gates: `pnpm typecheck`, `pnpm lint` (0 errors; 17 pre-existing web-storefront warnings), `pnpm check:no-any`, `pnpm check:boundaries`, `pnpm check:features`, `pnpm check:theme`, and `pnpm build:api`: PASS.
+- Full API suite: 135/135 executed suites PASS, 658/658 tests PASS; 5 suites/10 conditional tests skipped.
+- Required PostgreSQL 16 zero-to-upgrade `prisma migrate deploy` proof is locally blocked: `docker version` cannot connect to `dockerDesktopLinuxEngine`, and no local `psql`, PostgreSQL service, or database URL is available. No remote database was accessed. Run this ephemeral gate before integration.

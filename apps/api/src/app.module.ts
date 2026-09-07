@@ -37,6 +37,7 @@ import { UploadModule } from './upload/upload.module';
 import { CustomerAuthModule } from './auth/customer-auth.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { FinanceModule } from './finance/finance.module';
+import { FinancialProjectionModule } from './financial-projection/financial-projection.module';
 import { PlanGatingGuard } from './common/guards/plan-gating.guard';
 import { FeatureControlModule } from './feature-control/feature-control.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -318,6 +319,7 @@ if (enableBullmq) {
     // Management (Phase 3)
     PurchasingModule,
     FinanceModule,
+    FinancialProjectionModule,
 
     // Customer Auth (B2C)
     CustomerAuthModule,
