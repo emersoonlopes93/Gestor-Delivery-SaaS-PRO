@@ -54,6 +54,7 @@ export interface CreateFinancialTransactionDTO {
 }
 
 export interface UpdateFinancialTransactionDTO {
+  accountId?: string;
   status?: FinancialStatus;
   paymentDate?: Date;
   description?: string;

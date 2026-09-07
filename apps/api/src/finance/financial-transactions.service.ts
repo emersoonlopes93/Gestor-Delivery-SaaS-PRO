@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { 
   FinancialTransactionDTO, 
@@ -8,10 +8,53 @@ import {
   FinancialTransactionType
 } from '@gestor/types';
 import { FinancialStatus as PrismaFinancialStatus, FinancialTransactionType as PrismaFinancialTransactionType, Prisma } from '@prisma/client';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
 export class FinancialTransactionsService {
   constructor(private prisma: PrismaService) {}
+
+  private getAccountBalanceEffect(transaction: {
+    accountId: string | null;
+    amount: Prisma.Decimal | number;
+    status: PrismaFinancialStatus;
+    type: PrismaFinancialTransactionType;
+  }): { accountId: string; amount: number } | null {
+    if (transaction.status !== PrismaFinancialStatus.paid || !transaction.accountId) {
+      return null;
+    }
+
+    const multiplier = transaction.type === PrismaFinancialTransactionType.income ? 1 : -1;
+    return { accountId: transaction.accountId, amount: Number(transaction.amount) * multiplier };
+  }
+
+  private async ensureAccountBelongsToTenant(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    accountId: string,
+  ): Promise<void> {
+    const account = await tx.financialAccount.findFirst({
+      where: { id: accountId, tenantId },
+      select: { id: true },
+    });
+    if (!account) throw new NotFoundException('Conta financeira não encontrada');
+  }
+
+  private async applyAccountBalanceEffect(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    effect: { accountId: string; amount: number } | null,
+  ): Promise<void> {
+    if (!effect || effect.amount === 0) return;
+
+    const updated = await tx.financialAccount.updateMany({
+      where: { id: effect.accountId, tenantId },
+      data: { balance: { increment: effect.amount } },
+    });
+    if (updated.count !== 1) {
+      throw new NotFoundException('Conta financeira não encontrada');
+    }
+  }
 
   private toPrismaType(type: FinancialTransactionType): PrismaFinancialTransactionType {
     switch (type) {
@@ -86,7 +129,7 @@ export class FinancialTransactionsService {
       if (!account) throw new NotFoundException('Conta financeira nÃ£o encontrada');
     }
 
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    return runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       const transaction = await tx.financialTransaction.create({
         data: {
           tenantId,
@@ -106,18 +149,11 @@ export class FinancialTransactionsService {
         }
       });
 
-      // If transition is created as PAID and has an account, update account balance
-      if (transaction.status === PrismaFinancialStatus.paid && transaction.accountId) {
-        const multiplier = transaction.type === PrismaFinancialTransactionType.income ? 1 : -1;
-        await tx.financialAccount.updateMany({
-          where: { id: transaction.accountId, tenantId },
-          data: {
-            balance: {
-              increment: Number(transaction.amount) * multiplier
-            }
-          }
-        });
-      }
+      await this.applyAccountBalanceEffect(
+        tx,
+        tenantId,
+        this.getAccountBalanceEffect(transaction),
+      );
 
       return this.mapToDTO(transaction);
     });
@@ -130,16 +166,29 @@ export class FinancialTransactionsService {
 
     if (!existing) throw new NotFoundException('Transação não encontrada');
 
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.financialTransaction.updateMany({
+    return runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const current = await tx.financialTransaction.findFirst({
+        where: { id, tenantId },
+      });
+      if (!current) throw new NotFoundException('Financial transaction not found');
+
+      if (dto.accountId !== undefined) {
+        await this.ensureAccountBelongsToTenant(tx, tenantId, dto.accountId);
+      }
+
+      const result = await tx.financialTransaction.updateMany({
         where: { id, tenantId },
         data: {
-          ...(dto.status && { status: this.toPrismaStatus(dto.status) }),
-          ...(dto.paymentDate && { paymentDate: dto.paymentDate }),
-          ...(dto.description && { description: dto.description }),
+          ...(dto.accountId !== undefined && { accountId: dto.accountId }),
+          ...(dto.status !== undefined && { status: this.toPrismaStatus(dto.status) }),
+          ...(dto.paymentDate !== undefined && { paymentDate: dto.paymentDate }),
+          ...(dto.description !== undefined && { description: dto.description }),
           ...(dto.amount !== undefined && { amount: dto.amount }),
         },
       });
+      if (result.count !== 1) {
+        throw new ConflictException('Financial transaction changed during update');
+      }
 
       const updated = await tx.financialTransaction.findFirst({
         where: { id, tenantId },
@@ -147,18 +196,14 @@ export class FinancialTransactionsService {
       });
       if (!updated) throw new NotFoundException('TransaÃ§Ã£o nÃ£o encontrada');
 
-      // If status changed to PAID, update balance
-      if (existing.status !== PrismaFinancialStatus.paid && updated.status === PrismaFinancialStatus.paid && updated.accountId) {
-        const multiplier = updated.type === PrismaFinancialTransactionType.income ? 1 : -1;
-        await tx.financialAccount.updateMany({
-          where: { id: updated.accountId, tenantId },
-          data: {
-            balance: {
-              increment: Number(updated.amount) * multiplier
-            }
-          }
-        });
-      }
+      const previousEffect = this.getAccountBalanceEffect(current);
+      const nextEffect = this.getAccountBalanceEffect(updated);
+      await this.applyAccountBalanceEffect(
+        tx,
+        tenantId,
+        previousEffect ? { ...previousEffect, amount: -previousEffect.amount } : null,
+      );
+      await this.applyAccountBalanceEffect(tx, tenantId, nextEffect);
 
       return this.mapToDTO(updated);
     });

@@ -2163,3 +2163,17 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Focused API tests: ingredients 7/7 PASS (1, 10, 12, 1000, 0.5, zero and negative rejection); suppliers 5/5 PASS (optional CNPJ, normalization, archive, and tenant scope). Focused web contract test: 2/2 PASS.
 - `pnpm typecheck`, `pnpm check:no-any`, API lint, web-tenant lint, `pnpm build:api`, `pnpm build:web-tenant`, and `git diff --check`: PASS.
 - Authenticated browser smoke was not run because no authenticated local runtime/session was established for this isolated change.
+
+---
+
+## Finance P0-A and P0-B balance integrity (2026-09-07)
+
+- Isolated branch `fix/finance-p0-cash-balance`, based on `origin/main-copy` / `17a19b8a`.
+- Cash refunds now preserve the original POS payment method and expected physical cash includes only cash sales and cash refunds. Legacy refunds without a method resolve their method from the linked sale movement. A repeated refund for the same tenant/session/order is ignored.
+- Financial transactions compute the previous and next paid-account effects. Within a serializable Prisma transaction they revert the previous effect and apply the next effect with atomic account increments. Paid amount changes, account changes, and paid-to-pending/cancelled transitions therefore preserve balance integrity.
+- Purchases remain unchanged: unpaid purchases create pending expenses and do not mutate account balances. No schema, migration, Financial Projection, web-tenant, remote database, deployment, Dokploy, or main-copy promotion was performed.
+
+### Validation
+
+- Focused Cash, POS, Finance, and Purchasing tests: 22/22 PASS. Full API suite: 140 passed suites / 684 passed tests; 5 suites / 10 conditional tests skipped.
+- `pnpm typecheck`, `pnpm check:no-any`, API lint, API build, and `git diff --check`: PASS.
