@@ -32,6 +32,7 @@ model Tenant {
   orderSequence                  Int                                @default(0) @map("order_sequence")
   businessGroupRole              BusinessGroupTenantRole?           @map("business_group_role")
   paymentTransactions            PaymentTransaction[]
+  paymentRefunds                 PaymentRefund[]
   paymentProviderConnections     PaymentProviderConnection[]
   orderPaymentAttempts           OrderPaymentAttempt[]
   platformFeeEntries             PlatformFeeEntry[]
@@ -1085,6 +1086,7 @@ model Order {
   isScheduled            Boolean                      @default(false) @map("is_scheduled")
   orderCoupons           OrderCoupon[]
   paymentTransactions    PaymentTransaction[]
+  paymentRefunds         PaymentRefund[]
   paymentAttempts        OrderPaymentAttempt[]
   cashMovements          CashMovement[]
   cashbackHistory        CashbackTransaction[]
@@ -2269,10 +2271,42 @@ model PaymentTransaction {
   order                 Order?               @relation(fields: [orderId], references: [id])
   orderPaymentAttempt   OrderPaymentAttempt? @relation(fields: [orderPaymentAttemptId], references: [id], onDelete: SetNull)
   tenant                Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refunds               PaymentRefund[]
   splitPayments         SplitPayment[]
 
   @@index([tenantId, status])
   @@index([gatewayTxId])
+}
+
+model PaymentRefund {
+  id                   String              @id @default(uuid())
+  tenantId             String              @map("tenant_id")
+  orderId              String              @map("order_id")
+  paymentTransactionId String              @map("payment_transaction_id")
+  provider             String              @db.VarChar(50)
+  providerPaymentId    String              @map("provider_payment_id") @db.VarChar(255)
+  providerRefundId     String?             @unique @map("provider_refund_id") @db.VarChar(255)
+  amount               Decimal             @db.Decimal(12, 2)
+  currency             String              @default("BRL") @db.VarChar(10)
+  status               PaymentRefundStatus @default(REQUESTED)
+  idempotencyKey       String              @map("idempotency_key") @db.VarChar(160)
+  requestedAt          DateTime            @default(now()) @map("requested_at")
+  processedAt          DateTime?           @map("processed_at")
+  confirmedAt          DateTime?           @map("confirmed_at")
+  failedAt             DateTime?           @map("failed_at")
+  failureCode          String?             @map("failure_code") @db.VarChar(120)
+  failureMessage       String?             @map("failure_message") @db.VarChar(500)
+  providerStatus       String?             @map("provider_status") @db.VarChar(120)
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  tenant               Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order                Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentTransaction   PaymentTransaction  @relation(fields: [paymentTransactionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, paymentTransactionId, idempotencyKey])
+  @@index([tenantId, status])
+  @@index([paymentTransactionId, status])
+  @@map("payment_refunds")
 }
 
 model Coupon {
@@ -3950,6 +3984,14 @@ enum PaymentTxStatus {
   confirmed
   failed
   expired
+}
+
+enum PaymentRefundStatus {
+  REQUESTED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  UNKNOWN
 }
 
 enum BillingPlanType {
