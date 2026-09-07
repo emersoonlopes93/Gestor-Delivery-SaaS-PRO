@@ -29,6 +29,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingIngredient) {
@@ -38,7 +39,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         description: editingIngredient.description || '',
         unit: editingIngredient.unit,
         purchaseUnit: editingIngredient.purchaseUnit || editingIngredient.unit,
-        conversionFactor: editingIngredient.conversionFactor || 1,
+        conversionFactor: editingIngredient.conversionFactor ?? 1,
         category: editingIngredient.category || '',
         minStock: editingIngredient.minStock || 0,
         initialPurchaseActive: false,
@@ -63,19 +64,6 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
     }
   }, [editingIngredient, isOpen]);
 
-  // Auto-detect conversion factor
-  useEffect(() => {
-    if (editingIngredient) return; // Don't auto-change during edit
-
-    let factor = 1;
-    if (formData.unit === UnitType.G && formData.purchaseUnit === UnitType.KG) factor = 1000;
-    if (formData.unit === UnitType.ML && formData.purchaseUnit === UnitType.L) factor = 1000;
-    
-    if (factor !== formData.conversionFactor) {
-      setFormData(prev => ({ ...prev, conversionFactor: factor }));
-    }
-  }, [formData.unit, formData.purchaseUnit, editingIngredient, formData.conversionFactor]);
-
   const calculatedValues = useMemo(() => {
     if (!formData.initialPurchaseActive || !formData.initialPurchase) return null;
     
@@ -96,6 +84,13 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const conversionFactor = formData.conversionFactor;
+    if (conversionFactor === undefined || !Number.isFinite(conversionFactor) || conversionFactor <= 0) {
+      setFormError('Informe um fator de conversão maior que zero.');
+      return;
+    }
+
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const payload = { ...formData };
@@ -196,11 +191,17 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                 <input
                   type="number"
                   step="0.0001"
-                  value={formData.conversionFactor}
-                  onChange={(e) => setFormData({ ...formData, conversionFactor: Number(e.target.value) })}
+                  min="0.0001"
+                  aria-label="Fator de Conversão"
+                  value={formData.conversionFactor ?? ''}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    conversionFactor: e.target.value === '' ? undefined : Number(e.target.value),
+                  })}
                   className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground text-sm"
                 />
                 <p className="text-[10px] text-muted-foreground">Ex: 1000 se base=g e compra=kg</p>
+                {formError && <p role="alert" className="text-xs text-destructive">{formError}</p>}
               </div>
 
               <div className="space-y-1.5">

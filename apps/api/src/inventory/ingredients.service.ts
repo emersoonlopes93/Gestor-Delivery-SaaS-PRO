@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
 import { UnitType as PrismaUnitType, Prisma } from '@prisma/client';
@@ -29,6 +29,14 @@ export class IngredientsService {
       [UnitType.L]: PrismaUnitType.l,
     };
     return map[unit];
+  }
+
+  private resolveConversionFactor(value: number | undefined): number {
+    const conversionFactor = value ?? 1;
+    if (!Number.isFinite(conversionFactor) || conversionFactor <= 0) {
+      throw new BadRequestException('O fator de conversão deve ser maior que zero');
+    }
+    return conversionFactor;
   }
 
   async findAll(tenantId: string): Promise<IngredientDTO[]> {
@@ -75,7 +83,7 @@ export class IngredientsService {
           description: ingredientData.description,
           unit: this.mapPrismaUnit(ingredientData.unit),
           purchaseUnit: ingredientData.purchaseUnit ? this.mapPrismaUnit(ingredientData.purchaseUnit) : this.mapPrismaUnit(ingredientData.unit),
-          conversionFactor: ingredientData.conversionFactor || 1,
+          conversionFactor: this.resolveConversionFactor(ingredientData.conversionFactor),
           category: ingredientData.category,
           minStock: ingredientData.minStock,
           tenantId,
@@ -168,7 +176,9 @@ export class IngredientsService {
         description: updateData.description,
         unit: updateData.unit ? this.mapPrismaUnit(updateData.unit) : undefined,
         purchaseUnit: updateData.purchaseUnit ? this.mapPrismaUnit(updateData.purchaseUnit) : undefined,
-        conversionFactor: updateData.conversionFactor,
+        conversionFactor: updateData.conversionFactor === undefined
+          ? undefined
+          : this.resolveConversionFactor(updateData.conversionFactor),
         category: updateData.category,
         minStock: updateData.minStock,
         isActive: updateData.isActive,
