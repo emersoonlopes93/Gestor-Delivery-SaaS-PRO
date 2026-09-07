@@ -80,6 +80,29 @@ provider, conexão opcional, valor, moeda, chave idempotente e status canônico.
 - SaaS Billing remains separate from Order Payments. No Asaas adapter, new Mercado Pago
   integration, router, external refund or provider pricing was added.
 
+## Refund lifecycle P0-C V2
+
+Refund is separate from operational order cancellation. Cancelling an order neither creates nor
+confirms a refund. A refund reaches `SUCCEEDED` only after an authoritative provider response or
+an authenticated webhook that matches an active local refund.
+
+- `PaymentRefund` is tenant-scoped and belongs to an order plus a confirmed same-tenant
+  `PaymentTransaction`. This slice supports full refunds for own Mercado Pago payments only.
+  Partial refund, chargeback, Cash, FinancialTransaction, Financial Projection, RevenueEvent
+  and marketplaces remain outside this flow.
+- Canonical states are `REQUESTED`, `PROCESSING`, `SUCCEEDED`, `FAILED` and `UNKNOWN`.
+  Ambiguous network/provider outcomes remain `UNKNOWN`, not definitive failure, and may be
+  reconciled using the provider payment/refund identity.
+- `(tenantId, paymentTransactionId, idempotencyKey)` retains a stable retry key. A full refund
+  already `SUCCEEDED` cannot trigger another provider request; known `providerRefundId` is
+  unique.
+- The Mercado Pago adapter uses its documented payment-refund request with
+  `X-Idempotency-Key` and its specific payment/refund lookup. Tokens and raw provider payloads
+  are not persisted or logged.
+- A `payment.status=refunded` webhook confirms only a matching active `PaymentRefund`.
+  Duplicate or late delivery cannot regress a final state. No scheduler and no
+  `cancel order -> refund` automation were introduced.
+
 ## Webhook inbox
 
 O fluxo obrigatório é: autenticar pelo adapter, resolver tenant/provider/tentativa, registrar

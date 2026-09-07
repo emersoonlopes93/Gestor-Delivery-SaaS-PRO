@@ -2177,3 +2177,34 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 - Focused Cash, POS, Finance, and Purchasing tests: 22/22 PASS. Full API suite: 140 passed suites / 684 passed tests; 5 suites / 10 conditional tests skipped.
 - `pnpm typecheck`, `pnpm check:no-any`, API lint, API build, and `git diff --check`: PASS.
+
+---
+
+## Finance P0-C V2 - persisted Mercado Pago refund lifecycle (2026-09-07)
+
+- Branch `feat/payment-refund-lifecycle`, based on `origin/main-copy` / `a094c90f`, in
+  `C:\wt\pedehub\refund-v2`.
+- Additive migration `20260907140000_payment_refund_lifecycle` creates tenant-scoped
+  `PaymentRefund`, its `REQUESTED | PROCESSING | SUCCEEDED | FAILED | UNKNOWN` lifecycle,
+  tenant/order/payment-transaction FKs, logical idempotency uniqueness and unique provider
+  refund identity. No backfill exists.
+- `PaymentRefundService` supports full Mercado Pago refunds only. It validates the same-tenant
+  confirmed payment/order relation, persists and reuses a stable idempotency key, never turns an
+  ambiguous provider result into failure, and reconciles active refunds only by provider
+  payment/refund identity. No endpoint or web UI was added.
+- Authenticated payment webhook handling maps `refunded` only to a matching active refund;
+  duplicate and out-of-order events preserve terminal state. Order cancellation remains separate
+  from refund success.
+
+### Validation
+
+- Focused refund adapter/lifecycle/webhook: 3 suites / 15 tests PASS. Cash, POS, Finance,
+  Purchasing and order-cancellation regressions: 5 suites / 23 tests PASS.
+- Full API suite: 142 passed suites / 697 passed tests; 5 suites / 10 conditional tests skipped.
+  Typecheck, no-any, boundaries, features, API lint, API build and diff check passed.
+- Prisma generate/validate passed. PostgreSQL 16 from-zero applied 70 migrations; upgrade from
+  the 69-migration `a094c90f` baseline applied only this migration. The schema diff retained
+  only the four known baseline index renames (Analytics, Customer External Identities, Driver
+  Ledger, Order Payment Attempts); no refund-specific drift remains.
+- No real Mercado Pago request, remote database, Dokploy, deploy or `main-copy` promotion.
+  P0-D COGS reversal remains deferred.

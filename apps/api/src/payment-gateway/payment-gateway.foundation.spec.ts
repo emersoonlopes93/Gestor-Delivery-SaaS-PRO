@@ -43,6 +43,7 @@ describe('PaymentGatewayService payment foundation compatibility', () => {
     paymentTransaction: {
       findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
   };
   const tenantContext = { getTenantId: jest.fn().mockReturnValue('tenant-a') };
@@ -64,6 +65,10 @@ describe('PaymentGatewayService payment foundation compatibility', () => {
     }),
     transitionStatus: jest.fn().mockResolvedValue({ id: 'attempt-a' }),
     attachExternalPayment: jest.fn().mockResolvedValue({ id: 'attempt-a' }),
+    transitionStatusOnce: jest.fn().mockResolvedValue({ transitioned: true }),
+  };
+  const paymentRefundService = {
+    confirmFullRefundFromPaymentWebhook: jest.fn().mockResolvedValue(true),
   };
   const service = new PaymentGatewayService(
     prisma as never,
@@ -73,6 +78,7 @@ describe('PaymentGatewayService payment foundation compatibility', () => {
     connectionService as never,
     {} as never,
     paymentAttemptService as never,
+    paymentRefundService as never,
   );
   const originalFetch = global.fetch;
 
@@ -102,6 +108,7 @@ describe('PaymentGatewayService payment foundation compatibility', () => {
       provider: PaymentProvider.mercado_pago,
       status: OrderPaymentAttemptStatus.CREATED,
     });
+    paymentRefundService.confirmFullRefundFromPaymentWebhook.mockResolvedValue(true);
   });
 
   afterAll(() => {
@@ -163,5 +170,36 @@ describe('PaymentGatewayService payment foundation compatibility', () => {
     expect(prisma.tenantClient.paymentTransaction.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ gatewayName: 'manual_pix' }) }),
     );
+  });
+
+  it('maps a refunded webhook to the persisted refund lifecycle without cancelling the order', async () => {
+    const webhookUpdate: (transaction: object, payment: object) => Promise<void> = Reflect.get(
+      service,
+      'updateTransactionRecord',
+    );
+    const webhookTransaction = {
+      ...transaction,
+      gatewayTxId: 'mp-payment-a',
+      order: { id: 'order-a', status: 'cancelled' },
+    };
+
+    await webhookUpdate.call(service, webhookTransaction, {
+      id: 'mp-payment-a',
+      status: 'refunded',
+    });
+
+    expect(paymentRefundService.confirmFullRefundFromPaymentWebhook).toHaveBeenCalledWith({
+      tenantId: 'tenant-a',
+      paymentTransactionId: 'transaction-a',
+      providerPaymentId: 'mp-payment-a',
+    });
+    expect(paymentAttemptService.transitionStatusOnce).toHaveBeenCalledWith({
+      tenantId: 'tenant-a',
+      attemptId: 'attempt-a',
+      status: OrderPaymentAttemptStatus.REFUNDED,
+    });
+    expect(prisma.paymentTransaction.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'transaction-a' },
+    }));
   });
 });
