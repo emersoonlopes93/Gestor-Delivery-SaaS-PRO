@@ -2246,3 +2246,32 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
   only the four known baseline index renames (Analytics, Customer External Identities, Driver
   Ledger and Order Payment Attempts); no P0-D drift was introduced. Ephemeral local container
   only; no remote database, deploy or Dokploy action was performed.
+
+---
+
+## Purchasing date contract and local demo seed audit (2026-09-07)
+
+- Branch `fix/purchasing-date-and-seed-audit`, based on `origin/main-copy` /
+  `63c1e16a95c8d31118b89e68529e3ef2c3bd6616`, accepts the browser's valid
+  `YYYY-MM-DD` purchase date contract as a business date and persists it at UTC noon. Valid full
+  ISO timestamps remain accepted; empty, malformed and impossible dates return a friendly HTTP
+  400 before Prisma is called.
+- Purchase creation now verifies that both supplier and ingredients belong to the current tenant
+  before creating the purchase, stock movement or finance record. Paid purchases retain their
+  existing no-financial-transaction behavior and unpaid purchases still create a pending expense.
+- The local demo seed is idempotent for delivery rules and now provides the minimum purchasing
+  path: demo supplier, two stocked ingredients, recipe rows for the existing demo pizza, a cash
+  financial account and one open cash session. It deliberately does not create purchases, orders,
+  POS transactions, refunds, reversals or financial projections.
+- Fresh ephemeral PostgreSQL 16 validation applied 71 migrations and ran the seed twice. Both
+  runs succeeded; final counts were tenant=1, users=1, suppliers=1, ingredients=2, recipes=2,
+  financial_accounts=1, open_cash_sessions=1 and delivery_rules=3. No remote database, migration,
+  deploy or Dokploy action was performed.
+
+### Validation
+
+- Focused Purchasing, Finance and Inventory tests: 5 suites / 19 tests PASS. This includes the
+  controller-to-service date-only contract, invalid-date HTTP 400 behavior, exact business date
+  persistence, paid/unpaid finance behavior, stock effects and tenant isolation.
+- `pnpm typecheck`, `pnpm check:no-any`, API lint and API build: PASS. No web-tenant source,
+  Prisma schema or migration changed.

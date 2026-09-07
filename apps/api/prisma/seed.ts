@@ -1,5 +1,12 @@
 import 'reflect-metadata';
-import { PrismaClient, TenantStatus, TenantSubscriptionStatus } from '@prisma/client';
+import {
+  CashSessionStatus,
+  FinancialAccountType,
+  PrismaClient,
+  TenantStatus,
+  TenantSubscriptionStatus,
+  UnitType,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   TENANT_PERMISSIONS,
@@ -629,32 +636,25 @@ async function seedDemoTenant() {
       }
     }
 
-    // Create delivery rate rules
-    await prisma.deliveryRateRule.create({
-      data: {
-        tenantId: tenant.id,
-        type: 'neighborhood',
-        neighborhood: 'centro',
-        rate: 8.0,
-      },
-    });
-
-    await prisma.deliveryRateRule.create({
-      data: {
-        tenantId: tenant.id,
-        type: 'neighborhood',
-        neighborhood: 'jardins',
-        rate: 12.0,
-      },
-    });
-
-    await prisma.deliveryRateRule.create({
-      data: {
-        tenantId: tenant.id,
-        type: 'fixed',
-        fixedRate: 10.0,
-      },
-    });
+    // Preserve the small demo delivery set on repeated seeds.
+    const deliveryRules = [
+      { type: 'neighborhood' as const, neighborhood: 'centro', rate: 8.0 },
+      { type: 'neighborhood' as const, neighborhood: 'jardins', rate: 12.0 },
+      { type: 'fixed' as const, fixedRate: 10.0 },
+    ];
+    for (const rule of deliveryRules) {
+      const existingRule = await prisma.deliveryRateRule.findFirst({
+        where: {
+          tenantId: tenant.id,
+          type: rule.type,
+          neighborhood: rule.neighborhood ?? null,
+          fixedRate: rule.fixedRate ?? null,
+        },
+      });
+      if (!existingRule) {
+        await prisma.deliveryRateRule.create({ data: { tenantId: tenant.id, ...rule } });
+      }
+    }
 
     // Create demo category (ProductCategory)
     const category = await prisma.productCategory.upsert({
@@ -668,7 +668,7 @@ async function seedDemoTenant() {
     });
 
     // Create product
-    await prisma.product.upsert({
+    const pizza = await prisma.product.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-de-calabresa' } },
       update: {},
       create: {
@@ -709,6 +709,57 @@ async function seedDemoTenant() {
     });
 
     console.log('   ✅ Catalog data seeded');
+    const supplier = await prisma.supplier.upsert({
+      where: { tenantId_cnpj: { tenantId: tenant.id, cnpj: '11999999000191' } },
+      update: { name: 'Fornecedor Demo', isActive: true },
+      create: { tenantId: tenant.id, name: 'Fornecedor Demo', cnpj: '11999999000191', isActive: true },
+    });
+    const ingredients = await Promise.all([
+      prisma.ingredient.upsert({
+        where: { tenantId_sku: { tenantId: tenant.id, sku: 'DEMO-FARINHA' } },
+        update: { isActive: true },
+        create: {
+          tenantId: tenant.id, name: 'Farinha de Trigo', sku: 'DEMO-FARINHA',
+          unit: UnitType.kg, purchaseUnit: UnitType.kg, conversionFactor: 1,
+          currentCost: 5, currentStock: 20, minStock: 2, isActive: true,
+        },
+      }),
+      prisma.ingredient.upsert({
+        where: { tenantId_sku: { tenantId: tenant.id, sku: 'DEMO-MUSSARELA' } },
+        update: { isActive: true },
+        create: {
+          tenantId: tenant.id, name: 'Mussarela', sku: 'DEMO-MUSSARELA',
+          unit: UnitType.kg, purchaseUnit: UnitType.kg, conversionFactor: 1,
+          currentCost: 30, currentStock: 10, minStock: 1, isActive: true,
+        },
+      }),
+    ]);
+    for (const [ingredient, quantity] of [[ingredients[0], 0.3], [ingredients[1], 0.25]] as const) {
+      await prisma.productRecipeIngredient.upsert({
+        where: { productId_ingredientId: { productId: pizza.id, ingredientId: ingredient.id } },
+        update: { quantity, tenantId: tenant.id },
+        create: { tenantId: tenant.id, productId: pizza.id, ingredientId: ingredient.id, quantity },
+      });
+    }
+
+    const financialAccount = await prisma.financialAccount.findFirst({
+      where: { tenantId: tenant.id, name: 'Caixa Operacional' },
+    });
+    if (!financialAccount) {
+      await prisma.financialAccount.create({
+        data: { tenantId: tenant.id, name: 'Caixa Operacional', type: FinancialAccountType.cash, balance: 0, active: true },
+      });
+    }
+    const openCashSession = await prisma.cashSession.findFirst({
+      where: { tenantId: tenant.id, operatorId: owner.id, status: CashSessionStatus.open },
+    });
+    if (!openCashSession) {
+      await prisma.cashSession.create({
+        data: { tenantId: tenant.id, operatorId: owner.id, status: CashSessionStatus.open, openingAmount: 0, notes: 'Sessao demo' },
+      });
+    }
+
+    console.log(`Operational demo data seeded for ${supplier.name}`);
   } catch (err) {
     console.error('❌ Error inside seedDemoTenant:', err);
     throw err;
