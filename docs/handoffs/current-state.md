@@ -2148,3 +2148,18 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Global gates: `pnpm typecheck`, `pnpm lint` (0 errors; 17 pre-existing web-storefront warnings), `pnpm check:no-any`, `pnpm check:boundaries`, `pnpm check:features`, `pnpm check:theme`, and `pnpm build:api`: PASS.
 - Full API suite: 135/135 executed suites PASS, 658/658 tests PASS; 5 suites/10 conditional tests skipped.
 - Required PostgreSQL 16 zero-to-upgrade `prisma migrate deploy` proof is locally blocked: `docker version` cannot connect to `dockerDesktopLinuxEngine`, and no local `psql`, PostgreSQL service, or database URL is available. No remote database was accessed. Run this ephemeral gate before integration.
+
+---
+
+## Management quick fixes: inventory factor and suppliers (2026-09-07)
+
+- Isolated branch `fix/management-quick-fixes`, based on `origin/main-copy` / `2ec9ffd1399f5d4e5d7225c5b8bfe2d36b86e344`, in `C:\wt\pedehub\mgmt-quickfix`.
+- The ingredient editor preserves an explicitly entered conversion factor. The factor means the number of base-consumption units contained in one purchase unit: for example, 1 kg to g is 1000 and a box of 12 units is 12. Client and API reject zero, negative, and non-finite values; a missing legacy value remains 1.
+- Supplier CNPJ/CPF is optional end-to-end. Empty input is normalized to `null`, duplicate lookup remains tenant-scoped for a real identifier, and supplier removal now archives through `isActive=false` instead of deleting purchase history. The tenant UI surfaces failures with accessible messages and offers explicit activate/inactivate actions; the nonfunctional document action was removed.
+- No schema, migration, remote database, deploy, Dokploy, marketplace, Cash, Finance, Analytics, or Financial Projection behavior was changed.
+
+### Validation
+
+- Focused API tests: ingredients 7/7 PASS (1, 10, 12, 1000, 0.5, zero and negative rejection); suppliers 5/5 PASS (optional CNPJ, normalization, archive, and tenant scope). Focused web contract test: 2/2 PASS.
+- `pnpm typecheck`, `pnpm check:no-any`, API lint, web-tenant lint, `pnpm build:api`, `pnpm build:web-tenant`, and `git diff --check`: PASS.
+- Authenticated browser smoke was not run because no authenticated local runtime/session was established for this isolated change.

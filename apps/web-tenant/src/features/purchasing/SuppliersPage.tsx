@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { SupplierDTO, CreateSupplierDTO } from '@gestor/types';
 import { SupplierModal } from './SupplierModal';
-import { Truck, Plus, Search, Mail, Phone, FileText } from 'lucide-react';
+import { Truck, Plus, Search, Mail, Phone } from 'lucide-react';
 
 export function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
@@ -10,6 +10,7 @@ export function SuppliersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierDTO | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     loadSuppliers();
@@ -23,13 +24,14 @@ export function SuppliersPage() {
         setSuppliers(response.data);
       }
     } catch (error) {
-      console.error('Erro ao carregar fornecedores:', error);
+      setActionError(error instanceof Error ? error.message : 'Não foi possível carregar fornecedores.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSave = async (data: CreateSupplierDTO) => {
+    setActionError(null);
     try {
       if (editingSupplier) {
         await api.put(`/purchasing/suppliers/${editingSupplier.id}`, data);
@@ -39,8 +41,31 @@ export function SuppliersPage() {
       loadSuppliers();
       setIsModalOpen(false);
     } catch (error) {
-      console.error('Erro ao salvar fornecedor:', error);
+      setActionError(error instanceof Error ? error.message : 'Não foi possível salvar o fornecedor.');
       throw error;
+    }
+  };
+
+  const handleDeactivate = async (supplier: SupplierDTO) => {
+    if (!supplier.isActive) {
+      try {
+        setActionError(null);
+        await api.put(`/purchasing/suppliers/${supplier.id}`, { isActive: true });
+        await loadSuppliers();
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Não foi possível reativar o fornecedor.');
+      }
+      return;
+    }
+
+    if (!window.confirm(`Inativar ${supplier.name}? As compras históricas serão preservadas.`)) return;
+
+    try {
+      setActionError(null);
+      await api.delete(`/purchasing/suppliers/${supplier.id}`);
+      await loadSuppliers();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Não foi possível inativar o fornecedor.');
     }
   };
 
@@ -72,6 +97,7 @@ export function SuppliersPage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        {actionError && <p role="alert" className="mx-4 mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p>}
         <div className="border-b border-border bg-muted/50 p-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -136,16 +162,23 @@ export function SuppliersPage() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-3">
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingSupplier(supplier);
                             setIsModalOpen(true);
                           }}
+                          aria-label={`Editar fornecedor ${supplier.name}`}
                           className="text-primary-600 hover:text-primary-700 font-semibold text-xs"
                         >
                           Editar
                         </button>
-                        <button type="button" className="text-muted-foreground transition-colors hover:text-foreground">
-                          <FileText className="h-4 w-4" />
+                        <button
+                          type="button"
+                          onClick={() => void handleDeactivate(supplier)}
+                          aria-label={`${supplier.isActive ? 'Inativar' : 'Reativar'} fornecedor ${supplier.name}`}
+                          className="text-muted-foreground transition-colors hover:text-foreground font-semibold text-xs"
+                        >
+                          {supplier.isActive ? 'Inativar' : 'Reativar'}
                         </button>
                       </div>
                     </td>
