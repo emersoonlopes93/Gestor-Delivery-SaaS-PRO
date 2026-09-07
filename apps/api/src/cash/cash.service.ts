@@ -14,12 +14,13 @@ import {
   CashMovementType,
 } from '@gestor/types';
 import { PaymentMethod as PrismaPaymentMethod, Prisma } from '@prisma/client';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
 export class CashService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private parsePaymentMethod(value: string): PrismaPaymentMethod | null {
+  private parsePaymentMethod(value: string | null | undefined): PrismaPaymentMethod | null {
     switch (value) {
       case 'cash':
         return PrismaPaymentMethod.cash;
@@ -341,17 +342,36 @@ export class CashService {
     cashSessionId: string,
     orderId: string,
     amount: number,
+    paymentMethod: string | null | undefined,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.cashMovement.create({
-      data: {
-        tenantId,
-        cashSessionId,
-        type: 'refund',
-        amount,
-        orderId,
-        description: 'Estorno de venda PDV',
-      },
-    });
+    const createRefund = async (client: Prisma.TransactionClient): Promise<void> => {
+      const existingRefund = await client.cashMovement.findFirst({
+        where: { tenantId, cashSessionId, orderId, type: 'refund' },
+        select: { id: true },
+      });
+      if (existingRefund) return;
+
+      const parsedPaymentMethod = this.parsePaymentMethod(paymentMethod);
+      await client.cashMovement.create({
+        data: {
+          tenantId,
+          cashSessionId,
+          type: 'refund',
+          amount,
+          ...(parsedPaymentMethod ? { paymentMethod: parsedPaymentMethod } : {}),
+          orderId,
+          description: 'Estorno de venda PDV',
+        },
+      });
+    };
+
+    if (tx) {
+      await createRefund(tx);
+      return;
+    }
+
+    await runSerializableTransactionWithRetry(this.prisma, createRefund);
   }
 
   /**
@@ -366,12 +386,25 @@ export class CashService {
       type: movement.type as CashMovementType,
       amount: Number(movement.amount),
       paymentMethod: movement.paymentMethod,
+      orderId: movement.orderId,
     })));
   }
 
   private calculateExpectedCashAmount(
-    movements: Array<{ type: CashMovementType; amount: number; paymentMethod?: PrismaPaymentMethod | null }>,
+    movements: Array<{
+      type: CashMovementType;
+      amount: number;
+      paymentMethod?: PrismaPaymentMethod | null;
+      orderId?: string | null;
+    }>,
   ): number {
+    const salePaymentMethodsByOrderId = new Map<string, PrismaPaymentMethod | null>();
+    for (const movement of movements) {
+      if (movement.type === 'sale' && movement.orderId) {
+        salePaymentMethodsByOrderId.set(movement.orderId, movement.paymentMethod ?? null);
+      }
+    }
+
     let expected = 0;
     for (const movement of movements) {
       switch (movement.type) {
@@ -385,9 +418,16 @@ export class CashService {
           }
           break;
         case 'withdrawal':
-        case 'refund':
           expected -= movement.amount;
           break;
+        case 'refund': {
+          const refundPaymentMethod = movement.paymentMethod
+            ?? (movement.orderId ? salePaymentMethodsByOrderId.get(movement.orderId) : null);
+          if (refundPaymentMethod === PrismaPaymentMethod.cash) {
+            expected -= movement.amount;
+          }
+          break;
+        }
       }
     }
 
@@ -448,6 +488,7 @@ export class CashService {
             type: movement.type,
             amount: movement.amount,
             paymentMethod: this.parsePaymentMethod(movement.paymentMethod || ''),
+            orderId: movement.orderId,
           }))),
     };
   }

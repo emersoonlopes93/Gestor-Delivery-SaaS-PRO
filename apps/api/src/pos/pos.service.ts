@@ -793,7 +793,13 @@ export class PosService {
     }
 
     if (order.cashSessionId && order.status !== 'draft') {
-      await this.cashService.registerRefundMovement(tenantId, order.cashSessionId, orderId, Number(order.total));
+      await this.cashService.registerRefundMovement(
+        tenantId,
+        order.cashSessionId,
+        orderId,
+        Number(order.total),
+        order.paymentMethod,
+      );
     }
 
     return this.getOrderDetail(orderId, tenantId);

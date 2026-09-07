@@ -183,3 +183,35 @@ describe('PosService atomic sale', () => {
       .rejects.toBeInstanceOf(ConflictException);
   });
 });
+
+describe('PosService cancellation refund method', () => {
+  it('passes the persisted sale payment method to the idempotent refund movement', async () => {
+    const prisma = {
+      order: { findFirst: jest.fn().mockResolvedValue({
+        id: 'order-1', tenantId: 'tenant-a', sourceChannel: 'pos', status: 'confirmed',
+        cashSessionId: 'session-1', paymentMethod: PaymentMethod.pix, total: 42, fulfillmentType: 'pickup',
+      }) },
+      dineInTable: { updateMany: jest.fn() },
+    };
+    const cashService = { registerRefundMovement: jest.fn() };
+    const ordersService = { updateOrderStatus: jest.fn() };
+    const service = new PosService(
+      prisma as never,
+      {} as never,
+      cashService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      ordersService as never,
+      {} as never,
+    );
+    jest.spyOn(service, 'getOrderDetail').mockResolvedValue({ id: 'order-1' } as never);
+
+    await service.cancelPosSale('tenant-a', 'order-1', 'operator-1');
+
+    expect(cashService.registerRefundMovement).toHaveBeenCalledWith(
+      'tenant-a', 'session-1', 'order-1', 42, PaymentMethod.pix,
+    );
+  });
+});
