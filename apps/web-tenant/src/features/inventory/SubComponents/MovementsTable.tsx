@@ -31,6 +31,7 @@ export function MovementsTable() {
     [StockMovementType.ADJUST]: { label: 'Ajuste', color: 'text-blue-600 bg-blue-50', icon: RefreshCcw },
     [StockMovementType.WASTE]: { label: 'Perda/Desperdício', color: 'text-amber-600 bg-amber-50', icon: Trash2 },
     [StockMovementType.THEORETICAL_DEPLETION]: { label: 'Baixa de Pedido', color: 'text-purple-600 bg-purple-50', icon: ShoppingCart },
+    [StockMovementType.THEORETICAL_REVERSAL]: { label: 'Estorno de Pedido', color: 'text-teal-600 bg-teal-50', icon: RefreshCcw },
     [StockMovementType.PURCHASE_ENTRY]: { label: 'Compra', color: 'text-emerald-600 bg-emerald-50', icon: ShoppingCart },
     [StockMovementType.INVENTORY_ADJUSTMENT]: { label: 'Inventário', color: 'text-indigo-600 bg-indigo-50', icon: ClipboardList },
   };

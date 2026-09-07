@@ -2608,22 +2608,26 @@ model Ingredient {
 }
 
 model StockMovement {
-  id           String            @id @default(uuid())
-  tenantId     String            @map("tenant_id")
-  ingredientId String            @map("ingredient_id")
-  type         StockMovementType
-  quantity     Decimal           @db.Decimal(10, 4)
-  unitCost     Decimal?          @map("unit_cost") @db.Decimal(10, 4)
-  orderId      String?           @map("order_id")
-  userId       String?           @map("user_id")
-  notes        String?           @db.VarChar(255)
-  createdAt    DateTime          @default(now()) @map("created_at")
-  ingredient   Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-  order        Order?            @relation(fields: [orderId], references: [id])
-  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                   String            @id @default(uuid())
+  tenantId             String            @map("tenant_id")
+  ingredientId         String            @map("ingredient_id")
+  type                 StockMovementType
+  quantity             Decimal           @db.Decimal(10, 4)
+  unitCost             Decimal?          @map("unit_cost") @db.Decimal(10, 4)
+  orderId              String?           @map("order_id")
+  reversalOfMovementId String?           @unique @map("reversal_of_movement_id")
+  userId               String?           @map("user_id")
+  notes                String?           @db.VarChar(255)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  ingredient           Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  order                Order?            @relation(fields: [orderId], references: [id])
+  reversalOfMovement   StockMovement?    @relation("StockMovementReversal", fields: [reversalOfMovementId], references: [id], onDelete: Restrict)
+  reversal             StockMovement?    @relation("StockMovementReversal")
+  tenant               Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([ingredientId])
+  @@index([tenantId, orderId, type])
   @@map("stock_movements")
 }
 
@@ -4311,6 +4315,7 @@ enum StockMovementType {
   adjust
   waste
   theoretical_depletion
+  theoretical_reversal
   purchase_entry
   inventory_adjustment
 }
