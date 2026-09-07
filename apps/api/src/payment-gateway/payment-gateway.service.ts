@@ -13,6 +13,7 @@ import { PaymentProviderConnectionService } from '../payment-foundation/payment-
 import { PaymentWebhookInboxService } from '../payment-foundation/payment-webhook-inbox.service';
 import { redactFinancialSecretText } from '../payment-foundation/payment-secret-redaction';
 import { OrderPaymentAttemptService } from '../payment-foundation/order-payment-attempt.service';
+import { PaymentRefundService } from './payment-refund.service';
 
 interface MercadoPagoConfig {
   connectionId: string | null;
@@ -109,6 +110,7 @@ export class PaymentGatewayService {
     private readonly connectionService: PaymentProviderConnectionService,
     private readonly webhookInbox: PaymentWebhookInboxService,
     private readonly paymentAttemptService: OrderPaymentAttemptService,
+    private readonly paymentRefundService: PaymentRefundService,
   ) {}
 
   private async getOrdersService(): Promise<OrdersService> {
@@ -853,6 +855,28 @@ export class PaymentGatewayService {
   }
 
   private async updateTransactionRecord(transaction: Prisma.PaymentTransactionGetPayload<{ include: { order: true } }>, payment: MercadoPagoPayment): Promise<void> {
+    if (payment.status === 'refunded') {
+      const refundTransitioned = await this.paymentRefundService.confirmFullRefundFromPaymentWebhook({
+        tenantId: transaction.tenantId,
+        paymentTransactionId: transaction.id,
+        providerPaymentId: payment.id.toString(),
+      });
+      await this.prisma.paymentTransaction.update({
+        where: { id: transaction.id },
+        data: {
+          metadata: this.mergeMetadata(transaction.metadata, { mercadoPagoPayment: payment }),
+        },
+      });
+      if (refundTransitioned && transaction.orderPaymentAttemptId) {
+        await this.paymentAttemptService.transitionStatusOnce({
+          tenantId: transaction.tenantId,
+          attemptId: transaction.orderPaymentAttemptId,
+          status: OrderPaymentAttemptStatus.REFUNDED,
+        });
+      }
+      return;
+    }
+
     let newStatus: PaymentTxStatus;
     let orderStatus: OrderStatus;
 
