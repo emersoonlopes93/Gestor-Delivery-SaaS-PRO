@@ -3,6 +3,34 @@ import { OrderResponseDTO } from '@gestor/types';
 
 @Injectable()
 export class PrinterService {
+  private getKdsOptionItems(snapshot: unknown): Array<{ snapshotName: string; quantity: number }> {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return [];
+
+    const optionItems = (snapshot as { optionItems?: unknown }).optionItems;
+    if (!Array.isArray(optionItems)) return [];
+
+    return optionItems.flatMap((option) => {
+      if (!option || typeof option !== 'object' || Array.isArray(option)) return [];
+
+      const { snapshotName, quantity } = option as { snapshotName?: unknown; quantity?: unknown };
+      if (typeof snapshotName !== 'string' || !snapshotName.trim()) return [];
+
+      return [{
+        snapshotName: snapshotName.trim(),
+        quantity: typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      }];
+    });
+  }
+
+  private getMarketplaceCompositionLines(composition?: string | null): string[] {
+    if (!composition) return [];
+
+    return composition
+      .split('\n')
+      .map((line) => line.trim().replace(/^[-+]\s*/, ''))
+      .filter(Boolean);
+  }
+
   private getFulfillmentLabel(value?: string | null): string {
     if (typeof value !== 'string') return 'PEDIDO';
     const normalized = value.trim();
@@ -110,6 +138,14 @@ export class PrinterService {
 
       if (item.notes) {
         lines.push(`  >> OBS: ${item.notes.toUpperCase()}`);
+      }
+
+      for (const option of this.getKdsOptionItems(item.snapshotCatalogV2Json)) {
+        lines.push(`  - ${option.quantity}x ${option.snapshotName.toUpperCase()}`);
+      }
+
+      for (const compositionLine of this.getMarketplaceCompositionLines(item.snapshotComposition)) {
+        lines.push(`  - ${compositionLine.toUpperCase()}`);
       }
       
       // V3 Options and Combo Slots
