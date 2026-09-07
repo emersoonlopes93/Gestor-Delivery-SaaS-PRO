@@ -5,7 +5,8 @@ describe('PurchasesService financial transaction regression', () => {
   it('keeps unpaid purchases as pending expenses without applying an account balance', async () => {
     const tx = {
       purchase: { create: jest.fn().mockResolvedValue({ id: 'purchase-1', items: [] }) },
-      ingredient: { findUnique: jest.fn().mockResolvedValue({ currentStock: 0, currentCost: 0 }), update: jest.fn() },
+      supplier: { findFirst: jest.fn().mockResolvedValue({ id: 'supplier-1' }) },
+      ingredient: { findFirst: jest.fn().mockResolvedValue({ currentStock: 0, currentCost: 0 }), update: jest.fn() },
       stockMovement: { create: jest.fn() },
       financialTransaction: { create: jest.fn() },
     };
