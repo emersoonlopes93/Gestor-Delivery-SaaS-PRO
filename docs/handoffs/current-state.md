@@ -2114,6 +2114,15 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 ---
 
+## Inventory contract alignment (2026-09-07)
+
+- Branch isolada `fix/inventory-contracts`, baseada em `origin/main-copy` / `eb878454`.
+- O web-tenant agora usa os endpoints existentes `POST /inventory-counts` e `GET/POST /losses`; a contagem envia `ingredientId`, `theoreticalStock` e `physicalStock`, que são o contrato do DTO da API.
+- A listagem de perdas, consumida pela tela existente, foi adicionada como leitura tenant-scoped de movimentos `WASTE`, com custo do snapshot do movimento e sem alteração da baixa, custo, pedidos, PDV, marketplace ou schema.
+- Validação: 3 suítes API/9 testes e 1 arquivo web/2 testes passaram; lint API/web, `check:no-any`, build API/web e `git diff --check` passaram. Sem migração, banco remoto, deploy, Dokploy ou promoção de `main-copy`.
+
+---
+
 ## 99Food native lifecycle reconciliation (2026-09-05)
 
 - Official Swagger contract applied on `integrate/99food-orders-v1-main-copy`: token get/refresh, authorization page, native detail, confirm, ready and merchant-owned delivered now use the documented V1 endpoints and StandardResponse (`errno=0`) semantics. IDs above JavaScript safe integer range remain decimal strings end-to-end.

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
-import { IngredientDTO } from '@gestor/types';
+import { IngredientDTO, UnitType } from '@gestor/types';
 import { Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { Modal } from '@/components/Modal';
+import { INVENTORY_API_PATHS } from '../inventory-api-contract';
 
 interface LossEntry {
   id: string;
-  ingredient: IngredientDTO;
+  ingredient: { name: string; unit: UnitType };
   quantity: number;
   reason: string;
   createdAt: string;
@@ -33,8 +34,8 @@ export function LossesPage() {
     setIsLoading(true);
     try {
       const [lossRes, ingRes] = await Promise.all([
-        api.get<LossEntry[]>('/inventory/losses'),
-        api.get<IngredientDTO[]>('/inventory/ingredients')
+        api.get<LossEntry[]>(INVENTORY_API_PATHS.losses),
+        api.get<IngredientDTO[]>(INVENTORY_API_PATHS.ingredients)
       ]);
       if (lossRes.success) setLosses(lossRes.data);
       if (ingRes.success) setIngredients(ingRes.data);
@@ -48,7 +49,7 @@ export function LossesPage() {
   const handleSave = async () => {
     if (!selectedIngredient || !quantity) return;
     try {
-      await api.post('/inventory/losses', {
+      await api.post(INVENTORY_API_PATHS.losses, {
         ingredientId: selectedIngredient,
         quantity: Number(quantity),
         reason

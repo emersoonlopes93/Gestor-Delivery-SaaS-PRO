@@ -1,10 +1,40 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { StockMovementType } from '@gestor/types';
+import { StockMovementType, UnitType } from '@gestor/types';
+
+type LossEntryDTO = {
+  id: string;
+  ingredient: { name: string; unit: UnitType };
+  quantity: number;
+  reason: string;
+  createdAt: Date;
+  costImpact: number;
+};
 
 @Injectable()
 export class LossesService {
   constructor(private prisma: PrismaService) {}
+
+  async findAll(tenantId: string): Promise<LossEntryDTO[]> {
+    const losses = await this.prisma.stockMovement.findMany({
+      where: { tenantId, type: StockMovementType.WASTE },
+      include: { ingredient: { select: { name: true, unit: true, currentCost: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return losses.map((loss) => ({
+      id: loss.id,
+      ingredient: {
+        name: loss.ingredient.name,
+        unit: loss.ingredient.unit as UnitType,
+      },
+      quantity: Number(loss.quantity),
+      reason: loss.notes?.replace(/^Perda:\s*/, '') || 'other',
+      createdAt: loss.createdAt,
+      costImpact: Number(loss.quantity) * Number(loss.unitCost ?? loss.ingredient.currentCost),
+    }));
+  }
 
   async create(tenantId: string, ingredientId: string, quantity: number, reason: string) {
     const ingredient = await this.prisma.ingredient.findFirst({
