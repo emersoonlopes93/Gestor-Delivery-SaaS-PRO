@@ -42,4 +42,31 @@ describe('LossesService', () => {
       .rejects.toBeInstanceOf(NotFoundException);
     expect(db.$transaction).not.toHaveBeenCalled();
   });
+
+  it('records a tenant-scoped waste movement and decrements the same ingredient', async () => {
+    const db = makeDb();
+    const tx = {
+      ingredient: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockMovement: { create: jest.fn().mockResolvedValue({ id: 'loss-1' }) },
+    };
+    db.ingredient.findFirst.mockResolvedValue({ id: 'ingredient-1', currentCost: 4 });
+    db.$transaction.mockImplementation(async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx));
+
+    await expect(new LossesService(db as never).create('tenant-a', 'ingredient-1', 2.5, 'expiration'))
+      .resolves.toEqual({ id: 'loss-1' });
+    expect(tx.ingredient.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ingredient-1', tenantId: 'tenant-a' },
+      data: { currentStock: { decrement: 2.5 } },
+    });
+    expect(tx.stockMovement.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'tenant-a',
+        ingredientId: 'ingredient-1',
+        type: StockMovementType.WASTE,
+        quantity: 2.5,
+        unitCost: 4,
+        notes: 'Perda: expiration',
+      }),
+    });
+  });
 });
