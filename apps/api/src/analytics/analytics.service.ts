@@ -169,6 +169,7 @@ export class AnalyticsService {
       where: {
         tenantId,
         type: StockMovementType.theoretical_depletion,
+        order: { is: { status: { not: PrismaOrderStatus.cancelled } } },
         createdAt: {
           gte: new Date(startDate),
           lte: new Date(endDate),

@@ -135,37 +135,63 @@ export class TheoreticalStockService {
     });
   }
 
-  async reverseOrderDepletion(tenantId: string, orderId: string) {
+  async reverseOrderDepletion(tenantId: string, orderId: string): Promise<void> {
     this.logger.log(`Reversing theoretical stock depletion for order ${orderId}`);
 
-    const movements = await this.prisma.stockMovement.findMany({
+    await runSerializableTransactionWithRetry(
+      this.prisma,
+      (tx) => this.reverseOrderDepletionInTransaction(tx, tenantId, orderId),
+      {
+        onRetry: (attempt, delayMs) => this.logger.warn(
+          `Retrying theoretical stock reversal for order ${orderId} after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+        ),
+      },
+    );
+  }
+
+  async reverseOrderDepletionInTransaction(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    orderId: string,
+  ): Promise<void> {
+    const lockKey = `${tenantId}:${orderId}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+
+    const movements = await tx.stockMovement.findMany({
       where: {
         orderId,
         tenantId,
         type: StockMovementType.THEORETICAL_DEPLETION,
       },
+      include: { reversal: true },
     });
 
     for (const move of movements) {
-      const qtyToReturn = Number(move.quantity);
+      if (move.reversal) continue;
 
-      await this.prisma.$transaction(async (tx) => {
-        // 1. Delete or nullify the depletion movement
-        // We delete to "undo" the history if it was just a cancellation
-        await tx.stockMovement.delete({
-          where: { id: move.id },
-        });
-
-        // 2. Increment physical stock back
-        await tx.ingredient.update({
-          where: { id: move.ingredientId },
-          data: {
-            currentStock: {
-              increment: qtyToReturn,
-            },
-          },
-        });
+      await tx.stockMovement.create({
+        data: {
+          tenantId,
+          ingredientId: move.ingredientId,
+          type: StockMovementType.THEORETICAL_REVERSAL,
+          quantity: move.quantity,
+          unitCost: move.unitCost,
+          orderId: move.orderId,
+          reversalOfMovementId: move.id,
+          notes: `Theoretical reversal for cancelled order ${orderId}`,
+        },
       });
+      const restored = await tx.ingredient.updateMany({
+        where: { id: move.ingredientId, tenantId },
+        data: {
+          currentStock: {
+            increment: move.quantity,
+          },
+        },
+      });
+      if (restored.count !== 1) {
+        throw new BadRequestException('Ingredient from theoretical depletion was not found for this tenant.');
+      }
     }
   }
 

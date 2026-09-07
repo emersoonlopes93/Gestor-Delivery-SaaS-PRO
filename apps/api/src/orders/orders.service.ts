@@ -1361,9 +1361,7 @@ export class OrdersService {
         });
 
         // Reverter estoque teórico
-        await this.inventoryService.reverseOrderDepletion(tenantId, orderId).catch(e => {
-          this.logger.error(`Erro ao reverter estoque para pedido cancelado ${orderId}: ${e.message}`);
-        });
+        await this.inventoryService.reverseOrderDepletionInTransaction(tx, tenantId, orderId);
       }
 
       // Se pedido foi marcado como pronto, emitir notificação especial
