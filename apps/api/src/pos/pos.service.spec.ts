@@ -210,6 +210,12 @@ describe('PosService cancellation refund method', () => {
 
     await service.cancelPosSale('tenant-a', 'order-1', 'operator-1');
 
+    expect(ordersService.updateOrderStatus).toHaveBeenCalledWith(
+      'order-1',
+      'tenant-a',
+      expect.objectContaining({ status: 'cancelled' }),
+      'operator-1',
+    );
     expect(cashService.registerRefundMovement).toHaveBeenCalledWith(
       'tenant-a', 'session-1', 'order-1', 42, PaymentMethod.pix,
     );

@@ -94,3 +94,71 @@ describe('OrdersService public checkout atomicity', () => {
     expect(tx.coupon.update).not.toHaveBeenCalled();
   });
 });
+
+describe('OrdersService cancellation stock reversal atomicity', () => {
+  const makeCancellationHarness = (inventoryFailure?: Error) => {
+    let committed = false;
+    const tx = {
+      order: { update: jest.fn().mockResolvedValue({ id: 'order-1', status: 'cancelled', updatedAt: new Date() }) },
+      dineInTable: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      orderTimeline: { create: jest.fn() },
+      tenant: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const prisma = {
+      order: { findFirst: jest.fn().mockResolvedValue({
+        id: 'order-1', tenantId: 'tenant-a', status: 'pending', total: 20,
+        sourceChannel: 'direct_online', orderNumber: '#0001', fulfillmentType: 'pickup',
+        deliveryDriverId: null, isScheduled: false, publicTrackingToken: null, customerPhone: null,
+      }) },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => {
+        const result = await callback(tx);
+        committed = true;
+        return result;
+      }),
+    };
+    const inventoryService = {
+      reverseOrderDepletionInTransaction: jest.fn().mockImplementation(async () => {
+        if (inventoryFailure) throw inventoryFailure;
+      }),
+    };
+    const service = new OrdersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      inventoryService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { emitOrderCancelled: jest.fn(), emitOrderChanged: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      { recordOrderStatusEvent: jest.fn() } as never,
+      { handleInternalStatusChanged: jest.fn().mockResolvedValue({ deferred: false }) } as never,
+      {} as never,
+    );
+    return { service, tx, inventoryService, get committed() { return committed; } };
+  };
+
+  it('runs own-checkout cancellation and stock reversal through the same transaction', async () => {
+    const harness = makeCancellationHarness();
+
+    await harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' });
+
+    expect(harness.inventoryService.reverseOrderDepletionInTransaction).toHaveBeenCalledWith(
+      harness.tx, 'tenant-a', 'order-1',
+    );
+    expect(harness.committed).toBe(true);
+  });
+
+  it('does not commit the cancelled status when stock reversal fails', async () => {
+    const harness = makeCancellationHarness(new BadRequestException('stock reversal failed'));
+
+    await expect(
+      harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(harness.committed).toBe(false);
+  });
+});

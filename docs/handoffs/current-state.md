@@ -2208,3 +2208,41 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
   Ledger, Order Payment Attempts); no refund-specific drift remains.
 - No real Mercado Pago request, remote database, Dokploy, deploy or `main-copy` promotion.
   P0-D COGS reversal remains deferred.
+
+---
+
+## Finance P0-D V2 - immutable stock reversal (2026-09-07)
+
+- Branch `feat/immutable-stock-reversal`, based on `origin/main-copy` /
+  `8eb37b4256db95c8cca5a8ae8a1b195182befa35`, in `C:\wt\pedehub\cogs-reversal-v2`.
+- Additive migration `20260907150000_immutable_stock_reversal` adds the explicit
+  `StockMovementType.theoretical_reversal`, nullable `reversalOfMovementId`, a self-relation,
+  unique reversal-per-original enforcement and a tenant/order/type index. No existing movement,
+  balance or historical record is rewritten; no backfill exists.
+- Cancellation preserves `theoretical_depletion` and creates one compensating
+  `theoretical_reversal` with the original ingredient, quantity, order and persisted `unitCost`.
+  The reversal does not read the current recipe or ingredient cost. A tenant/order advisory
+  transaction lock plus the database uniqueness constraint make retry and concurrency safe.
+- `OrdersService.updateOrderStatus` calls the reversible stock operation with its existing
+  transaction, so the cancelled status and stock reversal commit or roll back together. POS keeps
+  using that canonical order transition. Cash, FinancialAccount, PaymentRefund, marketplace
+  adapters and FinancialProjection schema remain unchanged.
+- Analytics now excludes depletion from cancelled orders when calculating operational COGS, which
+  preserves the pre-existing net-sales meaning after depletion history becomes immutable.
+  FinancialProjection continues to use only the persisted depletion snapshot as historical COGS.
+- Historical depletion movements that were deleted before this change cannot be reconstructed
+  safely (`CANNOT_RECONSTRUCT`).
+
+### Validation
+
+- Focused stock, cancellation, POS, Analytics and FinancialProjection tests: 5 suites / 31 tests
+  PASS. This includes original preservation, link, historical cost, changed recipe/cost isolation,
+  multi-ingredient order, tenant scope, idempotency/concurrency and transaction rollback.
+- Full API suite: 143 passed suites / 706 passed tests; 5 suites / 10 conditional tests skipped.
+- `pnpm typecheck`, `pnpm check:no-any`, `pnpm check:boundaries`, `pnpm check:features`, API lint,
+  API build and `git diff --check`: PASS.
+- Prisma generate/validate and schema diff: PASS. PostgreSQL 16 from-zero applied 71 migrations;
+  upgrade from the 70-migration P0-C baseline applied only this migration. The schema diff retained
+  only the four known baseline index renames (Analytics, Customer External Identities, Driver
+  Ledger and Order Payment Attempts); no P0-D drift was introduced. Ephemeral local container
+  only; no remote database, deploy or Dokploy action was performed.
