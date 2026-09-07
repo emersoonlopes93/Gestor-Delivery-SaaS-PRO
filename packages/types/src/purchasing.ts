@@ -64,7 +64,7 @@ export interface PurchaseItemDTO {
 export interface CreatePurchaseDTO {
   supplierId: string;
   number?: string;
-  purchaseDate?: Date;
+  purchaseDate?: Date | string;
   items: CreatePurchaseItemDTO[];
   paymentStatus?: PaymentStatus;
 }

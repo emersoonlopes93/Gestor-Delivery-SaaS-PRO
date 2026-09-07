@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { 
   PurchaseDTO, 
@@ -11,6 +11,46 @@ import {
   UnitType
 } from '@gestor/types';
 import { Prisma, UnitType as PrismaUnitType } from '@prisma/client';
+
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function normalizePurchaseDate(value: Date | string | undefined): Date {
+  if (value === undefined) return new Date();
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw new BadRequestException('Data da compra invalida.');
+    }
+    return value;
+  }
+
+  const dateValue = value.trim();
+  if (!dateValue) {
+    throw new BadRequestException('Data da compra invalida.');
+  }
+
+  const dateOnly = DATE_ONLY_PATTERN.exec(dateValue);
+  if (dateOnly) {
+    const year = Number(dateOnly[1]);
+    const month = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+    const date = new Date(Date.UTC(year, month - 1, day, 12));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      throw new BadRequestException('Data da compra invalida.');
+    }
+    return date;
+  }
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException('Data da compra invalida.');
+  }
+  return date;
+}
 
 @Injectable()
 export class PurchasesService {
@@ -54,9 +94,16 @@ export class PurchasesService {
   }
 
   async create(tenantId: string, dto: CreatePurchaseDTO): Promise<PurchaseDTO> {
+    const purchaseDate = normalizePurchaseDate(dto.purchaseDate);
     const totalValue = dto.items.reduce((acc, item) => acc + (item.quantity * item.unitCost), 0);
 
     return this.prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.findFirst({
+        where: { id: dto.supplierId, tenantId },
+        select: { id: true },
+      });
+      if (!supplier) throw new NotFoundException('Fornecedor nÃ£o encontrado');
+
       // 1. Create Purchase
       const purchase = await tx.purchase.create({
         data: {
@@ -66,7 +113,7 @@ export class PurchasesService {
           totalValue,
           status: PurchaseStatus.RECEIVED, // For Phase 3, we assume direct reception for simplicity
           paymentStatus: dto.paymentStatus || PaymentStatus.PAID,
-          purchaseDate: dto.purchaseDate || new Date(),
+          purchaseDate,
           items: {
             create: dto.items.map(item => ({
               tenantId,
@@ -85,8 +132,8 @@ export class PurchasesService {
 
       // 2. Process each item (Stock + Cost)
       for (const item of dto.items) {
-        const ingredient = await tx.ingredient.findUnique({
-          where: { id: item.ingredientId }
+        const ingredient = await tx.ingredient.findFirst({
+          where: { id: item.ingredientId, tenantId },
         });
 
         if (!ingredient) throw new NotFoundException(`Insumo ${item.ingredientId} não encontrado`);
