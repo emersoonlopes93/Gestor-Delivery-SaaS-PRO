@@ -15,6 +15,10 @@ Platform Fee, roteamento entre providers, refund, chargeback ou reconciliação 
 completa. Mercado Pago continua sendo o único adapter externo existente; `asaas` é apenas
 uma identidade de domínio nesta fase.
 
+P0-C V2 is the explicitly approved additive exception for own Mercado Pago full refunds; its
+boundaries are defined in the refund lifecycle section below. It does not add partial refunds,
+chargebacks, provider routing, marketplace refunds or financial reconciliation automation.
+
 ## Credenciais financeiras
 
 - Cada conexão pertence a exatamente um tenant e um provider por meio de
