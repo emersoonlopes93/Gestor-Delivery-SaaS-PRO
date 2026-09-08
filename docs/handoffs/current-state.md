@@ -2296,3 +2296,25 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Focused navigation registry contracts cover stable IDs, sidebar projection/filtering, capability
   metadata, dynamic route precedence, parent breadcrumb resolution and hidden/deep-link routes.
 - Web typecheck, `check:no-any`, web lint, web build and `git diff --check`: PASS.
+
+---
+
+## Navigation V2 - Slice 2 sidebar regrouping (2026-09-07)
+
+- Branch `feat/navigation-sidebar-v2`, based on `origin/main-copy` /
+  `742707dd9d5d5b2cf78b2510bdf1ac72c85ab3f1`, reorganizes the existing 42 visible navigation
+  entries into six workflow groups: Operação, Cardápio e Produção, Financeiro, Gestão, Canais e
+  Relacionamento and Configurações.
+- All stable IDs, paths, route components, permissions, feature flags and module metadata remain
+  in the Slice 1 registry. `AppLayout` continues to consume only the registry projection; its
+  initial accordion group is now Operação.
+- Cash remains a single visible `/cash` entry in Operação. A contextual financial shortcut or hub
+  is deferred to Slice 3, avoiding a duplicate visible path. Billing and Partners remain
+  temporarily in Configurações; a future account/user-menu placement is deferred.
+- No backend, API, Prisma schema, migration, route declaration, remote database, deploy or Dokploy
+  behavior changed.
+
+### Validation
+
+- Focused navigation registry tests: 5 passed. Web typecheck, `check:no-any`, web lint, web build
+  and `git diff --check`: PASS.

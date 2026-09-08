@@ -277,7 +277,7 @@ export function AppLayout() {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
     if (saved) return saved;
     const openGroups: Record<string, boolean> = {};
-    for (const g of SIDEBAR_GROUPS) openGroups[g.id] = g.id === 'dashboard';
+    for (const g of SIDEBAR_GROUPS) openGroups[g.id] = g.id === 'operations';
     return { collapsed: false, openGroups } satisfies SidebarState;
   }, []);
 
