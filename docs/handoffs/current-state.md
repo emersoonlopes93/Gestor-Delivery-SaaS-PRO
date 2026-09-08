@@ -2349,3 +2349,7 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Duas correcoes frontend pequenas foram aplicadas: a busca de clientes agora consome o envelope paginado real de `GET /crm/customers`, e o Financeiro carrega metricas e lancamentos de forma independente para que a indisponibilidade de Analytics nao descarte transacoes financeiras autorizadas.
 - Achados adiados incluem divergencias de permissoes de mutacao em Financeiro, Metas e Equipe; gates de Financeiro, Inbox e Marketplaces; reset de desenvolvimento do WhatsApp; refund de venda apos fechamento de caixa; validacao de perdas de estoque; saldo financeiro exibido e lifecycle de compras.
 - Nenhum backend, schema, migration, dependencia, provider, banco remoto ou deploy foi alterado. Testes focados web: 7 arquivos / 26 testes; typecheck, no-any, lint, build e diff check passaram. Smoke visual autenticado nao foi executado por ausencia de ambiente local autenticado.
+
+## Management/Finance reports dedup (2026-09-08)
+
+- Decisão de produto aplicada: `/analytics/reports` e o stable ID `analytics.reports` permanecem canônicos no Financeiro. A landing Gestão deixou de expor o card duplicado, sem alterar rota, `ReportsPage`, breadcrumb Financeiro, registry, guards, backend, schema ou providers.

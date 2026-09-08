@@ -67,6 +67,12 @@ describe('navigation registry', () => {
     const byId = new Map(NAVIGATION_ITEMS.map((entry) => [entry.id, entry]));
     expect(byId.get('channels.hub')).toMatchObject({ permission: 'orders.read', path: '/channels' });
     expect(byId.get('management.hub')).toMatchObject({ path: '/management' });
+    expect(byId.get('analytics.reports')).toMatchObject({
+      path: '/analytics/reports',
+      permission: 'reports.read',
+      module: 'reports',
+      parentId: 'management.finance',
+    });
     expect(byId.get('analytics.goals')).toMatchObject({ permission: 'goals.read', featureKey: 'goals', parentId: 'management.hub' });
     expect(byId.get('analytics.bi')).toMatchObject({ permission: 'reports.read', featureKey: 'bi_advanced', parentId: 'management.hub' });
     expect(byId.get('analytics.performance')).toMatchObject({ permission: 'reports.read', module: 'reports', parentId: 'management.hub' });
@@ -91,7 +97,7 @@ describe('navigation registry', () => {
   });
 
   it('keeps the management landing functional for partial access and preserves old route metadata', () => {
-    const management = getNavigationItems(['analytics.reports', 'analytics.goals', 'analytics.performance', 'analytics.bi', 'management.employees']);
+    const management = getNavigationItems(['analytics.goals', 'analytics.performance', 'analytics.bi', 'management.employees']);
     const visible = filterNavigationItems(
       management,
       (_flag, key) => key !== 'goals' && key !== 'bi_advanced',
@@ -99,12 +105,14 @@ describe('navigation registry', () => {
       () => true,
     );
 
-    expect(visible.map((entry) => entry.id)).toEqual(['analytics.reports', 'analytics.performance']);
+    expect(visible.map((entry) => entry.id)).toEqual(['analytics.performance']);
     expect(getNavigationItem('/management')?.id).toBe('management.hub');
     expect(getNavigationItem('/analytics/goals')?.id).toBe('analytics.goals');
     expect(getNavigationItem('/analytics/performance')?.id).toBe('analytics.performance');
     expect(getNavigationItem('/analytics/business-intelligence')?.id).toBe('analytics.bi');
     expect(getNavigationItem('/management/employees')?.id).toBe('management.employees');
+    expect(getNavigationItem('/analytics/reports')?.id).toBe('analytics.reports');
+    expect(getBreadcrumbMetadata('/analytics/reports')).toEqual({ parentLabel: 'Financeiro', label: 'Relatórios Financeiros' });
     expect(getBreadcrumbMetadata('/analytics/goals')).toEqual({ parentLabel: 'Gestão', label: 'Metas' });
     expect(getBreadcrumbMetadata('/analytics/performance')).toEqual({ parentLabel: 'Gestão', label: 'Desempenho de Vendas' });
     expect(getBreadcrumbMetadata('/analytics/business-intelligence')).toEqual({ parentLabel: 'Gestão', label: 'BI Avançado' });
