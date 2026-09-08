@@ -5,6 +5,8 @@ import { format } from 'date-fns';
 import { FinancialTransactionDTO } from '@gestor/types';
 
 import { TransactionModal } from './TransactionModal';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 interface DashboardMetrics {
   financial: {
@@ -81,15 +83,13 @@ export function FinancePage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto text-left">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-3">
-            <Wallet className="h-8 w-8 text-primary-600" />
-            Gestão Financeira
-          </h1>
-          <p className="text-muted-foreground mt-1">Controle seu fluxo de caixa, DRE e saúde financeira do negócio.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        className="mb-6"
+        title="Financeiro"
+        description="Controle seu fluxo de caixa, DRE e saúde financeira do negócio."
+        icon={Wallet}
+        action={(
+          <div className="flex flex-wrap items-center justify-end gap-3">
           <button 
             onClick={handleExport}
             disabled={transactions.length === 0}
@@ -103,8 +103,11 @@ export function FinancePage() {
           >
             <Plus className="h-5 w-5" /> Novo Lançamento
           </button>
-        </div>
-      </div>
+          </div>
+        )}
+      />
+
+      <ContextualNavigation itemIds={['management.finance', 'cash.home', 'analytics.reports']} />
 
       <TransactionModal 
         isOpen={isModalOpen}

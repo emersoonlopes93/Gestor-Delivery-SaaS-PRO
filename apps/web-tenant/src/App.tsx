@@ -55,6 +55,7 @@ import { SuppliersPage } from './features/purchasing/SuppliersPage';
 import { PurchasesPage } from './features/purchasing/PurchasesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
 import { EmployeesPage } from './features/management/employees/EmployeesPage';
+import { ChannelsPage } from './features/navigation/ChannelsPage';
 
 // WhatsApp & IA & Campanhas (Phase 11)
 import { WhatsAppConfigPage } from './features/whatsapp/pages/WhatsAppConfigPage';
@@ -381,6 +382,15 @@ export function App() {
                 <InboxPage />
               </PermissionGate>
             </FeatureGate>
+          }
+        />
+
+        <Route
+          path="/channels"
+          element={
+            <PermissionGate permission="orders.read">
+              <ChannelsPage />
+            </PermissionGate>
           }
         />
 

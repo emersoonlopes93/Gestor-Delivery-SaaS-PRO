@@ -6,6 +6,8 @@ import { MovementsTable } from './SubComponents/MovementsTable';
 import { LossesPage } from './SubComponents/LossesPage';
 import { InventoryCountPage } from './SubComponents/InventoryCountPage';
 import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle } from 'lucide-react';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts';
 
@@ -71,15 +73,13 @@ export function InventoryPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto text-left space-y-6">
-      {/* Header Centralizado */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2">
-            <Package className="text-primary-600" /> Hub de Suprimentos
-          </h1>
-          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">Gestão inteligente de insumos e movimentações.</p>
-        </div>
-        <button
+      <PageHeader
+        className="mb-6"
+        title="Estoque"
+        description="Gestão inteligente de insumos e movimentações."
+        icon={Package}
+        action={(
+          <button
           onClick={() => {
             setEditingIngredient(null);
             setIsModalOpen(true);
@@ -87,8 +87,11 @@ export function InventoryPage() {
           className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-primary-500/20"
         >
           <span className="text-lg">+</span> Novo Insumo
-        </button>
-      </div>
+          </button>
+        )}
+      />
+
+      <ContextualNavigation itemIds={['management.purchases', 'management.suppliers']} />
 
       {/* KPI Dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

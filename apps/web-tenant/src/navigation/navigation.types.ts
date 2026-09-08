@@ -14,6 +14,8 @@ export type NavigationItem = {
   navigationKind: NavigationKind;
   parentId?: string;
   breadcrumbLabel?: string;
+  hubLabel?: string;
+  hubDescription?: string;
   match?: (pathname: string) => boolean;
 };
 

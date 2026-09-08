@@ -32,26 +32,27 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   item({ id: 'pos.home', label: 'PDV', path: '/pos', icon: ShoppingCart, permission: 'pos.read' }),
   item({ id: 'pos.tables', label: 'Mesas', path: '/pos/tables', icon: QrCode, permission: 'pos.read', featureKey: 'dine_in' }),
   item({ id: 'pos.printers', label: 'Impressão', path: '/pos/printers', icon: Printer, permission: 'settings.manage', featureKey: 'printing' }),
-  item({ id: 'cash.home', label: 'Caixa e Fechamento', path: '/cash', icon: Wallet, permission: 'cash.read' }),
+  item({ id: 'cash.home', label: 'Caixa e Fechamento', path: '/cash', icon: Wallet, permission: 'cash.read', parentId: 'management.finance' }),
   item({ id: 'management.employees', label: 'Equipe', path: '/management/employees', icon: Users, permission: 'users.read' }),
-  item({ id: 'management.suppliers', label: 'Fornecedores', path: '/management/suppliers', icon: Truck, permission: 'purchasing.read', module: 'purchasing' }),
-  item({ id: 'management.purchases', label: 'Compras', path: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read', module: 'purchasing' }),
-  item({ id: 'management.finance', label: 'Visão Financeira', path: '/management/finance', icon: Wallet, permission: 'finance.read', module: 'finance', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' }),
-  item({ id: 'crm.customers', label: 'Clientes', path: '/customers', icon: Users, permission: 'crm.read', module: 'crm' }),
-  item({ id: 'crm.dashboard', label: 'CRM Avançado', path: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED', featureKey: 'crm_enterprise' }),
-  item({ id: 'marketing.automations', label: 'Automações', path: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' }),
-  item({ id: 'crm.promotions', label: 'Promoções & Cupons', path: '/promotions', icon: Ticket, permission: 'crm.manage_coupons', module: 'crm' }),
-  item({ id: 'analytics.reports', label: 'Relatórios Financeiros', path: '/analytics/reports', icon: ChartLine, permission: 'reports.read', module: 'reports' }),
+  item({ id: 'management.suppliers', label: 'Fornecedores', hubDescription: 'Organize fornecedores e dados de compra.', path: '/management/suppliers', icon: Truck, permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' }),
+  item({ id: 'management.purchases', label: 'Compras', hubDescription: 'Registre entradas e reposições de insumos.', path: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' }),
+  item({ id: 'management.finance', label: 'Financeiro', hubLabel: 'Visão', hubDescription: 'Acompanhe lançamentos e o resultado do negócio.', path: '/management/finance', icon: Wallet, permission: 'finance.read', module: 'finance', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' }),
+  item({ id: 'channels.hub', label: 'Canais e Relacionamento', path: '/channels', icon: Link2, permission: 'orders.read' }),
+  item({ id: 'crm.customers', label: 'Clientes', hubDescription: 'Acompanhe clientes e seu histórico de pedidos.', path: '/customers', icon: Users, permission: 'crm.read', module: 'crm', parentId: 'channels.hub' }),
+  item({ id: 'crm.dashboard', label: 'CRM Avançado', hubDescription: 'Analise a base de clientes e oportunidades.', path: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED', featureKey: 'crm_enterprise', parentId: 'channels.hub' }),
+  item({ id: 'marketing.automations', label: 'Automações', hubDescription: 'Defina jornadas automáticas de relacionamento.', path: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns', parentId: 'channels.hub' }),
+  item({ id: 'crm.promotions', label: 'Promoções & Cupons', hubLabel: 'Promoções', hubDescription: 'Crie cupons e ações promocionais para clientes.', path: '/promotions', icon: Ticket, permission: 'crm.manage_coupons', module: 'crm', parentId: 'channels.hub' }),
+  item({ id: 'analytics.reports', label: 'Relatórios Financeiros', hubLabel: 'Relatórios', hubDescription: 'Consulte relatórios financeiros consolidados.', path: '/analytics/reports', icon: ChartLine, permission: 'reports.read', module: 'reports', parentId: 'management.finance' }),
   item({ id: 'analytics.bi', label: 'BI Avançado', path: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED', featureKey: 'bi_advanced' }),
   item({ id: 'analytics.performance', label: 'Desempenho de Vendas', path: '/analytics/performance', icon: BarChart3, permission: 'reports.read', module: 'reports', match: (p) => p === '/analytics/performance' }),
   item({ id: 'analytics.goals', label: 'Metas', path: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS', featureKey: 'goals' }),
-  item({ id: 'whatsapp.inbox', label: 'WhatsApp', path: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED', featureKey: 'whatsapp_advanced' }),
-  item({ id: 'campaigns.home', label: 'Campanhas', path: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' }),
-  item({ id: 'whatsapp.config', label: 'Configurar WhatsApp', path: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT', featureKey: 'whatsapp_connect' }),
+  item({ id: 'whatsapp.inbox', label: 'WhatsApp', hubDescription: 'Atenda conversas e pedidos pelo WhatsApp.', path: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED', featureKey: 'whatsapp_advanced', parentId: 'channels.hub' }),
+  item({ id: 'campaigns.home', label: 'Campanhas', hubDescription: 'Planeje campanhas para engajar clientes.', path: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns', parentId: 'channels.hub' }),
+  item({ id: 'whatsapp.config', label: 'Configurar WhatsApp', hubDescription: 'Configure o canal de atendimento por WhatsApp.', path: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT', featureKey: 'whatsapp_connect', parentId: 'channels.hub' }),
   item({ id: 'settings.home', label: 'Configurações da Loja', path: '/settings', icon: Settings, permission: 'settings.manage' }),
   item({ id: 'settings.network', label: 'Rede de Lojas', path: '/settings/network', icon: Building2, permission: 'settings.manage' }),
-  item({ id: 'settings.integrations', label: 'Marketplaces', path: '/settings/integrations', icon: Link2, permission: 'settings.manage', featureKey: 'ifood_marketplace', match: (p) => p === '/settings/integrations' }),
-  item({ id: 'settings.storefront', label: 'Loja Própria', path: '/settings/storefront', icon: Palette, permission: 'settings.manage' }),
+  item({ id: 'settings.integrations', label: 'Marketplaces', hubDescription: 'Gerencie integrações com marketplaces.', path: '/settings/integrations', icon: Link2, permission: 'settings.manage', featureKey: 'ifood_marketplace', parentId: 'channels.hub', match: (p) => p === '/settings/integrations' }),
+  item({ id: 'settings.storefront', label: 'Loja Própria', hubDescription: 'Configure o cardápio público da sua loja.', path: '/settings/storefront', icon: Palette, permission: 'settings.manage', parentId: 'channels.hub' }),
   item({ id: 'settings.scheduling', label: 'Agendamentos', path: '/settings/scheduling', icon: CalendarClock, permission: 'settings.manage', featureKey: 'scheduling' }),
   item({ id: 'settings.notifications', label: 'Notificações', path: '/settings/notifications', icon: Bell, permission: 'settings.manage' }),
   item({ id: 'catalog.product-editor', label: 'Editar Produto', path: '/catalog/products/:id/v2', navigationKind: 'CONTEXTUAL', parentId: 'catalog.products' }),
@@ -67,10 +68,10 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
 
 export const NAVIGATION_GROUPS: readonly NavigationGroup[] = [
   { id: 'operations', label: 'Operação', itemIds: ['dashboard.overview', 'orders.list', 'orders.board', 'orders.kds', 'pos.home', 'pos.tables', 'cash.home', 'delivery.dispatch', 'delivery.map', 'delivery.drivers', 'delivery.zones'] },
-  { id: 'catalog-production', label: 'Cardápio e Produção', itemIds: ['catalog.products', 'catalog.categories', 'catalog.option-groups', 'catalog.combos', 'catalog.upsells', 'inventory.home', 'management.purchases', 'management.suppliers'] },
-  { id: 'finance', label: 'Financeiro', itemIds: ['management.finance', 'analytics.reports'] },
+  { id: 'catalog-production', label: 'Cardápio e Produção', itemIds: ['catalog.products', 'catalog.categories', 'catalog.option-groups', 'catalog.combos', 'catalog.upsells', 'inventory.home'] },
+  { id: 'finance', label: 'Financeiro', itemIds: ['management.finance'] },
   { id: 'management', label: 'Gestão', itemIds: ['analytics.goals', 'analytics.performance', 'analytics.bi', 'management.employees'] },
-  { id: 'channels', label: 'Canais e Relacionamento', itemIds: ['crm.customers', 'crm.dashboard', 'crm.promotions', 'campaigns.home', 'marketing.automations', 'whatsapp.inbox', 'whatsapp.config', 'settings.storefront', 'settings.integrations'] },
+  { id: 'channels', label: 'Canais e Relacionamento', itemIds: ['channels.hub'] },
   { id: 'settings', label: 'Configurações', itemIds: ['settings.home', 'settings.network', 'settings.notifications', 'settings.scheduling', 'pos.printers', 'orders.automation', 'billing.plan', 'billing.partners'] },
 ];
 
@@ -79,7 +80,29 @@ const itemsById = new Map(NAVIGATION_ITEMS.map((entry) => [entry.id, entry]));
 export function getNavigationItem(pathname: string): NavigationItem | undefined {
   return NAVIGATION_ITEMS.find((entry) => entry.navigationKind !== 'SIDEBAR' && !entry.path.includes(':') && matchNavigationItem(entry, pathname))
     ?? NAVIGATION_ITEMS.find((entry) => entry.navigationKind !== 'SIDEBAR' && matchNavigationItem(entry, pathname))
-    ?? NAVIGATION_ITEMS.find((entry) => matchNavigationItem(entry, pathname));
+    ?? NAVIGATION_ITEMS
+      .filter((entry) => matchNavigationItem(entry, pathname))
+      .sort((left, right) => right.path.length - left.path.length)[0];
+}
+
+export function getNavigationItems(itemIds: readonly string[]): readonly NavigationItem[] {
+  return itemIds.flatMap((id) => {
+    const entry = itemsById.get(id);
+    return entry ? [entry] : [];
+  });
+}
+
+export function filterNavigationItems(
+  items: readonly NavigationItem[],
+  isFeatureVisible: (featureFlag?: string, featureKey?: string) => boolean,
+  hasPermission: (permission?: string) => boolean,
+  hasModule: (module?: string) => boolean,
+): readonly NavigationItem[] {
+  return items.filter((entry) => (
+    isFeatureVisible(entry.featureFlag, entry.featureKey)
+    && hasPermission(entry.permission)
+    && hasModule(entry.module)
+  ));
 }
 
 export function matchNavigationItem(entry: NavigationItem, pathname: string): boolean {
@@ -94,7 +117,7 @@ export function getBreadcrumbMetadata(pathname: string): BreadcrumbMetadata {
   const parent = entry.parentId ? itemsById.get(entry.parentId) : undefined;
   if (parent) return { parentLabel: parent.label, label: entry.breadcrumbLabel ?? entry.label };
   const group = NAVIGATION_GROUPS.find((candidate) => candidate.itemIds.includes(entry.id));
-  return group && group.id !== 'operations' && group.id !== 'settings'
+  return group && group.id !== 'operations' && group.id !== 'settings' && group.label !== entry.label
     ? { parentLabel: group.label, label: entry.label }
     : { label: entry.label };
 }
