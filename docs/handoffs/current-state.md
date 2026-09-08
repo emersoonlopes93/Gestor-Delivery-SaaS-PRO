@@ -2275,3 +2275,24 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
   persistence, paid/unpaid finance behavior, stock effects and tenant isolation.
 - `pnpm typecheck`, `pnpm check:no-any`, API lint and API build: PASS. No web-tenant source,
   Prisma schema or migration changed.
+
+---
+
+## Navigation metadata foundation - Slice 1 (2026-09-07)
+
+- Branch `feat/navigation-metadata-v2`, based on `origin/main-copy` /
+  `02bde8a031b04661e715f6ad88f82de7242e88c6`, introduces a static navigation registry separate
+  from `AppLayout`. The visible sidebar projection preserves its ten groups and 42 entries, order,
+  labels, paths, permissions and feature keys.
+- The registry additionally classifies contextual, deep-link and valid-hidden routes. Breadcrumb
+  resolution now uses metadata, supports dynamic product/combo editor patterns and follows a
+  declared parent without needing a visual sidebar entry.
+- `App.tsx` keeps the existing router declarations and all `PermissionGate`, `ModuleGate` and
+  `FeatureGate` behavior. No paths, backend, schema, migration, deploy, remote database or Dokploy
+  behavior changed.
+
+### Validation
+
+- Focused navigation registry contracts cover stable IDs, sidebar projection/filtering, capability
+  metadata, dynamic route precedence, parent breadcrumb resolution and hidden/deep-link routes.
+- Web typecheck, `check:no-any`, web lint, web build and `git diff --check`: PASS.

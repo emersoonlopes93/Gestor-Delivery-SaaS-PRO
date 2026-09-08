@@ -1,46 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
-import {
-  BarChart3,
-  BookOpen,
-  Handshake,
-  Box,
-  ChartLine,
-  ChefHat,
-  ClipboardList,
-  Goal,
-  LayoutGrid,
-  MapPin,
-  Menu,
-  Package,
-  Settings,
-  ShoppingCart,
-  SlidersHorizontal,
-  Ticket,
-  Truck,
-  Users,
-  Wallet,
-  Bell,
-  UserCircle,
-  ChevronRight,
-  Moon,
-  Sun,
-  Building2,
-  LogOut,
-  Globe,
-  QrCode,
-  Printer,
-  MessageSquare,
-  Megaphone,
-  Bot,
-  Palette,
-  Link2,
-  CreditCard,
-  CalendarClock,
-  Smartphone
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Building2, ChevronRight, Globe, LayoutGrid, LogOut, Menu, Moon, QrCode, Sun, UserCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
@@ -58,164 +19,11 @@ import toast, { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
-
-type SidebarItem = {
-  id: string;
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  permission?: string;
-  featureFlag?: string;
-  featureKey?: string;
-  isExternal?: boolean;
-  match?: (pathname: string) => boolean;
-};
-
-type SidebarGroup = {
-  id: string;
-  label: string;
-  items: readonly SidebarItem[];
-};
-
-const isFeatureVisibleByEnv = (flag?: string) => {
-  if (!flag) return true;
-  // Acessa a flag no import.meta.env, lidando de forma segura 
-  const envValue = import.meta.env[flag];
-  if (envValue === undefined) {
-    return false; // Se a flag não existe, não mostrar.
-  }
-  return String(envValue).toLowerCase() === 'true';
-};
+import { filterSidebarNavigation, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
+import type { SidebarNavigationGroup, SidebarNavigationItem } from '../navigation/navigation.types';
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
-
-
-
-const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    items: [
-      {
-        id: 'dashboard-overview',
-        label: 'Visão Geral',
-        to: '/dashboard',
-        icon: LayoutGrid,
-        permission: 'dashboard.view',
-        match: (p) => p === '/dashboard',
-      },
-      {
-        id: 'billing-plan',
-        label: 'Plano e Cobrança',
-        to: '/billing',
-        icon: CreditCard,
-        permission: 'billing.read',
-        match: (p) => p === '/billing',
-      },
-      {
-        id: 'billing-partners',
-        label: 'Beneficios',
-        to: '/partners',
-        icon: Handshake,
-        permission: 'billing.read',
-        match: (p) => p === '/partners',
-      },
-    ],
-  },
-  {
-    id: 'catalog',
-    label: 'Cardápio',
-    items: [
-      { id: 'catalog-categories', label: 'Categorias', to: '/catalog/categories', icon: BookOpen, permission: 'catalog.read' },
-      { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
-      { id: 'catalog-complements', label: 'Grupos de Opções', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
-      { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
-      { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS', featureKey: 'upsells' },
-      { id: 'catalog-inventory', label: 'Estoque & Ficha Técnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
-    ],
-  },
-  {
-    id: 'orders',
-    label: 'Pedidos',
-    items: [
-      { id: 'orders-list', label: 'Lista de Pedidos', to: '/orders', icon: ClipboardList, permission: 'orders.read', match: (p) => p === '/orders' },
-      { id: 'orders-board', label: 'Kanban Operacional', to: '/orders/board', icon: BarChart3, permission: 'orders.use_kanban' },
-      { id: 'orders-kds', label: 'KDS (Cozinha)', to: '/orders/kds', icon: ChefHat, permission: 'kds.use', featureKey: 'kds' },
-      { id: 'orders-automation', label: 'Automacao de Pedidos', to: '/orders/settings/automation', icon: Bot, permission: 'orders.settings.manage' },
-    ],
-  },
-  {
-    id: 'delivery',
-    label: 'Logística',
-    items: [
-      { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
-      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read', featureFlag: 'VITE_FEATURE_DELIVERY_LIVE_MAP', featureKey: 'delivery_live_map' },
-      { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
-      { id: 'delivery-zones', label: 'Zonas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
-    ],
-  },
-  {
-    id: 'pos',
-    label: 'PDV e Caixa',
-    items: [
-      { id: 'pos', label: 'Ponto de Venda', to: '/pos', icon: ShoppingCart, permission: 'pos.read' },
-      { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read', featureKey: 'dine_in' },
-      { id: 'pos-printers', label: 'Impressoras', to: '/pos/printers', icon: Printer, permission: 'settings.manage', featureKey: 'printing' },
-      { id: 'cash', label: 'Caixa', to: '/cash', icon: Wallet, permission: 'cash.read' },
-    ],
-  },
-  {
-    id: 'management',
-    label: 'Gestão',
-    items: [
-      { id: 'management-employees', label: 'Funcionários', to: '/management/employees', icon: Users, permission: 'users.read' },
-      { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
-      { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
-      { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' },
-    ],
-  },
-  {
-    id: 'crm',
-    label: 'CRM e Marketing',
-    items: [
-      { id: 'customers', label: 'Clientes (CRM)', to: '/customers', icon: Users, permission: 'crm.read' },
-      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED', featureKey: 'crm_enterprise' },
-      { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' },
-      { id: 'promotions', label: 'Promoções & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
-    ],
-  },
-  {
-    id: 'analytics',
-    label: 'Gestão & Performance',
-    items: [
-      { id: 'analytics-reports', label: 'Relatórios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
-      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED', featureKey: 'bi_advanced' },
-      { id: 'analytics-performance', label: 'Desempenho', to: '/analytics/performance', icon: BarChart3, permission: 'reports.read', match: (p) => p === '/analytics/performance' },
-      { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS', featureKey: 'goals' },
-    ],
-  },
-  {
-    id: 'whatsapp',
-    label: 'WhatsApp',
-    items: [
-      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED', featureKey: 'whatsapp_advanced' },
-      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' },
-      { id: 'whatsapp-config', label: 'WhatsApp', to: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT', featureKey: 'whatsapp_connect' },
-    ],
-  },
-  {
-    id: 'system',
-    label: 'Sistema',
-    items: [
-      { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
-      { id: 'settings-network', label: 'Rede de Lojas', to: '/settings/network', icon: Building2, permission: 'settings.manage' },
-      { id: 'settings-integrations', label: 'Integrações', to: '/settings/integrations', icon: Link2, permission: 'settings.manage', featureKey: 'ifood_marketplace', match: (p) => p === '/settings/integrations' },
-      { id: 'settings-storefront', label: 'Personalizar Vitrine', to: '/settings/storefront', icon: Palette, permission: 'settings.manage' },
-      { id: 'settings-scheduling', label: 'Agendamentos', to: '/settings/scheduling', icon: CalendarClock, permission: 'settings.manage', featureKey: 'scheduling' },
-      { id: 'notifications', label: 'Notificações', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
-    ],
-  },
-];
+const SIDEBAR_GROUPS = getSidebarNavigation();
 
 type SidebarState = {
   collapsed: boolean;
@@ -244,12 +52,12 @@ function safeParseSidebarState(raw: string | null): SidebarState | null {
   }
 }
 
-function isItemActive(item: SidebarItem, pathname: string): boolean {
+function isItemActive(item: SidebarNavigationItem, pathname: string): boolean {
   if (item.match) return item.match(pathname);
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
-function firstActiveGroupId(groups: readonly SidebarGroup[], pathname: string): string | null {
+function firstActiveGroupId(groups: readonly SidebarNavigationGroup[], pathname: string): string | null {
   for (const g of groups) {
     for (const it of g.items) {
       if (isItemActive(it, pathname)) return g.id;
@@ -259,7 +67,7 @@ function firstActiveGroupId(groups: readonly SidebarGroup[], pathname: string): 
 }
 
 function SidebarGroupView(props: {
-  group: SidebarGroup;
+  group: SidebarNavigationGroup;
   collapsed: boolean;
   isOpen: boolean;
   isAnyItemActive: boolean;
@@ -412,7 +220,7 @@ export function AppLayout() {
     },
     onError: (err) => {
       console.error('Erro ao trocar loja:', err);
-      alert('Não foi possível trocar de loja nesta rede.');
+      alert('NÃ£o foi possÃ­vel trocar de loja nesta rede.');
     },
   });
 
@@ -425,7 +233,7 @@ export function AppLayout() {
   const storePauseMutation = useMutation({
     mutationFn: async (nextPaused: boolean) => {
       if (!resolvedStoreStatus.canTogglePause) {
-        throw new Error('A pausa operacional só pode ser alterada dentro do horário de funcionamento.');
+        throw new Error('A pausa operacional sÃ³ pode ser alterada dentro do horÃ¡rio de funcionamento.');
       }
       return api.patch('/tenant/store-pause', {
         isStorePaused: nextPaused,
@@ -437,7 +245,7 @@ export function AppLayout() {
       toast.success(nextPaused ? 'Recebimento de pedidos pausado.' : 'Recebimento de pedidos retomado.');
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Não foi possível alterar a pausa operacional.');
+      toast.error(error instanceof Error ? error.message : 'NÃ£o foi possÃ­vel alterar a pausa operacional.');
     },
   });
 
@@ -452,9 +260,9 @@ export function AppLayout() {
 
   useNotificationAudio(tenantData?.id);
 
-  // Mantém conexão ao namespace /chat ativa em qualquer rota autenticada.
-  // Necessário para que whatsapp.handoff chegue ao bus de notificação
-  // independentemente de o operador estar ou não na InboxPage.
+  // MantÃ©m conexÃ£o ao namespace /chat ativa em qualquer rota autenticada.
+  // NecessÃ¡rio para que whatsapp.handoff chegue ao bus de notificaÃ§Ã£o
+  // independentemente de o operador estar ou nÃ£o na InboxPage.
   useChatSocket(tenantData?.id);
 
   // Browser Notifications Integration
@@ -494,10 +302,10 @@ export function AppLayout() {
 
     const { hostname, origin } = window.location;
 
-    // Capacitor/Android: hostname é 'capacitor://localhost', não fazer parsing
+    // Capacitor/Android: hostname Ã© 'capacitor://localhost', nÃ£o fazer parsing
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('capacitor://')) {
-      // Em Capacitor ou localhost, usar variável de ambiente ou fallback seguro
-      // Se não tiver VITE_STOREFRONT_BASE_URL configurado, usar a mesma origem da API
+      // Em Capacitor ou localhost, usar variÃ¡vel de ambiente ou fallback seguro
+      // Se nÃ£o tiver VITE_STOREFRONT_BASE_URL configurado, usar a mesma origem da API
       const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
       if (apiBase && !apiBase.startsWith('/')) {
         // Extrair origin da API URL (removendo /api/v1 ou similar)
@@ -505,7 +313,7 @@ export function AppLayout() {
         setStorefrontBaseUrl(apiOrigin);
         return;
       }
-      // Fallback final: não definir storefrontBaseUrl em Capacitor sem config
+      // Fallback final: nÃ£o definir storefrontBaseUrl em Capacitor sem config
       setStorefrontBaseUrl('');
       return;
     }
@@ -521,16 +329,11 @@ export function AppLayout() {
   }, []);
 
   const groups = useMemo(() => {
-    const filtered: SidebarGroup[] = [];
-    for (const g of SIDEBAR_GROUPS) {
-      const items = g.items
-        .filter((it) => (isFeatureVisible ? isFeatureVisible(it.featureFlag, it.featureKey) : isFeatureVisibleByEnv(it.featureFlag)))
-        .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
-        .map((it) => it);
-
-      if (items.length) filtered.push({ ...g, items });
-    }
-    return filtered;
+    return filterSidebarNavigation(
+      SIDEBAR_GROUPS,
+      (featureFlag, featureKey) => isFeatureVisible ? isFeatureVisible(featureFlag, featureKey) : !featureFlag || String(import.meta.env[featureFlag]).toLowerCase() === 'true',
+      (permission) => !permission || hasPermission(userPermissions, permission),
+    );
   }, [isFeatureVisible, userPermissions]);
 
   const activeGroupId = useMemo(() => {
@@ -650,37 +453,7 @@ export function AppLayout() {
 
 
 
-  const getBreadcrumb = () => {
-    const segments = location.pathname.split('/').filter(Boolean);
-    if (segments.length === 0) return { label: 'Dashboard' };
-
-    // Procurar nos SIDEBAR_GROUPS o item correspondente
-    for (const group of SIDEBAR_GROUPS) {
-      for (const item of group.items) {
-        if (isItemActive(item, location.pathname)) {
-          // Se o grupo é Dashboard ou Sistema, apenas mostre o label do item para manter limpo
-          if (group.id === 'dashboard' || group.id === 'system') {
-            return { label: item.label };
-          }
-          return {
-            parentLabel: group.label,
-            label: item.label
-          };
-        }
-      }
-    }
-
-    // Fallback amigável
-    const firstSegment = segments[0];
-    const formattedSegment = firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1);
-    if (segments.length > 1) {
-      const formattedChild = segments[1].charAt(0).toUpperCase() + segments[1].slice(1);
-      return { parentLabel: formattedSegment, label: formattedChild };
-    }
-    return { label: formattedSegment };
-  };
-
-  const breadcrumb = getBreadcrumb();
+  const breadcrumb = getBreadcrumbMetadata(location.pathname);
 
   useEffect(() => {
     document.title = breadcrumb.label ? `${systemName} - ${breadcrumb.label}` : systemName;
@@ -815,7 +588,7 @@ export function AppLayout() {
                   className="flex flex-row items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all group shadow-sm h-[34px]"
                 >
                   <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">Cardápio</span>
+                  <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">CardÃ¡pio</span>
                 </a>
                 <button
                   type="button"
