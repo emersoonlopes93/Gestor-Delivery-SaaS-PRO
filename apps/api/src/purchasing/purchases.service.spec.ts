@@ -79,6 +79,14 @@ describe('PurchasesService purchase date contract', () => {
     expect(tx.purchase.create.mock.calls[0][0].data.purchaseDate.toISOString()).toBe('2026-09-07T15:30:00.000Z');
   });
 
+  it('keeps paid purchases from creating a pending financial transaction', async () => {
+    const { service, tx } = makeHarness();
+
+    await service.create('tenant-a', { ...createInput(), paymentStatus: PaymentStatus.PAID });
+
+    expect(tx.financialTransaction.create).not.toHaveBeenCalled();
+  });
+
   it('keeps unpaid purchase finance behavior unchanged', async () => {
     const { service, tx } = makeHarness();
 
