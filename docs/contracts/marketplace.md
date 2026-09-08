@@ -252,6 +252,10 @@ Novas cifras usam `enc:v2:<keyVersion>` com AES-256-GCM, nonce aleatório de 12 
 
 Native detail parsing preserves unquoted 64-bit identifiers as decimal strings before JSON parsing. The normalizer accepts the official direct `OrderModel` and bounded native containers (`data`, `order_info`, `order`, `order_detail`, `detail`) only when an `order_id` is present. When the remote detail is sparse, missing address, price, and item fields may be completed from the signed `data.order_info` received with `orderNew`; an incomplete merged snapshot remains retryable and is not imported as a placeholder.
 
+### Native payment method normalization (2026-09-08)
+
+The native `OrderModel` payment source is `pay_channel`, with the documented legacy `pay_type` used only when `pay_channel` is absent. Exact existing-domain mappings are: cash channel `153` to `cash`, PIX channels `212` and `280` to `pix`, POS credit `262` to `credit_card`, POS debit `263` to `debit_card`, and generic POS `154` to `card_on_delivery`. Legacy cash (`pay_type=2`) and courier POS (`pay_type=3`) map to the same existing methods. Unknown, missing, or non-equivalent channels remain `other`; in particular, combined credit/debit channel `150` is not guessed as either card type. Historical orders are not backfilled.
+
 ### Native action activation and privacy-protected names (2026-09-05)
 
 99Food actions initiated from the operational order board require `orders.update_status`, a tenant-scoped `CONNECTED` 99Food connection, `MARKETPLACE_99FOOD_ENABLED=true`, and operational BullMQ. The connected store is the tenant's explicit opt-in for these native actions. The generic beta `marketplace_orders` preset controls marketplace-management surfaces and does not independently block the normal order-status endpoint; iFood retains its provider-specific feature and entitlement gate.

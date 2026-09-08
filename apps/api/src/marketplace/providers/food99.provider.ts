@@ -319,7 +319,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       customerPhone: this.readString(address, ['phone', 'virtual_phone_number']) ?? '',
       customerEmail: null,
       notes: this.readString(order, ['remark']),
-      paymentMethod: 'other',
+      paymentMethod: this.nativePaymentMethod(order),
       isPrepaid: customerPaid !== null,
       amountDue: 0,
       changeFor: this.minorMoney(order.change_for),
@@ -429,6 +429,25 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     if (methodNames.includes('PIX')) return 'pix';
     if (methodNames.includes('DEBIT')) return 'debit_card';
     if (methodNames.includes('CREDIT')) return 'credit_card';
+    return 'other';
+  }
+
+  private nativePaymentMethod(order: Record<string, unknown>): NormalizedMarketplaceOrder['paymentMethod'] {
+    // 99Food's native OrderModel recommends pay_channel over the legacy
+    // pay_type. Only channels with an exact internal equivalent are mapped.
+    const payChannel = this.numberValue(order.pay_channel);
+    if (payChannel !== null) {
+      if (payChannel === 153) return 'cash';
+      if (payChannel === 212 || payChannel === 280) return 'pix';
+      if (payChannel === 262) return 'credit_card';
+      if (payChannel === 263) return 'debit_card';
+      if (payChannel === 154) return 'card_on_delivery';
+      return 'other';
+    }
+
+    const payType = this.numberValue(order.pay_type);
+    if (payType === 2) return 'cash';
+    if (payType === 3) return 'card_on_delivery';
     return 'other';
   }
 

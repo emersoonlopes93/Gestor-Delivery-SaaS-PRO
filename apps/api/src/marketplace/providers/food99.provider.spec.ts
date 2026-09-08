@@ -150,7 +150,7 @@ describe('Food99Provider', () => {
         data: {
           order_info: {
             order_id: '5764656197621845665', order_index: 42, status: 100,
-            create_time: 1768815200, delivery_type: 2, remark: 'Sem cebola',
+            create_time: 1768815200, delivery_type: 2, pay_channel: 153, remark: 'Sem cebola',
             price: {
               order_price: 3599, customer_need_paying_money: 618,
               items_discount: 3000, delivery_discount: 500, delivery_price: 699,
@@ -171,7 +171,7 @@ describe('Food99Provider', () => {
     expect(normalized).toMatchObject({
       externalOrderId: '5764656197621845665', itemsSubtotal: 35.99, total: 6.18,
       discountTotal: 37.79, deliveryFee: 6.99, serviceFee: 0.99,
-      notes: 'Sem cebola', deliveryOwnership: 'MERCHANT', isPrepaid: true,
+      notes: 'Sem cebola', deliveryOwnership: 'MERCHANT', isPrepaid: true, paymentMethod: 'cash',
     });
     expect(normalized.items[0]).toMatchObject({ name: 'HambÃºrguer', notes: 'Bem passado', totalPrice: 35.99 });
     expect(normalized.items[0].options).toEqual(expect.arrayContaining([
@@ -266,5 +266,61 @@ describe('Food99Provider', () => {
       externalOrder: { data: { order_id: '5764656197621845665', delivery_type: deliveryType, order_items: [], price: {} } },
     });
     expect(normalized.deliveryOwnership).toBe(deliveryOwnership);
+  });
+
+  it.each([
+    [153, 'cash'],
+    [212, 'pix'],
+    [280, 'pix'],
+    [262, 'credit_card'],
+    [263, 'debit_card'],
+    [154, 'card_on_delivery'],
+  ])('maps documented native pay_channel %s to %s', async (payChannel, paymentMethod) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', pay_channel: payChannel, pay_type: 1,
+        order_items: [], price: {},
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      externalOrderId: '5764656197621845665',
+      paymentMethod,
+    });
+  });
+
+  it.each([
+    [2, 'cash'],
+    [3, 'card_on_delivery'],
+  ])('falls back to documented legacy pay_type %s when pay_channel is missing', async (payType, paymentMethod) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', pay_type: payType,
+        order_items: [], price: {},
+      },
+    });
+
+    expect(normalized.paymentMethod).toBe(paymentMethod);
+  });
+
+  it.each([
+    { pay_channel: 999, pay_type: 2 },
+    { pay_channel: 150, pay_type: 1 },
+    {},
+  ])('keeps unknown, ambiguous, or missing native payment data as other', async (paymentFields) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', ...paymentFields,
+        order_items: [], price: {},
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      externalOrderId: '5764656197621845665',
+      paymentMethod: 'other',
+    });
   });
 });

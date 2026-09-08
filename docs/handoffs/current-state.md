@@ -2353,3 +2353,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 ## Management/Finance reports dedup (2026-09-08)
 
 - Decisão de produto aplicada: `/analytics/reports` e o stable ID `analytics.reports` permanecem canônicos no Financeiro. A landing Gestão deixou de expor o card duplicado, sem alterar rota, `ReportsPage`, breadcrumb Financeiro, registry, guards, backend, schema ou providers.
+
+## 99Food native payment method normalization (2026-09-08)
+
+- Branch `fix/99food-payment-method`, based on `origin/main-copy` / `15cc571000bd5d4c560b71b43ab206c7125ad424`, replaces the native order adapter's unconditional `other` value with documented `pay_channel` mappings to existing PedeHub payment methods. Legacy `pay_type` is used only when the detailed channel is absent.
+- Exact supported mappings are cash, PIX, POS credit, POS debit and card on delivery. Unknown, missing and ambiguous channels remain `other`; combined online credit/debit channel `150` is deliberately not guessed because the existing domain distinguishes credit from debit.
+- Provider IDs remain lossless strings. Confirmation, BAPP/OpenAPI lifecycle, persistence/API contracts, schema, migrations and other providers are unchanged. Previously stored orders are not backfilled.
+- Focused backend coverage verifies supported channels, legacy fallback, unknown/missing fallback and long order IDs (1 suite / 29 tests PASS). Focused web coverage verifies normalized labels, including `card_on_delivery` and the neutral `other` label (1 file / 8 tests PASS). API and web typecheck, lint and build, global `check:no-any`, and `git diff --check` passed.

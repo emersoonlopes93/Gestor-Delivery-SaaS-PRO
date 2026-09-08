@@ -18,10 +18,12 @@ interface OrderPaymentSectionProps {
 const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   credit_card: { label: 'Cartão de Crédito', icon: CreditCard, color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400' },
   debit_card: { label: 'Cartão de Débito', icon: CreditCard, color: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400' },
+  card_on_delivery: { label: 'Cartão na Entrega', icon: CreditCard, color: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400' },
   pix: { label: 'PIX', icon: Sparkles, color: 'text-teal-600 bg-teal-100 dark:bg-teal-900/40 dark:text-teal-400' },
   cash: { label: 'Dinheiro', icon: Banknote, color: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-400' },
   meal_voucher: { label: 'Vale Refeição', icon: Ticket, color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/40 dark:text-orange-400' },
   online: { label: 'Pagamento Online', icon: Wallet, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/40 dark:text-purple-400' },
+  other: { label: 'Outro', icon: Wallet, color: 'text-muted-foreground bg-muted dark:bg-slate-800 dark:text-muted-foreground' },
 };
 
 export const OrderPaymentSection = memo(function OrderPaymentSection({ 
