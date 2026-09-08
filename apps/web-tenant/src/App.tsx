@@ -56,6 +56,7 @@ import { PurchasesPage } from './features/purchasing/PurchasesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
 import { EmployeesPage } from './features/management/employees/EmployeesPage';
 import { ChannelsPage } from './features/navigation/ChannelsPage';
+import { ManagementPage } from './features/navigation/ManagementPage';
 
 // WhatsApp & IA & Campanhas (Phase 11)
 import { WhatsAppConfigPage } from './features/whatsapp/pages/WhatsAppConfigPage';
@@ -407,6 +408,7 @@ export function App() {
         />
 
         {/* Phase 3 - Management Layer */}
+        <Route path="/management" element={<ManagementPage />} />
         <Route
           path="/management/suppliers"
           element={
