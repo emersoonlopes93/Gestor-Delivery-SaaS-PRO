@@ -49,7 +49,8 @@ describe('navigation hubs UI contract', () => {
     expect(navigationHub).toContain("user?.enabledModules?.includes(module) === true");
     expect(navigationHub).toContain('sm:grid-cols-2 lg:grid-cols-3');
     expect(navigationHub).toContain("variant={primary ? 'primary' : 'secondary'}");
-    expect(navigationHub).toContain('Revisão prioritária');
+    expect(navigationHub).toContain('min-h-[12rem] border-primary/30 bg-primary/5 p-5');
+    expect(navigationHub).toContain('mt-5 block text-lg font-semibold tracking-tight text-foreground');
     expect(navigationHub).toContain("sectionItems.length === 1 ? 'área' : 'áreas'");
     expect(navigationHub).toContain('group-focus-visible:ring-2');
   });

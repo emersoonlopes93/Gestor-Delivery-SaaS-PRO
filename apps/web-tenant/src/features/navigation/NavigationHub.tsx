@@ -108,8 +108,7 @@ function HubLink({ entry, variant }: HubLinkProps) {
             <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Icon className="h-6 w-6" aria-hidden />
             </span>
-            <span className="mt-5 block text-xs font-semibold uppercase tracking-wider text-primary">Revisão prioritária</span>
-            <span className="mt-1 block text-lg font-semibold tracking-tight text-foreground">{entry.hubLabel ?? entry.label}</span>
+            <span className="mt-5 block text-lg font-semibold tracking-tight text-foreground">{entry.hubLabel ?? entry.label}</span>
             <span className="mt-2 block text-sm leading-5 text-muted-foreground">{entry.hubDescription}</span>
             <ArrowRight className="mt-auto self-end h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" aria-hidden />
           </div>
