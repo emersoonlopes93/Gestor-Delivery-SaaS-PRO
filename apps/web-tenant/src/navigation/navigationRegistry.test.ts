@@ -10,12 +10,12 @@ import {
 } from './navigationRegistry';
 
 describe('navigation registry', () => {
-  it('projects the six manager-workflow groups through the three navigation hubs', () => {
+  it('projects the six manager-workflow groups through the navigation hubs', () => {
     const sidebar = getSidebarNavigation();
     expect(sidebar).toHaveLength(6);
-    expect(sidebar.flatMap((group) => group.items)).toHaveLength(31);
+    expect(sidebar.flatMap((group) => group.items)).toHaveLength(28);
     expect(NAVIGATION_ITEMS.map((entry) => entry.id)).toEqual(expect.arrayContaining([
-      'dashboard.overview', 'orders.kds', 'inventory.home', 'management.purchases', 'analytics.reports', 'settings.integrations', 'channels.hub',
+      'dashboard.overview', 'orders.kds', 'inventory.home', 'management.purchases', 'analytics.reports', 'settings.integrations', 'channels.hub', 'management.hub',
     ]));
     expect(NAVIGATION_GROUPS.map((group) => group.id)).toEqual(['operations', 'catalog-production', 'finance', 'management', 'channels', 'settings']);
     expect(sidebar.map((group) => group.label)).toEqual(['Operação', 'Cardápio e Produção', 'Financeiro', 'Gestão', 'Canais e Relacionamento', 'Configurações']);
@@ -23,6 +23,7 @@ describe('navigation registry', () => {
     expect(sidebar.find((group) => group.id === 'finance')?.items.map((entry) => entry.id)).toEqual(['management.finance']);
     expect(sidebar.find((group) => group.id === 'catalog-production')?.items.map((entry) => entry.id)).not.toEqual(expect.arrayContaining(['management.purchases', 'management.suppliers']));
     expect(sidebar.find((group) => group.id === 'channels')?.items.map((entry) => entry.id)).toEqual(['channels.hub']);
+    expect(sidebar.find((group) => group.id === 'management')?.items.map((entry) => entry.id)).toEqual(['management.hub']);
   });
 
   it('keeps the current guards and filters sidebar entries without changing their order', () => {
@@ -65,6 +66,11 @@ describe('navigation registry', () => {
   it('keeps hub card entries subject to their original permission and feature metadata', () => {
     const byId = new Map(NAVIGATION_ITEMS.map((entry) => [entry.id, entry]));
     expect(byId.get('channels.hub')).toMatchObject({ permission: 'orders.read', path: '/channels' });
+    expect(byId.get('management.hub')).toMatchObject({ path: '/management' });
+    expect(byId.get('analytics.goals')).toMatchObject({ permission: 'goals.read', featureKey: 'goals', parentId: 'management.hub' });
+    expect(byId.get('analytics.bi')).toMatchObject({ permission: 'reports.read', featureKey: 'bi_advanced', parentId: 'management.hub' });
+    expect(byId.get('analytics.performance')).toMatchObject({ permission: 'reports.read', module: 'reports', parentId: 'management.hub' });
+    expect(byId.get('management.employees')).toMatchObject({ permission: 'users.read', parentId: 'management.hub' });
     expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'ifood_marketplace', parentId: 'channels.hub' });
     expect(byId.get('management.purchases')).toMatchObject({ permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' });
     expect(byId.get('whatsapp.config')).toMatchObject({ permission: 'settings.manage', featureKey: 'whatsapp_connect', parentId: 'channels.hub' });
@@ -82,5 +88,26 @@ describe('navigation registry', () => {
     );
 
     expect(visible.map((entry) => entry.id)).toEqual(['whatsapp.inbox']);
+  });
+
+  it('keeps the management landing functional for partial access and preserves old route metadata', () => {
+    const management = getNavigationItems(['analytics.reports', 'analytics.goals', 'analytics.performance', 'analytics.bi', 'management.employees']);
+    const visible = filterNavigationItems(
+      management,
+      (_flag, key) => key !== 'goals' && key !== 'bi_advanced',
+      (permission) => permission === 'reports.read',
+      () => true,
+    );
+
+    expect(visible.map((entry) => entry.id)).toEqual(['analytics.reports', 'analytics.performance']);
+    expect(getNavigationItem('/management')?.id).toBe('management.hub');
+    expect(getNavigationItem('/analytics/goals')?.id).toBe('analytics.goals');
+    expect(getNavigationItem('/analytics/performance')?.id).toBe('analytics.performance');
+    expect(getNavigationItem('/analytics/business-intelligence')?.id).toBe('analytics.bi');
+    expect(getNavigationItem('/management/employees')?.id).toBe('management.employees');
+    expect(getBreadcrumbMetadata('/analytics/goals')).toEqual({ parentLabel: 'Gestão', label: 'Metas' });
+    expect(getBreadcrumbMetadata('/analytics/performance')).toEqual({ parentLabel: 'Gestão', label: 'Desempenho de Vendas' });
+    expect(getBreadcrumbMetadata('/analytics/business-intelligence')).toEqual({ parentLabel: 'Gestão', label: 'BI Avançado' });
+    expect(getBreadcrumbMetadata('/management/employees')).toEqual({ parentLabel: 'Gestão', label: 'Equipe' });
   });
 });
