@@ -8,6 +8,7 @@ export type NavigationItem = {
   path: string;
   icon?: LucideIcon;
   permission?: string;
+  module?: string;
   featureFlag?: string;
   featureKey?: string;
   navigationKind: NavigationKind;
