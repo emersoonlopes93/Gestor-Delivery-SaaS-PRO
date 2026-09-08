@@ -188,7 +188,19 @@ export class PurchasesService {
         });
       }
 
-      return this.findOne(tenantId, purchase.id);
+      const createdPurchase = await tx.purchase.findFirst({
+        where: { id: purchase.id, tenantId },
+        include: {
+          supplier: true,
+          items: { include: { ingredient: true } },
+        },
+      });
+
+      if (!createdPurchase) {
+        throw new NotFoundException('Compra não encontrada');
+      }
+
+      return this.mapToDTO(createdPurchase);
     });
   }
 

@@ -10,6 +10,12 @@ describe('PurchasesService purchase date contract', () => {
         create: jest.fn().mockImplementation(async ({ data }: { data: { paymentStatus: PaymentStatus } }) => ({
           id: 'purchase-a', items: [], paymentStatus: data.paymentStatus,
         })),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'purchase-a', tenantId: 'tenant-a', supplierId: 'supplier-a', number: null, totalValue: 10,
+          status: PurchaseStatus.RECEIVED, paymentStatus: PaymentStatus.PAID,
+          purchaseDate: new Date('2026-09-07T12:00:00.000Z'), notes: null,
+          createdAt: new Date(), updatedAt: new Date(), supplier: null, items: [],
+        }),
       },
       ingredient: {
         findFirst: jest.fn().mockResolvedValue({ id: 'ingredient-a', currentStock: 3, currentCost: 4 }),
@@ -38,7 +44,7 @@ describe('PurchasesService purchase date contract', () => {
   });
 
   it('accepts the date-only browser contract at a timezone-stable business-day anchor', async () => {
-    const { service, tx } = makeHarness();
+    const { service, prisma, tx } = makeHarness();
 
     await service.create('tenant-a', createInput());
 
@@ -52,6 +58,10 @@ describe('PurchasesService purchase date contract', () => {
     }));
     expect(tx.stockMovement.create).toHaveBeenCalledTimes(1);
     expect(tx.financialTransaction.create).not.toHaveBeenCalled();
+    expect(tx.purchase.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'purchase-a', tenantId: 'tenant-a' },
+    }));
+    expect(prisma.purchase.findFirst).not.toHaveBeenCalled();
   });
 
   it.each(['', '2026-02-30', 'not-a-date'])('rejects invalid purchaseDate %p as a domain validation error', async (purchaseDate) => {
