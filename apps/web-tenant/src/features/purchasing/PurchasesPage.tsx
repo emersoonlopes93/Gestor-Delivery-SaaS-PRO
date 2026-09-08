@@ -5,6 +5,8 @@ import { PurchaseModal } from './PurchaseModal';
 import { LucideIcon, ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 export function PurchasesPage() {
   const [purchases, setPurchases] = useState<PurchaseDTO[]>([]);
@@ -76,47 +78,60 @@ export function PurchasesPage() {
   const uniqueSuppliers = new Set(purchases.map(p => p.supplier?.id)).size;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-left">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
-            <ShoppingCart className="h-8 w-8 text-primary-600" />
-            Compras e Entradas
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Registre entradas de insumos e controle seus custos de aquisição.</p>
-        </div>
-        <button
+    <div className="mx-auto max-w-7xl space-y-6 p-4 pb-24 text-left md:p-6">
+      <PageHeader
+        title="Compras e entradas"
+        description="Registre o recebimento de insumos e acompanhe as compras da operação."
+        icon={ShoppingCart}
+        action={<button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm flex items-center gap-2 group"
+          className="hidden items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:flex"
         >
-          <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
+          <Plus className="h-5 w-5" />
+          Nova Compra
+        </button>}
+      />
+
+      <div className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 md:hidden">
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <Plus className="h-5 w-5" aria-hidden />
           Nova Compra
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+      <ContextualNavigation itemIds={['inventory.home', 'management.purchases', 'management.suppliers']} />
+
+      <section aria-label="Resumo das compras" className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="grid divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="p-4">
           <div className="text-sm font-medium text-muted-foreground mb-1">Total Comprado (Mês)</div>
           <div className="text-2xl font-bold text-foreground">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCompradoMes)}</div>
           <div className="text-xs text-muted-foreground mt-1">Referente a compras não canceladas neste mês</div>
         </div>
-        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+        <div className="p-4">
           <div className="text-sm font-medium text-muted-foreground mb-1">Pagamentos Pendentes</div>
           <div className="text-2xl font-bold text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pagamentosPendentes)}</div>
           <div className="text-xs text-muted-foreground mt-1">{pendingPurchases.length} faturas pendentes ou parciais</div>
         </div>
-        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+        <div className="p-4">
           <div className="text-sm font-medium text-muted-foreground mb-1">Fornecedores Ativos</div>
           <div className="text-2xl font-bold text-primary-600">{uniqueSuppliers}</div>
           <div className="text-xs text-muted-foreground mt-1">Fornecedores que você já comprou</div>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="p-4 border-b border-border bg-muted">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <label className="sr-only" htmlFor="purchases-search">Buscar compras</label>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
             <input
+              id="purchases-search"
               type="text"
               placeholder="Buscar por NF ou fornecedor..."
               value={searchTerm}

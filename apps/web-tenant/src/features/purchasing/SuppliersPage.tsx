@@ -3,6 +3,8 @@ import { api } from '../../lib/api-client';
 import { SupplierDTO, CreateSupplierDTO } from '@gestor/types';
 import { SupplierModal } from './SupplierModal';
 import { Truck, Plus, Search, Mail, Phone } from 'lucide-react';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 export function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
@@ -75,33 +77,45 @@ export function SuppliersPage() {
   );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-left">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-3">
-            <Truck className="h-8 w-8 text-primary-600" />
-            Fornecedores
-          </h1>
-          <p className="mt-1 text-muted-foreground">Gerencie sua rede de parceiros e fornecedores de insumos.</p>
-        </div>
-        <button
+    <div className="mx-auto max-w-7xl space-y-6 p-4 text-left md:p-6">
+      <PageHeader
+        title="Fornecedores"
+        description="Mantenha os parceiros de compra prontos para as próximas entradas."
+        icon={Truck}
+        action={<button
           onClick={() => {
             setEditingSupplier(null);
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 group"
+          className="hidden items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:flex"
         >
-          <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
+          <Plus className="h-5 w-5" />
           Novo Fornecedor
-        </button>
-      </div>
+        </button>}
+      />
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <button
+        type="button"
+        onClick={() => {
+          setEditingSupplier(null);
+          setIsModalOpen(true);
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hidden"
+      >
+        <Plus className="h-5 w-5" aria-hidden />
+        Novo Fornecedor
+      </button>
+
+      <ContextualNavigation itemIds={['inventory.home', 'management.purchases', 'management.suppliers']} />
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         {actionError && <p role="alert" className="mx-4 mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p>}
         <div className="border-b border-border bg-muted/50 p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <label className="sr-only" htmlFor="suppliers-search">Buscar fornecedores</label>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <input
+              id="suppliers-search"
               type="text"
               placeholder="Buscar por nome ou CNPJ..."
               value={searchTerm}
@@ -134,22 +148,23 @@ export function SuppliersPage() {
                       <div className="font-semibold text-foreground">{supplier.name}</div>
                     </td>
                     <td className="px-6 py-4 font-mono text-sm text-muted-foreground">
-                      {supplier.cnpj || '---'}
+                      {supplier.cnpj || 'Não informado'}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-1">
+                      <div className="min-w-[11rem] space-y-1">
                         {supplier.email && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Mail className="h-3 w-3" />
+                            <Mail className="h-3 w-3" aria-hidden />
                             {supplier.email}
                           </div>
                         )}
                         {supplier.phone && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Phone className="h-3 w-3" />
+                            <Phone className="h-3 w-3" aria-hidden />
                             {supplier.phone}
                           </div>
                         )}
+                        {!supplier.email && !supplier.phone && <span className="text-xs text-muted-foreground">Sem contato informado</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4">
