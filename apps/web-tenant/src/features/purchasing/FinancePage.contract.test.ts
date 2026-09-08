@@ -11,6 +11,13 @@ describe('FinancePage UX contract', () => {
     expect(source).not.toContain("api.get<FinancialAccountDTO[]>");
   });
 
+  it('keeps financial transactions usable when analytics metrics are unavailable', () => {
+    expect(source).toContain('Promise.allSettled([');
+    expect(source).toContain("metricsResult.status === 'fulfilled'");
+    expect(source).toContain("transactionsResult.status === 'fulfilled'");
+    expect(source).toContain('setTransactions(transactionsResult.value.data)');
+  });
+
   it('preserves finance actions, four overview values, DRE, and in-memory pending composition', () => {
     expect(source).toContain('handleExport');
     expect(source).toContain('TransactionModal');
@@ -38,7 +45,7 @@ describe('FinancePage UX contract', () => {
 
   it('keeps financial unknown states and mobile reading safeguards explicit', () => {
     expect(source).toContain('const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false)');
-    expect(source).toContain('if (transRes.success) {');
+    expect(source).toContain("transactionsResult.status === 'fulfilled' && transactionsResult.value.success");
     expect(source).toContain('setHasLoadedTransactions(true)');
     expect(source).toContain('isLoading || !hasLoadedTransactions');
     expect(source).toContain('Carregando pendências...');

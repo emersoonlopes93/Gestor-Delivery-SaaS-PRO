@@ -59,14 +59,16 @@ export function FinancePage() {
     try {
       setIsLoading(true);
       const today = format(new Date(), 'yyyy-MM-dd');
-      const [metricsRes, transRes] = await Promise.all([
+      const [metricsResult, transactionsResult] = await Promise.allSettled([
         api.get<DashboardMetrics>(`/analytics/dashboard?startDate=${today}&endDate=${today}`),
         api.get<FinancialTransactionDTO[]>('/finance/transactions')
       ]);
 
-      if (metricsRes.success) setMetrics(metricsRes.data);
-      if (transRes.success) {
-        setTransactions(transRes.data);
+      if (metricsResult.status === 'fulfilled' && metricsResult.value.success) {
+        setMetrics(metricsResult.value.data);
+      }
+      if (transactionsResult.status === 'fulfilled' && transactionsResult.value.success) {
+        setTransactions(transactionsResult.value.data);
         setHasLoadedTransactions(true);
       }
     } catch (error) {
