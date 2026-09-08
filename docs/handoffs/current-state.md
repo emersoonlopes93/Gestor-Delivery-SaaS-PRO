@@ -2318,3 +2318,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 - Focused navigation registry tests: 5 passed. Web typecheck, `check:no-any`, web lint, web build
   and `git diff --check`: PASS.
+
+## Navigation V2 - Slice 3 internal hubs (2026-09-07)
+
+- Scope: frontend-only navigation refinement in `apps/web-tenant`. Financeiro keeps `/management/finance` as its primary entry and now links contextually to Caixa e Fechamento (`/cash`) and Relatórios (`/analytics/reports`). Estoque keeps its native tabs and adds contextual links to Compras and Fornecedores. No destination page data, route guard, financial, cash, stock, marketplace, refund, WhatsApp or business logic was changed.
+- Route strategy: `/channels` is a protected tenant route requiring the established `orders.read` permission. Its cards reuse the existing registry item permission, feature and module metadata, so it presents only destinations already available to the current tenant. All retained destination routes and their authoritative guards remain unchanged.
+- Sidebar discovery is now Sidebar -> Hub -> destination: Caixa remains in Operação; report, purchases and suppliers are removed from the sidebar and reached through their hubs; Canais e Relacionamento has the stable `channels.hub` entry. Breadcrumb metadata declares Financeiro, Estoque and Canais e Relacionamento as parents for the relevant old child routes.
+- Deferred: no new connection/status presentation, aggregate dashboard data or backend capability endpoint was added. Any future navigation changes should continue to use the registry and individual route guards.
+- Validation: offline frozen dependency bootstrap completed. Focused navigation registry and hub structural contract tests: 2 files / 10 tests PASS. Web typecheck, `check:no-any`, web lint, web build and `git diff --check`: PASS. Independent visual evaluation of the responsive hub structure: PASS.

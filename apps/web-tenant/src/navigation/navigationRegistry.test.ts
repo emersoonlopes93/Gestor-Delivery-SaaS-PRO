@@ -2,21 +2,27 @@ import {
   filterSidebarNavigation,
   getBreadcrumbMetadata,
   getNavigationItem,
+  getNavigationItems,
   getSidebarNavigation,
+  filterNavigationItems,
   NAVIGATION_GROUPS,
   NAVIGATION_ITEMS,
 } from './navigationRegistry';
 
 describe('navigation registry', () => {
-  it('projects the six manager-workflow groups without changing visible item identity', () => {
+  it('projects the six manager-workflow groups through the three navigation hubs', () => {
     const sidebar = getSidebarNavigation();
     expect(sidebar).toHaveLength(6);
-    expect(sidebar.flatMap((group) => group.items)).toHaveLength(42);
+    expect(sidebar.flatMap((group) => group.items)).toHaveLength(31);
     expect(NAVIGATION_ITEMS.map((entry) => entry.id)).toEqual(expect.arrayContaining([
-      'dashboard.overview', 'orders.kds', 'inventory.home', 'management.purchases', 'analytics.reports', 'settings.integrations',
+      'dashboard.overview', 'orders.kds', 'inventory.home', 'management.purchases', 'analytics.reports', 'settings.integrations', 'channels.hub',
     ]));
     expect(NAVIGATION_GROUPS.map((group) => group.id)).toEqual(['operations', 'catalog-production', 'finance', 'management', 'channels', 'settings']);
     expect(sidebar.map((group) => group.label)).toEqual(['Operação', 'Cardápio e Produção', 'Financeiro', 'Gestão', 'Canais e Relacionamento', 'Configurações']);
+    expect(sidebar.find((group) => group.id === 'operations')?.items.map((entry) => entry.id)).toContain('cash.home');
+    expect(sidebar.find((group) => group.id === 'finance')?.items.map((entry) => entry.id)).toEqual(['management.finance']);
+    expect(sidebar.find((group) => group.id === 'catalog-production')?.items.map((entry) => entry.id)).not.toEqual(expect.arrayContaining(['management.purchases', 'management.suppliers']));
+    expect(sidebar.find((group) => group.id === 'channels')?.items.map((entry) => entry.id)).toEqual(['channels.hub']);
   });
 
   it('keeps the current guards and filters sidebar entries without changing their order', () => {
@@ -48,5 +54,33 @@ describe('navigation registry', () => {
     expect(getNavigationItem('/catalog/simulation')?.navigationKind).toBe('DEEP_LINK');
     expect(getNavigationItem('/settings/qr-codes')?.navigationKind).toBe('VALID_HIDDEN');
     expect(getBreadcrumbMetadata('/settings/qr-codes')).toEqual({ parentLabel: 'Configurações da Loja', label: 'QR Code' });
+  });
+
+  it('resolves hub parents for retained child routes', () => {
+    expect(getBreadcrumbMetadata('/cash')).toEqual({ parentLabel: 'Financeiro', label: 'Caixa e Fechamento' });
+    expect(getBreadcrumbMetadata('/management/purchases')).toEqual({ parentLabel: 'Estoque', label: 'Compras' });
+    expect(getBreadcrumbMetadata('/settings/integrations')).toEqual({ parentLabel: 'Canais e Relacionamento', label: 'Marketplaces' });
+  });
+
+  it('keeps hub card entries subject to their original permission and feature metadata', () => {
+    const byId = new Map(NAVIGATION_ITEMS.map((entry) => [entry.id, entry]));
+    expect(byId.get('channels.hub')).toMatchObject({ permission: 'orders.read', path: '/channels' });
+    expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'ifood_marketplace', parentId: 'channels.hub' });
+    expect(byId.get('management.purchases')).toMatchObject({ permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' });
+    expect(byId.get('whatsapp.config')).toMatchObject({ permission: 'settings.manage', featureKey: 'whatsapp_connect', parentId: 'channels.hub' });
+    expect(byId.get('settings.storefront')?.hubDescription).toBe('Configure o cardápio público da sua loja.');
+    expect(byId.get('settings.integrations')?.hubDescription).toBe('Gerencie integrações com marketplaces.');
+  });
+
+  it('filters hub destinations with the same permission, feature and module requirements as their routes', () => {
+    const channels = getNavigationItems(['settings.integrations', 'whatsapp.inbox', 'crm.customers']);
+    const visible = filterNavigationItems(
+      channels,
+      (_flag, key) => key !== 'ifood_marketplace',
+      (permission) => permission !== 'crm.read',
+      (module) => module !== 'crm',
+    );
+
+    expect(visible.map((entry) => entry.id)).toEqual(['whatsapp.inbox']);
   });
 });
