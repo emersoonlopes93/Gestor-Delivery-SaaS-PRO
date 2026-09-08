@@ -2342,3 +2342,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 | Gestão (hub) | Sim | Sim | Porta de entrada estável para as áreas acima. |
 
 - Deferred: no new management KPIs, data summaries, route aliases, redirects or dashboard redesign. A future visual redesign or legacy cleanup must retain the registry and route guards as sources of truth.
+
+## Functional audit V2 after UX V2 (2026-09-08)
+
+- A auditoria confirmou que Gestao e Financeiro reutilizam o mesmo item `analytics.reports`, rota `/analytics/reports` e `ReportsPage`. Como o item possui um unico `parentId`, o breadcrumb permanece Financeiro mesmo quando a origem e Gestao. A definicao do dominio canonico foi adiada para decisao de produto; rotas, IDs e guards nao foram alterados.
+- Duas correcoes frontend pequenas foram aplicadas: a busca de clientes agora consome o envelope paginado real de `GET /crm/customers`, e o Financeiro carrega metricas e lancamentos de forma independente para que a indisponibilidade de Analytics nao descarte transacoes financeiras autorizadas.
+- Achados adiados incluem divergencias de permissoes de mutacao em Financeiro, Metas e Equipe; gates de Financeiro, Inbox e Marketplaces; reset de desenvolvimento do WhatsApp; refund de venda apos fechamento de caixa; validacao de perdas de estoque; saldo financeiro exibido e lifecycle de compras.
+- Nenhum backend, schema, migration, dependencia, provider, banco remoto ou deploy foi alterado. Testes focados web: 7 arquivos / 26 testes; typecheck, no-any, lint, build e diff check passaram. Smoke visual autenticado nao foi executado por ausencia de ambiente local autenticado.
