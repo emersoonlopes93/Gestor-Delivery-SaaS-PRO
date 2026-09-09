@@ -2367,3 +2367,22 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Goals now independently guard create, update and delete with `goals.create`, `goals.update` and `goals.delete`. Employee management keeps `users.read` for listing, requires `users.create` plus `users.roles` to create, `users.update` plus `users.roles` to edit, and `users.delete` to delete.
 - WhatsApp Inbox discovery and route access now require `chat.read`, matching the chat read endpoints. Sending, handoff, closing and quick-reply management are independently guarded by their existing `chat.*` permissions. `orders.read` no longer grants Inbox access or chat actions.
 - No backend guard, route path, stable ID, schema, migration, dependency, remote database, provider, Dokploy or deployment changed. Focused web contracts, typecheck, `check:no-any`, lint, build and diff check passed; the known Vite chunk-size warning remains unchanged.
+
+## Refund after cash close (2026-09-09)
+
+- Branch `fix/refund-after-cash-close`, based on `origin/main-copy` /
+  `c840ddaae2ee6e05d22fbe668a8f08e94cbed8c2`, keeps the cash ledger and a closed
+  session's persisted reconciliation fields consistent when the existing POS cancellation
+  flow records a late cash refund against the original session.
+- Cash sessions are hybrid: open sessions derive expected physical cash from movements;
+  closed sessions expose a persisted `closingAmountCalculated` and `closingDifference`.
+  A late cash refund now recalculates and atomically updates only those two reconciliation
+  fields on the original closed session. `closingAmountDeclared` remains historical, and a
+  non-cash refund does not change physical-cash totals or any current/new session.
+- The refund registration transaction now takes a tenant/session/order-scoped PostgreSQL
+  advisory lock before its existing duplicate lookup, preserving idempotency for concurrent
+  retries without a schema change. PaymentRefund, FinancialAccount, FinancialTransaction,
+  FinancialProjection, providers and cancellation-to-provider-refund behavior remain unchanged.
+- Focused Cash, POS, PaymentRefund, FinancialTransaction, FinancialProjection and order
+  atomicity suites: 6 suites / 46 tests PASS. API typecheck, lint, `check:no-any`, API build
+  and `git diff --check`: PASS. No database, provider, Dokploy or deploy action was performed.

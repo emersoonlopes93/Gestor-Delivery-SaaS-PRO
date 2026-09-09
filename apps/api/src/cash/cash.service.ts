@@ -140,21 +140,35 @@ export class CashService {
     closingAmountDeclared: number,
     notes?: string,
   ): Promise<CashSessionDetailDTO> {
-    const session = await this.prisma.cashSession.findFirst({
-      where: { id: sessionId, tenantId, operatorId, status: 'open' },
-    });
-
-    if (!session) {
-      throw new NotFoundException(
-        'Sessão de caixa não encontrada ou já fechada.',
-      );
-    }
-
-    // Calculate expected amount
-    const closingAmountCalculated = await this.calculateExpectedAmount(sessionId);
-    const closingDifference = closingAmountDeclared - closingAmountCalculated;
-
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockCashSession(tx, tenantId, sessionId);
+
+      const session = await tx.cashSession.findFirst({
+        where: { id: sessionId, tenantId, operatorId, status: 'open' },
+      });
+      if (!session) {
+        throw new NotFoundException(
+          'Sessão de caixa não encontrada ou já fechada.',
+        );
+      }
+
+      const movements = await tx.cashMovement.findMany({
+        where: { tenantId, cashSessionId: sessionId },
+        select: {
+          type: true,
+          amount: true,
+          paymentMethod: true,
+          orderId: true,
+        },
+      });
+      const closingAmountCalculated = this.calculateExpectedCashAmount(movements.map((movement) => ({
+        type: movement.type as CashMovementType,
+        amount: Number(movement.amount),
+        paymentMethod: movement.paymentMethod,
+        orderId: movement.orderId,
+      })));
+      const closingDifference = closingAmountDeclared - closingAmountCalculated;
+
       // Create closing movement
       await tx.cashMovement.create({
         data: {
@@ -187,6 +201,27 @@ export class CashService {
     });
 
     return this.mapSessionDetailToDTO(updated);
+  }
+
+  private async lockCashSession(
+    client: Prisma.TransactionClient,
+    tenantId: string,
+    cashSessionId: string,
+  ): Promise<void> {
+    await client.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${`cash-session:${tenantId}:${cashSessionId}`}))
+    `;
+  }
+
+  private async lockRefund(
+    client: Prisma.TransactionClient,
+    tenantId: string,
+    cashSessionId: string,
+    orderId: string,
+  ): Promise<void> {
+    await client.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${`cash-refund:${tenantId}:${cashSessionId}:${orderId}`}))
+    `;
   }
 
   /**
@@ -346,6 +381,24 @@ export class CashService {
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const createRefund = async (client: Prisma.TransactionClient): Promise<void> => {
+      // Closing and refunds share a session lock so a refund cannot be written
+      // between the close calculation and its persisted snapshot. The second,
+      // refund-specific lock preserves idempotency for concurrent retries.
+      await this.lockCashSession(client, tenantId, cashSessionId);
+      await this.lockRefund(client, tenantId, cashSessionId, orderId);
+
+      const session = await client.cashSession.findFirst({
+        where: { id: cashSessionId, tenantId },
+        select: {
+          id: true,
+          status: true,
+          closingAmountDeclared: true,
+        },
+      });
+      if (!session) {
+        throw new NotFoundException('Sessão de caixa não encontrada para registrar o estorno.');
+      }
+
       const existingRefund = await client.cashMovement.findFirst({
         where: { tenantId, cashSessionId, orderId, type: 'refund' },
         select: { id: true },
@@ -353,6 +406,14 @@ export class CashService {
       if (existingRefund) return;
 
       const parsedPaymentMethod = this.parsePaymentMethod(paymentMethod);
+      const originalSale = parsedPaymentMethod
+        ? null
+        : await client.cashMovement.findFirst({
+            where: { tenantId, cashSessionId, orderId, type: 'sale' },
+            select: { paymentMethod: true },
+          });
+      const physicalPaymentMethod = parsedPaymentMethod ?? originalSale?.paymentMethod ?? null;
+
       await client.cashMovement.create({
         data: {
           tenantId,
@@ -364,6 +425,39 @@ export class CashService {
           description: 'Estorno de venda PDV',
         },
       });
+
+      // A closed session exposes its persisted closing snapshot instead of
+      // recalculating on every read. Keep that snapshot aligned with the cash
+      // ledger when a cash refund is recorded against the original session.
+      // The declared count is historical and intentionally remains unchanged.
+      if (session.status === 'closed' && physicalPaymentMethod === PrismaPaymentMethod.cash) {
+        const movements = await client.cashMovement.findMany({
+          where: { tenantId, cashSessionId },
+          select: {
+            type: true,
+            amount: true,
+            paymentMethod: true,
+            orderId: true,
+          },
+        });
+        const closingAmountCalculated = this.calculateExpectedCashAmount(movements.map((movement) => ({
+          type: movement.type as CashMovementType,
+          amount: Number(movement.amount),
+          paymentMethod: movement.paymentMethod,
+          orderId: movement.orderId,
+        })));
+        const closingAmountDeclared = Number(session.closingAmountDeclared);
+
+        await client.cashSession.update({
+          where: { id: session.id },
+          data: {
+            closingAmountCalculated,
+            ...(session.closingAmountDeclared !== null
+              ? { closingDifference: closingAmountDeclared - closingAmountCalculated }
+              : {}),
+          },
+        });
+      }
     };
 
     if (tx) {
@@ -372,22 +466,6 @@ export class CashService {
     }
 
     await runSerializableTransactionWithRetry(this.prisma, createRefund);
-  }
-
-  /**
-   * Helper to calculate expected cash balance in a session.
-   */
-  private async calculateExpectedAmount(sessionId: string): Promise<number> {
-    const movements = await this.prisma.cashMovement.findMany({
-      where: { cashSessionId: sessionId },
-    });
-
-    return this.calculateExpectedCashAmount(movements.map((movement) => ({
-      type: movement.type as CashMovementType,
-      amount: Number(movement.amount),
-      paymentMethod: movement.paymentMethod,
-      orderId: movement.orderId,
-    })));
   }
 
   private calculateExpectedCashAmount(
