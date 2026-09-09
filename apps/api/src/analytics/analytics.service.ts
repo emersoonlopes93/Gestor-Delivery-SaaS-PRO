@@ -412,7 +412,7 @@ export class AnalyticsService {
       .reduce((acc: number, t) => acc + Number(t.amount), 0);
 
     const accounts = await this.prisma.financialAccount.aggregate({
-      where: { tenantId },
+      where: { tenantId, active: true },
       _sum: { balance: true }
     });
 

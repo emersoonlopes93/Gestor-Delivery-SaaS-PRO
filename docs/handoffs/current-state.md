@@ -2438,3 +2438,12 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Focused order presenter/reconciliation/payment UI tests, web typecheck, `check:no-any`,
   web lint, web build and `git diff --check` passed. No authenticated visual smoke,
   remote database, provider action, Dokploy action or deployment was run.
+
+## Canonical financial balance source (2026-09-09)
+
+- `Saldo em contas` remains backed by the persisted `FinancialAccount.balance` ledger, not by
+  sales, cash sessions, marketplace receivables, projections or a second transaction sum.
+- The Analytics aggregation is tenant-scoped and now includes only active financial accounts;
+  inactive account history remains stored but is excluded from available balance.
+- No write path, transaction semantics, cash/refund behavior, marketplace semantics, schema,
+  migration, API contract, dependency or historical data was changed.
