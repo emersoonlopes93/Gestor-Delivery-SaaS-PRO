@@ -20,8 +20,12 @@ type ProjectionWrite = {
   saleGrossState: FinancialProjectionValueState;
   discountTotal: Prisma.Decimal | null;
   discountTotalState: FinancialProjectionValueState;
+  discountMerchantState: FinancialProjectionValueState;
+  discountPlatformState: FinancialProjectionValueState;
   deliveryCharged: Prisma.Decimal | null;
+  deliveryChargedState: FinancialProjectionValueState;
   serviceCharged: Prisma.Decimal | null;
+  serviceChargedState: FinancialProjectionValueState;
   customerPaid: Prisma.Decimal | null;
   customerPaidState: FinancialProjectionValueState;
   paymentMethod: PaymentMethod | null;
@@ -151,8 +155,13 @@ describe('FinancialProjectionService', () => {
         normalizedPayload: {
           itemsSubtotal: 100,
           total: 90,
+          customerPaidAmount: 90,
+          paymentStatus: 'PAID',
+          collectionResponsibility: 'MARKETPLACE',
           isPrepaid: true,
           discountTotal: 10,
+          deliveryFee: 8,
+          serviceFee: 2,
           externalOrderId: '9223372036854775807',
         },
       }],
@@ -165,12 +174,71 @@ describe('FinancialProjectionService', () => {
     expect(write.saleGross?.toString()).toBe('100');
     expect(write.customerPaid?.toString()).toBe('90');
     expect(write.discountTotal?.toString()).toBe('10');
+    expect(write.deliveryCharged?.toString()).toBe('8');
+    expect(write.serviceCharged?.toString()).toBe('2');
     expect(write.customerPaidState).toBe(FinancialProjectionValueState.KNOWN);
+    expect(write.discountMerchantState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.discountPlatformState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.marketplaceFeeState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.sourceFieldProvenance.customerPaid).toEqual({
-      source: '99food.customer_need_paying_money via marketplace.normalizedPayload.total',
+      source: '99food.customer_need_paying_money confirmed by native online payment mode',
     });
+  });
+
+  it('keeps absent 99Food discounts and customer fees unknown instead of zero', async () => {
+    const { service, upsert } = await setup(orderFixture({
+      marketplaceOrders: [{
+        id: 'marketplace-99-unknown-values',
+        provider: MarketplaceProvider.FOOD_99,
+        normalizedPayload: {
+          itemsSubtotal: 100,
+          paymentStatus: 'UNKNOWN',
+          collectionResponsibility: 'UNKNOWN',
+        },
+      }],
+    }));
+
+    await service.projectOrder('tenant-1', 'order-1');
+
+    const write = writeFrom(upsert);
+    expect(write.discountTotal).toBeNull();
+    expect(write.discountTotalState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.deliveryCharged).toBeNull();
+    expect(write.deliveryChargedState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.serviceCharged).toBeNull();
+    expect(write.serviceChargedState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.customerPaid).toBeNull();
+    expect(write.customerPaidState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.UNKNOWN);
+  });
+
+  it('does not treat a 99Food pay-on-delivery amount as already paid or as merchant receivable', async () => {
+    const { service, upsert } = await setup(orderFixture({
+      paymentMethod: PaymentMethod.cash,
+      marketplaceOrders: [{
+        id: 'marketplace-99-cash',
+        provider: MarketplaceProvider.FOOD_99,
+        normalizedPayload: {
+          itemsSubtotal: 100,
+          total: 90,
+          customerPaidAmount: null,
+          amountToCollect: 90,
+          paymentStatus: 'PENDING',
+          collectionResponsibility: 'DRIVER',
+        },
+      }],
+    }));
+
+    await service.projectOrder('tenant-1', 'order-1');
+
+    const write = writeFrom(upsert);
+    expect(write.customerPaid).toBeNull();
+    expect(write.customerPaidState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.paymentMethod).toBe(PaymentMethod.cash);
+    expect(write.paymentChannel).toBe('DRIVER_COLLECTION_PENDING');
+    expect(write.marketplaceFeeState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.UNKNOWN);
   });
 
   it('records COGS only from persisted theoretical movements and never infers a cancellation refund', async () => {

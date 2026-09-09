@@ -253,17 +253,23 @@ export class FinancialProjectionService {
     normalizedPayload: NormalizedMarketplacePayload | null,
   ): MoneyFact & { paymentMethod: PaymentMethod | null; paymentChannel: string | null; observedAt: Date | null } {
     if (source === FinancialProjectionSource.FOOD_99) {
-      const value = this.readNumber(normalizedPayload, 'total');
-      const prepaid = normalizedPayload?.isPrepaid === true;
-      if (prepaid && value !== null) {
+      const value = this.readNumber(normalizedPayload, 'customerPaidAmount');
+      const paymentStatus = normalizedPayload?.paymentStatus;
+      const collectionResponsibility = normalizedPayload?.collectionResponsibility;
+      if (paymentStatus === 'PAID' && value !== null) {
         return {
-          ...this.known(value, '99food.customer_need_paying_money via marketplace.normalizedPayload.total'),
-          paymentMethod: null,
-          paymentChannel: 'MARKETPLACE_99FOOD_PREPAID',
+          ...this.known(value, '99food.customer_need_paying_money confirmed by native online payment mode'),
+          paymentMethod: order.paymentMethod,
+          paymentChannel: 'MARKETPLACE_99FOOD',
           observedAt: null,
         };
       }
-      return { ...this.unknown(), paymentMethod: null, paymentChannel: null, observedAt: null };
+      return {
+        ...this.unknown(),
+        paymentMethod: order.paymentMethod,
+        paymentChannel: collectionResponsibility === 'DRIVER' ? 'DRIVER_COLLECTION_PENDING' : null,
+        observedAt: null,
+      };
     }
 
     if (source === FinancialProjectionSource.IFOOD) {
