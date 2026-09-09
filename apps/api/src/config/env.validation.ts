@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
+  ALLOW_WHATSAPP_DEV_RESET: z.enum(['true', 'false']).default('false'),
   API_PORT: z.coerce.number().int().positive().default(3333),
   API_PREFIX: z.string().min(1).default('/api/v1'),
   DATABASE_URL: z.string().min(1),
