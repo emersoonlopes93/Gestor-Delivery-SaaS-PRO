@@ -39,7 +39,7 @@ describe('navigation registry', () => {
     expect(byId.get('analytics.goals')).toMatchObject({ permission: 'goals.read', featureKey: 'goals' });
     expect(byId.get('campaigns.home')).toMatchObject({ permission: 'crm.manage_coupons', featureKey: 'campaigns' });
     expect(byId.get('whatsapp.inbox')).toMatchObject({ permission: 'chat.read', featureKey: 'whatsapp_advanced' });
-    expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'ifood_marketplace' });
+    expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'marketplace_orders' });
     expect(byId.get('pos.tables')).toMatchObject({ permission: 'pos.read', featureKey: 'dine_in' });
     expect(byId.get('pos.printers')).toMatchObject({ permission: 'settings.manage', featureKey: 'printing' });
     expect(byId.get('settings.scheduling')).toMatchObject({ permission: 'settings.manage', featureKey: 'scheduling' });
@@ -77,7 +77,7 @@ describe('navigation registry', () => {
     expect(byId.get('analytics.bi')).toMatchObject({ permission: 'reports.read', featureKey: 'bi_advanced', parentId: 'management.hub' });
     expect(byId.get('analytics.performance')).toMatchObject({ permission: 'reports.read', module: 'reports', parentId: 'management.hub' });
     expect(byId.get('management.employees')).toMatchObject({ permission: 'users.read', parentId: 'management.hub' });
-    expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'ifood_marketplace', parentId: 'channels.hub' });
+    expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'marketplace_orders', parentId: 'channels.hub' });
     expect(byId.get('management.purchases')).toMatchObject({ permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' });
     expect(byId.get('whatsapp.config')).toMatchObject({ permission: 'settings.manage', featureKey: 'whatsapp_connect', parentId: 'channels.hub' });
     expect(byId.get('settings.storefront')?.hubDescription).toBe('Configure o cardápio público da sua loja.');

@@ -510,7 +510,7 @@ export function App() {
         <Route
           path="/settings/integrations"
           element={
-            <FeatureGate featureKey="ifood_marketplace">
+            <FeatureGate featureKey="marketplace_orders">
               <PermissionGate permission="settings.manage">
                 <IntegrationsPage />
               </PermissionGate>
