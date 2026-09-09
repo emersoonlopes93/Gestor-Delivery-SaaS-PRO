@@ -379,7 +379,7 @@ export function App() {
           path="/whatsapp/inbox"
           element={
             <FeatureGate featureKey="whatsapp_advanced">
-              <PermissionGate permission="orders.read">
+              <PermissionGate permission="chat.read">
                 <InboxPage />
               </PermissionGate>
             </FeatureGate>

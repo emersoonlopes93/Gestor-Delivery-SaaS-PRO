@@ -38,7 +38,7 @@ describe('navigation registry', () => {
     expect(byId.get('analytics.bi')).toMatchObject({ permission: 'reports.read', featureKey: 'bi_advanced' });
     expect(byId.get('analytics.goals')).toMatchObject({ permission: 'goals.read', featureKey: 'goals' });
     expect(byId.get('campaigns.home')).toMatchObject({ permission: 'crm.manage_coupons', featureKey: 'campaigns' });
-    expect(byId.get('whatsapp.inbox')).toMatchObject({ permission: 'orders.read', featureKey: 'whatsapp_advanced' });
+    expect(byId.get('whatsapp.inbox')).toMatchObject({ permission: 'chat.read', featureKey: 'whatsapp_advanced' });
     expect(byId.get('settings.integrations')).toMatchObject({ permission: 'settings.manage', featureKey: 'ifood_marketplace' });
     expect(byId.get('pos.tables')).toMatchObject({ permission: 'pos.read', featureKey: 'dine_in' });
     expect(byId.get('pos.printers')).toMatchObject({ permission: 'settings.manage', featureKey: 'printing' });

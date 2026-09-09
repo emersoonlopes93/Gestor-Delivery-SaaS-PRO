@@ -19,6 +19,7 @@ import { FinancialTransactionDTO } from '@gestor/types';
 import { TransactionModal } from './TransactionModal';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { Card } from '../../components/ui/Card';
+import { usePermissions } from '../../hooks/use-tenant-auth';
 
 interface DashboardMetrics {
   financial: {
@@ -45,6 +46,8 @@ const formatCurrency = (value: number | undefined) => (
 );
 
 export function FinancePage() {
+  const { has } = usePermissions();
+  const canManageFinance = has('finance.manage');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransactionDTO[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -137,23 +140,27 @@ export function FinancePage() {
             >
               <Download className="h-4 w-4" aria-hidden /> Exportar
             </button>
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              <Plus className="h-4 w-4" aria-hidden /> Novo lançamento
-            </button>
+            {canManageFinance && (
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <Plus className="h-4 w-4" aria-hidden /> Novo lançamento
+              </button>
+            )}
         </div>
       </header>
 
       <ContextualNavigation itemIds={['management.finance', 'cash.home', 'analytics.reports']} />
 
-      <TransactionModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={loadData}
-      />
+      {canManageFinance && (
+        <TransactionModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={loadData}
+        />
+      )}
 
       <section className="mb-6" aria-labelledby="finance-overview-title">
         <Card className="overflow-hidden border-primary/25">

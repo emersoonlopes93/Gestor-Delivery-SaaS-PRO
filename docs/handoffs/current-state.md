@@ -2360,3 +2360,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Exact supported mappings are cash, PIX, POS credit, POS debit and card on delivery. Unknown, missing and ambiguous channels remain `other`; combined online credit/debit channel `150` is deliberately not guessed because the existing domain distinguishes credit from debit.
 - Provider IDs remain lossless strings. Confirmation, BAPP/OpenAPI lifecycle, persistence/API contracts, schema, migrations and other providers are unchanged. Previously stored orders are not backfilled.
 - Focused backend coverage verifies supported channels, legacy fallback, unknown/missing fallback and long order IDs (1 suite / 29 tests PASS). Focused web coverage verifies normalized labels, including `card_on_delivery` and the neutral `other` label (1 file / 8 tests PASS). API and web typecheck, lint and build, global `check:no-any`, and `git diff --check` passed.
+
+## Permissions and mutation guards (2026-09-08)
+
+- Branch `fix/permissions-mutation-guards`, based on `origin/main-copy` / `b01ffe2c70aba50d6779e896eeb657e99a88a02b`, aligns frontend mutation affordances with existing backend permission decorators only. Finance remains readable with `finance.read`, while transaction creation requires `finance.manage`.
+- Goals now independently guard create, update and delete with `goals.create`, `goals.update` and `goals.delete`. Employee management keeps `users.read` for listing, requires `users.create` plus `users.roles` to create, `users.update` plus `users.roles` to edit, and `users.delete` to delete.
+- WhatsApp Inbox discovery and route access now require `chat.read`, matching the chat read endpoints. Sending, handoff, closing and quick-reply management are independently guarded by their existing `chat.*` permissions. `orders.read` no longer grants Inbox access or chat actions.
+- No backend guard, route path, stable ID, schema, migration, dependency, remote database, provider, Dokploy or deployment changed. Focused web contracts, typecheck, `check:no-any`, lint, build and diff check passed; the known Vite chunk-size warning remains unchanged.
