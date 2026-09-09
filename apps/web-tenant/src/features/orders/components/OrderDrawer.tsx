@@ -59,9 +59,11 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
       isScheduled: order.isScheduled ?? false,
       deliveryDriverName: order.deliveryDriverName ?? undefined,
       operational: order.operational,
-    })
+    }, Date.now(), { status: order.status, timeline: order.timeline })
     : null;
-  const orderTime = order ? presentOrderTime(order.createdAt) : null;
+  const orderTime = order
+    ? presentOrderTime(order.createdAt, Date.now(), { status: order.status, timeline: order.timeline })
+    : null;
   const closeTracking = useCallback(() => setIsTrackingOpen(false), []);
 
   useEffect(() => {

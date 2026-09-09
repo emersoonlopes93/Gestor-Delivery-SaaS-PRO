@@ -2421,3 +2421,20 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
   marketplace-paid orders or print the exact delivery collection amount. Cash writes remain untouched.
 - No schema, migration, dependency, historical backfill, iFood/own-app behavior, provider action,
   confirmation mode, BAPP/OpenAPI, remote database or deployment changed.
+
+## Terminal order SLA freeze (2026-09-09)
+
+- Branch `fix/99food-terminal-order-sla`, based on `origin/main-copy` /
+  `0766a51cd534a7775852d4003a0839e2a4c1a587`, stops the order-details SLA display
+  from measuring terminal orders through the present time.
+- The shared presenter now uses the persisted `OrderTimeline` entry for the final
+  `completed` or `cancelled` status. That timeline event is created in the canonical
+  order status transition, including marketplace events. Active orders still use the
+  current time. A terminal order without a valid persisted terminal event displays that
+  its final time is unavailable instead of silently using `Date.now()` or `updatedAt`.
+- The change is frontend-only. It does not alter provider status mapping, BAPP/OpenAPI,
+  payment or financial semantics, printing, KDS, schema, migrations, API contracts or
+  dependencies.
+- Focused order presenter/reconciliation/payment UI tests, web typecheck, `check:no-any`,
+  web lint, web build and `git diff --check` passed. No authenticated visual smoke,
+  remote database, provider action, Dokploy action or deployment was run.

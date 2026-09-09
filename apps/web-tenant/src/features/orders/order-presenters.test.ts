@@ -36,6 +36,47 @@ describe('order presenters', () => {
     expect(pending.operational.financialSummary.operationalValueLabel).toBe('Venda');
   });
 
+  it('continues counting SLA time for an active 99Food order', () => {
+    const createdAt = '2026-09-09T12:00:00.000Z';
+    expect(presentOrderTime(createdAt, new Date('2026-09-09T12:31:00.000Z').getTime(), { status: 'out_for_delivery' }))
+      .toMatchObject({ minutes: 31, label: 'atrasado 1 min', delayed: true });
+    expect(presentOrderTime(createdAt, new Date('2026-09-09T12:45:00.000Z').getTime(), { status: 'out_for_delivery' }))
+      .toMatchObject({ minutes: 45, label: 'atrasado 15 min', delayed: true });
+  });
+
+  it('freezes a terminal order at its persisted terminal timeline event', () => {
+    const createdAt = '2026-09-09T12:00:00.000Z';
+    const timing = {
+      status: 'completed' as const,
+      timeline: [{ status: 'completed' as const, createdAt: '2026-09-09T12:42:00.000Z' }],
+    };
+    const first = presentOrderTime(createdAt, new Date('2026-09-09T13:00:00.000Z').getTime(), timing);
+    const later = presentOrderTime(createdAt, new Date('2026-09-09T16:00:00.000Z').getTime(), timing);
+    expect(first).toMatchObject({ minutes: 42, label: 'atrasado 12 min', delayed: true });
+    expect(later).toEqual(first);
+  });
+
+  it('does not show a late badge for a terminal order completed within SLA', () => {
+    const order = boardOrder({ status: 'completed' });
+    const timing = {
+      status: 'completed' as const,
+      timeline: [{ status: 'completed' as const, createdAt: '2026-09-06T12:20:00.000Z' }],
+    };
+    expect(presentOrderTime(order.createdAt, new Date('2026-09-06T14:00:00.000Z').getTime(), timing))
+      .toMatchObject({ minutes: 20, delayed: false });
+    expect(resolveOrderPriority(order, new Date('2026-09-06T14:00:00.000Z').getTime(), timing).label)
+      .not.toBe('Pedido atrasado');
+  });
+
+  it('freezes cancelled orders and does not use now without a terminal event', () => {
+    const createdAt = '2026-09-09T12:00:00.000Z';
+    const cancelled = { status: 'cancelled' as const, timeline: [{ status: 'cancelled' as const, createdAt: '2026-09-09T12:18:00.000Z' }] };
+    expect(presentOrderTime(createdAt, new Date('2026-09-09T17:00:00.000Z').getTime(), cancelled))
+      .toMatchObject({ minutes: 18, delayed: false });
+    expect(presentOrderTime(createdAt, new Date('2026-09-09T17:00:00.000Z').getTime(), { status: 'completed', timeline: [] }))
+      .toEqual({ minutes: null, label: 'tempo final não informado', delayed: false });
+  });
+
   it('searches the whole board snapshot and keeps filters based on shared operational policy', () => {
     const order = boardOrder({ deliveryDriverName: 'Mário' });
     expect(matchesBoardSearch(order, '9999')).toBe(true);

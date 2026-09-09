@@ -5,6 +5,7 @@ import type {
   OrderOperationalViewModel,
   OrderOrigin,
   OrderStatus,
+  OrderTimelineEntryDTO,
 } from '@gestor/types';
 
 export const ORDER_TIME_THRESHOLDS_MINUTES = {
@@ -29,12 +30,49 @@ export type BoardFilter =
   | 'all' | 'PEDEHUB' | 'IFOOD' | 'FOOD_99' | 'action'
   | 'delayed' | 'sync_failed' | 'merchant' | 'provider';
 
-export function elapsedMinutes(createdAt: string, now = Date.now()): number {
-  return Math.max(0, Math.floor((now - new Date(createdAt).getTime()) / 60_000));
+const TERMINAL_ORDER_STATUSES = new Set<OrderStatus>(['completed', 'cancelled']);
+
+export type OrderTimingInput = {
+  status?: OrderStatus;
+  timeline?: readonly Pick<OrderTimelineEntryDTO, 'status' | 'createdAt'>[];
+};
+
+function validTimestamp(value: string | undefined): number | null {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-export function presentOrderTime(createdAt: string, now = Date.now()): { minutes: number; label: string; delayed: boolean } {
-  const minutes = elapsedMinutes(createdAt, now);
+function terminalTimestamp(timing?: OrderTimingInput): number | null | undefined {
+  if (!timing?.status || !TERMINAL_ORDER_STATUSES.has(timing.status)) return undefined;
+  const timestamps = (timing.timeline ?? [])
+    .filter((entry) => entry.status === timing.status)
+    .map((entry) => validTimestamp(entry.createdAt))
+    .filter((timestamp): timestamp is number => timestamp !== null);
+  return timestamps.length > 0 ? Math.max(...timestamps) : null;
+}
+
+export function elapsedMinutes(
+  createdAt: string,
+  now = Date.now(),
+  timing?: OrderTimingInput,
+): number | null {
+  const start = validTimestamp(createdAt);
+  if (start === null) return null;
+  const terminal = terminalTimestamp(timing);
+  if (terminal === null) return null;
+  return Math.max(0, Math.floor(((terminal ?? now) - start) / 60_000));
+}
+
+export function presentOrderTime(
+  createdAt: string,
+  now = Date.now(),
+  timing?: OrderTimingInput,
+): { minutes: number | null; label: string; delayed: boolean } {
+  const minutes = elapsedMinutes(createdAt, now, timing);
+  if (minutes === null) {
+    return { minutes: null, label: 'tempo final não informado', delayed: false };
+  }
   if (minutes > ORDER_TIME_THRESHOLDS_MINUTES.delayed) {
     return { minutes, label: `atrasado ${minutes - ORDER_TIME_THRESHOLDS_MINUTES.delayed} min`, delayed: true };
   }
@@ -47,10 +85,11 @@ export function presentOrderTime(createdAt: string, now = Date.now()): { minutes
 export function resolveOrderPriority(
   order: Pick<OrderBoardItemDTO, 'status' | 'createdAt' | 'isScheduled' | 'deliveryDriverName' | 'operational'>,
   now = Date.now(),
+  timing?: OrderTimingInput,
 ): { level: OrderPriority; label: string } {
   if (order.operational.syncState === 'FAILED') return { level: 'critical', label: 'Falha de sincronização' };
   if (order.status === 'pending') return { level: 'critical', label: 'Precisa confirmar' };
-  const time = presentOrderTime(order.createdAt, now);
+  const time = presentOrderTime(order.createdAt, now, timing);
   if (time.delayed) return { level: 'warning', label: 'Pedido atrasado' };
   if (order.status === 'ready_for_delivery' && order.operational.deliveryOwnership === 'MERCHANT' && !order.deliveryDriverName) {
     return { level: 'warning', label: 'Pronto sem motoboy' };
