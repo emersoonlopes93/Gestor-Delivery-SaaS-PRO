@@ -2386,3 +2386,19 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Focused Cash, POS, PaymentRefund, FinancialTransaction, FinancialProjection and order
   atomicity suites: 6 suites / 46 tests PASS. API typecheck, lint, `check:no-any`, API build
   and `git diff --check`: PASS. No database, provider, Dokploy or deploy action was performed.
+
+## Inventory loss hardening (2026-09-09)
+
+- Branch `fix/inventory-loss-hardening`, based on `origin/main-copy` /
+  `c71154a802cc02352ae75bebcb85e346d1984c06`, rejects zero, negative and non-finite loss
+  quantities before any lookup or write.
+- A loss now applies its stock decrement through one tenant-scoped conditional write
+  (`currentStock >= quantity`). A zero-row result rejects as insufficient stock and creates no
+  movement. The decrement and existing `WASTE` movement remain inside one transaction, so a
+  movement-write failure rolls the decrement back. The existing `currentCost` is retained as the
+  historical `unitCost` snapshot.
+- No schema, migration, frontend, Purchasing, recipe/theoretical depletion, immutable reversal,
+  FinancialAccount, FinancialTransaction, FinancialProjection, Cash or provider code changed.
+  Focused loss, inventory count, theoretical stock and order atomicity suites: 4 suites / 26
+  tests PASS. The loss test launches concurrent requests over a shared conditional-update model;
+  no local PostgreSQL 16 image was present for a database integration variant.
