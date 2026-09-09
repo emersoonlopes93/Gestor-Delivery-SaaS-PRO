@@ -93,7 +93,7 @@ describe('navigation registry', () => {
       (module) => module !== 'crm',
     );
 
-    expect(visible.map((entry) => entry.id)).toEqual(['whatsapp.inbox']);
+    expect(visible.map((entry) => entry.id)).toEqual(['settings.integrations', 'whatsapp.inbox']);
   });
 
   it('keeps the management landing functional for partial access and preserves old route metadata', () => {
