@@ -290,15 +290,18 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const deliveryType = this.numberValue(order.delivery_type);
     const items = Array.isArray(order.order_items) ? order.order_items : [];
     const normalizedItems = items.map((item, index) => this.normalizeNativeItem(item, index));
-    const customerPaid = this.minorMoney(price?.customer_need_paying_money);
-    const itemDiscount = this.minorMoney(price?.items_discount) ?? 0;
-    const deliveryDiscount = this.minorMoney(price?.delivery_discount) ?? 0;
+    const customerPayable = this.minorMoney(price?.customer_need_paying_money);
+    const itemDiscount = this.minorMoney(price?.items_discount);
+    const deliveryDiscount = this.minorMoney(price?.delivery_discount);
     const otherFees = this.asRecord(price?.others_fees);
-    const couponDiscount = this.minorMoney(otherFees?.coupon_discount) ?? 0;
+    const couponDiscount = this.minorMoney(otherFees?.coupon_discount);
     const orderPrice = this.minorMoney(price?.order_price);
     const realPrice = this.minorMoney(price?.real_price);
     const itemsSubtotal = orderPrice
       ?? normalizedItems.reduce((sum, item) => this.roundMoney(sum + item.totalPrice), 0);
+    const payment = this.nativePaymentSemantics(order, customerPayable);
+    const discountValues = [itemDiscount, deliveryDiscount, couponDiscount]
+      .filter((value): value is number => value !== null);
 
     return {
       provider: MarketplaceProvider.FOOD_99,
@@ -320,17 +323,28 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       customerEmail: null,
       notes: this.readString(order, ['remark']),
       paymentMethod: this.nativePaymentMethod(order),
-      isPrepaid: customerPaid !== null,
-      amountDue: 0,
+      isPrepaid: payment.paymentStatus === 'PAID',
+      amountDue: payment.amountToCollect ?? undefined,
+      customerPaidAmount: payment.customerPaidAmount,
+      amountToCollect: payment.amountToCollect,
+      paymentStatus: payment.paymentStatus,
+      collectionResponsibility: payment.collectionResponsibility,
+      merchantReceivable: null,
+      merchantFundedDiscount: null,
+      platformFundedDiscount: null,
+      platformFees: null,
       changeFor: this.minorMoney(order.change_for),
-      // The documented price values are integer centavos. `order_price` is kept
-      // as the operational sale value; customer_need_paying_money is the amount
-      // paid on 99Food. No restaurant receivable is inferred.
+      // Native price fields are integer centavos. `order_price` is the product
+      // sale value and `customer_need_paying_money` is the customer's payable
+      // total. Payment mode determines whether that amount was paid online or
+      // must still be collected; no merchant receivable is inferred.
       itemsSubtotal,
-      discountTotal: this.roundMoney(itemDiscount + deliveryDiscount + couponDiscount),
-      deliveryFee: this.minorMoney(price?.delivery_price) ?? 0,
-      serviceFee: this.minorMoney(otherFees?.service_price) ?? 0,
-      total: customerPaid ?? realPrice ?? itemsSubtotal,
+      discountTotal: discountValues.length > 0
+        ? this.roundMoney(discountValues.reduce((sum, value) => sum + value, 0))
+        : undefined,
+      deliveryFee: this.minorMoney(price?.delivery_price) ?? undefined,
+      serviceFee: this.minorMoney(otherFees?.service_price) ?? undefined,
+      total: customerPayable ?? realPrice ?? itemsSubtotal,
       scheduledFor: null,
       items: normalizedItems,
       deliveryAddress: address
@@ -449,6 +463,62 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     if (payType === 2) return 'cash';
     if (payType === 3) return 'card_on_delivery';
     return 'other';
+  }
+
+  private nativePaymentSemantics(
+    order: Record<string, unknown>,
+    customerPayable: number | null,
+  ): Pick<NormalizedMarketplaceOrder,
+    'customerPaidAmount' | 'amountToCollect' | 'paymentStatus' | 'collectionResponsibility'> {
+    const payChannel = this.numberValue(order.pay_channel);
+    if (payChannel !== null) {
+      if ([150, 212, 280].includes(payChannel)) {
+        return {
+          customerPaidAmount: customerPayable,
+          amountToCollect: 0,
+          paymentStatus: 'PAID',
+          collectionResponsibility: 'MARKETPLACE',
+        };
+      }
+      if ([153, 154, 262, 263].includes(payChannel)) {
+        return {
+          customerPaidAmount: null,
+          amountToCollect: customerPayable,
+          paymentStatus: 'PENDING',
+          collectionResponsibility: 'DRIVER',
+        };
+      }
+      return {
+        customerPaidAmount: null,
+        amountToCollect: null,
+        paymentStatus: 'UNKNOWN',
+        collectionResponsibility: 'UNKNOWN',
+      };
+    }
+
+    const payType = this.numberValue(order.pay_type);
+    if (payType === 1) {
+      return {
+        customerPaidAmount: customerPayable,
+        amountToCollect: 0,
+        paymentStatus: 'PAID',
+        collectionResponsibility: 'MARKETPLACE',
+      };
+    }
+    if (payType === 2 || payType === 3) {
+      return {
+        customerPaidAmount: null,
+        amountToCollect: customerPayable,
+        paymentStatus: 'PENDING',
+        collectionResponsibility: 'DRIVER',
+      };
+    }
+    return {
+      customerPaidAmount: null,
+      amountToCollect: null,
+      paymentStatus: 'UNKNOWN',
+      collectionResponsibility: 'UNKNOWN',
+    };
   }
 
   private sumFeeType(values: unknown[], type: string): number {

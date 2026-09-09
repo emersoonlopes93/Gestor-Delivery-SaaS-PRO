@@ -256,6 +256,12 @@ Native detail parsing preserves unquoted 64-bit identifiers as decimal strings b
 
 The native `OrderModel` payment source is `pay_channel`, with the documented legacy `pay_type` used only when `pay_channel` is absent. Exact existing-domain mappings are: cash channel `153` to `cash`, PIX channels `212` and `280` to `pix`, POS credit `262` to `credit_card`, POS debit `263` to `debit_card`, and generic POS `154` to `card_on_delivery`. Legacy cash (`pay_type=2`) and courier POS (`pay_type=3`) map to the same existing methods. Unknown, missing, or non-equivalent channels remain `other`; in particular, combined credit/debit channel `150` is not guessed as either card type. Historical orders are not backfilled.
 
+### Native financial and collection semantics (2026-09-09)
+
+`price.order_price` is the gross product sale. `price.customer_need_paying_money` is the customer's payable total; it is not payment evidence by itself. Detailed `pay_channel` takes precedence over legacy `pay_type` when classifying collection. Online channels (`150`, `212`, `280`) establish marketplace collection and a paid customer amount, so `amountToCollect=0`. Cash/POS delivery channels (`153`, `154`, `262`, `263`) establish pending driver collection for the exact customer payable amount. Unknown or missing modes preserve payment, collection and amount-to-collect as unknown rather than zero.
+
+`items_discount`, `delivery_discount` and `others_fees.coupon_discount` establish the total discount but do not identify its funder. `delivery_price` and `others_fees.service_price` are customer charges. Merchant-funded discount, platform-funded discount, platform fees and merchant receivable remain unknown because the native order snapshot does not provide those facts. The normalized snapshot persists these distinctions in the existing JSON field; no new database column or inferred settlement exists.
+
 ### Native action activation and privacy-protected names (2026-09-05)
 
 99Food actions initiated from the operational order board require `orders.update_status`, a tenant-scoped `CONNECTED` 99Food connection, `MARKETPLACE_99FOOD_ENABLED=true`, and operational BullMQ. The connected store is the tenant's explicit opt-in for these native actions. The generic beta `marketplace_orders` preset controls marketplace-management surfaces and does not independently block the normal order-status endpoint; iFood retains its provider-specific feature and entitlement gate.
@@ -268,7 +274,7 @@ A fonte normativa do callback nativo Ã© o portal 99Food: [Webhooks](https://op
 
 O snapshot nativo usa `order_info.order_items` e a Ã¡rvore `sub_item_list`; seus preÃ§os inteiros sÃ£o centavos. A importaÃ§Ã£o preserva esses subitens como linhas legÃ­veis de complemento, incluindo quantidade, e mantÃ©m `remark` como observaÃ§Ã£o. JSON de opÃ§Ãµes nÃ£o Ã© exibido ao operador, KDS ou impressÃ£o.
 
-Os valores oficiais consumidos sÃ£o `price.order_price` (venda operacional dos produtos), `price.customer_need_paying_money` (valor pago pelo cliente), `price.items_discount`, `price.delivery_discount`, `price.others_fees.coupon_discount`, `price.delivery_price` e `price.others_fees.service_price`. O snapshot nÃ£o entrega, nesse contrato, um recebÃ­vel/repasse do restaurante; ele nunca Ã© deduzido. Pedidos prÃ©-pagos exibem “Pago na 99Food”, e o Kanban destaca a venda dos produtos, nÃ£o o valor pago apÃ³s subsÃ­dios.
+Os valores oficiais consumidos sÃ£o `price.order_price` (venda operacional dos produtos), `price.customer_need_paying_money` (total devido pelo cliente, cujo pagamento depende do modo de cobranÃ§a), `price.items_discount`, `price.delivery_discount`, `price.others_fees.coupon_discount`, `price.delivery_price` e `price.others_fees.service_price`. O snapshot nÃ£o entrega, nesse contrato, um recebÃ­vel/repasse do restaurante; ele nunca Ã© deduzido. Pedidos pagos online exibem “Pago na 99Food”; pedidos de cobranÃ§a pelo entregador exibem o valor exato a cobrar; e o Kanban destaca a venda dos produtos, nÃ£o o total do cliente apÃ³s descontos e taxas.
 
 O Swagger oficial define `delivery_type=1` como entrega da plataforma (`PROVIDER`) e `delivery_type=2` como entrega da loja (`MERCHANT`); ausência ou valor desconhecido vira `UNKNOWN`. O Routing V2 continua fail-closed para `PROVIDER` e `UNKNOWN`.
 

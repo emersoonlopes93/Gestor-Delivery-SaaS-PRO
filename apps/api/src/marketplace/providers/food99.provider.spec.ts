@@ -171,7 +171,10 @@ describe('Food99Provider', () => {
     expect(normalized).toMatchObject({
       externalOrderId: '5764656197621845665', itemsSubtotal: 35.99, total: 6.18,
       discountTotal: 37.79, deliveryFee: 6.99, serviceFee: 0.99,
-      notes: 'Sem cebola', deliveryOwnership: 'MERCHANT', isPrepaid: true, paymentMethod: 'cash',
+      notes: 'Sem cebola', deliveryOwnership: 'MERCHANT', isPrepaid: false, paymentMethod: 'cash',
+      customerPaidAmount: null, amountToCollect: 6.18, paymentStatus: 'PENDING',
+      collectionResponsibility: 'DRIVER', merchantReceivable: null,
+      merchantFundedDiscount: null, platformFundedDiscount: null, platformFees: null,
     });
     expect(normalized.items[0]).toMatchObject({ name: 'HambÃºrguer', notes: 'Bem passado', totalPrice: 35.99 });
     expect(normalized.items[0].options).toEqual(expect.arrayContaining([
@@ -322,5 +325,139 @@ describe('Food99Provider', () => {
       externalOrderId: '5764656197621845665',
       paymentMethod: 'other',
     });
+  });
+
+  it.each([
+    [1, 212, 'PROVIDER'],
+    [2, 280, 'MERCHANT'],
+  ])('marks online payment as paid by the marketplace for delivery_type %s', async (deliveryType, payChannel, ownership) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', delivery_type: deliveryType,
+        pay_channel: payChannel, pay_type: 1,
+        price: { order_price: 5000, customer_need_paying_money: 4200 },
+        order_items: [],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      deliveryOwnership: ownership,
+      paymentMethod: 'pix',
+      paymentStatus: 'PAID',
+      collectionResponsibility: 'MARKETPLACE',
+      customerPaidAmount: 42,
+      amountToCollect: 0,
+      isPrepaid: true,
+      merchantReceivable: null,
+    });
+  });
+
+  it('uses documented legacy online pay_type only when pay_channel is absent', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', delivery_type: 2, pay_type: 1,
+        price: { order_price: 5000, customer_need_paying_money: 4200 },
+        order_items: [],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      paymentStatus: 'PAID', collectionResponsibility: 'MARKETPLACE',
+      customerPaidAmount: 42, amountToCollect: 0,
+    });
+  });
+
+  it('keeps an online channel financially known when its card method is intentionally ambiguous', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', pay_channel: 150, pay_type: 2,
+        price: { customer_need_paying_money: 4200 }, order_items: [],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      paymentMethod: 'other', paymentStatus: 'PAID', collectionResponsibility: 'MARKETPLACE',
+      customerPaidAmount: 42, amountToCollect: 0,
+    });
+  });
+
+  it.each([
+    [153, 'cash'],
+    [154, 'card_on_delivery'],
+    [262, 'credit_card'],
+    [263, 'debit_card'],
+  ])('keeps native pay-on-delivery channel %s pending for driver collection', async (payChannel, paymentMethod) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', delivery_type: 2,
+        pay_channel: payChannel, pay_type: 1,
+        price: { order_price: 5000, customer_need_paying_money: 4200 },
+        order_items: [],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      paymentMethod,
+      paymentStatus: 'PENDING',
+      collectionResponsibility: 'DRIVER',
+      customerPaidAmount: null,
+      amountToCollect: 42,
+      isPrepaid: false,
+    });
+  });
+
+  it('keeps discount funding, platform fees and merchant receivable unknown', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', pay_channel: 212,
+        price: {
+          order_price: 5000,
+          customer_need_paying_money: 4200,
+          items_discount: 500,
+          delivery_discount: 200,
+          delivery_price: 600,
+          others_fees: { coupon_discount: 100, service_price: 100 },
+        },
+        order_items: [],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      itemsSubtotal: 50,
+      discountTotal: 8,
+      deliveryFee: 6,
+      serviceFee: 1,
+      merchantFundedDiscount: null,
+      platformFundedDiscount: null,
+      platformFees: null,
+      merchantReceivable: null,
+    });
+  });
+
+  it('does not turn absent financial values into zero', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', pay_channel: 999,
+        price: {}, order_items: [],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      paymentStatus: 'UNKNOWN',
+      collectionResponsibility: 'UNKNOWN',
+      customerPaidAmount: null,
+      amountToCollect: null,
+      merchantReceivable: null,
+      platformFees: null,
+    });
+    expect(normalized.discountTotal).toBeUndefined();
+    expect(normalized.deliveryFee).toBeUndefined();
+    expect(normalized.serviceFee).toBeUndefined();
   });
 });

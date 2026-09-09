@@ -71,6 +71,14 @@ export type NormalizedMarketplaceOrder = {
   paymentMethod?: 'cash' | 'pix' | 'credit_card' | 'debit_card' | 'card_on_delivery' | 'other';
   isPrepaid?: boolean;
   amountDue?: number;
+  customerPaidAmount?: number | null;
+  amountToCollect?: number | null;
+  paymentStatus?: 'PAID' | 'PENDING' | 'UNKNOWN';
+  collectionResponsibility?: 'MARKETPLACE' | 'MERCHANT' | 'DRIVER' | 'UNKNOWN';
+  merchantReceivable?: number | null;
+  merchantFundedDiscount?: number | null;
+  platformFundedDiscount?: number | null;
+  platformFees?: number | null;
   changeFor?: number | null;
   itemsSubtotal?: number;
   discountTotal?: number;
