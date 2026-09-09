@@ -491,6 +491,14 @@ export interface OrderFinancialSummary {
   customerPaid: number | null;
   paymentState: 'UNKNOWN' | 'PENDING' | 'PAID';
   paymentLabel: string;
+  amountToCollect?: number | null;
+  amountToCollectState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  collectionResponsibility?: 'MARKETPLACE' | 'MERCHANT' | 'DRIVER' | 'UNKNOWN';
+  merchantReceivable?: number | null;
+  merchantReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  discountFundingState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  platformFees?: number | null;
+  platformFeesState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
 }
 
 export interface OrderDeliverySummary {

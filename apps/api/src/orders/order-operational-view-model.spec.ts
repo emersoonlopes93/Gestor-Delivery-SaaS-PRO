@@ -72,8 +72,12 @@ describe('getOrderOperationalViewModel', () => {
     expect(pending.primaryAction).toMatchObject({ type: 'CONFIRM', mode: 'PROVIDER_ASYNC' });
     expect(pending.availableActions.some((candidate) => candidate.type === 'CANCEL')).toBe(false);
     expect(pending.financialSummary).toMatchObject({
-      operationalValue: 52.9,
-      operationalValueLabel: 'Venda',
+      operationalValue: 48,
+      operationalValueLabel: 'Venda dos produtos',
+      customerPaid: null,
+      amountToCollect: null,
+      paymentState: 'UNKNOWN',
+      collectionResponsibility: 'UNKNOWN',
     });
 
     const preparing = getOrderOperationalViewModel({
@@ -83,6 +87,84 @@ describe('getOrderOperationalViewModel', () => {
       deliveryOwnership: 'MERCHANT',
     });
     expect(preparing.primaryAction).toMatchObject({ type: 'MARK_READY', mode: 'PROVIDER_ASYNC' });
+  });
+
+  it('separates paid-online 99Food sale, customer payment and zero collection amount', () => {
+    const result = getOrderOperationalViewModel({
+      ...base,
+      provider: 'FOOD_99',
+      deliveryOwnership: 'MERCHANT',
+      marketplaceNormalizedPayload: {
+        itemsSubtotal: 48,
+        total: 42,
+        customerPaidAmount: 42,
+        amountToCollect: 0,
+        paymentStatus: 'PAID',
+        collectionResponsibility: 'MARKETPLACE',
+        discountTotal: 6,
+      },
+    });
+
+    expect(result.financialSummary).toMatchObject({
+      operationalValue: 48,
+      operationalValueLabel: 'Venda dos produtos',
+      saleAmount: 48,
+      customerPaid: 42,
+      paymentState: 'PAID',
+      paymentLabel: 'Pago na 99Food',
+      amountToCollect: 0,
+      amountToCollectState: 'KNOWN',
+      collectionResponsibility: 'MARKETPLACE',
+      merchantReceivable: null,
+      merchantReceivableState: 'UNKNOWN',
+      discountFundingState: 'UNKNOWN',
+      platformFees: null,
+      platformFeesState: 'UNKNOWN',
+    });
+  });
+
+  it('exposes the real amount for self-delivery collection without marking it paid', () => {
+    const result = getOrderOperationalViewModel({
+      ...base,
+      provider: 'FOOD_99',
+      deliveryOwnership: 'MERCHANT',
+      marketplaceNormalizedPayload: {
+        customerPaidAmount: null,
+        amountToCollect: 52.9,
+        paymentStatus: 'PENDING',
+        collectionResponsibility: 'DRIVER',
+      },
+    });
+
+    expect(result.financialSummary).toMatchObject({
+      customerPaid: null,
+      paymentState: 'PENDING',
+      paymentLabel: 'A cobrar na entrega',
+      amountToCollect: 52.9,
+      amountToCollectState: 'KNOWN',
+      collectionResponsibility: 'DRIVER',
+    });
+  });
+
+  it('preserves unknown payment and collection values as null', () => {
+    const result = getOrderOperationalViewModel({
+      ...base,
+      provider: 'FOOD_99',
+      deliveryOwnership: 'MERCHANT',
+      marketplaceNormalizedPayload: {
+        paymentStatus: 'UNKNOWN',
+        collectionResponsibility: 'UNKNOWN',
+      },
+    });
+
+    expect(result.financialSummary).toMatchObject({
+      customerPaid: null,
+      amountToCollect: null,
+      amountToCollectState: 'UNKNOWN',
+      paymentState: 'UNKNOWN',
+      paymentLabel: 'Pagamento a confirmar',
+      collectionResponsibility: 'UNKNOWN',
+    });
   });
 
   it.each([

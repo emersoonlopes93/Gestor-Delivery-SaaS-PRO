@@ -1,4 +1,4 @@
-import { PaymentMethod, type OrderResponseDTO, type OrderStatus } from '@gestor/types';
+import { PaymentMethod, type OrderFinancialSummary, type OrderResponseDTO, type OrderStatus } from '@gestor/types';
 import { PrinterService } from './printer.service';
 
 function makeOrder(): OrderResponseDTO {
@@ -39,6 +39,26 @@ function makeOrder(): OrderResponseDTO {
   };
 }
 
+function withFood99Financial(order: OrderResponseDTO, financialSummary: OrderFinancialSummary): OrderResponseDTO {
+  return {
+    ...order,
+    operational: {
+      origin: 'FOOD_99', provider: 'FOOD_99', displayChannel: '99Food',
+      deliveryOwnership: 'MERCHANT', fulfillmentMode: 'delivery',
+      capabilities: {
+        canConfirm: true, canStartPreparation: true, canMarkReady: true, canCancel: false,
+        canAssignDriver: true, canDispatch: true, canRecalculateRoute: true, canComplete: true,
+        canPrint: true, canEdit: false,
+      },
+      availableActions: [], marketplaceOperation: { state: 'NONE' }, syncState: 'NONE',
+      financialSummary,
+      deliverySummary: { ownership: 'MERCHANT', label: 'Entrega própria' },
+      productionSummary: { state: 'IN_PRODUCTION', label: 'Na cozinha' },
+      primaryAction: null, secondaryActions: [],
+    },
+  };
+}
+
 describe('PrinterService kitchen ticket', () => {
   it('prints the same marketplace composition visible in KDS cards', async () => {
     const content = await new PrinterService().formatTicket(makeOrder(), 'kitchen', 'GERAL');
@@ -54,5 +74,55 @@ describe('PrinterService kitchen ticket', () => {
 
     expect(content).toContain('- 1x GRANOLA');
     expect(content).toContain('- 2x MORANGO');
+  });
+});
+
+describe('PrinterService 99Food payment semantics', () => {
+  const baseFinancial: OrderFinancialSummary = {
+    operationalValue: 24, operationalValueLabel: 'Venda dos produtos', saleAmount: 24,
+    customerPaid: null, paymentState: 'UNKNOWN', paymentLabel: 'Pagamento a confirmar',
+    amountToCollect: null, amountToCollectState: 'UNKNOWN', collectionResponsibility: 'UNKNOWN',
+    merchantReceivable: null, merchantReceivableState: 'UNKNOWN',
+    discountFundingState: 'UNKNOWN', platformFees: null, platformFeesState: 'UNKNOWN',
+  };
+
+  it('prints a clear no-charge instruction for marketplace-paid self-delivery', async () => {
+    const order = withFood99Financial(makeOrder(), {
+      ...baseFinancial,
+      customerPaid: 24, paymentState: 'PAID', paymentLabel: 'Pago na 99Food',
+      amountToCollect: 0, amountToCollectState: 'KNOWN', collectionResponsibility: 'MARKETPLACE',
+    });
+
+    const content = await new PrinterService().formatTicket(order, 'customer');
+
+    expect(content).toContain('PAGAMENTO: PAGO NA 99FOOD');
+    expect(content).toContain('NAO COBRAR NA ENTREGA');
+    expect(content).toContain('VALOR A COBRAR: R$ 0,00');
+  });
+
+  it('prints the exact driver collection amount for pay on delivery', async () => {
+    const order = withFood99Financial(makeOrder(), {
+      ...baseFinancial,
+      paymentState: 'PENDING', paymentLabel: 'A cobrar na entrega',
+      amountToCollect: 24, amountToCollectState: 'KNOWN', collectionResponsibility: 'DRIVER',
+    });
+
+    const content = await new PrinterService().formatTicket(order, 'customer');
+
+    expect(content).toContain('PAGAMENTO: A COBRAR NA ENTREGA');
+    expect(content).toContain('VALOR A COBRAR:');
+    expect(content).toContain('24,00');
+    expect(content).toContain('TOTAL DO CLIENTE:');
+    expect(content).not.toContain('TOTAL PAGO:');
+  });
+
+  it('prints an unknown collection amount without converting it to zero', async () => {
+    const order = withFood99Financial(makeOrder(), baseFinancial);
+
+    const content = await new PrinterService().formatTicket(order, 'customer');
+
+    expect(content).toContain('PAGAMENTO: PAGAMENTO A CONFIRMAR');
+    expect(content).toContain('VALOR A COBRAR: NAO INFORMADO');
+    expect(content).not.toContain('VALOR A COBRAR: R$ 0,00');
   });
 });

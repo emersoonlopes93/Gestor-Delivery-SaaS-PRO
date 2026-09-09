@@ -24,6 +24,7 @@ export type OperationalOrderInput = {
   deliveryDriverName?: string | null;
   provider?: string | null;
   deliveryOwnership?: string | null;
+  marketplaceNormalizedPayload?: unknown;
   latestMarketplaceOperation?: MarketplaceOperationInput;
 };
 
@@ -68,6 +69,55 @@ function operationAction(operation?: string): OrderOperationalActionType | null 
   if (operation === 'DELIVER') return 'COMPLETE';
   if (operation === 'CANCEL') return 'CANCEL';
   return null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function finiteNumber(record: Record<string, unknown> | null, field: string): number | null {
+  const value = record?.[field];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalViewModel['financialSummary'] {
+  const payload = asRecord(input.marketplaceNormalizedPayload);
+  const paymentStatus = payload?.paymentStatus;
+  const paymentState = paymentStatus === 'PAID' || paymentStatus === 'PENDING'
+    ? paymentStatus
+    : 'UNKNOWN';
+  const collection = payload?.collectionResponsibility;
+  const collectionResponsibility = collection === 'MARKETPLACE'
+    || collection === 'MERCHANT'
+    || collection === 'DRIVER'
+    ? collection
+    : 'UNKNOWN';
+  const customerPaid = finiteNumber(payload, 'customerPaidAmount');
+  const amountToCollect = finiteNumber(payload, 'amountToCollect');
+  const discountTotal = finiteNumber(payload, 'discountTotal');
+
+  return {
+    operationalValue: input.itemsSubtotal,
+    operationalValueLabel: 'Venda dos produtos',
+    saleAmount: input.itemsSubtotal,
+    customerPaid,
+    paymentState,
+    paymentLabel: paymentState === 'PAID'
+      ? 'Pago na 99Food'
+      : paymentState === 'PENDING'
+        ? 'A cobrar na entrega'
+        : 'Pagamento a confirmar',
+    amountToCollect,
+    amountToCollectState: amountToCollect === null ? 'UNKNOWN' : 'KNOWN',
+    collectionResponsibility,
+    merchantReceivable: null,
+    merchantReceivableState: 'UNKNOWN',
+    discountFundingState: discountTotal === 0 ? 'NOT_APPLICABLE' : 'UNKNOWN',
+    platformFees: null,
+    platformFeesState: 'UNKNOWN',
+  };
 }
 
 function action(
@@ -219,7 +269,7 @@ export function getOrderOperationalViewModel(input: OperationalOrderInput): Orde
       friendlyMessage: operationFriendlyMessage,
     },
     syncState,
-    financialSummary: {
+    financialSummary: origin === 'FOOD_99' ? food99FinancialSummary(input) : {
       operationalValue: input.total,
       operationalValueLabel: 'Venda',
       saleAmount: input.total,

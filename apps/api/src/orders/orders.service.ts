@@ -677,6 +677,7 @@ export class OrdersService {
               select: {
                 provider: true,
                 deliveryOwnership: true,
+                normalizedPayload: true,
                 operations: {
                   orderBy: { createdAt: 'desc' },
                   take: 1,
@@ -713,6 +714,7 @@ export class OrdersService {
             deliveryDriverName: o.deliveryDriver?.name,
             provider: o.marketplaceOrders[0]?.provider,
             deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+            marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
             latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
           }),
         })),
@@ -861,6 +863,7 @@ export class OrdersService {
           select: {
             provider: true,
             deliveryOwnership: true,
+            normalizedPayload: true,
             operations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
@@ -895,6 +898,7 @@ export class OrdersService {
         deliveryDriverName: o.deliveryDriver?.name,
         provider: o.marketplaceOrders[0]?.provider,
         deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+        marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
         latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
       }),
       createdAt: o.createdAt.toISOString(),
@@ -960,6 +964,7 @@ export class OrdersService {
           select: {
             provider: true,
             deliveryOwnership: true,
+            normalizedPayload: true,
             operations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
@@ -1146,6 +1151,7 @@ export class OrdersService {
     marketplaceOrders?: Array<{
       provider: string;
       deliveryOwnership: string;
+      normalizedPayload?: Prisma.JsonValue | null;
       operations: Array<{ operation: string; status: string }>;
     }>;
   }): OrderResponseDTO {
@@ -1181,6 +1187,7 @@ export class OrdersService {
           deliveryDriverName: order.deliveryDriver?.name,
           provider: marketplaceOrder?.provider,
           deliveryOwnership: marketplaceOrder?.deliveryOwnership,
+          marketplaceNormalizedPayload: marketplaceOrder?.normalizedPayload,
           latestMarketplaceOperation: marketplaceOrder?.operations[0] ?? null,
         }),
       } : {}),

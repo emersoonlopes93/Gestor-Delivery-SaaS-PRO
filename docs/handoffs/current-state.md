@@ -2402,3 +2402,22 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
   Focused loss, inventory count, theoretical stock and order atomicity suites: 4 suites / 26
   tests PASS. The loss test launches concurrent requests over a shared conditional-update model;
   no local PostgreSQL 16 image was present for a database integration variant.
+
+## 99Food order financial and payment semantics (2026-09-09)
+
+- Branch `fix/99food-financial-payment-semantics`, based on `origin/main-copy` /
+  `f6f2a374564238ad74a1a606db340def5a397427`, separates the native gross product sale,
+  customer payable total, confirmed online payment, amount to collect and collection owner.
+- `pay_channel` remains authoritative over legacy `pay_type`. Online channels are marketplace-paid
+  and carry zero collection; cash/POS delivery channels remain pending for the exact driver collection
+  amount. Unknown payment modes keep payment and collection values unknown instead of converting them
+  to zero. The existing payment-method mapping is unchanged.
+- Total discounts and customer delivery/service charges retain their documented raw sources. Discount
+  funding, platform fees and merchant receivable remain unknown because the native order snapshot does
+  not provide them. FinancialProjection reads only the explicit normalized customer-paid fact and never
+  treats gross value as receivable. No automatic FinancialTransaction is created for marketplace orders.
+- The order board now labels the gross product sale explicitly. The drawer separates payment status,
+  paid amount, collection amount and unknown expected payout. Customer tickets say not to charge for
+  marketplace-paid orders or print the exact delivery collection amount. Cash writes remain untouched.
+- No schema, migration, dependency, historical backfill, iFood/own-app behavior, provider action,
+  confirmation mode, BAPP/OpenAPI, remote database or deployment changed.

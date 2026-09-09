@@ -113,8 +113,22 @@ export class PrinterService {
       if (address.reference) lines.push(`REF: ${address.reference}`);
     }
     if (type === 'customer') {
+      const financial = order.operational?.financialSummary;
       lines.push(thinSeparator);
-      lines.push(`PAGAMENTO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+      if (financial?.amountToCollectState) {
+        lines.push(`PAGAMENTO: ${financial.paymentLabel.toUpperCase()}`);
+        lines.push(`METODO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+        if (financial.paymentState === 'PAID' && financial.amountToCollect === 0) {
+          lines.push('NAO COBRAR NA ENTREGA');
+          lines.push('VALOR A COBRAR: R$ 0,00');
+        } else if (financial.amountToCollectState === 'KNOWN' && typeof financial.amountToCollect === 'number') {
+          lines.push(`VALOR A COBRAR: ${financial.amountToCollect.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+        } else {
+          lines.push('VALOR A COBRAR: NAO INFORMADO');
+        }
+      } else {
+        lines.push(`PAGAMENTO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+      }
       if (order.changeFor) {
         lines.push(`TROCO PARA: ${order.changeFor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
       }
@@ -180,13 +194,14 @@ export class PrinterService {
     if (type === 'customer') {
       const subStr = order.itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
       const totalStr = order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
+      const financial = order.operational?.financialSummary;
       
       lines.push(`SUBTOTAL: ${subStr}`);
       if (order.discountTotal > 0) lines.push(`DESCONTO: ${order.discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10)}`);
       lines.push(thinSeparator);
       
       if (format === 'escpos') lines.push(BOLD_ON, FONT_DOUBLE);
-      lines.push(`TOTAL PAGO: ${totalStr}`);
+      lines.push(`${financial?.paymentState === 'PENDING' ? 'TOTAL DO CLIENTE' : financial?.paymentState === 'UNKNOWN' ? 'TOTAL INFORMADO' : 'TOTAL PAGO'}: ${totalStr}`);
       if (format === 'escpos') lines.push(FONT_NORMAL, BOLD_OFF);
 
       lines.push(separator);

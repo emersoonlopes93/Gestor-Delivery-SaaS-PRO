@@ -56,14 +56,14 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
           
           {deliveryFee > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Taxa de Entrega</span>
+              <span className="text-muted-foreground font-medium">Taxa de entrega do cliente</span>
               <span className="text-foreground font-bold">{fmt(deliveryFee)}</span>
             </div>
           )}
 
           {serviceFee > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Taxa de Serviço</span>
+              <span className="text-muted-foreground font-medium">Taxa de serviço do cliente</span>
               <span className="text-foreground font-bold">{fmt(serviceFee)}</span>
             </div>
           )}
@@ -72,7 +72,9 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
             <div className="flex justify-between text-sm">
               <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                 <Ticket className="w-3.5 h-3.5" />
-                <span className="font-medium">Descontos {couponCode ? `(${couponCode})` : ''}</span>
+                <span className="font-medium">
+                  Descontos{financialSummary?.discountFundingState === 'UNKNOWN' ? ' (origem não informada)' : ''} {couponCode ? `(${couponCode})` : ''}
+                </span>
               </div>
               <span className="text-emerald-600 dark:text-emerald-400 font-black">-{fmt(discountTotal)}</span>
             </div>
@@ -88,13 +90,49 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
             </div>
           )}
 
-          <div className="pt-4 border-t border-border flex justify-between items-center">
-            <div>
-              <span className="text-sm font-black text-foreground uppercase tracking-tight">{financialSummary?.operationalValueLabel ?? 'Valor do pedido'}</span>
-              <p className="mt-1 text-[10px] font-bold text-muted-foreground">{financialSummary?.paymentLabel ?? 'Pagamento não confirmado'}</p>
+          {financialSummary?.amountToCollectState ? (
+            <div className="space-y-2.5 border-t border-border pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-black uppercase tracking-tight text-foreground">Status do pagamento</span>
+                <span className="text-sm font-black text-foreground">{financialSummary.paymentLabel}</span>
+              </div>
+              {typeof financialSummary.customerPaid === 'number' ? (
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-muted-foreground">Total pago pelo cliente</span>
+                  <span className="font-black text-foreground">{fmt(financialSummary.customerPaid)}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-muted-foreground">Valor a cobrar</span>
+                <span className="font-black text-foreground">
+                  {financialSummary.amountToCollectState === 'KNOWN' && typeof financialSummary.amountToCollect === 'number'
+                    ? fmt(financialSummary.amountToCollect)
+                    : 'A confirmar'}
+                </span>
+              </div>
+              {financialSummary.paymentState === 'PAID' && financialSummary.amountToCollect === 0 ? (
+                <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-center text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Não cobrar na entrega
+                </p>
+              ) : null}
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-muted-foreground">Repasse previsto para a loja</span>
+                <span className="font-black text-foreground">
+                  {financialSummary.merchantReceivableState === 'KNOWN' && typeof financialSummary.merchantReceivable === 'number'
+                    ? fmt(financialSummary.merchantReceivable)
+                    : 'A confirmar'}
+                </span>
+              </div>
             </div>
-            <span className="text-xl font-black text-foreground">{fmt(financialSummary?.operationalValue ?? total)}</span>
-          </div>
+          ) : (
+            <div className="pt-4 border-t border-border flex justify-between items-center">
+              <div>
+                <span className="text-sm font-black text-foreground uppercase tracking-tight">{financialSummary?.operationalValueLabel ?? 'Valor do pedido'}</span>
+                <p className="mt-1 text-[10px] font-bold text-muted-foreground">{financialSummary?.paymentLabel ?? 'Pagamento não confirmado'}</p>
+              </div>
+              <span className="text-xl font-black text-foreground">{fmt(financialSummary?.operationalValue ?? total)}</span>
+            </div>
+          )}
         </div>
 
         {/* Método de Pagamento */}
