@@ -22,6 +22,7 @@ import { OrderSimulationPage } from './features/catalog/OrderSimulationPage';
 import { UpsellsPage } from './features/catalog/UpsellsPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
+import { OrderManagerV2Page } from './features/orders/v2/OrderManagerV2Page';
 import { KdsPage } from './features/orders/KdsPage';
 import { OrderAutomationSettingsPage } from './features/orders/OrderAutomationSettingsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
@@ -202,6 +203,16 @@ export function App() {
             <PermissionGate permission="orders.use_kanban">
               <OperationBoardPage />
             </PermissionGate>
+          }
+        />
+        <Route
+          path="/orders/manager"
+          element={
+            <FeatureGate featureKey="order_manager_v2">
+              <PermissionGate permission="orders.use_kanban">
+                <OrderManagerV2Page />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route

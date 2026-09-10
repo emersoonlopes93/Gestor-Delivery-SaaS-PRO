@@ -18,6 +18,7 @@ const ENV_FLAG_TO_FEATURE_KEY: Record<string, string> = {
   VITE_FEATURE_AI_AGENT: 'ai_agent',
   VITE_FEATURE_FRANCHISE: 'franchise',
   VITE_FEATURE_ADMIN_INTEGRATIONS: 'admin_integrations',
+  VITE_FEATURE_ORDER_MANAGER_V2: 'order_manager_v2',
 };
 
 const FEATURE_KEY_TO_ENV_FLAG: Record<string, string> = Object.fromEntries(

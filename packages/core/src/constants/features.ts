@@ -30,6 +30,7 @@ export type CatalogFeatureKey =
   | 'storefront_core'
   | 'checkout_core'
   | 'orders_core'
+  | 'order_manager_v2'
   | 'upload_core'
   | 'health_check'
   | 'feature_control_center'
@@ -253,6 +254,18 @@ const CORE_FEATURES: readonly FeatureCatalogEntry[] = [
 ] as const;
 
 const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
+  {
+    key: 'order_manager_v2',
+    name: 'Gestor de Pedidos 2.0',
+    description: 'Cockpit operacional visual para pedidos, mantido como experiencia beta reversivel.',
+    category: 'orders',
+    essential: false,
+    canDisable: true,
+    status: 'beta',
+    moduleKey: 'orders',
+    requiredPermission: 'orders.use_kanban',
+    envFallbackKey: 'VITE_FEATURE_ORDER_MANAGER_V2',
+  },
   {
     key: 'delivery_radius',
     name: 'Entrega por Raio',

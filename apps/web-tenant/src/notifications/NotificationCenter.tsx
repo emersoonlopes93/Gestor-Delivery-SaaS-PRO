@@ -18,6 +18,7 @@ import { useSoundManager } from './useSoundManager';
 import { useTenantAuth } from '../hooks/use-tenant-auth';
 import { createTabLeader, type TabLeader } from './tabLeader';
 import { traceNotificationE2E } from './e2eTrace';
+import { browserSpeechProvider, isVoiceAlertsEnabled, sharedOrderAlertCoordinator } from '../features/orders/v2/order-alert-coordinator';
 
 const MAX_TRANSIENT_TOASTS = 2;
 
@@ -165,11 +166,16 @@ export function NotificationCenter() {
           });
         }
         await soundManager.playEvent(event.type);
+        const scopeKey = user ? `${user.tenantId}:${user.userId}` : undefined;
+        const speech = browserSpeechProvider();
+        if (speech && isVoiceAlertsEnabled(scopeKey)) {
+          sharedOrderAlertCoordinator.enqueue(event, speech);
+        }
       }
     });
 
     return unsubscribe;
-  }, [enqueueTransient, soundManager, user?.tenantId]);
+  }, [enqueueTransient, soundManager, user]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

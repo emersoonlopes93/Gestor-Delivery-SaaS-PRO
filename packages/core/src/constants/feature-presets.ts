@@ -18,6 +18,7 @@ export type FeaturePresetEntry = {
 const OPTIONAL_KEYS = FEATURE_CATALOG.filter((feature) => !feature.essential).map((feature) => feature.key);
 
 const MVP_DISABLED: CatalogFeatureKey[] = [
+  'order_manager_v2',
   'crm_enterprise',
   'campaigns',
   'whatsapp_connect',
