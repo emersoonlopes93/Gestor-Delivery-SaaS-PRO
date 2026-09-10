@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   FinancialStatus as PrismaFinancialStatus,
   FinancialTransactionType as PrismaFinancialTransactionType,
@@ -126,5 +126,14 @@ describe('FinancialTransactionsService account balance effects', () => {
     await expect(service.update('tenant-a', transaction.id, { accountId: 'account-other' })).rejects.toBeInstanceOf(NotFoundException);
     expect(accounts[0].balance).toBe(50);
     expect(accounts[2].balance).toBe(0);
+  });
+
+  it('rejects generic creation of purchase ledger entries', async () => {
+    const { service, accounts } = makeHarness();
+    await expect(service.create('tenant-a', {
+      accountId: 'account-a', type: FinancialTransactionType.EXPENSE, category: 'purchase', amount: 10,
+      status: FinancialStatus.PAID, referenceId: 'purchase-a', referenceType: 'purchase',
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(accounts[0].balance).toBe(0);
   });
 });

@@ -9,6 +9,7 @@ describe('PurchasesController', () => {
     const controller = Reflect.construct(PurchasesController, [purchasesService]);
     const dto: CreatePurchaseDTO = {
       supplierId: 'supplier-1',
+      idempotencyKey: 'purchase-key-1',
       purchaseDate: '2026-09-07',
       items: [
         {
@@ -19,8 +20,20 @@ describe('PurchasesController', () => {
       ],
     };
 
-    await controller.create('tenant-1', dto);
+    await controller.create('tenant-1', dto, 'actor-1');
 
-    expect(purchasesService.create).toHaveBeenCalledWith('tenant-1', dto);
+    expect(purchasesService.create).toHaveBeenCalledWith('tenant-1', dto, 'actor-1');
+  });
+
+  it('forwards pay and cancel commands with the tenant actor', async () => {
+    const purchasesService = {
+      pay: jest.fn(),
+      cancel: jest.fn(),
+    };
+    const controller = Reflect.construct(PurchasesController, [purchasesService]);
+    await controller.pay('tenant-1', 'purchase-1', { accountId: 'account-1' }, 'actor-1');
+    await controller.cancel('tenant-1', 'purchase-1', 'actor-1');
+    expect(purchasesService.pay).toHaveBeenCalledWith('tenant-1', 'purchase-1', { accountId: 'account-1' }, 'actor-1');
+    expect(purchasesService.cancel).toHaveBeenCalledWith('tenant-1', 'purchase-1', 'actor-1');
   });
 });
