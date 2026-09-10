@@ -15,6 +15,8 @@ import {
   useFood99AuthorizationUrl,
 } from '../marketplace/hooks';
 
+let ifoodEnabled = true;
+
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
@@ -31,12 +33,16 @@ vi.mock('../marketplace/hooks', () => ({
   useReprocessMarketplaceOrder: vi.fn(),
   useFood99AuthorizationUrl: vi.fn(),
 }));
+vi.mock('../../hooks/useTenantCapabilities', () => ({
+  useTenantCapabilities: () => ({ isFeatureEnabled: (featureKey: string) => featureKey !== 'ifood_marketplace' || ifoodEnabled }),
+}));
 
 const mutation = () => ({ isPending: false, mutate: vi.fn(), mutateAsync: vi.fn() });
 const refetch = vi.fn();
 
 describe('IntegrationsPage multi-iFood connections', () => {
   beforeEach(() => {
+    ifoodEnabled = true;
     vi.mocked(useMarketplaceStatus).mockReturnValue({ data: null, isLoading: false, refetch } as never);
     vi.mocked(useMarketplaceConnections).mockReturnValue({
       data: [
@@ -103,5 +109,28 @@ describe('IntegrationsPage multi-iFood connections', () => {
     const html = renderToStaticMarkup(<IntegrationsPage />);
     expect(html).toContain('Falhou');
     expect(html).not.toContain('Offline');
+  });
+
+  it('keeps the generic marketplace page and 99Food available without exposing iFood administration', () => {
+    ifoodEnabled = false;
+    const html = renderToStaticMarkup(<IntegrationsPage />);
+
+    expect(html).toContain('Integrações Marketplace');
+    expect(html).toContain('99Food');
+    expect(html).toContain('Autorizar');
+    expect(html).toContain('Adicionar loja 99Food');
+    expect(html).not.toContain('Adicionar loja iFood');
+    expect(html).not.toContain('Loja Centro');
+    expect(html).not.toContain('Loja Shopping');
+    expect(useMarketplaceStatus).toHaveBeenCalledWith('ifood', false);
+  });
+
+  it('exposes iFood administration only when its capability is enabled', () => {
+    ifoodEnabled = true;
+    const html = renderToStaticMarkup(<IntegrationsPage />);
+
+    expect(html).toContain('Adicionar loja iFood');
+    expect(html).toContain('Loja Centro');
+    expect(useMarketplaceStatus).toHaveBeenCalledWith('ifood', true);
   });
 });

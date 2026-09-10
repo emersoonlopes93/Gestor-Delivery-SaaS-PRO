@@ -1,7 +1,7 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import type { TenantJwtPayload } from '@gestor/types';
-import { MarketplaceEventStatus, Prisma } from '@prisma/client';
+import { MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators';
@@ -13,6 +13,7 @@ import { MarketplaceOrderIngestionService } from '../services/marketplace-order-
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceStatusSyncService } from '../services/marketplace-status-sync.service';
 import { Food99HttpClientService } from '../services/food99-http-client.service';
+import { FeatureControlService } from '../../feature-control/feature-control.service';
 import { randomUUID } from 'crypto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
@@ -29,6 +30,7 @@ export class MarketplaceTenantController {
     private readonly prisma: PrismaService,
     private readonly statusSyncService: MarketplaceStatusSyncService,
     private readonly food99Client: Food99HttpClientService,
+    private readonly featureControl: FeatureControlService,
   ) {}
 
   @Post('99food/authorization-url')
@@ -43,13 +45,17 @@ export class MarketplaceTenantController {
   @RequirePermissions('settings.manage')
   async listConnections(@Req() req: TenantRequest) {
     const rows = await this.connectionService.listTenantConnections(req.user.tenantId);
-    return rows.map((row) => this.connectionService.maskConnection(row));
+    const canManageIfood = await this.canManageIfood(req.user.tenantId);
+    return rows
+      .filter((row) => canManageIfood || row.provider !== MarketplaceProvider.IFOOD)
+      .map((row) => this.connectionService.maskConnection(row));
   }
 
   @Get('connections/:connectionId')
   @RequirePermissions('settings.manage')
   async getConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
     const connection = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
+    await this.assertProviderAccess(req.user.tenantId, connection.provider);
     return this.connectionService.maskConnection(connection);
   }
 
@@ -69,6 +75,8 @@ export class MarketplaceTenantController {
       settingsJson?: Record<string, unknown>;
     },
   ) {
+    const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
+    await this.assertProviderAccess(req.user.tenantId, existing.provider);
     const connection = await this.connectionService.updateManual(req.user.tenantId, connectionId, {
       ...body,
       settingsJson: (body.settingsJson ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -87,6 +95,8 @@ export class MarketplaceTenantController {
       tokenExpiresAt?: string;
     },
   ) {
+    const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
+    await this.assertProviderAccess(req.user.tenantId, existing.provider);
     const connection = await this.connectionService.updateManual(req.user.tenantId, connectionId, body);
     return this.connectionService.maskConnection(connection);
   }
@@ -94,6 +104,8 @@ export class MarketplaceTenantController {
   @Post('connections/:connectionId/disconnect')
   @RequirePermissions('settings.manage')
   async disconnectConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
+    const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
+    await this.assertProviderAccess(req.user.tenantId, existing.provider);
     const connection = await this.connectionService.disconnectById(req.user.tenantId, connectionId);
     return this.connectionService.maskConnection(connection);
   }
@@ -101,6 +113,8 @@ export class MarketplaceTenantController {
   @Delete('connections/:connectionId')
   @RequirePermissions('settings.manage')
   async removeConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
+    const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
+    await this.assertProviderAccess(req.user.tenantId, existing.provider);
     const connection = await this.connectionService.disconnectById(req.user.tenantId, connectionId);
     return this.connectionService.maskConnection(connection);
   }
@@ -109,6 +123,7 @@ export class MarketplaceTenantController {
   @RequirePermissions('settings.manage')
   async getProviderStatus(@Req() req: TenantRequest, @Param('provider') providerParam: string) {
     const provider = this.providerRegistry.parseProvider(providerParam);
+    await this.assertProviderAccess(req.user.tenantId, provider);
     const connection = await this.connectionService.getTenantConnectionStatus(req.user.tenantId, provider);
     return connection ? this.connectionService.maskConnection(connection) : null;
   }
@@ -130,6 +145,7 @@ export class MarketplaceTenantController {
     },
   ) {
     const provider = this.providerRegistry.parseProvider(providerParam);
+    await this.assertProviderAccess(req.user.tenantId, provider);
     const connection = await this.connectionService.connectManual(req.user.tenantId, provider, {
       ...body,
       settingsJson: (body.settingsJson ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -141,6 +157,7 @@ export class MarketplaceTenantController {
   @RequirePermissions('settings.manage')
   async disconnect(@Req() req: TenantRequest, @Param('provider') providerParam: string) {
     const provider = this.providerRegistry.parseProvider(providerParam);
+    await this.assertProviderAccess(req.user.tenantId, provider);
     const connection = await this.connectionService.disconnect(req.user.tenantId, provider);
     return this.connectionService.maskConnection(connection);
   }
@@ -148,8 +165,9 @@ export class MarketplaceTenantController {
   @Get('orders')
   @RequirePermissions('orders.read')
   async listMarketplaceOrders(@Req() req: TenantRequest) {
+    const canManageIfood = await this.canManageIfood(req.user.tenantId);
     return this.prisma.marketplaceOrder.findMany({
-      where: { tenantId: req.user.tenantId },
+      where: { tenantId: req.user.tenantId, ...(canManageIfood ? {} : { provider: { not: MarketplaceProvider.IFOOD } }) },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
       select: {
@@ -180,6 +198,7 @@ export class MarketplaceTenantController {
     @Query('externalOrderId') externalOrderId?: string,
     @Query('status') status?: string,
   ) {
+    const canManageIfood = await this.canManageIfood(req.user.tenantId);
     const normalizedStatus = status?.trim();
     if (normalizedStatus && !Object.values(MarketplaceEventStatus).includes(normalizedStatus as MarketplaceEventStatus)) {
       throw new BadRequestException('Invalid marketplace event status.');
@@ -190,6 +209,7 @@ export class MarketplaceTenantController {
         ...(eventId?.trim() ? { eventId: eventId.trim() } : {}),
         ...(externalOrderId?.trim() ? { externalOrderId: externalOrderId.trim() } : {}),
         ...(normalizedStatus ? { status: normalizedStatus as MarketplaceEventStatus } : {}),
+        ...(canManageIfood ? {} : { provider: { not: MarketplaceProvider.IFOOD } }),
       },
       orderBy: [{ receivedAt: 'desc' }],
       take: 100,
@@ -248,12 +268,22 @@ export class MarketplaceTenantController {
   @Post('events/:eventInboxId/reprocess')
   @RequirePermissions('settings.manage')
   async reprocessEvent(@Req() req: TenantRequest, @Param('eventInboxId') eventInboxId: string) {
+    const event = await this.prisma.marketplaceEventInbox.findFirst({
+      where: { id: eventInboxId, tenantId: req.user.tenantId },
+      select: { provider: true },
+    });
+    if (event) await this.assertProviderAccess(req.user.tenantId, event.provider);
     return this.inboxService.reprocessEventInbox(eventInboxId, req.user.tenantId);
   }
 
   @Post('orders/:marketplaceOrderId/reprocess')
   @RequirePermissions('settings.manage')
   async reprocessOrder(@Req() req: TenantRequest, @Param('marketplaceOrderId') marketplaceOrderId: string) {
+    const order = await this.prisma.marketplaceOrder.findFirst({
+      where: { id: marketplaceOrderId, tenantId: req.user.tenantId },
+      select: { provider: true },
+    });
+    if (order) await this.assertProviderAccess(req.user.tenantId, order.provider);
     return this.ingestionService.reprocessMarketplaceOrder(marketplaceOrderId, req.user.tenantId);
   }
 
@@ -332,5 +362,16 @@ export class MarketplaceTenantController {
       },
     });
     return result;
+  }
+
+  private async canManageIfood(tenantId: string): Promise<boolean> {
+    const capability = await this.featureControl.resolveTenantFeature({ tenantId, featureKey: 'ifood_marketplace' });
+    return capability.enabled;
+  }
+
+  private async assertProviderAccess(tenantId: string, provider: MarketplaceProvider): Promise<void> {
+    if (provider === MarketplaceProvider.IFOOD && !(await this.canManageIfood(tenantId))) {
+      throw new ForbiddenException('iFood marketplace feature is disabled for this tenant.');
+    }
   }
 }

@@ -19,6 +19,7 @@ import {
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { Switch } from '../../components/ui/Switch';
+import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
 
 type ManualConnectForm = {
   externalMerchantId: string;
@@ -62,6 +63,8 @@ function eventStatusBadge(status?: string | null) {
 
 export function IntegrationsPage() {
   const queryClient = useQueryClient();
+  const { isFeatureEnabled } = useTenantCapabilities();
+  const canManageIfood = isFeatureEnabled('ifood_marketplace');
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualProvider, setManualProvider] = useState<'ifood' | '99food'>('ifood');
   const [manualForm, setManualForm] = useState<ManualConnectForm>({
@@ -70,7 +73,7 @@ export function IntegrationsPage() {
     displayName: 'iFood',
   });
 
-  const { data: status, isLoading: loadingStatus, refetch: refetchStatus } = useMarketplaceStatus('ifood');
+  const { data: status, isLoading: loadingStatus, refetch: refetchStatus } = useMarketplaceStatus('ifood', canManageIfood);
   const { data: connections, isLoading: loadingConnections, isError: connectionsError, error: connectionsErrorObj, refetch: refetchConnections } = useMarketplaceConnections();
   const { data: orders = [], isLoading: loadingOrders, isError: ordersError, error: ordersErrorObj, refetch: refetchOrders } = useMarketplaceOrders();
   const { data: events = [], isLoading: loadingEvents, isError: eventsError, error: eventsErrorObj, refetch: refetchEvents } = useMarketplaceEvents();
@@ -88,8 +91,31 @@ export function IntegrationsPage() {
   const isBillingEnabled = Boolean(billingPreview?.includedChannels?.includes('marketplace_ifood'));
 
   const includedChannels = billingPreview?.includedChannels ?? [];
+  const visibleConnections = useMemo(
+    () => connections?.filter((connection) => canManageIfood || connection.provider !== 'ifood') ?? [],
+    [canManageIfood, connections],
+  );
+  const visibleEvents = useMemo(
+    () => events.filter((event) => canManageIfood || event.provider !== 'ifood'),
+    [canManageIfood, events],
+  );
+  const visibleOrders = useMemo(
+    () => orders.filter((order) => canManageIfood || order.provider !== 'ifood'),
+    [canManageIfood, orders],
+  );
+
+  const refreshMarketplace = () => Promise.all([
+    ...(canManageIfood ? [refetchStatus()] : []),
+    refetchConnections(),
+    refetchOrders(),
+    refetchEvents(),
+  ]);
 
   const handleManualConnect = async () => {
+    if (manualProvider === 'ifood' && !canManageIfood) {
+      toast.error('A integração iFood não está habilitada para este tenant.');
+      return;
+    }
     if (!manualForm.externalMerchantId.trim() || !manualForm.externalStoreId.trim()) {
       toast.error('Preencha merchant e store id para criar a conexão manual.');
       return;
@@ -112,7 +138,7 @@ export function IntegrationsPage() {
       toast.success(`Conexão ${manualProvider === '99food' ? '99Food' : 'iFood'} atualizada.`);
       setShowManualForm(false);
       setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: manualProvider === '99food' ? '99Food' : 'iFood' });
-      await Promise.all([refetchStatus(), refetchConnections(), refetchOrders(), refetchEvents()]);
+      await refreshMarketplace();
       queryClient.invalidateQueries({ queryKey: ['marketplace-billing-preview'] });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Falha ao conectar o marketplace.';
@@ -124,7 +150,7 @@ export function IntegrationsPage() {
     try {
       await disconnectMutation.mutateAsync(connectionId);
       toast.success('Conexão iFood desconectada.');
-      await refetchStatus();
+      if (canManageIfood) await refetchStatus();
       await refetchConnections();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Falha ao desconectar.';
@@ -136,7 +162,7 @@ export function IntegrationsPage() {
     try {
       await reconnectMutation.mutateAsync(connectionId);
       toast.success('Loja iFood reconectada.');
-      await refetchStatus();
+      if (canManageIfood) await refetchStatus();
       await refetchConnections();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Falha ao reconectar.';
@@ -147,7 +173,7 @@ export function IntegrationsPage() {
   const channelLabel = isBillingEnabled ? 'Incluído no billing' : 'Excluído do billing';
   const channelTone = isBillingEnabled ? 'success' : 'warning';
   const sections = [
-    { id: 'ifood', label: 'iFood', provider: 'ifood' as const, comingSoon: false },
+    ...(canManageIfood ? [{ id: 'ifood', label: 'iFood', provider: 'ifood' as const, comingSoon: false }] : []),
     { id: 'rappi', label: 'Rappi', provider: 'rappi' as const, comingSoon: true },
     { id: 'ubereats', label: 'Uber Eats', provider: 'ubereats' as const, comingSoon: true },
     { id: '99food', label: '99Food', provider: '99food' as const, comingSoon: false },
@@ -157,12 +183,12 @@ export function IntegrationsPage() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
       <PageHeader
         title="Integrações Marketplace"
-        description="Central de conexão, ingestão e acompanhamento do iFood neste tenant."
+        description="Central de conexão, ingestão e acompanhamento dos marketplaces deste tenant."
         icon={Link2}
         action={
           <button
             type="button"
-            onClick={() => Promise.all([refetchStatus(), refetchConnections(), refetchOrders(), refetchEvents()])}
+            onClick={refreshMarketplace}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted transition-all"
           >
             <RefreshCw className="w-4 h-4" />
@@ -172,7 +198,7 @@ export function IntegrationsPage() {
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="p-6 xl:col-span-2 space-y-5">
+        {canManageIfood ? <Card className="p-6 xl:col-span-2 space-y-5">
           {connectionsError || ordersError || eventsError ? (
             <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
               <div className="font-black">Falha ao carregar marketplace</div>
@@ -339,7 +365,33 @@ export function IntegrationsPage() {
               </div>
             </div>
           )}
-        </Card>
+        </Card> : <Card className="p-6 xl:col-span-2">
+          <div className="space-y-1">
+            <h2 className="text-xl font-black text-foreground">Marketplaces habilitados</h2>
+            <p className="text-sm text-muted-foreground">Gerencie as conexões disponíveis para este tenant.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setManualProvider('99food');
+                setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: '99Food' });
+                setShowManualForm(true);
+              }}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-black text-foreground hover:bg-muted transition-all"
+            >
+              <Settings2 className="w-4 h-4" />
+              Adicionar loja 99Food
+            </button>
+          </div>
+          {showManualForm ? <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-black text-foreground"><ShieldCheck className="w-4 h-4 text-primary" />Adicionar loja 99Food</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Merchant ID</span><input value={manualForm.externalMerchantId} onChange={(e) => setManualForm((prev) => ({ ...prev, externalMerchantId: e.target.value }))} className="input-premium" placeholder="merchant..." /></label>
+              <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Store ID</span><input value={manualForm.externalStoreId} onChange={(e) => setManualForm((prev) => ({ ...prev, externalStoreId: e.target.value }))} className="input-premium" placeholder="store..." /></label>
+              <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome exibido</span><input value={manualForm.displayName} onChange={(e) => setManualForm((prev) => ({ ...prev, displayName: e.target.value }))} className="input-premium" placeholder="99Food" /></label>
+            </div>
+            <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => setShowManualForm(false)} className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted transition-all">Cancelar</button><button type="button" onClick={handleManualConnect} disabled={connectFood99Mutation.isPending} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all">{connectFood99Mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}Salvar conexão</button></div>
+          </div> : null}
+        </Card>}
 
         <div className="space-y-6">
           <Card className="p-5 space-y-3">
@@ -390,10 +442,10 @@ export function IntegrationsPage() {
             <div className="space-y-3">
               {loadingConnections ? (
                 <div className="text-sm text-muted-foreground">Carregando conexões...</div>
-              ) : (connections?.length ?? 0) === 0 ? (
+              ) : visibleConnections.length === 0 ? (
                 <div className="text-sm text-muted-foreground">Nenhuma conexão encontrada.</div>
               ) : (
-                connections?.map((connection) => (
+                visibleConnections.map((connection) => (
                   <div key={connection.id} className="rounded-2xl border border-border bg-muted/20 p-3 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -440,11 +492,11 @@ export function IntegrationsPage() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-border bg-muted/20 p-3">
                 <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pedidos importados</div>
-                <div className="mt-1 text-lg font-black text-foreground">{orders.length}</div>
+                <div className="mt-1 text-lg font-black text-foreground">{visibleOrders.length}</div>
               </div>
               <div className="rounded-xl border border-border bg-muted/20 p-3">
                 <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Eventos inbox</div>
-                <div className="mt-1 text-lg font-black text-foreground">{events.length}</div>
+                <div className="mt-1 text-lg font-black text-foreground">{visibleEvents.length}</div>
               </div>
             </div>
           </Card>
@@ -465,11 +517,11 @@ export function IntegrationsPage() {
 
           {loadingEvents ? (
             <div className="text-sm text-muted-foreground">Carregando eventos...</div>
-          ) : events.length === 0 ? (
+          ) : visibleEvents.length === 0 ? (
             <div className="text-sm text-muted-foreground">Nenhum evento importado ainda.</div>
           ) : (
             <div className="space-y-3">
-              {events.slice(0, 8).map((event) => (
+              {visibleEvents.slice(0, 8).map((event) => (
                 <div key={event.id} className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="space-y-1">
@@ -518,11 +570,11 @@ export function IntegrationsPage() {
 
           {loadingOrders ? (
             <div className="text-sm text-muted-foreground">Carregando pedidos...</div>
-          ) : orders.length === 0 ? (
+          ) : visibleOrders.length === 0 ? (
             <div className="text-sm text-muted-foreground">Nenhum pedido marketplace importado ainda.</div>
           ) : (
             <div className="space-y-3">
-              {orders.slice(0, 8).map((order) => (
+              {visibleOrders.slice(0, 8).map((order) => (
                 <div key={order.id} className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="space-y-1">

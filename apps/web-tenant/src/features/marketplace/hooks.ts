@@ -86,13 +86,14 @@ export function useMarketplaceConnections() {
   });
 }
 
-export function useMarketplaceStatus(provider: MarketplaceProvider = 'ifood') {
+export function useMarketplaceStatus(provider: MarketplaceProvider = 'ifood', enabled = true) {
   return useQuery({
     queryKey: ['marketplace-status', provider],
     queryFn: async () => {
       const res = await api.get<MarketplaceStatusDTO>(`/marketplaces/${provider}/status`);
       return res.data ?? null;
     },
+    enabled,
   });
 }
 

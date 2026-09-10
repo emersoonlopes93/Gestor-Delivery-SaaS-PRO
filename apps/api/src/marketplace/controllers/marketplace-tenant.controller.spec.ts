@@ -1,4 +1,5 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { MarketplaceProvider } from '@prisma/client';
 import { MarketplaceTenantController } from './marketplace-tenant.controller';
 
 describe('MarketplaceTenantController connection tenancy', () => {
@@ -12,17 +13,20 @@ describe('MarketplaceTenantController connection tenancy', () => {
       maskConnection: jest.fn((value: unknown) => value),
     };
     const food99Client = { getAuthorizationUrl: jest.fn() };
+    const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
+    const providerRegistry = { parseProvider: jest.fn().mockReturnValue(MarketplaceProvider.IFOOD) };
     const controller = new MarketplaceTenantController(
-      { parseProvider: jest.fn().mockReturnValue('IFOOD') } as never,
+      providerRegistry as never,
       connectionService as never,
       {} as never,
       {} as never,
       {} as never,
       {} as never,
       food99Client as never,
+      featureControl as never,
     );
     const request = { user: { tenantId: 'tenant-1' } } as never;
-    return { controller, connectionService, food99Client, request };
+    return { controller, connectionService, food99Client, featureControl, providerRegistry, request };
   };
 
   it('lists only connections from the authenticated tenant', async () => {
@@ -68,5 +72,25 @@ describe('MarketplaceTenantController connection tenancy', () => {
     food99Client.getAuthorizationUrl.mockResolvedValue('https://auth.99food.test/start');
     await expect(controller.getFood99AuthorizationUrl({ appShopId: 'shop-99' })).resolves.toEqual({ url: 'https://auth.99food.test/start' });
     expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String), 'shop-99');
+  });
+
+  it('blocks direct iFood administration when the tenant lacks ifood_marketplace', async () => {
+    const { controller, connectionService, featureControl, request } = makeController();
+    featureControl.resolveTenantFeature.mockResolvedValue({ enabled: false });
+
+    await expect(controller.connectManual(request, 'ifood', { externalMerchantId: 'merchant-a' }))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(connectionService.connectManual).not.toHaveBeenCalled();
+  });
+
+  it('keeps 99Food administration independent from ifood_marketplace', async () => {
+    const { controller, connectionService, featureControl, providerRegistry, request } = makeController();
+    featureControl.resolveTenantFeature.mockResolvedValue({ enabled: false });
+    providerRegistry.parseProvider.mockReturnValue(MarketplaceProvider.FOOD_99);
+    connectionService.connectManual.mockResolvedValue({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99 });
+
+    await expect(controller.connectManual(request, '99food', { externalMerchantId: 'merchant-99', externalStoreId: 'shop-99' }))
+      .resolves.toEqual({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99 });
+    expect(connectionService.connectManual).toHaveBeenCalledWith('tenant-1', MarketplaceProvider.FOOD_99, expect.any(Object));
   });
 });
