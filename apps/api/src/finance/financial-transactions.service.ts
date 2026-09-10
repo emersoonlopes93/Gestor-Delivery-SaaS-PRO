@@ -121,6 +121,9 @@ export class FinancialTransactionsService {
   }
 
   async create(tenantId: string, dto: CreateFinancialTransactionDTO): Promise<FinancialTransactionDTO> {
+    if (dto.referenceType === 'purchase' || dto.referenceType === 'purchase_reversal') {
+      throw new ConflictException('Lancamentos de compra devem ser gerenciados pelo lifecycle de compras.');
+    }
     if (dto.accountId) {
       const account = await this.prisma.financialAccount.findFirst({
         where: { id: dto.accountId, tenantId },
@@ -171,6 +174,9 @@ export class FinancialTransactionsService {
         where: { id, tenantId },
       });
       if (!current) throw new NotFoundException('Financial transaction not found');
+      if (current.referenceType === 'purchase' || current.referenceType === 'purchase_reversal') {
+        throw new ConflictException('Lancamento de compra e imutavel fora do lifecycle de compras.');
+      }
 
       if (dto.accountId !== undefined) {
         await this.ensureAccountBelongsToTenant(tx, tenantId, dto.accountId);

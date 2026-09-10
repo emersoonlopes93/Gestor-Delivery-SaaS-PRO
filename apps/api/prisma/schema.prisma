@@ -126,6 +126,7 @@ model Tenant {
   products                       Product[]
   purchaseItems                  PurchaseItem[]
   purchases                      Purchase[]
+  purchaseSettlements            PurchaseSettlement[]
   quickReplies                   QuickReply[]
   revenueEvents                  RevenueEvent[]
   financialProjections           FinancialProjection[]
@@ -2615,12 +2616,16 @@ model StockMovement {
   quantity             Decimal           @db.Decimal(10, 4)
   unitCost             Decimal?          @map("unit_cost") @db.Decimal(10, 4)
   orderId              String?           @map("order_id")
+  purchaseId           String?           @map("purchase_id")
+  purchaseItemId       String?           @unique @map("purchase_item_id")
   reversalOfMovementId String?           @unique @map("reversal_of_movement_id")
   userId               String?           @map("user_id")
   notes                String?           @db.VarChar(255)
   createdAt            DateTime          @default(now()) @map("created_at")
   ingredient           Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
   order                Order?            @relation(fields: [orderId], references: [id])
+  purchase             Purchase?         @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  purchaseItem         PurchaseItem?     @relation(fields: [purchaseItemId], references: [id], onDelete: Restrict)
   reversalOfMovement   StockMovement?    @relation("StockMovementReversal", fields: [reversalOfMovementId], references: [id], onDelete: Restrict)
   reversal             StockMovement?    @relation("StockMovementReversal")
   tenant               Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2628,6 +2633,7 @@ model StockMovement {
   @@index([tenantId])
   @@index([ingredientId])
   @@index([tenantId, orderId, type])
+  @@index([tenantId, purchaseId, type])
   @@map("stock_movements")
 }
 
@@ -3058,14 +3064,20 @@ model Purchase {
   status        PurchaseStatus @default(draft)
   paymentStatus PaymentStatus  @default(pending) @map("payment_status")
   purchaseDate  DateTime       @default(now()) @map("purchase_date")
+  idempotencyKey String?        @map("idempotency_key") @db.VarChar(100)
+  idempotencyFingerprint String? @map("idempotency_fingerprint") @db.VarChar(64)
+  cancelledAt   DateTime?      @map("cancelled_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   items         PurchaseItem[]
+  stockMovements StockMovement[]
+  settlement    PurchaseSettlement?
   supplier      Supplier       @relation(fields: [supplierId], references: [id])
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([supplierId])
+  @@unique([tenantId, idempotencyKey])
   @@map("purchases")
 }
 
@@ -3081,6 +3093,7 @@ model PurchaseItem {
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   purchase     Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockMovement StockMovement?
 
   @@index([purchaseId])
   @@index([ingredientId])
@@ -3131,6 +3144,7 @@ model FinancialAccount {
   updatedAt    DateTime               @updatedAt @map("updated_at")
   tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions FinancialTransaction[]
+  purchaseSettlements PurchaseSettlement[]
 
   @@index([tenantId])
   @@map("financial_accounts")
@@ -3149,15 +3163,43 @@ model FinancialTransaction {
   description   String?
   referenceId   String?                  @map("reference_id")
   referenceType String?                  @map("reference_type")
+  reversalOfTransactionId String?        @unique @map("reversal_of_transaction_id")
   createdAt     DateTime                 @default(now()) @map("created_at")
   updatedAt     DateTime                 @updatedAt @map("updated_at")
   account       FinancialAccount?        @relation(fields: [accountId], references: [id])
+  reversalOfTransaction FinancialTransaction? @relation("FinancialTransactionReversal", fields: [reversalOfTransactionId], references: [id], onDelete: Restrict)
+  reversal      FinancialTransaction?    @relation("FinancialTransactionReversal")
+  purchaseSettlement PurchaseSettlement? @relation("PurchaseSettlementTransaction")
+  purchaseSettlementReversal PurchaseSettlement? @relation("PurchaseSettlementReversal")
   tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([accountId])
   @@index([dueDate])
   @@map("financial_transactions")
+}
+
+model PurchaseSettlement {
+  id                       String               @id @default(uuid())
+  tenantId                 String               @map("tenant_id")
+  purchaseId               String               @unique @map("purchase_id")
+  accountId                String               @map("account_id")
+  amount                   Decimal              @db.Decimal(10, 2)
+  financialTransactionId   String               @unique @map("financial_transaction_id")
+  paidAt                   DateTime             @default(now()) @map("paid_at")
+  reversedAt               DateTime?            @map("reversed_at")
+  reversalTransactionId    String?              @unique @map("reversal_transaction_id")
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
+  tenant                   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchase                 Purchase             @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  account                  FinancialAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  financialTransaction     FinancialTransaction @relation("PurchaseSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  reversalTransaction      FinancialTransaction? @relation("PurchaseSettlementReversal", fields: [reversalTransactionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([tenantId, accountId])
+  @@map("purchase_settlements")
 }
 
 model OrderSplit {
@@ -4317,6 +4359,7 @@ enum StockMovementType {
   theoretical_depletion
   theoretical_reversal
   purchase_entry
+  purchase_reversal
   inventory_adjustment
 }
 

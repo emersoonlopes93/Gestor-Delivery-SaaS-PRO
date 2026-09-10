@@ -45,6 +45,8 @@ export interface PurchaseDTO {
   purchaseDate: Date;
   createdAt: Date;
   updatedAt: Date;
+  cancelledAt?: Date;
+  settlement?: PurchaseSettlementDTO;
   supplier?: SupplierDTO;
   items?: PurchaseItemDTO[];
 }
@@ -67,6 +69,23 @@ export interface CreatePurchaseDTO {
   purchaseDate?: Date | string;
   items: CreatePurchaseItemDTO[];
   paymentStatus?: PaymentStatus;
+  accountId?: string;
+  idempotencyKey: string;
+}
+
+export interface PayPurchaseDTO {
+  accountId: string;
+}
+
+export interface PurchaseSettlementDTO {
+  id: string;
+  purchaseId: string;
+  accountId: string;
+  amount: number;
+  financialTransactionId: string;
+  paidAt: Date;
+  reversedAt?: Date;
+  reversalTransactionId?: string;
 }
 
 export interface CreatePurchaseItemDTO {

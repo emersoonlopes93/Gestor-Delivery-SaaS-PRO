@@ -1,18 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { PurchaseDTO, PurchaseStatus, PaymentStatus, CreatePurchaseDTO } from '@gestor/types';
+import { PurchaseDTO, PurchaseStatus, PaymentStatus, CreatePurchaseDTO, FinancialAccountDTO } from '@gestor/types';
 import { PurchaseModal } from './PurchaseModal';
-import { LucideIcon, ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { LucideIcon, ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock, Ban, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { Modal } from '../../components/Modal';
+import { usePermissions } from '../../hooks/use-tenant-auth';
 
 export function PurchasesPage() {
   const [purchases, setPurchases] = useState<PurchaseDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
+  const [purchaseToPay, setPurchaseToPay] = useState<PurchaseDTO | null>(null);
+  const [payAccountId, setPayAccountId] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const { has } = usePermissions();
+  const canManage = has('purchasing.manage');
 
   useEffect(() => {
     loadPurchases();
@@ -40,6 +48,44 @@ export function PurchasesPage() {
     } catch (error) {
       console.error('Erro ao registrar compra:', error);
       throw error;
+    }
+  };
+
+  const openPay = async (purchase: PurchaseDTO) => {
+    try {
+      const response = await api.get<FinancialAccountDTO[]>('/finance/accounts');
+      if (response.success) setAccounts(response.data.filter((account) => account.active));
+      setPayAccountId('');
+      setPurchaseToPay(purchase);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Nao foi possivel carregar as contas financeiras.');
+    }
+  };
+
+  const handlePay = async () => {
+    if (!purchaseToPay || !payAccountId || actionPending) return;
+    setActionPending(true);
+    try {
+      await api.post(`/purchasing/purchases/${purchaseToPay.id}/pay`, { accountId: payAccountId });
+      setPurchaseToPay(null);
+      await loadPurchases();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Nao foi possivel pagar a compra.');
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  const handleCancel = async (purchase: PurchaseDTO) => {
+    if (actionPending || !window.confirm('Cancelar esta compra integralmente e reverter seus efeitos?')) return;
+    setActionPending(true);
+    try {
+      await api.post(`/purchasing/purchases/${purchase.id}/cancel`);
+      await loadPurchases();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Cancelamento bloqueado; verifique a reconciliacao de estoque.');
+    } finally {
+      setActionPending(false);
     }
   };
 
@@ -73,7 +119,10 @@ export function PurchasesPage() {
     })
     .reduce((sum, p) => sum + Number(p.totalValue), 0);
 
-  const pendingPurchases = purchases.filter(p => p.paymentStatus === PaymentStatus.PENDING || p.paymentStatus === PaymentStatus.PARTIAL && p.status !== PurchaseStatus.CANCELLED);
+  const pendingPurchases = purchases.filter((purchase) =>
+    (purchase.paymentStatus === PaymentStatus.PENDING || purchase.paymentStatus === PaymentStatus.PARTIAL)
+    && purchase.status !== PurchaseStatus.CANCELLED,
+  );
   const pagamentosPendentes = pendingPurchases.reduce((sum, p) => sum + Number(p.totalValue), 0);
   const uniqueSuppliers = new Set(purchases.map(p => p.supplier?.id)).size;
 
@@ -83,16 +132,16 @@ export function PurchasesPage() {
         title="Compras e entradas"
         description="Registre o recebimento de insumos e acompanhe as compras da operação."
         icon={ShoppingCart}
-        action={<button
+        action={canManage ? <button
           onClick={() => setIsModalOpen(true)}
           className="hidden items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:flex"
         >
           <Plus className="h-5 w-5" />
           Nova Compra
-        </button>}
+        </button> : undefined}
       />
 
-      <div className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 md:hidden">
+      {canManage && <div className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 md:hidden">
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
@@ -101,7 +150,7 @@ export function PurchasesPage() {
           <Plus className="h-5 w-5" aria-hidden />
           Nova Compra
         </button>
-      </div>
+      </div>}
 
       <ContextualNavigation itemIds={['inventory.home', 'management.purchases', 'management.suppliers']} />
 
@@ -156,6 +205,7 @@ export function PurchasesPage() {
                   <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Total</th>
                   <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Pagamento</th>
+                  {canManage && <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Acoes</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -168,6 +218,36 @@ export function PurchasesPage() {
                       </div>
                       <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{purchase.id.slice(0, 8)}</div>
                     </td>
+                    {canManage && (
+                      <td className="px-6 py-4">
+                        {purchase.status !== PurchaseStatus.CANCELLED && (
+                          <div className="flex gap-2">
+                            {purchase.paymentStatus === PaymentStatus.PENDING && (
+                              <button
+                                type="button"
+                                onClick={() => void openPay(purchase)}
+                                disabled={actionPending}
+                                className="rounded-lg border border-border p-2 text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                                aria-label={`Pagar compra ${purchase.number || purchase.id}`}
+                              >
+                                <CreditCard className="h-4 w-4" aria-hidden />
+                              </button>
+                            )}
+                            {purchase.paymentStatus !== PaymentStatus.PARTIAL && (
+                              <button
+                                type="button"
+                                onClick={() => void handleCancel(purchase)}
+                                disabled={actionPending}
+                                className="rounded-lg border border-border p-2 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                                aria-label={`Cancelar compra ${purchase.number || purchase.id}`}
+                              >
+                                <Ban className="h-4 w-4" aria-hidden />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-foreground">{purchase.supplier?.name}</div>
                     </td>
@@ -192,7 +272,7 @@ export function PurchasesPage() {
                 ))}
                 {filteredPurchases.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={canManage ? 7 : 6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <ShoppingCart className="h-12 w-12 mb-3 opacity-50" />
                         <p>Nenhuma compra registrada.</p>
@@ -211,6 +291,28 @@ export function PurchasesPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
       />
+      <Modal
+        isOpen={Boolean(purchaseToPay)}
+        onClose={() => !actionPending && setPurchaseToPay(null)}
+        title="Pagar compra"
+        footer={(
+          <>
+            <button type="button" onClick={() => setPurchaseToPay(null)} disabled={actionPending} className="rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
+              Voltar
+            </button>
+            <button type="button" onClick={() => void handlePay()} disabled={!payAccountId || actionPending} className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+              {actionPending ? 'Pagando...' : 'Confirmar pagamento'}
+            </button>
+          </>
+        )}
+      >
+        <p className="mb-4 text-sm text-muted-foreground">O valor integral sera debitado uma unica vez da conta selecionada.</p>
+        <label className="mb-1 block text-sm font-semibold text-foreground" htmlFor="purchase-pay-account">Conta financeira ativa</label>
+        <select id="purchase-pay-account" value={payAccountId} onChange={(event) => setPayAccountId(event.target.value)} className="input-premium">
+          <option value="">Selecione uma conta</option>
+          {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+        </select>
+      </Modal>
     </div>
   );
 }

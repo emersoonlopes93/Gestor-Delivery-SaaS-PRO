@@ -25,6 +25,7 @@ export enum StockMovementType {
   THEORETICAL_DEPLETION = 'theoretical_depletion',
   THEORETICAL_REVERSAL = 'theoretical_reversal',
   PURCHASE_ENTRY = 'purchase_entry',
+  PURCHASE_REVERSAL = 'purchase_reversal',
   INVENTORY_ADJUSTMENT = 'inventory_adjustment',
 }
 

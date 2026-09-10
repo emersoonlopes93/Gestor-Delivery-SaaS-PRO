@@ -1,3 +1,12 @@
+## Purchase Lifecycle Completion (2026-09-10)
+
+- `POST /purchasing/purchases` continua representando recebimento imediato, agora com chave de idempotência tenant-scoped e fingerprint persistente; retries equivalentes retornam a compra existente sem duplicar estoque ou financeiro.
+- Novas entradas possuem vínculo estruturado entre Purchase, PurchaseItem e StockMovement. Histórico sem vínculo não sofre backfill por texto e tem cancelamento automático bloqueado.
+- Compras pagas exigem conta ativa do mesmo tenant e gravam despesa realizada, débito e PurchaseSettlement único atomicamente. Compras pendentes podem ser liquidadas integralmente por `POST /purchasing/purchases/:id/pay`; partial permanece legado e não suportado.
+- `POST /purchasing/purchases/:id/cancel` preserva movimentos e lançamentos originais, cria reversões imutáveis de estoque e, quando pago, lançamento financeiro compensatório na mesma conta. Estoque insuficiente bloqueia toda a operação sem efeitos parciais.
+- Migration `20260910120000_purchase_lifecycle_completion` é aditiva, deixa campos históricos nullable e não executa backfill heurístico. Frontend gera chave estável por tentativa, exige conta em compra paga e oferece pagar/cancelar com proteção contra duplo submit.
+- Validação local: 10 suítes focadas API/79 testes, 1 suíte PostgreSQL/7 testes de concorrência e rollback, 1 arquivo web/3 testes, migration from-zero com 72/72 migrations, API/web typecheck, no-any, lint, builds, theme, features, boundaries e `git diff --check` passaram. Regressões 99Food/Marketplace/WhatsApp também passaram em suítes focadas. Nenhum deploy, banco remoto ou provider real faz parte desta entrega.
+
 ## Gestor de Pedidos UX V2 — Slice 3 (2026-09-06)
 
 - O socket `/orders` já montado por notificações agora publica um bus interno tipado; conexão só é considerada pronta após `joinedTenant`, sem criar SSE ou conexão adicional.

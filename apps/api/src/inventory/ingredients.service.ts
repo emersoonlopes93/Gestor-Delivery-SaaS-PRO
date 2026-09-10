@@ -115,7 +115,8 @@ export class IngredientsService {
                 totalCost: initialPurchase.totalCost,
               }
             }
-          }
+          },
+          include: { items: { select: { id: true } } },
         });
 
         // Update Ingredient with initial stock and cost
@@ -132,6 +133,8 @@ export class IngredientsService {
           data: {
             tenantId,
             ingredientId: ingredient.id,
+            purchaseId: purchase.id,
+            purchaseItemId: purchase.items[0].id,
             type: 'purchase_entry',
             quantity: quantityBase,
             unitCost: unitCostBase,
