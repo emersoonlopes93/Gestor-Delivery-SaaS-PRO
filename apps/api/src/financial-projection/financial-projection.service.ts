@@ -92,7 +92,7 @@ export class FinancialProjectionService {
     );
     const customerPayment = this.resolveCustomerPayment(order, source, normalizedPayload);
     const cogsSnapshot = this.resolveCogs(order.stockMovements);
-    const discountMerchant = this.unknown();
+    const discountMerchant = this.resolveMerchantFundedDiscount(source, normalizedPayload);
     const discountPlatform = this.unknown();
     const refund = this.unknown();
     const marketplaceFact = source === FinancialProjectionSource.PEDEHUB || source === FinancialProjectionSource.POS
@@ -212,6 +212,17 @@ export class FinancialProjectionService {
         : this.known(value, 'marketplace.normalizedPayload.discountTotal');
     }
     return this.known(discountTotal, 'order.discountTotal');
+  }
+
+  private resolveMerchantFundedDiscount(
+    source: FinancialProjectionSource,
+    normalizedPayload: NormalizedMarketplacePayload | null,
+  ): MoneyFact {
+    if (source !== FinancialProjectionSource.FOOD_99) return this.unknown();
+    const value = this.readNumber(normalizedPayload, 'merchantFundedDiscount');
+    return value === null
+      ? this.unknown()
+      : this.known(value, '99food.promotions[].shop_subside_price (order-level only)');
   }
 
   private resolveOrderCharge(

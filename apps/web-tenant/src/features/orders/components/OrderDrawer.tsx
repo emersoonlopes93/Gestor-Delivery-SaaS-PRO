@@ -251,9 +251,16 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           <header className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-5 border-b border-border bg-muted/50 dark:bg-muted/50 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
-              <h2 id="order-drawer-title" className="text-xl font-black text-foreground tracking-tight">
-                Pedido #{order?.orderNumber || '...'}
-              </h2>
+              <div>
+                <h2 id="order-drawer-title" className="text-xl font-black text-foreground tracking-tight">
+                  {order?.operational?.origin === 'FOOD_99' && order.operational.providerOrderNumber
+                    ? `Pedido 99Food #${order.operational.providerOrderNumber}`
+                    : `Pedido #${order?.orderNumber || '...'}`}
+                </h2>
+                {order?.operational?.origin === 'FOOD_99' && order.operational.providerOrderNumber ? (
+                  <p className="text-xs font-bold text-muted-foreground">PedeHub #{order.orderNumber}</p>
+                ) : null}
+              </div>
               {order && <OrderStatusBadge status={order.status} />}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">

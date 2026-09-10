@@ -51,9 +51,25 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
     expect(html).toContain('Total pago pelo cliente');
     expect(html).toContain('Valor a cobrar');
     expect(html).toContain('Não cobrar na entrega');
-    expect(html).toContain('Repasse previsto para a loja');
+    expect(html).toContain('Ganho estimado da loja');
+    expect(html).toContain('Repasse liquidado');
     expect(html).toContain('A confirmar');
     expect(html).toContain('origem não informada');
+  });
+
+  it('shows proven merchant-funded discount without treating it as settlement', () => {
+    const html = render({
+      ...baseFinancial,
+      merchantFundedDiscount: 6.35,
+      merchantFundedDiscountState: 'KNOWN',
+      settledReceivable: null,
+      settledReceivableState: 'UNKNOWN',
+    }, 'pix', 36.35);
+
+    expect(html).toContain('Desconto suportado pela loja');
+    expect(html).toContain('6,35');
+    expect(html).toContain('Repasse liquidado');
+    expect(html).toContain('A confirmar');
   });
 
   it('shows the exact pay-on-delivery amount without claiming it was paid', () => {
@@ -79,5 +95,17 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
     expect(html).toContain('Valor a cobrar');
     expect(html).toContain('A confirmar');
     expect(html).toContain('Valor a cobrar</span><span class="font-black text-foreground">A confirmar');
+  });
+
+  it('renders not-applicable financial facts explicitly instead of zero or unknown', () => {
+    const html = render({
+      ...baseFinancial,
+      amountToCollectState: 'NOT_APPLICABLE',
+      merchantReceivableState: 'NOT_APPLICABLE',
+      settledReceivableState: 'NOT_APPLICABLE',
+    }, 'other');
+
+    expect(html).toContain('Não aplicável');
+    expect(html).not.toContain('Valor a cobrar</span><span class="font-black text-foreground">R$');
   });
 });

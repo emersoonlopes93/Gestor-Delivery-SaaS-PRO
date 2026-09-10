@@ -23,6 +23,7 @@ export type OperationalOrderInput = {
   itemsSubtotal: number;
   deliveryDriverName?: string | null;
   provider?: string | null;
+  externalDisplayId?: string | null;
   deliveryOwnership?: string | null;
   marketplaceNormalizedPayload?: unknown;
   latestMarketplaceOperation?: MarketplaceOperationInput;
@@ -97,6 +98,7 @@ function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalV
   const customerPaid = finiteNumber(payload, 'customerPaidAmount');
   const amountToCollect = finiteNumber(payload, 'amountToCollect');
   const discountTotal = finiteNumber(payload, 'discountTotal');
+  const merchantFundedDiscount = finiteNumber(payload, 'merchantFundedDiscount');
 
   return {
     operationalValue: input.itemsSubtotal,
@@ -114,6 +116,10 @@ function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalV
     collectionResponsibility,
     merchantReceivable: null,
     merchantReceivableState: 'UNKNOWN',
+    settledReceivable: null,
+    settledReceivableState: 'UNKNOWN',
+    merchantFundedDiscount,
+    merchantFundedDiscountState: merchantFundedDiscount === null ? 'UNKNOWN' : 'KNOWN',
     discountFundingState: discountTotal === 0 ? 'NOT_APPLICABLE' : 'UNKNOWN',
     platformFees: null,
     platformFeesState: 'UNKNOWN',
@@ -257,6 +263,7 @@ export function getOrderOperationalViewModel(input: OperationalOrderInput): Orde
   return {
     origin,
     provider: input.provider ?? null,
+    providerOrderNumber: input.externalDisplayId ?? null,
     displayChannel,
     deliveryOwnership: ownership,
     fulfillmentMode: input.fulfillmentType,

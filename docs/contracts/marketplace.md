@@ -260,6 +260,14 @@ The native `OrderModel` payment source is `pay_channel`, with the documented leg
 
 `price.order_price` is the gross product sale. `price.customer_need_paying_money` is the customer's payable total; it is not payment evidence by itself. Detailed `pay_channel` takes precedence over legacy `pay_type` when classifying collection. Online channels (`150`, `212`, `280`) establish marketplace collection and a paid customer amount, so `amountToCollect=0`. Cash/POS delivery channels (`153`, `154`, `262`, `263`) establish pending driver collection for the exact customer payable amount. Unknown or missing modes preserve payment, collection and amount-to-collect as unknown rather than zero.
 
+The native `order_index` is the provider's shop order number for the day and is preserved as the operational display number; the internal PedeHub order number remains visible. `order_id` remains a lossless string because official examples exceed JavaScript's safe integer range.
+
+The normalized snapshot also preserves `real_price`, `real_pay_price`, and `shop_paid_money` as provider price facts without reclassifying them. The official model describes the first two as post-component/post-discount price stages and `shop_paid_money` as a cash-order rider advance scenario; none is treated as merchant receivable or settled payout. `promotions[].shop_subside_price` is the documented merchant-borne promotion cost. Only the order-level promotions array is aggregated because the official fixture repeats item promotions in `promotion_detail`/`promo_list`; item and order arrays must never be summed together. External/platform funding remains unknown.
+
+`others_fees.service_price` is preserved as the provider-reported service fee. The available snapshot does not prove that it is merchant revenue, merchant cost, or part of the merchant estimate, so operational copy remains neutral and no receivable calculation consumes it.
+
+`FinancialProjection.merchantReceivable` continues to mean a projected/estimated receivable, never settlement. Since the available native contract and preserved fixtures do not prove a 99Food merchant-estimated-receivable field, it remains `UNKNOWN`; actual settlement also remains `UNKNOWN`. Order ingestion creates no `FinancialTransaction` and never changes `FinancialAccount.balance`.
+
 `items_discount`, `delivery_discount` and `others_fees.coupon_discount` establish the total discount but do not identify its funder. `delivery_price` and `others_fees.service_price` are customer charges. Merchant-funded discount, platform-funded discount, platform fees and merchant receivable remain unknown because the native order snapshot does not provide those facts. The normalized snapshot persists these distinctions in the existing JSON field; no new database column or inferred settlement exists.
 
 ### Native action activation and privacy-protected names (2026-09-05)

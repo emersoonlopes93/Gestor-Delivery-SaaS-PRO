@@ -79,6 +79,11 @@ export type NormalizedMarketplaceOrder = {
   merchantFundedDiscount?: number | null;
   platformFundedDiscount?: number | null;
   platformFees?: number | null;
+  providerPriceFields?: {
+    realPrice: number | null;
+    realPayPrice: number | null;
+    shopPaidMoney: number | null;
+  };
   changeFor?: number | null;
   itemsSubtotal?: number;
   discountTotal?: number;

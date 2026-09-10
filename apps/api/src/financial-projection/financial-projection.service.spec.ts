@@ -20,6 +20,7 @@ type ProjectionWrite = {
   saleGrossState: FinancialProjectionValueState;
   discountTotal: Prisma.Decimal | null;
   discountTotalState: FinancialProjectionValueState;
+  discountMerchant: Prisma.Decimal | null;
   discountMerchantState: FinancialProjectionValueState;
   discountPlatformState: FinancialProjectionValueState;
   deliveryCharged: Prisma.Decimal | null;
@@ -160,6 +161,7 @@ describe('FinancialProjectionService', () => {
           collectionResponsibility: 'MARKETPLACE',
           isPrepaid: true,
           discountTotal: 10,
+          merchantFundedDiscount: 3,
           deliveryFee: 8,
           serviceFee: 2,
           externalOrderId: '9223372036854775807',
@@ -177,12 +179,16 @@ describe('FinancialProjectionService', () => {
     expect(write.deliveryCharged?.toString()).toBe('8');
     expect(write.serviceCharged?.toString()).toBe('2');
     expect(write.customerPaidState).toBe(FinancialProjectionValueState.KNOWN);
-    expect(write.discountMerchantState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.discountMerchant?.toString()).toBe('3');
+    expect(write.discountMerchantState).toBe(FinancialProjectionValueState.KNOWN);
     expect(write.discountPlatformState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.marketplaceFeeState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.sourceFieldProvenance.customerPaid).toEqual({
       source: '99food.customer_need_paying_money confirmed by native online payment mode',
+    });
+    expect(write.sourceFieldProvenance.discountMerchant).toEqual({
+      source: '99food.promotions[].shop_subside_price (order-level only)',
     });
   });
 

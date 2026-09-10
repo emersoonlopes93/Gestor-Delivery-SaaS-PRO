@@ -2447,3 +2447,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
   inactive account history remains stored but is excluded from available balance.
 - No write path, transaction semantics, cash/refund behavior, marketplace semantics, schema,
   migration, API contract, dependency or historical data was changed.
+## 99Food order contract closure (2026-09-10)
+
+- Worktree/branch: `C:\wt\pedehub\99food-contract-closure` / `fix/99food-order-contract-closure`.
+- Preserved the native 99Food provider order number (`order_index`) alongside the internal PedeHub number in order details and print.
+- Separated gross product sale, customer-paid amount, amount to collect, estimated merchant receivable and actual settlement in operational presentation. Unknown estimates/settlements remain “A confirmar”.
+- Customer tickets now print `customerPaid` for paid marketplace orders and never label the gross order value as paid; paid-online orders explicitly say not to collect.
+- Preserved `real_price`, `real_pay_price`, and `shop_paid_money` as non-inferred provider facts. Aggregates only order-level `promotions[].shop_subside_price` to avoid order/item duplicate counting; platform funding remains unknown.
+- `FinancialProjection.merchantReceivable` and actual settlement remain unknown. No automatic `FinancialTransaction`, `FinancialAccount` mutation, schema change, migration, backfill, provider action or deployment.

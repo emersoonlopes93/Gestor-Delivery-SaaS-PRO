@@ -496,6 +496,10 @@ export interface OrderFinancialSummary {
   collectionResponsibility?: 'MARKETPLACE' | 'MERCHANT' | 'DRIVER' | 'UNKNOWN';
   merchantReceivable?: number | null;
   merchantReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  settledReceivable?: number | null;
+  settledReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  merchantFundedDiscount?: number | null;
+  merchantFundedDiscountState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
   discountFundingState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
   platformFees?: number | null;
   platformFeesState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
@@ -515,6 +519,7 @@ export interface OrderProductionSummary {
 export interface OrderOperationalViewModel {
   origin: OrderOrigin;
   provider: string | null;
+  providerOrderNumber?: string | null;
   displayChannel: string;
   deliveryOwnership: OrderDeliveryOwnership;
   fulfillmentMode: FulfillmentType;

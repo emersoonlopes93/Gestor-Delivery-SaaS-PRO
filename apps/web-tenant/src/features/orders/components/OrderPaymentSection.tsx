@@ -42,6 +42,14 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
   const payment = PAYMENT_METHOD_LABELS[paymentMethod] || { label: paymentMethod, icon: Wallet, color: 'text-muted-foreground bg-muted dark:bg-slate-800 dark:text-muted-foreground' };
   const Icon = payment.icon;
+  const financialValue = (
+    state: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE' | undefined,
+    value: number | null | undefined,
+  ) => state === 'KNOWN' && typeof value === 'number'
+    ? fmt(value)
+    : state === 'NOT_APPLICABLE'
+      ? 'Não aplicável'
+      : 'A confirmar';
   return (
     <section>
       <h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-3">Pagamento e Totais</h3>
@@ -63,7 +71,7 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
 
           {serviceFee > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Taxa de serviço do cliente</span>
+              <span className="text-muted-foreground font-medium">Taxa de serviço informada pela 99Food</span>
               <span className="text-foreground font-bold">{fmt(serviceFee)}</span>
             </div>
           )}
@@ -79,6 +87,14 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
               <span className="text-emerald-600 dark:text-emerald-400 font-black">-{fmt(discountTotal)}</span>
             </div>
           )}
+
+          {financialSummary?.merchantFundedDiscountState === 'KNOWN'
+            && typeof financialSummary.merchantFundedDiscount === 'number' ? (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground font-medium">Desconto suportado pela loja</span>
+                <span className="text-foreground font-bold">{fmt(financialSummary.merchantFundedDiscount)}</span>
+              </div>
+            ) : null}
 
           {cashbackUsed && cashbackUsed > 0 && (
             <div className="flex justify-between text-sm">
@@ -105,9 +121,7 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-muted-foreground">Valor a cobrar</span>
                 <span className="font-black text-foreground">
-                  {financialSummary.amountToCollectState === 'KNOWN' && typeof financialSummary.amountToCollect === 'number'
-                    ? fmt(financialSummary.amountToCollect)
-                    : 'A confirmar'}
+                  {financialValue(financialSummary.amountToCollectState, financialSummary.amountToCollect)}
                 </span>
               </div>
               {financialSummary.paymentState === 'PAID' && financialSummary.amountToCollect === 0 ? (
@@ -116,11 +130,15 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
                 </p>
               ) : null}
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-muted-foreground">Repasse previsto para a loja</span>
+                <span className="font-medium text-muted-foreground">Ganho estimado da loja</span>
                 <span className="font-black text-foreground">
-                  {financialSummary.merchantReceivableState === 'KNOWN' && typeof financialSummary.merchantReceivable === 'number'
-                    ? fmt(financialSummary.merchantReceivable)
-                    : 'A confirmar'}
+                  {financialValue(financialSummary.merchantReceivableState, financialSummary.merchantReceivable)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-muted-foreground">Repasse liquidado</span>
+                <span className="font-black text-foreground">
+                  {financialValue(financialSummary.settledReceivableState, financialSummary.settledReceivable)}
                 </span>
               </div>
             </div>

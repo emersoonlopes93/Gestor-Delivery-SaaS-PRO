@@ -297,6 +297,9 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const couponDiscount = this.minorMoney(otherFees?.coupon_discount);
     const orderPrice = this.minorMoney(price?.order_price);
     const realPrice = this.minorMoney(price?.real_price);
+    const realPayPrice = this.minorMoney(price?.real_pay_price);
+    const shopPaidMoney = this.minorMoney(price?.shop_paid_money);
+    const merchantFundedDiscount = this.nativeMerchantFundedDiscount(order.promotions);
     const itemsSubtotal = orderPrice
       ?? normalizedItems.reduce((sum, item) => this.roundMoney(sum + item.totalPrice), 0);
     const payment = this.nativePaymentSemantics(order, customerPayable);
@@ -330,9 +333,10 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       paymentStatus: payment.paymentStatus,
       collectionResponsibility: payment.collectionResponsibility,
       merchantReceivable: null,
-      merchantFundedDiscount: null,
+      merchantFundedDiscount,
       platformFundedDiscount: null,
       platformFees: null,
+      providerPriceFields: { realPrice, realPayPrice, shopPaidMoney },
       changeFor: this.minorMoney(order.change_for),
       // Native price fields are integer centavos. `order_price` is the product
       // sale value and `customer_need_paying_money` is the customer's payable
@@ -519,6 +523,23 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       paymentStatus: 'UNKNOWN',
       collectionResponsibility: 'UNKNOWN',
     };
+  }
+
+  private nativeMerchantFundedDiscount(value: unknown): number | null {
+    if (!Array.isArray(value)) return null;
+
+    let total = 0;
+    for (const promotionValue of value) {
+      const promotion = this.asRecord(promotionValue);
+      const shopSubsidy = this.minorMoney(promotion?.shop_subside_price);
+      if (shopSubsidy === null) return null;
+      total += shopSubsidy;
+    }
+
+    // The official order fixture repeats item promotions in both
+    // `promotion_detail`/`promo_list` and the order-level `promotions` array.
+    // Aggregate the authoritative order-level array only to avoid double count.
+    return this.roundMoney(total);
   }
 
   private sumFeeType(values: unknown[], type: string): number {

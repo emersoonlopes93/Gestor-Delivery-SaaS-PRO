@@ -75,18 +75,32 @@ export class PrinterService {
 
     if (format === 'escpos') lines.push(INITIALIZE);
 
+    const providerOrderNumber = order.operational?.origin === 'FOOD_99'
+      ? order.operational.providerOrderNumber
+      : null;
+
     // Header
     if (type === 'customer') {
       if (format === 'escpos') lines.push(CENTER, FONT_DOUBLE, BOLD_ON);
       lines.push(center('GESTOR DELIVERY SAAS PRO'));
       if (format === 'escpos') lines.push(FONT_NORMAL);
-      lines.push(center(`${this.getFulfillmentLabel(order.fulfillmentType)} - ${order.orderNumber}`));
+      if (providerOrderNumber) {
+        lines.push(center(`99FOOD - PEDIDO #${providerOrderNumber}`));
+        lines.push(center(`PEDEHUB #${order.orderNumber}`));
+      } else {
+        lines.push(center(`${this.getFulfillmentLabel(order.fulfillmentType)} - ${order.orderNumber}`));
+      }
     } else {
       if (format === 'escpos') lines.push(CENTER, BOLD_ON);
       lines.push(center('*** PRODUCAO / KDS ***'));
       lines.push(center(`SETOR: ${station?.toUpperCase() || 'GERAL'}`));
       if (format === 'escpos') lines.push(FONT_DOUBLE);
-      lines.push(center(`PEDIDO: #${order.orderNumber}`));
+      if (providerOrderNumber) {
+        lines.push(center(`99FOOD - PEDIDO #${providerOrderNumber}`));
+        lines.push(center(`PEDEHUB #${order.orderNumber}`));
+      } else {
+        lines.push(center(`PEDIDO: #${order.orderNumber}`));
+      }
       if (format === 'escpos') lines.push(FONT_NORMAL);
     }
     
@@ -119,7 +133,7 @@ export class PrinterService {
         lines.push(`PAGAMENTO: ${financial.paymentLabel.toUpperCase()}`);
         lines.push(`METODO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
         if (financial.paymentState === 'PAID' && financial.amountToCollect === 0) {
-          lines.push('NAO COBRAR NA ENTREGA');
+          lines.push('*** NAO COBRAR DO CLIENTE ***');
           lines.push('VALOR A COBRAR: R$ 0,00');
         } else if (financial.amountToCollectState === 'KNOWN' && typeof financial.amountToCollect === 'number') {
           lines.push(`VALOR A COBRAR: ${financial.amountToCollect.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
@@ -193,7 +207,6 @@ export class PrinterService {
 
     if (type === 'customer') {
       const subStr = order.itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
-      const totalStr = order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
       const financial = order.operational?.financialSummary;
       
       lines.push(`SUBTOTAL: ${subStr}`);
@@ -201,7 +214,16 @@ export class PrinterService {
       lines.push(thinSeparator);
       
       if (format === 'escpos') lines.push(BOLD_ON, FONT_DOUBLE);
-      lines.push(`${financial?.paymentState === 'PENDING' ? 'TOTAL DO CLIENTE' : financial?.paymentState === 'UNKNOWN' ? 'TOTAL INFORMADO' : 'TOTAL PAGO'}: ${totalStr}`);
+      if (financial?.paymentState === 'PAID' && typeof financial.customerPaid === 'number') {
+        const customerPaid = financial.customerPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        lines.push(`TOTAL PAGO PELO CLIENTE: ${customerPaid}`);
+      } else if (financial?.paymentState === 'PENDING' && typeof financial.amountToCollect === 'number') {
+        const amountToCollect = financial.amountToCollect.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        lines.push(`TOTAL DO CLIENTE: ${amountToCollect}`);
+      } else {
+        const total = order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
+        lines.push(`TOTAL INFORMADO: ${total}`);
+      }
       if (format === 'escpos') lines.push(FONT_NORMAL, BOLD_OFF);
 
       lines.push(separator);

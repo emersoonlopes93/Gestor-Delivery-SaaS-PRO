@@ -66,6 +66,7 @@ describe('getOrderOperationalViewModel', () => {
     const pending = getOrderOperationalViewModel({
       ...base,
       provider: 'FOOD_99',
+      externalDisplayId: '210007',
       deliveryOwnership: 'MERCHANT',
     });
     expect(pending.capabilities).toMatchObject({ canConfirm: true, canMarkReady: true, canCancel: false });
@@ -93,6 +94,7 @@ describe('getOrderOperationalViewModel', () => {
     const result = getOrderOperationalViewModel({
       ...base,
       provider: 'FOOD_99',
+      externalDisplayId: '210007',
       deliveryOwnership: 'MERCHANT',
       marketplaceNormalizedPayload: {
         itemsSubtotal: 48,
@@ -121,6 +123,7 @@ describe('getOrderOperationalViewModel', () => {
       platformFees: null,
       platformFeesState: 'UNKNOWN',
     });
+    expect(result.providerOrderNumber).toBe('210007');
   });
 
   it('exposes the real amount for self-delivery collection without marking it paid', () => {

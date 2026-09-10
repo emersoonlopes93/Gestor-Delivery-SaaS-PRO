@@ -44,6 +44,7 @@ function withFood99Financial(order: OrderResponseDTO, financialSummary: OrderFin
     ...order,
     operational: {
       origin: 'FOOD_99', provider: 'FOOD_99', displayChannel: '99Food',
+      providerOrderNumber: '210007',
       deliveryOwnership: 'MERCHANT', fulfillmentMode: 'delivery',
       capabilities: {
         canConfirm: true, canStartPreparation: true, canMarkReady: true, canCancel: false,
@@ -96,8 +97,34 @@ describe('PrinterService 99Food payment semantics', () => {
     const content = await new PrinterService().formatTicket(order, 'customer');
 
     expect(content).toContain('PAGAMENTO: PAGO NA 99FOOD');
-    expect(content).toContain('NAO COBRAR NA ENTREGA');
+    expect(content).toContain('*** NAO COBRAR DO CLIENTE ***');
     expect(content).toContain('VALOR A COBRAR: R$ 0,00');
+  });
+
+  it('prints provider and internal numbers and never labels gross as customer-paid', async () => {
+    const order = withFood99Financial({ ...makeOrder(), itemsSubtotal: 68.99, total: 40.76 }, {
+      ...baseFinancial,
+      operationalValue: 68.99,
+      saleAmount: 68.99,
+      customerPaid: 40.76,
+      paymentState: 'PAID',
+      paymentLabel: 'Pago na 99Food',
+      amountToCollect: 0,
+      amountToCollectState: 'KNOWN',
+      collectionResponsibility: 'MARKETPLACE',
+    });
+
+    const content = await new PrinterService().formatTicket(order, 'customer');
+
+    expect(content).toContain('99FOOD - PEDIDO #210007');
+    expect(content).toContain('PEDEHUB #0056');
+    expect(content.replace(/\u00a0/g, ' ')).toContain('TOTAL PAGO PELO CLIENTE: R$ 40,76');
+    expect(content).not.toContain('TOTAL PAGO:');
+    expect(content).not.toContain('TOTAL PAGO PELO CLIENTE: R$ 68,99');
+
+    const kitchenContent = await new PrinterService().formatTicket(order, 'kitchen', 'GERAL');
+    expect(kitchenContent).toContain('99FOOD - PEDIDO #210007');
+    expect(kitchenContent).toContain('PEDEHUB #0056');
   });
 
   it('prints the exact driver collection amount for pay on delivery', async () => {

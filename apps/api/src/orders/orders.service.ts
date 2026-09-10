@@ -676,6 +676,7 @@ export class OrdersService {
             marketplaceOrders: {
               select: {
                 provider: true,
+                externalDisplayId: true,
                 deliveryOwnership: true,
                 normalizedPayload: true,
                 operations: {
@@ -713,6 +714,7 @@ export class OrdersService {
             itemsSubtotal: Number(o.itemsSubtotal),
             deliveryDriverName: o.deliveryDriver?.name,
             provider: o.marketplaceOrders[0]?.provider,
+            externalDisplayId: o.marketplaceOrders[0]?.externalDisplayId,
             deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
             marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
             latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
@@ -862,6 +864,7 @@ export class OrdersService {
         marketplaceOrders: {
           select: {
             provider: true,
+            externalDisplayId: true,
             deliveryOwnership: true,
             normalizedPayload: true,
             operations: {
@@ -897,6 +900,7 @@ export class OrdersService {
         itemsSubtotal: Number(o.itemsSubtotal),
         deliveryDriverName: o.deliveryDriver?.name,
         provider: o.marketplaceOrders[0]?.provider,
+        externalDisplayId: o.marketplaceOrders[0]?.externalDisplayId,
         deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
         marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
         latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
@@ -963,6 +967,7 @@ export class OrdersService {
         marketplaceOrders: {
           select: {
             provider: true,
+            externalDisplayId: true,
             deliveryOwnership: true,
             normalizedPayload: true,
             operations: {
@@ -1150,6 +1155,7 @@ export class OrdersService {
     }>;
     marketplaceOrders?: Array<{
       provider: string;
+      externalDisplayId?: string | null;
       deliveryOwnership: string;
       normalizedPayload?: Prisma.JsonValue | null;
       operations: Array<{ operation: string; status: string }>;
@@ -1186,6 +1192,7 @@ export class OrdersService {
           itemsSubtotal: Number(order.itemsSubtotal),
           deliveryDriverName: order.deliveryDriver?.name,
           provider: marketplaceOrder?.provider,
+          externalDisplayId: marketplaceOrder?.externalDisplayId,
           deliveryOwnership: marketplaceOrder?.deliveryOwnership,
           marketplaceNormalizedPayload: marketplaceOrder?.normalizedPayload,
           latestMarketplaceOperation: marketplaceOrder?.operations[0] ?? null,

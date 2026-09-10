@@ -201,6 +201,45 @@ describe('Food99Provider', () => {
     expect(normalized.items).toEqual([expect.objectContaining({ name: 'Pizza', totalPrice: 35.99 })]);
   });
 
+  it('keeps the observed gross and customer-paid totals separate and preserves provider price facts', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764607801871631353', order_index: 210007, pay_channel: 212, delivery_type: 2,
+        price: {
+          order_price: 6899,
+          real_price: 4289,
+          real_pay_price: 4076,
+          customer_need_paying_money: 4076,
+          shop_paid_money: 0,
+          items_discount: 3635,
+        },
+        promotions: [
+          { promo_type: 1, save_price: 2000, shop_subside_price: 500 },
+          { promo_type: 2, save_price: 1635, shop_subside_price: 135 },
+        ],
+        order_items: [{
+          app_item_id: 'item-1', name: 'Pedido observado', amount: 1, sku_price: 6899, total_price: 6899,
+          promotion_detail: { save_price: 2000, shop_subside_price: 500 },
+          promo_list: [{ save_price: 2000, shop_subside_price: 500 }],
+        }],
+      },
+    });
+
+    expect(normalized).toMatchObject({
+      externalOrderId: '5764607801871631353',
+      externalDisplayId: '210007',
+      itemsSubtotal: 68.99,
+      customerPaidAmount: 40.76,
+      amountToCollect: 0,
+      paymentStatus: 'PAID',
+      merchantFundedDiscount: 6.35,
+      platformFundedDiscount: null,
+      merchantReceivable: null,
+      providerPriceFields: { realPrice: 42.89, realPayPrice: 40.76, shopPaidMoney: 0 },
+    });
+  });
+
   it('replaces the 99Food privacy placeholder with documented name parts when available', async () => {
     const normalized = await provider.normalizeOrder({
       connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
