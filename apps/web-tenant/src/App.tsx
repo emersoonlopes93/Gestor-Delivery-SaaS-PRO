@@ -23,6 +23,7 @@ import { UpsellsPage } from './features/catalog/UpsellsPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { OrderManagerV2Page } from './features/orders/v2/OrderManagerV2Page';
+import { OrderManagerV2AccessDenied } from './features/orders/v2/OrderManagerV2AccessDenied';
 import { KdsPage } from './features/orders/KdsPage';
 import { OrderAutomationSettingsPage } from './features/orders/OrderAutomationSettingsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
@@ -208,8 +209,8 @@ export function App() {
         <Route
           path="/orders/manager"
           element={
-            <FeatureGate featureKey="order_manager_v2">
-              <PermissionGate permission="orders.use_kanban">
+            <FeatureGate featureKey="order_manager_v2" fallback={<OrderManagerV2AccessDenied />}>
+              <PermissionGate permission="orders.use_kanban" fallback={<OrderManagerV2AccessDenied />}>
                 <OrderManagerV2Page />
               </PermissionGate>
             </FeatureGate>

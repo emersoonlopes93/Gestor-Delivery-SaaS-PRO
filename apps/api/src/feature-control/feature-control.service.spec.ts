@@ -182,7 +182,7 @@ describe('FeatureControlService', () => {
       rbacService as never,
     );
 
-    return { service, prisma };
+    return { service, prisma, rbacService };
   };
 
   it('publishes the canonical initial go-live branch creation policy', () => {
@@ -422,6 +422,40 @@ describe('FeatureControlService', () => {
       enabled: true,
       reason: 'tenant_enabled_override',
       source: 'tenant_feature_override',
+    });
+  });
+
+  it('builds tenant capabilities with the authenticated user permissions', async () => {
+    const { service, rbacService } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    const capabilities = await service.getTenantCapabilities('tenant-1', 'authorized-user');
+
+    expect(rbacService.getUserPermissions).toHaveBeenCalledWith('authorized-user');
+    expect(capabilities.features.order_manager_v2).toEqual({
+      enabled: true,
+      reason: 'tenant_enabled_override',
+      source: 'tenant_feature_override',
+    });
+  });
+
+  it('reports missing_permission only for an opted-in Orders user without kanban access', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'restricted-user',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'missing_permission',
+      source: 'rbac',
     });
   });
 

@@ -56,6 +56,10 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('uma aba anuncia');
     expect(page).toContain('setSoundPreferenceEnabled');
     expect(page).toContain('setVoiceAlertsEnabled');
+    expect(page).toContain('soundManager.testSound()');
+    expect(page).toContain('testVoice');
+    expect(page).toContain('soundManager.setVolume');
+    expect(page).toContain('Teste de voz do Gestor de Pedidos.');
     expect(page).toContain('needsAudioUnlock');
     expect(center).toContain('sharedOrderAlertCoordinator.enqueue');
     expect(center).toContain('if (isLeader && !isConnectionEvent(event))');

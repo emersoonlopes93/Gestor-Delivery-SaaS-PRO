@@ -1,4 +1,4 @@
-import { TenantDefaultRole } from '@gestor/core';
+import { TENANT_ROLE_PERMISSIONS, TenantDefaultRole } from '@gestor/core';
 import {
   ensureDefaultTenantRoles,
   getTenantRolePolicy,
@@ -12,6 +12,15 @@ describe('default tenant roles', () => {
       assignable: true,
       requiresStrongConfirmation: true,
     });
+  });
+
+  it('grants the operational kanban only to the intended default roles', () => {
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.TENANT_OWNER]).toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.TENANT_ADMIN]).toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.MANAGER]).toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.CASHIER]).not.toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.KITCHEN]).not.toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.DELIVERY_OPERATOR]).not.toContain('orders.use_kanban');
   });
 
   it('creates the default tenant role catalog idempotently', async () => {

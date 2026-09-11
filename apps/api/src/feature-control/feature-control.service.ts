@@ -170,7 +170,7 @@ export class FeatureControlService {
   }
 
   async getTenantCapabilities(tenantId: string, userId?: string): Promise<TenantCapabilitiesResponse> {
-    const context = await this.buildContext(tenantId);
+    const context = await this.buildContext(tenantId, userId);
 
     const featureEntries = FEATURE_CATALOG.map((feature) => [
       feature.key,
