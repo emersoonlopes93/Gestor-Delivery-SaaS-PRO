@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ChevronRight, MapPin, Radio, Store, Truck, UserRound } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, MapPin, Printer, Radio, Store, Truck, UserRound } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderOperationalAction } from '@gestor/types';
 import { deliveryStatement, ORDER_STATUS_PRESENTATION, providerLabel } from '../order-presenters';
 import { formatElapsed, isRunnableStatusAction } from './order-manager-v2';
@@ -8,7 +8,9 @@ type Props = {
   now: number;
   onOpen: (order: OrderBoardItemDTO) => void;
   onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void;
+  onPrint: (order: OrderBoardItemDTO) => void;
   isActionPending: boolean;
+  isPrinting: boolean;
 };
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -24,7 +26,7 @@ const STATUS_ACCENT: Partial<Record<OrderBoardItemDTO['status'], string>> = {
   cancelled: 'before:bg-destructive',
 };
 
-export function OrderCardV2({ order, now, onOpen, onAction, isActionPending }: Props) {
+export function OrderCardV2({ order, now, onOpen, onAction, onPrint, isActionPending, isPrinting }: Props) {
   const action = order.operational.primaryAction;
   const alert = order.operational.syncState === 'FAILED' || order.status === 'pending';
   const fulfillmentLabel = order.fulfillmentType === 'delivery'
@@ -44,7 +46,7 @@ export function OrderCardV2({ order, now, onOpen, onAction, isActionPending }: P
     : 'Sincronizado';
   const status = ORDER_STATUS_PRESENTATION[order.status];
   return (
-    <article className={`group relative border border-border bg-card p-3 pl-4 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
+    <article className={`group relative rounded-xl border border-border bg-card p-3 pl-4 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l-xl hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
       <button type="button" className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Abrir pedido ${order.orderNumber}`} onClick={() => onOpen(order)} />
       <div className="pointer-events-none relative">
         <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
@@ -53,6 +55,7 @@ export function OrderCardV2({ order, now, onOpen, onAction, isActionPending }: P
             <h3 className="mt-1 text-xl font-black leading-none text-foreground">#{order.orderNumber}</h3>
           </div>
           <div className="flex flex-col items-end gap-1.5">
+            <button type="button" disabled={isPrinting} title="Imprimir pedido" aria-label={`Imprimir pedido ${order.orderNumber}`} onClick={(event) => { event.stopPropagation(); onPrint(order); }} className="pointer-events-auto relative z-10 grid h-7 w-7 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60"><Printer className="h-3.5 w-3.5" /></button>
             <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${alert ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'border-border bg-muted text-muted-foreground'}`}>
               {alert ? <AlertTriangle className="h-3 w-3" /> : <Radio className="h-3 w-3" />}{formatElapsed(order.createdAt, now)}
             </span>

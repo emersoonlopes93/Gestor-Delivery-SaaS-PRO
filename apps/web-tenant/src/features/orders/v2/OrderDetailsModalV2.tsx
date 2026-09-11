@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, ClipboardList, History, PackageOpen, Radio } from 'lucide-react';
+import { Activity, AlertTriangle, ClipboardList, History, PackageOpen, Printer, Radio } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderOperationalAction, OrderResponseDTO } from '@gestor/types';
 import { api } from '../../../lib/api-client';
 import { OrderTimelineSection } from '../components/OrderTimelineSection';
@@ -7,9 +7,9 @@ import { ORDER_STATUS_PRESENTATION } from '../order-presenters';
 import { ModalShell } from './ModalShell';
 import { formatElapsed, isRunnableStatusAction } from './order-manager-v2';
 
-type Props = { order: OrderBoardItemDTO | null; now: number; onClose: () => void; onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void; isActionPending: boolean };
+type Props = { order: OrderBoardItemDTO | null; now: number; onClose: () => void; onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void; onPrint: (order: OrderBoardItemDTO) => void; isActionPending: boolean; isPrinting: boolean };
 
-export function OrderDetailsModalV2({ order, now, onClose, onAction, isActionPending }: Props) {
+export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, isActionPending, isPrinting }: Props) {
   const [detail, setDetail] = useState<OrderResponseDTO | null>(null);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [tab, setTab] = useState<'summary' | 'timeline'>('summary');
@@ -21,8 +21,8 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, isActionPen
       .then((response) => { setDetail(response.data ?? null); setDetailState(response.data ? 'ready' : 'error'); })
       .catch(() => { setDetail(null); setDetailState('error'); });
   }, [order]);
-  return <ModalShell open={Boolean(order)} title={order ? `Pedido #${order.orderNumber}` : 'Pedido'} onClose={onClose}>
-    <div className="p-5 sm:p-7">
+  return <ModalShell open={Boolean(order)} title={order ? `Pedido #${order.orderNumber}` : 'Pedido'} onClose={onClose} headerActions={order ? <button type="button" disabled={isPrinting} title="Imprimir pedido" aria-label={`Imprimir pedido ${order.orderNumber}`} onClick={() => onPrint(order)} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60"><Printer className="h-4 w-4" /></button> : null}>
+    <div className="p-5 sm:p-6">
       {order ? <section className="mb-5 grid gap-px border border-border bg-border sm:grid-cols-4" aria-label="Resumo operacional do pedido">
         <OperationalSummary label="Status" value={ORDER_STATUS_PRESENTATION[order.status].label} icon={<Activity className="h-3.5 w-3.5" />} />
         <OperationalSummary label="Tempo aberto" value={formatElapsed(order.createdAt, now)} icon={<Radio className="h-3.5 w-3.5" />} />

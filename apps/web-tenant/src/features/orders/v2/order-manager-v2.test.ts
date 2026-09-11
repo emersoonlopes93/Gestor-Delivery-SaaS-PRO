@@ -72,6 +72,16 @@ describe('Order Manager V2 visual contracts', () => {
     expect(center).toContain('if (shouldAnnounce && !isConnectionEvent(event))');
   });
 
+  it('keeps search and filters outside the persisted collapsible cockpit panel', () => {
+    const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
+    expect(page).toContain('COCKPIT_COLLAPSED_STORAGE_KEY');
+    expect(page).toContain('aria-expanded={!cockpitCollapsed}');
+    expect(page).toContain('aria-controls="order-manager-v2-cockpit-expanded"');
+    expect(page).toContain('hidden={cockpitCollapsed}');
+    expect(page.indexOf('Buscar pedido por')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
+    expect(page).toContain('Metric label="Ativos"');
+  });
+
   it('labels card scan indicators and repeats operational context in details', () => {
     const card = readFileSync(resolve(__dirname, 'OrderCardV2.tsx'), 'utf8');
     const details = readFileSync(resolve(__dirname, 'OrderDetailsModalV2.tsx'), 'utf8');
@@ -85,5 +95,22 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('pointer-events-auto relative z-10');
     expect(details).toContain('Acoes de status do pedido');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('/orders/${order.id}/status');
+  });
+
+  it('wires accessible print actions to the canonical receipt flow', () => {
+    const card = readFileSync(resolve(__dirname, 'OrderCardV2.tsx'), 'utf8');
+    const details = readFileSync(resolve(__dirname, 'OrderDetailsModalV2.tsx'), 'utf8');
+    const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
+    const printFlow = readFileSync(resolve(__dirname, '../order-print.ts'), 'utf8');
+    expect(card).toContain('title="Imprimir pedido"');
+    expect(card).toContain('onPrint(order)');
+    expect(details).toContain('title="Imprimir pedido"');
+    expect(details).toContain('onPrint(order)');
+    expect(page).toContain('printOrderCustomerReceipt');
+    expect(page).toContain('Não foi possível imprimir o pedido');
+    expect(printFlow).toContain('/pos/sales/${orderId}/print?type=customer');
+    expect(printFlow).toContain('/orders/${orderId}/print-log');
+    expect(printFlow).toContain('printTicketViaPrimaryBluetooth');
+    expect(printFlow).toContain('printThermalText');
   });
 });

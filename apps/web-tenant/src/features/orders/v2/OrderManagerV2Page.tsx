@@ -3,6 +3,8 @@ import {
   Activity,
   AlertTriangle,
   BellRing,
+  ChevronDown,
+  ChevronUp,
   ChefHat,
   PackageCheck,
   RefreshCw,
@@ -22,6 +24,7 @@ import type {
   UpdateOrderStatusDTO,
 } from "@gestor/types";
 import { api } from "../../../lib/api-client";
+import { printOrderCustomerReceipt } from "../order-print";
 import { subscribeOrdersRealtimeEvents } from "../../../notifications/ordersRealtimeEvents";
 import {
   latestHintForOrder,
@@ -47,6 +50,7 @@ import {
 } from "./order-alert-coordinator";
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
+const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
 const LANE_STYLE = {
   kitchen: {
     rule: "border-t-4 border-t-amber-500",
@@ -79,6 +83,8 @@ export function OrderManagerV2Page() {
   const [selected, setSelected] = useState<OrderBoardItemDTO | null>(null);
   const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const [cockpitCollapsed, setCockpitCollapsed] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem(COCKPIT_COLLAPSED_STORAGE_KEY) === "true");
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
   const now = useSharedClock();
@@ -100,6 +106,10 @@ export function OrderManagerV2Page() {
       window.removeEventListener(VOICE_ALERTS_CHANGED_EVENT, syncVoice);
     };
   }, [voiceScope]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(COCKPIT_COLLAPSED_STORAGE_KEY, String(cockpitCollapsed));
+  }, [cockpitCollapsed]);
 
   const testVoice = useCallback(async () => {
     const speech = browserSpeechProvider();
@@ -174,6 +184,19 @@ export function OrderManagerV2Page() {
     }
   }, [reconcile, updatingOrderId]);
 
+  const handlePrint = useCallback(async (order: OrderBoardItemDTO) => {
+    if (printingOrderId) return;
+    setPrintingOrderId(order.id);
+    try {
+      await printOrderCustomerReceipt(order.id);
+      setError(null);
+    } catch {
+      setError("Não foi possível imprimir o pedido. Verifique a impressora ou permita a janela de impressão.");
+    } finally {
+      setPrintingOrderId(null);
+    }
+  }, [printingOrderId]);
+
   useEffect(() => {
     void fetchBoard();
   }, [fetchBoard]);
@@ -216,14 +239,24 @@ export function OrderManagerV2Page() {
   );
 
   return (
-    <main className="mx-auto max-w-[1800px] space-y-5 p-3 sm:p-6">
-      <header className="border border-border border-b-4 border-b-primary bg-card p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+    <main className="mx-auto max-w-[1800px] space-y-4 p-3 sm:p-5">
+      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-3 shadow-sm sm:p-4">
+        <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/35 px-3 py-2">
+          <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Gestor de Pedidos</p><p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">Operação ao vivo</p></div>
+          <Metric label="Ativos" value={kpis.active} />
+          <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
+          <Metric label="Em rota" value={kpis.route} />
+          <span className={`hidden items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold sm:inline-flex ${realtime.connectionState === "connected" ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
+          <span className="hidden text-[10px] font-bold text-muted-foreground lg:inline">Alertas: {soundManager.soundPreferenceEnabled ? "som ativo" : "som desligado"}</span>
+          <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
+        </div>
+        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-3">
+        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
           <div className="border-l-4 border-primary pl-3">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
             </p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+            <h1 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">
               Gestor de Pedidos
             </h1>
           </div>
@@ -335,6 +368,7 @@ export function OrderManagerV2Page() {
             </button>
           </div>
         </div>
+        </div>
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
           <label className="relative min-w-[min(100%,280px)] flex-1">
             <span className="sr-only">
@@ -346,7 +380,7 @@ export function OrderManagerV2Page() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar número, cliente ou motoboy"
-              className="h-10 w-full border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary"
+              className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary"
             />
           </label>
           <div className="flex flex-wrap gap-1" aria-label="Filtrar origem">
@@ -355,14 +389,14 @@ export function OrderManagerV2Page() {
                 key={candidate}
                 type="button"
                 onClick={() => setOrigin(candidate)}
-                className={`px-3 py-2 text-[11px] font-black ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
+                className={`rounded-lg px-3 py-2 text-[11px] font-black ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
               >
                 {candidate === "all" ? "Todos" : candidate}
               </button>
             ))}
           </div>
           <span
-            className={`ml-auto inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-bold ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}
+            className={`ml-auto inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-bold ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}
           >
             {realtime.connectionState === "connected" ? (
               <Wifi className="h-3.5 w-3.5" />
@@ -402,9 +436,9 @@ export function OrderManagerV2Page() {
             return (
               <section
                 key={lane.id}
-                className={`min-h-[360px] min-w-[19rem] snap-start border border-border bg-muted/15 xl:min-w-0 ${style.rule}`}
+                className={`min-h-[360px] min-w-[19rem] snap-start rounded-2xl border border-border bg-muted/15 xl:min-w-0 ${style.rule}`}
               >
-                <header className="flex items-start justify-between border-b border-border bg-card px-4 py-3">
+                <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-4 py-3">
                   <div className="flex items-start gap-2">
                     <Icon className="mt-0.5 h-4 w-4 text-foreground" />
                     <div>
@@ -417,7 +451,7 @@ export function OrderManagerV2Page() {
                     </div>
                   </div>
                   <span
-                    className={`border border-current/15 px-2 py-1 text-xs font-black ${style.badge}`}
+                    className={`rounded-lg border border-current/15 px-2 py-1 text-xs font-black ${style.badge}`}
                   >
                     {grouped[lane.id].length}
                   </span>
@@ -430,11 +464,13 @@ export function OrderManagerV2Page() {
                       now={now}
                       onOpen={setSelected}
                       onAction={handleStatusAction}
+                      onPrint={handlePrint}
                       isActionPending={updatingOrderId === order.id}
+                      isPrinting={printingOrderId === order.id}
                     />
                   ))}
                   {grouped[lane.id].length === 0 ? (
-                    <div className="grid min-h-36 place-items-center border border-dashed border-border p-4 text-center text-xs font-bold text-muted-foreground">
+                    <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border p-4 text-center text-xs font-bold text-muted-foreground">
                       Sem pedidos nesta etapa
                     </div>
                   ) : null}
@@ -449,7 +485,9 @@ export function OrderManagerV2Page() {
         now={now}
         onClose={() => setSelected(null)}
         onAction={handleStatusAction}
+        onPrint={handlePrint}
         isActionPending={updatingOrderId === selected?.id}
+        isPrinting={printingOrderId === selected?.id}
       />
     </main>
   );
@@ -465,9 +503,9 @@ function Metric({
   tone?: string;
 }) {
   return (
-    <div className="min-w-20 px-4 py-2">
-      <p className={`text-lg font-black tabular-nums ${tone}`}>{value}</p>
-      <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+    <div className="min-w-14 rounded-lg border border-border bg-background px-2 py-1 text-center">
+      <p className={`text-sm font-black tabular-nums ${tone}`}>{value}</p>
+      <p className="text-[8px] font-black uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
     </div>

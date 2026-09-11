@@ -2478,3 +2478,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Worktree/branch: `C:\wt\pedehub\order-manager-v2-card-quick-action` / `fix/order-manager-v2-card-quick-action`, based on `origin/main-copy` / `5cb007b1569e1d6fc9b0bf34291ae884940dc45b`.
 - The card action button was nested under the visual `pointer-events-none` layer, so clicks passed through to the full-card detail button. The action button now explicitly restores pointer events while retaining its foreground stacking and click propagation stop.
 - Focused V2 tests: 2 files / 10 tests PASS. Focused ESLint and `git diff --check`: PASS. No database, provider, Dokploy or deploy action was performed.
+
+## Order Manager V2 cockpit refinement (2026-09-11)
+
+- Worktree/branch: `C:\wt\pedehub\order-manager-v2-cockpit-refinement` / `feat/order-manager-v2-cockpit-refinement`, based on `origin/main-copy` / `3428d30baf7fa8ce350e4d78c293e04a269646ab`.
+- The V2 header now has a session-persisted, accessible operational cockpit panel. Its compact row preserves the manager context, compact real KPIs, synchronization, alert state and expand/collapse control; search and origin filters remain outside it and always available.
+- Cards, lanes, filters and modal spacing use the existing Tailwind radius scale for denser, less square presentation. No domain metric, lifecycle, provider, RBAC or alert rule changed.
+- Card and modal print icons call `printOrderCustomerReceipt`, which uses the legacy board's customer-ticket endpoint (`GET /pos/sales/:id/print?type=customer`), print logging (`POST /orders/:id/print-log`), primary Bluetooth transport on native and `printThermalText` browser fallback. A blocked window or transport error is surfaced through the existing V2 error region.
+- Focused V2 contracts: 2 files / 12 tests PASS; V2 plus tab-leader regression: 3 files / 19 tests PASS. Focused lint, `check:no-any` and `git diff --check`: PASS. The full web build is blocked by existing implicit-any errors and unresolved shared-package dependencies outside this change. Authenticated visual smoke remains unavailable because the browser automation CLI is not installed.
