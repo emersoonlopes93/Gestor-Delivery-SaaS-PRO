@@ -27,7 +27,7 @@ const routes = [
   { slug: 'delivery-rates', path: '/delivery/rates', readyText: 'Salvar configurações' },
   { slug: 'analytics-reports', path: '/analytics/reports', readyText: 'Relatórios Gerenciais' },
   { slug: 'suppliers', path: '/management/suppliers', readyText: 'Fornecedores' },
-  { slug: 'inventory', path: '/inventory', readyText: 'Hub de Suprimentos' },
+  { slug: 'inventory', path: '/inventory', readyText: 'Estoque' },
   { slug: 'promotions', path: '/promotions', readyText: 'Promoções e Retenção' },
 ] as const;
 
