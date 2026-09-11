@@ -82,6 +82,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(details).toContain('Proxima acao');
     expect(details).toContain('formatElapsed');
     expect(card).toContain('onAction(order, action)');
+    expect(card).toContain('pointer-events-auto relative z-10');
     expect(details).toContain('Acoes de status do pedido');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('/orders/${order.id}/status');
   });

@@ -2472,3 +2472,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - V2 cards and details now render only enabled status actions with a canonical target status. They call the existing tenant/RBAC-protected `PATCH /orders/:id/status` endpoint and reconcile the returned authoritative order. Driver assignment/dispatch remains outside this status-only control because it requires the existing delivery-run selection flow.
 - New-order notifications were already emitted by the Orders gateway. The sound/voice gap was the leader-only playback gate: a visible follower displayed the notification but did not announce it. Visible tabs now announce the deduplicated event; the existing leader event-sharing remains in place.
 - Focused V2 tests: 2 files / 10 tests PASS. Focused ESLint and `pnpm check:no-any`: PASS. `git diff --check`: PASS. Full web build remains blocked by pre-existing implicit-any and unresolved shared-package errors outside this change; no authenticated browser smoke was possible because `agent-browser` is not installed. No database, provider, Dokploy or deploy action was performed.
+
+## Order Manager V2 card quick action follow-up (2026-09-11)
+
+- Worktree/branch: `C:\wt\pedehub\order-manager-v2-card-quick-action` / `fix/order-manager-v2-card-quick-action`, based on `origin/main-copy` / `5cb007b1569e1d6fc9b0bf34291ae884940dc45b`.
+- The card action button was nested under the visual `pointer-events-none` layer, so clicks passed through to the full-card detail button. The action button now explicitly restores pointer events while retaining its foreground stacking and click propagation stop.
+- Focused V2 tests: 2 files / 10 tests PASS. Focused ESLint and `git diff --check`: PASS. No database, provider, Dokploy or deploy action was performed.
