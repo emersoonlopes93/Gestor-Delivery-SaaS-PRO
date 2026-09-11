@@ -51,18 +51,23 @@ describe('inventory and purchasing UX contract', () => {
   it('keeps the Nova Compra modal client contract and no-new-fetch boundary intact', () => {
     expect(purchases).toContain("api.get<PurchaseDTO[]>('/purchasing/purchases')");
     expect(purchases).toContain("api.post('/purchasing/purchases', data)");
-    expect((purchases.match(/api\.get/g) ?? [])).toHaveLength(1);
-    expect((purchases.match(/api\.post/g) ?? [])).toHaveLength(1);
+    expect(purchases).toContain("api.get<FinancialAccountDTO[]>('/finance/accounts')");
+    expect((purchases.match(/api\.get<PurchaseDTO\[]>\('\/purchasing\/purchases'\)/g) ?? [])).toHaveLength(1);
+    expect((purchases.match(/api\.get<FinancialAccountDTO\[]>\('\/finance\/accounts'\)/g) ?? [])).toHaveLength(1);
+    expect((purchases.match(/api\.post\('\/purchasing\/purchases', data\)/g) ?? [])).toHaveLength(1);
     expect(purchases).toContain('Nova Compra');
     expect(purchaseModal).toContain("api.get<SupplierDTO[]>('/purchasing/suppliers')");
     expect(purchaseModal).toContain("api.get<IngredientDTO[]>('/inventory/ingredients')");
+    expect(purchaseModal).toContain("api.get<FinancialAccountDTO[]>('/finance/accounts')");
     expect(purchaseModal).toContain('onSave: (data: CreatePurchaseDTO) => Promise<void>');
     expect(purchaseModal).toContain('handleSubmit(onSave)');
     expect(purchaseModal).toContain("name: \"items\"");
     expect(purchaseModal).toContain("register('supplierId', { required: true })");
     expect(purchaseModal).toContain("register('paymentStatus')");
     expect(purchaseModal).toContain("register('purchaseDate')");
-    expect((purchaseModal.match(/api\.get/g) ?? [])).toHaveLength(2);
+    expect((purchaseModal.match(/api\.get<SupplierDTO\[]>\('\/purchasing\/suppliers'\)/g) ?? [])).toHaveLength(1);
+    expect((purchaseModal.match(/api\.get<IngredientDTO\[]>\('\/inventory\/ingredients'\)/g) ?? [])).toHaveLength(1);
+    expect((purchaseModal.match(/api\.get<FinancialAccountDTO\[]>\('\/finance\/accounts'\)/g) ?? [])).toHaveLength(1);
   });
 
   it('keeps mobile and assistive-technology controls available', () => {
