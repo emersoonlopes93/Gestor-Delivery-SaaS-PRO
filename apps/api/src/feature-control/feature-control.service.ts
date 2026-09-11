@@ -655,6 +655,47 @@ export class FeatureControlService {
       context.moduleAccessMap,
     );
     const tenantOverride = this.resolveEffectiveOverride(feature, context);
+
+    if (feature.requiresExplicitTenantEnablement) {
+      if (tenantOverride?.mode === 'disabled') {
+        return {
+          enabled: false,
+          reason: 'tenant_disabled',
+          source: tenantOverride.source,
+        };
+      }
+
+      if (tenantOverride?.mode !== 'enabled') {
+        return {
+          enabled: false,
+          reason: 'tenant_opt_in_required',
+          source: 'feature_catalog',
+        };
+      }
+
+      // An opt-in grants eligibility for this tenant, but it never bypasses
+      // the canonical plan/module or RBAC gates below.
+      if (!availabilityResult.enabled) {
+        return availabilityResult;
+      }
+
+      const permissionDecision = this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
+      if (permissionDecision) {
+        return permissionDecision;
+      }
+
+      const envDecision = this.resolveEnvFallback(feature);
+      if (envDecision) {
+        return envDecision;
+      }
+
+      return {
+        enabled: true,
+        reason: 'tenant_enabled_override',
+        source: tenantOverride.source,
+      };
+    }
+
     const effectiveAvailability = this.applyTenantOverrideToAvailability(availabilityResult, tenantOverride);
 
     if (!effectiveAvailability.enabled) {

@@ -10,6 +10,7 @@ export type FeatureDecisionReason =
   | 'plan_not_allowed'
   | 'tenant_disabled'
   | 'tenant_enabled_override'
+  | 'tenant_opt_in_required'
   | 'missing_permission'
   | 'beta_disabled'
   | 'env_disabled'

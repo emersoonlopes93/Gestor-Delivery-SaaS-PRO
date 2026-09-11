@@ -11,6 +11,7 @@ export type FeatureDecisionReason =
   | 'plan_not_allowed'
   | 'tenant_disabled'
   | 'tenant_enabled_override'
+  | 'tenant_opt_in_required'
   | 'missing_permission'
   | 'beta_disabled'
   | 'env_disabled'
@@ -94,6 +95,11 @@ export type FeatureCatalogEntry = {
   envFallbackKey?: string;
   billingEntitlementKey?: BillingEntitlementKey;
   billingEntitlementFlagKey?: BillingEntitlementFlagKey;
+  /**
+   * Keeps a reversible beta feature unavailable until an operator explicitly
+   * enables it for one tenant. A global disable remains the kill switch.
+   */
+  requiresExplicitTenantEnablement?: boolean;
 };
 
 export type ModuleCatalogEntry = {
@@ -265,6 +271,7 @@ const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
     moduleKey: 'orders',
     requiredPermission: 'orders.use_kanban',
     envFallbackKey: 'VITE_FEATURE_ORDER_MANAGER_V2',
+    requiresExplicitTenantEnablement: true,
   },
   {
     key: 'delivery_radius',

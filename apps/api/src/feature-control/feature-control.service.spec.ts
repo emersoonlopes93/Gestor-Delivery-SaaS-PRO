@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 /// <reference types="node" />
 import { BadRequestException } from '@nestjs/common';
+import { FEATURE_PRESET_BY_KEY } from '@gestor/core';
 import { FeatureControlService } from './feature-control.service';
 
 type GlobalSettingOverride = {
@@ -344,6 +345,98 @@ describe('FeatureControlService', () => {
       reason: 'global_disabled',
       source: 'feature_global_setting',
     });
+  });
+
+  it('keeps Order Manager V2 off until the tenant is explicitly opted in', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'tenant_opt_in_required',
+      source: 'feature_catalog',
+    });
+  });
+
+  it('keeps Order Manager V2 off for an explicit tenant disable', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'disabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'tenant_disabled',
+      source: 'tenant_feature_override',
+    });
+  });
+
+  it('allows Order Manager V2 only after explicit tenant enablement and canonical gates', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: true,
+      reason: 'tenant_enabled_override',
+      source: 'tenant_feature_override',
+    });
+  });
+
+  it('keeps a global Order Manager V2 kill switch above tenant enablement', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      globalSettings: [{ featureKey: 'order_manager_v2', status: 'disabled' }],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'global_disabled',
+      source: 'feature_global_setting',
+    });
+  });
+
+  it('does not let Order Manager V2 opt-in bypass module or RBAC eligibility', async () => {
+    const { service } = makeService({
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toMatchObject({
+      enabled: false,
+      reason: 'plan_not_allowed',
+    });
+  });
+
+  it('keeps Order Manager V2 out of generic feature-enabling presets', () => {
+    expect(FEATURE_PRESET_BY_KEY.interno_teste.enabledFeatures).not.toContain('order_manager_v2');
+    expect(FEATURE_PRESET_BY_KEY.full_platform.enabledFeatures).not.toContain('order_manager_v2');
   });
 
   it('returns env_disabled when the env fallback explicitly disables the feature', async () => {
