@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, MapPin, Radio, Store, Truck, UserRound } from 'lucide-react';
 import type { OrderBoardItemDTO } from '@gestor/types';
-import { deliveryStatement, providerLabel } from '../order-presenters';
+import { deliveryStatement, ORDER_STATUS_PRESENTATION, providerLabel } from '../order-presenters';
 import { formatElapsed } from './order-manager-v2';
 
 type Props = { order: OrderBoardItemDTO; now: number; onOpen: (order: OrderBoardItemDTO) => void };
@@ -35,7 +35,8 @@ export function OrderCardV2({ order, now, onOpen }: Props) {
     ? 'Falha de sincronizacao'
     : order.operational.syncState === 'PENDING'
       ? 'Sincronizando'
-      : 'Sincronizado';
+    : 'Sincronizado';
+  const status = ORDER_STATUS_PRESENTATION[order.status];
   return (
     <article className={`group relative border border-border bg-card p-3 pl-4 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
       <button type="button" className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Abrir pedido ${order.orderNumber}`} onClick={() => onOpen(order)} />
@@ -45,9 +46,12 @@ export function OrderCardV2({ order, now, onOpen }: Props) {
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{providerLabel(order.operational)}</p>
             <h3 className="mt-1 text-xl font-black leading-none text-foreground">#{order.orderNumber}</h3>
           </div>
-          <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${alert ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'border-border bg-muted text-muted-foreground'}`}>
-            {alert ? <AlertTriangle className="h-3 w-3" /> : <Radio className="h-3 w-3" />}{formatElapsed(order.createdAt, now)}
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${alert ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'border-border bg-muted text-muted-foreground'}`}>
+              {alert ? <AlertTriangle className="h-3 w-3" /> : <Radio className="h-3 w-3" />}{formatElapsed(order.createdAt, now)}
+            </span>
+            <span className="max-w-28 truncate text-right text-[10px] font-black uppercase tracking-wide text-foreground">{status.label}</span>
+          </div>
         </div>
         <div className="space-y-2 py-3">
           <p className="flex items-center gap-2 truncate text-sm font-bold text-foreground"><UserRound className="h-3.5 w-3.5 text-muted-foreground" />{order.customerName}</p>
@@ -66,7 +70,7 @@ export function OrderCardV2({ order, now, onOpen }: Props) {
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-border pt-3">
-          <span className="text-sm font-black text-foreground">{money.format(order.operational.financialSummary.operationalValue)}</span>
+          <span><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">{order.operational.financialSummary.operationalValueLabel}</span><span className="text-sm font-black text-foreground">{money.format(order.operational.financialSummary.operationalValue)}</span></span>
           <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-primary">{action?.label ?? 'Detalhes'}<ChevronRight className="h-3.5 w-3.5" /></span>
         </div>
         {order.operational.marketplaceOperation.state !== 'NONE' ? <p className="mt-3 border-l-2 border-primary pl-2 text-[11px] font-semibold text-muted-foreground">{order.operational.marketplaceOperation.friendlyMessage}</p> : null}
