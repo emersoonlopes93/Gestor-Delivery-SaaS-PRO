@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OrderBoardItemDTO } from '@gestor/types';
 import { OrderAlertCoordinator } from './order-alert-coordinator';
-import { filterManagerOrders, formatElapsed, groupOrdersForManager, privacySafeOrderPhrase } from './order-manager-v2';
+import { filterManagerOrders, formatElapsed, groupOrdersForManager, isRunnableStatusAction, privacySafeOrderPhrase } from './order-manager-v2';
 
 function order(status: OrderBoardItemDTO['status'], overrides: Partial<OrderBoardItemDTO> = {}): OrderBoardItemDTO {
   return {
@@ -26,6 +26,12 @@ describe('Order Manager V2 projections', () => {
   it('uses a shared clock display and never emits customer data for voice', () => {
     expect(formatElapsed('2026-09-10T12:00:00.000Z', Date.parse('2026-09-10T12:46:00.000Z'))).toBe('46 min');
     expect(privacySafeOrderPhrase(order('pending'))).not.toContain('Cliente confidencial');
+  });
+  it('only exposes enabled actions backed by a canonical target status', () => {
+    expect(isRunnableStatusAction({ type: 'CONFIRM', label: 'Confirmar', mode: 'LOCAL', enabled: true, targetStatus: 'confirmed' })).toBe(true);
+    expect(isRunnableStatusAction({ type: 'CONFIRM', label: 'Confirmar', mode: 'DISABLED', enabled: false, targetStatus: 'confirmed' })).toBe(false);
+    expect(isRunnableStatusAction({ type: 'ASSIGN_DRIVER', label: 'Atribuir', mode: 'LOCAL', enabled: true })).toBe(false);
+    expect(isRunnableStatusAction({ type: 'DISPATCH', label: 'Despachar', mode: 'LOCAL', enabled: true, targetStatus: 'out_for_delivery' })).toBe(false);
   });
 });
 
@@ -62,7 +68,8 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('Teste de voz do Gestor de Pedidos.');
     expect(page).toContain('needsAudioUnlock');
     expect(center).toContain('sharedOrderAlertCoordinator.enqueue');
-    expect(center).toContain('if (isLeader && !isConnectionEvent(event))');
+    expect(center).toContain("document.visibilityState === 'visible'");
+    expect(center).toContain('if (shouldAnnounce && !isConnectionEvent(event))');
   });
 
   it('labels card scan indicators and repeats operational context in details', () => {
@@ -74,5 +81,8 @@ describe('Order Manager V2 visual contracts', () => {
     expect(details).toContain('Resumo operacional do pedido');
     expect(details).toContain('Proxima acao');
     expect(details).toContain('formatElapsed');
+    expect(card).toContain('onAction(order, action)');
+    expect(details).toContain('Acoes de status do pedido');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('/orders/${order.id}/status');
   });
 });

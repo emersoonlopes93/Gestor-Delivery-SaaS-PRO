@@ -17,7 +17,9 @@ import {
 import type {
   OrderBoardItemDTO,
   OrderChangedEvent,
+  OrderOperationalAction,
   OrderResponseDTO,
+  UpdateOrderStatusDTO,
 } from "@gestor/types";
 import { api } from "../../../lib/api-client";
 import { subscribeOrdersRealtimeEvents } from "../../../notifications/ordersRealtimeEvents";
@@ -76,6 +78,7 @@ export function OrderManagerV2Page() {
   const [origin, setOrigin] = useState<(typeof ORIGINS)[number]>("all");
   const [selected, setSelected] = useState<OrderBoardItemDTO | null>(null);
   const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
   const now = useSharedClock();
@@ -146,6 +149,30 @@ export function OrderManagerV2Page() {
       .finally(() => reconcileRef.current.delete(hint.orderId));
     reconcileRef.current.set(hint.orderId, request);
   }, []);
+
+  const handleStatusAction = useCallback(async (order: OrderBoardItemDTO, action: OrderOperationalAction) => {
+    if (!action.enabled || !action.targetStatus || updatingOrderId) return;
+    setUpdatingOrderId(order.id);
+    try {
+      const body: UpdateOrderStatusDTO = { status: action.targetStatus };
+      const response = await api.patch<OrderResponseDTO>(`/orders/${order.id}/status`, body);
+      const updatedOrder = response.data ? orderDetailToBoardItem(response.data) : null;
+      if (!updatedOrder) throw new Error('Resposta de atualizacao sem pedido.');
+      setOrders((current) => {
+        const next = reconcileBoardOrder(current, order.id, updatedOrder);
+        ordersRef.current = next;
+        return next;
+      });
+      setSelected(updatedOrder);
+      setLastConfirmedAt(Date.now());
+      setError(null);
+    } catch {
+      setError('Nao foi possivel atualizar o status. O pedido sera reconciliado antes da proxima tentativa.');
+      void reconcile({ eventId: `action-failed:${order.id}:${Date.now()}`, orderId: order.id, reason: 'status', occurredAt: new Date().toISOString() });
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  }, [reconcile, updatingOrderId]);
 
   useEffect(() => {
     void fetchBoard();
@@ -402,6 +429,8 @@ export function OrderManagerV2Page() {
                       order={order}
                       now={now}
                       onOpen={setSelected}
+                      onAction={handleStatusAction}
+                      isActionPending={updatingOrderId === order.id}
                     />
                   ))}
                   {grouped[lane.id].length === 0 ? (
@@ -419,6 +448,8 @@ export function OrderManagerV2Page() {
         order={selected}
         now={now}
         onClose={() => setSelected(null)}
+        onAction={handleStatusAction}
+        isActionPending={updatingOrderId === selected?.id}
       />
     </main>
   );

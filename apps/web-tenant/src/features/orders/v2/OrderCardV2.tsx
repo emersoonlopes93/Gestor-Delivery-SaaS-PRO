@@ -1,9 +1,15 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, MapPin, Radio, Store, Truck, UserRound } from 'lucide-react';
-import type { OrderBoardItemDTO } from '@gestor/types';
+import type { OrderBoardItemDTO, OrderOperationalAction } from '@gestor/types';
 import { deliveryStatement, ORDER_STATUS_PRESENTATION, providerLabel } from '../order-presenters';
-import { formatElapsed } from './order-manager-v2';
+import { formatElapsed, isRunnableStatusAction } from './order-manager-v2';
 
-type Props = { order: OrderBoardItemDTO; now: number; onOpen: (order: OrderBoardItemDTO) => void };
+type Props = {
+  order: OrderBoardItemDTO;
+  now: number;
+  onOpen: (order: OrderBoardItemDTO) => void;
+  onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void;
+  isActionPending: boolean;
+};
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -18,7 +24,7 @@ const STATUS_ACCENT: Partial<Record<OrderBoardItemDTO['status'], string>> = {
   cancelled: 'before:bg-destructive',
 };
 
-export function OrderCardV2({ order, now, onOpen }: Props) {
+export function OrderCardV2({ order, now, onOpen, onAction, isActionPending }: Props) {
   const action = order.operational.primaryAction;
   const alert = order.operational.syncState === 'FAILED' || order.status === 'pending';
   const fulfillmentLabel = order.fulfillmentType === 'delivery'
@@ -39,7 +45,7 @@ export function OrderCardV2({ order, now, onOpen }: Props) {
   const status = ORDER_STATUS_PRESENTATION[order.status];
   return (
     <article className={`group relative border border-border bg-card p-3 pl-4 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
-      <button type="button" className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Abrir pedido ${order.orderNumber}`} onClick={() => onOpen(order)} />
+      <button type="button" className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Abrir pedido ${order.orderNumber}`} onClick={() => onOpen(order)} />
       <div className="pointer-events-none relative">
         <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
           <div className="min-w-0">
@@ -71,7 +77,7 @@ export function OrderCardV2({ order, now, onOpen }: Props) {
         </div>
         <div className="flex items-center justify-between border-t border-border pt-3">
           <span><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">{order.operational.financialSummary.operationalValueLabel}</span><span className="text-sm font-black text-foreground">{money.format(order.operational.financialSummary.operationalValue)}</span></span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-primary">{action?.label ?? 'Detalhes'}<ChevronRight className="h-3.5 w-3.5" /></span>
+          {isRunnableStatusAction(action) ? <button type="button" disabled={isActionPending} onClick={(event) => { event.stopPropagation(); onAction(order, action); }} className="relative z-10 inline-flex items-center gap-1 border border-primary bg-primary px-2.5 py-2 text-[11px] font-black uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60">{isActionPending ? 'Atualizando' : action.label}<ChevronRight className="h-3.5 w-3.5" /></button> : <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-primary">{action?.label ?? 'Detalhes'}<ChevronRight className="h-3.5 w-3.5" /></span>}
         </div>
         {order.operational.marketplaceOperation.state !== 'NONE' ? <p className="mt-3 border-l-2 border-primary pl-2 text-[11px] font-semibold text-muted-foreground">{order.operational.marketplaceOperation.friendlyMessage}</p> : null}
       </div>

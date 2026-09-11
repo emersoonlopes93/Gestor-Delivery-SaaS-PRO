@@ -44,8 +44,8 @@ export function ModalShell({ open, title, children, onClose, size = 'large' }: M
 
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-end bg-black/45 p-0 sm:items-center sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`max-h-[calc(100dvh-env(safe-area-inset-top))] w-full overflow-y-auto bg-card shadow-2xl outline-none ${size === 'large' ? 'sm:max-w-5xl' : 'sm:max-w-xl'} rounded-t-[1.75rem] sm:rounded-[1.75rem]`}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.75rem] bg-card shadow-2xl outline-none ${size === 'large' ? 'sm:max-w-5xl' : 'sm:max-w-xl'}`}>
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
           <h2 id={titleId} className="text-base font-black text-foreground">{title}</h2>
           <button type="button" className="rounded-lg px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary" onClick={onClose}>Fechar</button>

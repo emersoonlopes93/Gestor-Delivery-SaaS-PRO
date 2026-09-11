@@ -11,4 +11,11 @@ describe('ModalShell accessibility contract', () => {
     expect(source).toContain('modalDepth');
     expect(source).toContain('restoreFocusRef.current?.focus()');
   });
+
+  it('centers the dialog at every responsive breakpoint', () => {
+    const source = readFileSync(resolve(__dirname, 'ModalShell.tsx'), 'utf8');
+    expect(source).toContain('items-center justify-center');
+    expect(source).toContain('rounded-[1.75rem]');
+    expect(source).not.toContain('items-end');
+  });
 });

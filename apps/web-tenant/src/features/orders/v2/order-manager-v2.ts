@@ -1,4 +1,4 @@
-import type { OrderBoardItemDTO, OrderStatus } from '@gestor/types';
+import type { OrderBoardItemDTO, OrderOperationalAction, OrderStatus } from '@gestor/types';
 
 export type OrderManagerLane = 'kitchen' | 'ready' | 'route' | 'finalization';
 
@@ -41,6 +41,10 @@ export function privacySafeOrderPhrase(order: Pick<OrderBoardItemDTO, 'orderNumb
   return order.operational.syncState === 'FAILED'
     ? `Atenção: pedido ${order.orderNumber} precisa de verificação.`
     : `Novo evento operacional no pedido ${order.orderNumber}.`;
+}
+
+export function isRunnableStatusAction(action: OrderOperationalAction | null | undefined): action is OrderOperationalAction & { targetStatus: OrderStatus } {
+  return Boolean(action?.enabled && action.targetStatus && action.type !== 'ASSIGN_DRIVER' && action.type !== 'DISPATCH');
 }
 
 export class OrderAlertQueue {

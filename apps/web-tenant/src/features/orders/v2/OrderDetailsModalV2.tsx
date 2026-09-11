@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, ClipboardList, History, PackageOpen, Radio } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderResponseDTO } from '@gestor/types';
+import type { OrderBoardItemDTO, OrderOperationalAction, OrderResponseDTO } from '@gestor/types';
 import { api } from '../../../lib/api-client';
 import { OrderTimelineSection } from '../components/OrderTimelineSection';
 import { ORDER_STATUS_PRESENTATION } from '../order-presenters';
 import { ModalShell } from './ModalShell';
-import { formatElapsed } from './order-manager-v2';
+import { formatElapsed, isRunnableStatusAction } from './order-manager-v2';
 
-type Props = { order: OrderBoardItemDTO | null; now: number; onClose: () => void };
+type Props = { order: OrderBoardItemDTO | null; now: number; onClose: () => void; onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void; isActionPending: boolean };
 
-export function OrderDetailsModalV2({ order, now, onClose }: Props) {
+export function OrderDetailsModalV2({ order, now, onClose, onAction, isActionPending }: Props) {
   const [detail, setDetail] = useState<OrderResponseDTO | null>(null);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [tab, setTab] = useState<'summary' | 'timeline'>('summary');
@@ -28,6 +28,9 @@ export function OrderDetailsModalV2({ order, now, onClose }: Props) {
         <OperationalSummary label="Tempo aberto" value={formatElapsed(order.createdAt, now)} icon={<Radio className="h-3.5 w-3.5" />} />
         <OperationalSummary label="Sincronizacao" value={order.operational.syncState === 'FAILED' ? 'Falha - verificar' : order.operational.syncState === 'PENDING' ? 'Em andamento' : 'Confirmada'} icon={order.operational.syncState === 'FAILED' ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> : <Radio className="h-3.5 w-3.5" />} />
         <OperationalSummary label="Proxima acao" value={order.operational.primaryAction?.label ?? 'Somente consulta'} icon={<ClipboardList className="h-3.5 w-3.5" />} />
+      </section> : null}
+      {order ? <section className="mb-5 flex flex-wrap gap-2" aria-label="Acoes de status do pedido">
+        {order.operational.availableActions.filter(isRunnableStatusAction).map((action) => <button key={action.type} type="button" disabled={isActionPending} onClick={() => onAction(order, action)} className="border border-primary bg-primary px-3 py-2 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60">{isActionPending ? 'Atualizando...' : action.label}</button>)}
       </section> : null}
       <div className="mb-6 flex gap-2 border-b border-border">
         <button type="button" onClick={() => setTab('summary')} className={`inline-flex items-center gap-2 border-b-2 px-3 py-3 text-xs font-black ${tab === 'summary' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}><ClipboardList className="h-4 w-4" />Resumo</button>

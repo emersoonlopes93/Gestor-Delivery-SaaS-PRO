@@ -2464,3 +2464,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Customer tickets now print `customerPaid` for paid marketplace orders and never label the gross order value as paid; paid-online orders explicitly say not to collect.
 - Preserved `real_price`, `real_pay_price`, and `shop_paid_money` as non-inferred provider facts. Aggregates only order-level `promotions[].shop_subside_price` to avoid order/item duplicate counting; platform funding remains unknown.
 - `FinancialProjection.merchantReceivable` and actual settlement remain unknown. No automatic `FinancialTransaction`, `FinancialAccount` mutation, schema change, migration, backfill, provider action or deployment.
+
+## Order Manager V2 live-operation fixes (2026-09-11)
+
+- Worktree/branch: `C:\wt\pedehub\order-manager-v2-live-fixes` / `fix/order-manager-v2-live-operations`, based on `origin/main-copy` / `38599fe53f28ff7a200ee0fa6f1adc4d6f6719b3`.
+- The V2 modal shell is centered at all breakpoints. The prior mobile-only bottom-sheet alignment was removed while portal, focus trap, Escape handling and scroll locking remain intact.
+- V2 cards and details now render only enabled status actions with a canonical target status. They call the existing tenant/RBAC-protected `PATCH /orders/:id/status` endpoint and reconcile the returned authoritative order. Driver assignment/dispatch remains outside this status-only control because it requires the existing delivery-run selection flow.
+- New-order notifications were already emitted by the Orders gateway. The sound/voice gap was the leader-only playback gate: a visible follower displayed the notification but did not announce it. Visible tabs now announce the deduplicated event; the existing leader event-sharing remains in place.
+- Focused V2 tests: 2 files / 10 tests PASS. Focused ESLint and `pnpm check:no-any`: PASS. `git diff --check`: PASS. Full web build remains blocked by pre-existing implicit-any and unresolved shared-package errors outside this change; no authenticated browser smoke was possible because `agent-browser` is not installed. No database, provider, Dokploy or deploy action was performed.
