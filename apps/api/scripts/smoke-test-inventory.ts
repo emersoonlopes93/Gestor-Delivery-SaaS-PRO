@@ -257,11 +257,15 @@ async function main() {
 
   if (orderId) {
     const movementsAfterCreate = await api('GET', `/inventory/movements?ingredientId=${ingredientId}`, undefined, token);
-    const depletionExists = Array.isArray(movementsAfterCreate.data) && movementsAfterCreate.data.some((movement) => {
-      const record = asRecord(movement);
-      return record?.type === 'theoretical_depletion' && record.orderId === orderId && record.quantity === expectedConsumption;
-    });
-    assert('order creates theoretical inventory depletion', depletionExists, 'missing theoretical depletion movement', movementsAfterCreate.data);
+    const theoreticalDepletion = Array.isArray(movementsAfterCreate.data)
+      ? movementsAfterCreate.data.map(asRecord).find((movement) =>
+        movement?.type === 'theoretical_depletion'
+        && movement.orderId === orderId
+        && movement.quantity === expectedConsumption,
+      )
+      : null;
+    const depletionId = theoreticalDepletion ? pickString(theoreticalDepletion, 'id') : null;
+    assert('order creates theoretical inventory depletion', typeof depletionId === 'string', 'missing theoretical depletion movement', movementsAfterCreate.data);
 
     const ingredientAfterCreate = await api('GET', `/inventory/ingredients/${ingredientId}`, undefined, token);
     const ingredientAfterCreateRecord = asRecord(ingredientAfterCreate.data);
@@ -279,11 +283,19 @@ async function main() {
     assert('cancel order status 200', cancel.status === 200, `Status=${cancel.status}`, cancel.raw);
 
     const movementsAfterCancel = await api('GET', `/inventory/movements?ingredientId=${ingredientId}`, undefined, token);
-    const depletionWasReversed = Array.isArray(movementsAfterCancel.data) && !movementsAfterCancel.data.some((movement) => {
+    const reversalExists = Array.isArray(movementsAfterCancel.data) && movementsAfterCancel.data.some((movement) => {
       const record = asRecord(movement);
-      return record?.type === 'theoretical_depletion' && record.orderId === orderId;
+      return record?.type === 'theoretical_reversal'
+        && record.orderId === orderId
+        && record.quantity === expectedConsumption
+        && record.reversalOfMovementId === depletionId;
     });
-    assert('cancel order reverses theoretical inventory depletion', depletionWasReversed, 'theoretical depletion movement still exists', movementsAfterCancel.data);
+    assert('cancel order records a linked theoretical inventory reversal', reversalExists, 'missing linked theoretical reversal movement', movementsAfterCancel.data);
+
+    const ingredientAfterCancel = await api('GET', `/inventory/ingredients/${ingredientId}`, undefined, token);
+    const ingredientAfterCancelRecord = asRecord(ingredientAfterCancel.data);
+    const observedStockAfterCancel = ingredientAfterCancelRecord ? pickNumber(ingredientAfterCancelRecord, 'currentStock') : null;
+    assert('cancel order restores theoretical inventory balance', observedStockAfterCancel === observedStockBefore, `stock=${observedStockAfterCancel}, expected=${observedStockBefore}`);
   }
 
   const failed = results.filter((r) => !r.passed);
