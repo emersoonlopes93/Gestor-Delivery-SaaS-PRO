@@ -80,6 +80,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('hidden={cockpitCollapsed}');
     expect(page.indexOf('Buscar pedido por')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
     expect(page).toContain('Metric label="Ativos"');
+    expect(page).toContain('2xl:justify-end');
   });
 
   it('labels card scan indicators and repeats operational context in details', () => {

@@ -251,8 +251,8 @@ export function OrderManagerV2Page() {
           <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
         </div>
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-3">
-        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-          <div className="border-l-4 border-primary pl-3">
+        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-end">
+          <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
             </p>
@@ -260,7 +260,7 @@ export function OrderManagerV2Page() {
               Gestor de Pedidos
             </h1>
           </div>
-          <div className="grid grid-cols-3 divide-x divide-border border border-border bg-muted/25 text-center">
+          <div className="hidden">
             <Metric label="Ativos" value={kpis.active} />
             <Metric
               label="Atenção"
