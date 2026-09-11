@@ -16,16 +16,27 @@ const PRIORITY: Record<NotificationEvent['priority'], number> = { low: 1, medium
 export class OrderAlertCoordinator {
   private playing = false;
   private queue: QueuedAlert[] = [];
+  private readonly seen = new Map<string, number>();
 
-  enqueue(event: Pick<NotificationEvent, 'type' | 'orderId' | 'priority' | 'createdAt'>, provider: SpeechProvider): void {
+  enqueue(
+    event: Pick<NotificationEvent, 'type' | 'priority' | 'createdAt'> & Partial<Pick<NotificationEvent, 'id' | 'title' | 'orderId'>>,
+    provider: SpeechProvider,
+  ): void {
+    const timestamp = new Date(event.createdAt).getTime();
+    const safeCreatedAt = Number.isFinite(timestamp) ? timestamp : Date.now();
+    this.prune(safeCreatedAt);
+    const eventId = event.id ?? `${event.type}:${event.title ?? event.orderId ?? safeCreatedAt}`;
+    if (this.seen.has(eventId)) return;
+    this.seen.set(eventId, safeCreatedAt);
+    const displayNumber = getOperationalDisplayNumber(event.title ?? '');
     const phrase = event.type === 'order.created'
-      ? `Novo pedido ${event.orderId ? 'recebido' : 'recebido na operação'}.`
+      ? displayNumber ? `Novo pedido ${displayNumber} recebido.` : 'Novo pedido recebido.'
       : event.type === 'order.ready'
-        ? 'Pedido pronto para a próxima etapa.'
+        ? displayNumber ? `Pedido ${displayNumber} pronto para a próxima etapa.` : 'Pedido pronto para a próxima etapa.'
         : event.type === 'order.cancelled'
-          ? 'Um pedido foi cancelado.'
+          ? displayNumber ? `Pedido ${displayNumber} cancelado.` : 'Um pedido foi cancelado.'
           : 'Atualização operacional disponível.';
-    this.queue.push({ phrase, priority: PRIORITY[event.priority], createdAt: new Date(event.createdAt).getTime() });
+    this.queue.push({ phrase, priority: PRIORITY[event.priority], createdAt: safeCreatedAt });
     this.queue.sort((left, right) => right.priority - left.priority || left.createdAt - right.createdAt);
     if (!this.playing) void this.flush(provider);
   }
@@ -35,6 +46,18 @@ export class OrderAlertCoordinator {
     while (this.queue.length > 0) await provider.speak((this.queue.shift() as QueuedAlert).phrase);
     this.playing = false;
   }
+
+  private prune(now: number): void {
+    for (const [eventId, seenAt] of this.seen) {
+      if (now - seenAt > 60_000) this.seen.delete(eventId);
+    }
+  }
+}
+
+/** Reads only a human-facing numeric token; a UUID/orderId is never speech input. */
+export function getOperationalDisplayNumber(title: string): string | null {
+  const match = title.match(/#(\d{1,12})\b/);
+  return match ? `#${match[1]}` : null;
 }
 
 export function browserSpeechProvider(): SpeechProvider | null {
