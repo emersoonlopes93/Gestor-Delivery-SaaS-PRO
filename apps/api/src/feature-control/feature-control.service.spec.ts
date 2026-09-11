@@ -256,6 +256,31 @@ describe('FeatureControlService', () => {
     });
   });
 
+  it('keeps the tenant access inventory independent from the SaaS admin role', async () => {
+    const { service } = makeService({
+      includedModules: ['crm'],
+      permissions: [],
+    });
+
+    const catalog = await service.getTenantFeatureCatalog('tenant-1');
+    const crmEnterprise = catalog.features.find((item) => item.featureKey === 'crm_enterprise');
+
+    expect(crmEnterprise).toMatchObject({
+      effectiveEnabled: true,
+      reason: 'global_beta',
+      requiredPermission: ['crm.read'],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'crm_enterprise',
+      userId: 'tenant-user-without-crm-read',
+    })).resolves.toMatchObject({
+      enabled: false,
+      reason: 'missing_permission',
+    });
+  });
+
   it('rejects unknown features', async () => {
     const { service } = makeService();
 

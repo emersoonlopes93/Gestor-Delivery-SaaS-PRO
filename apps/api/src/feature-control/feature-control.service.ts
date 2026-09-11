@@ -38,6 +38,14 @@ type ResolveTenantFeatureInput = {
   featureKey: string;
   userId?: string;
   requiredPermission?: string | string[];
+  /**
+   * The tenant-admin inventory is a configuration view, not a login session
+   * for the platform administrator who requested it. It must therefore show
+   * whether the tenant can receive the feature without accidentally testing
+   * the SaaS admin id against tenant-scoped roles. User-facing capability
+   * endpoints keep this disabled and continue to enforce RBAC.
+   */
+  skipUserPermissionCheck?: boolean;
 };
 
 type TenantModuleAccessRow = {
@@ -162,7 +170,7 @@ export class FeatureControlService {
   }
 
   async getTenantCapabilities(tenantId: string, userId?: string): Promise<TenantCapabilitiesResponse> {
-    const context = await this.buildContext(tenantId, userId);
+    const context = await this.buildContext(tenantId);
 
     const featureEntries = FEATURE_CATALOG.map((feature) => [
       feature.key,
@@ -242,7 +250,7 @@ export class FeatureControlService {
     });
   }
 
-  async getTenantFeatureCatalog(tenantId: string, userId?: string): Promise<AdminTenantFeaturesResponse> {
+  async getTenantFeatureCatalog(tenantId: string): Promise<AdminTenantFeaturesResponse> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { id: true, name: true, slug: true },
@@ -251,7 +259,7 @@ export class FeatureControlService {
       throw new NotFoundException('Tenant nao encontrado.');
     }
 
-    const context = await this.buildContext(tenantId, userId);
+    const context = await this.buildContext(tenantId);
 
     return {
       tenant,
@@ -259,8 +267,8 @@ export class FeatureControlService {
         const decision = this.resolveTenantFeatureWithContext(
           {
             tenantId,
-            userId,
             featureKey: feature.key,
+            skipUserPermissionCheck: true,
           },
           context,
         );
@@ -679,7 +687,9 @@ export class FeatureControlService {
         return availabilityResult;
       }
 
-      const permissionDecision = this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
+      const permissionDecision = input.skipUserPermissionCheck
+        ? null
+        : this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
       if (permissionDecision) {
         return permissionDecision;
       }
@@ -702,7 +712,9 @@ export class FeatureControlService {
       return effectiveAvailability;
     }
 
-    const permissionDecision = this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
+    const permissionDecision = input.skipUserPermissionCheck
+      ? null
+      : this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
     if (permissionDecision) {
       return permissionDecision;
     }
