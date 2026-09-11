@@ -9,7 +9,7 @@ describe('PurchasesController', () => {
     const controller = Reflect.construct(PurchasesController, [purchasesService]);
     const dto: CreatePurchaseDTO = {
       supplierId: 'supplier-1',
-      idempotencyKey: 'purchase-key-1',
+      idempotencyKey: 'test-idempotency-sentinel',
       purchaseDate: '2026-09-07',
       items: [
         {
