@@ -73,10 +73,10 @@ export class DeliveryRunsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly earnings: DriverEarningsService,
-    @Inject(forwardRef(() => OrdersService))
-    private readonly ordersService: Pick<OrdersService, 'applyOrderStatusTransitionInTransaction'>,
     @Optional() private readonly routing?: RoutingV2Service,
     @Optional() private readonly ordersGateway?: OrdersGateway,
+    @Optional() @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService?: Pick<OrdersService, 'applyOrderStatusTransitionInTransaction'>,
   ) {}
 
   async getBuilderData(tenantId: string): Promise<DeliveryRunBuilderDataDTO> {
@@ -604,6 +604,7 @@ export class DeliveryRunsService {
   }
 
   async startRun(tenantId: string, runId: string, driverId: string) {
+    const ordersService = this.requireOrdersService();
     const updated = await this.transaction(async (tx) => {
       const run = await this.getDriverRun(tx, tenantId, runId, driverId);
       if (run.status === DeliveryRunStatus.IN_PROGRESS || run.status === DeliveryRunStatus.RETURNING) return run;
@@ -625,7 +626,7 @@ export class DeliveryRunsService {
       const startedAt = new Date();
       const readyOrders = orders.filter((order) => order.status === 'ready_for_delivery');
       for (const order of readyOrders) {
-        await this.ordersService.applyOrderStatusTransitionInTransaction(tx, {
+        await ordersService.applyOrderStatusTransitionInTransaction(tx, {
           tenantId,
           orderId: order.id,
           expectedCurrentStatus: 'ready_for_delivery',
@@ -756,6 +757,7 @@ export class DeliveryRunsService {
   }
 
   async completeStop(tenantId: string, runId: string, stopId: string, driverId: string) {
+    const ordersService = this.requireOrdersService();
     const updated = await this.transaction(async (tx) => {
       const run = await this.getDriverRun(tx, tenantId, runId, driverId);
       const stop = run.stops.find((item) => item.id === stopId);
@@ -776,7 +778,7 @@ export class DeliveryRunsService {
       }
 
       if (!isAlreadyCompleted) {
-        await this.ordersService.applyOrderStatusTransitionInTransaction(tx, {
+        await ordersService.applyOrderStatusTransitionInTransaction(tx, {
           tenantId,
           orderId: order.id,
           expectedCurrentStatus: 'out_for_delivery',
@@ -1139,5 +1141,12 @@ export class DeliveryRunsService {
       }
       throw error;
     });
+  }
+
+  private requireOrdersService(): Pick<OrdersService, 'applyOrderStatusTransitionInTransaction'> {
+    if (!this.ordersService) {
+      throw new Error('OrdersService is required for canonical logistics status transitions.');
+    }
+    return this.ordersService;
   }
 }

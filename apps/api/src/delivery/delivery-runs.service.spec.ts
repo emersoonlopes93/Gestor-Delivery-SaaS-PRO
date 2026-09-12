@@ -63,9 +63,9 @@ describe('DeliveryRunsService', () => {
   const service = new DeliveryRunsService(
     prisma as never,
     earnings as never,
-    ordersService as never,
     undefined,
     gateway as never,
+    ordersService as never,
   );
 
   beforeEach(() => {
@@ -590,6 +590,30 @@ describe('DeliveryRunsService', () => {
 
     expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledTimes(1);
     expect(gateway.emitOrderChanged).not.toHaveBeenCalled();
+  });
+
+  it('allows one overlapping completeStop winner without duplicate earnings or realtime', async () => {
+    const stop = { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.ARRIVED, payAttemptSnapshot: false };
+    tx.deliveryRun.findFirst.mockImplementation(async () => baseRun({ status: DeliveryRunStatus.IN_PROGRESS, stops: [stop] }));
+    tx.order.findFirst.mockResolvedValue({ id: 'order-a', status: 'out_for_delivery' });
+    let releaseWinner: (() => void) | undefined;
+    const winnerStarted = new Promise<void>((resolve) => { releaseWinner = resolve; });
+    ordersService.applyOrderStatusTransitionInTransaction
+      .mockImplementationOnce(async () => { await winnerStarted; return { updatedOrder: { id: 'order-a', status: 'completed' } }; })
+      .mockRejectedValueOnce(new ConflictException({ code: 'ORDER_STATUS_STALE' }));
+    tx.deliveryStop.findMany.mockResolvedValue([{ ...stop, status: DeliveryStopStatus.DELIVERED }]);
+    tx.deliveryRun.update.mockResolvedValue(baseRun({ status: DeliveryRunStatus.COMPLETED }));
+
+    const first = service.completeStop('tenant-a', 'run-a', 'stop-a', 'driver-a');
+    await Promise.resolve();
+    const second = service.completeStop('tenant-a', 'run-a', 'stop-a', 'driver-a');
+    releaseWinner?.();
+
+    const results = await Promise.allSettled([first, second]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(earnings.postStop).toHaveBeenCalledTimes(1);
+    expect(gateway.emitOrderChanged).toHaveBeenCalledTimes(1);
   });
 
   it('blocks start with an explicit kitchen message while an order is preparing', async () => {
