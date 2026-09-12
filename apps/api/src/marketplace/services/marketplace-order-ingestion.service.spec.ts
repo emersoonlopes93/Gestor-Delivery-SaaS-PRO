@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { MarketplaceConnectionStatus, MarketplaceEventStatus, MarketplaceProvider, OrderStatus } from '@prisma/client';
 import { MarketplaceOrderIngestionService } from './marketplace-order-ingestion.service';
 
@@ -31,7 +32,10 @@ function ordersGatewayStub() {
   return { emitOrderChanged: jest.fn() };
 }
 
-function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersService = { updateOrderStatus: jest.fn() }) {
+function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersService = {
+  updateOrderStatus: jest.fn(),
+  applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}),
+}) {
   return {
     service: new MarketplaceOrderIngestionService(
       prisma as never,
@@ -102,8 +106,10 @@ describe('MarketplaceOrderIngestionService', () => {
     });
 
     expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
-    expect(tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: { status: OrderStatus.ready_for_delivery },
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledWith(tx, expect.objectContaining({
+      expectedCurrentStatus: OrderStatus.pending,
+      targetStatus: OrderStatus.ready_for_delivery,
+      transitionPolicy: 'food99_authoritative',
     }));
   });
 
@@ -129,7 +135,10 @@ describe('MarketplaceOrderIngestionService', () => {
     });
 
     expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
-    expect(tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: targetStatus } }));
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledWith(tx, expect.objectContaining({
+      targetStatus,
+      transitionPolicy: 'food99_authoritative',
+    }));
   });
 
   it('does not repeat the terminal transition or realtime side effect when the same 99Food finish event replays', async () => {
@@ -143,13 +152,17 @@ describe('MarketplaceOrderIngestionService', () => {
       $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
     };
     const gateway = ordersGatewayStub();
+    const ordersService = {
+      updateOrderStatus: jest.fn(),
+      applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}),
+    };
     const service = new MarketplaceOrderIngestionService(
       prisma as never,
       {} as never,
       {} as never,
       {} as never,
       gateway as never,
-      {} as never,
+      ordersService as never,
       {} as never,
       {} as never,
     );
@@ -165,7 +178,7 @@ describe('MarketplaceOrderIngestionService', () => {
       currentStatus: OrderStatus.completed,
     });
 
-    expect(tx.order.updateMany).toHaveBeenCalledTimes(1);
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledTimes(1);
     expect(tx.orderTimeline.create).toHaveBeenCalledTimes(1);
     expect(gateway.emitOrderChanged).toHaveBeenCalledTimes(1);
   });
@@ -182,13 +195,17 @@ describe('MarketplaceOrderIngestionService', () => {
     };
     const gateway = ordersGatewayStub();
     gateway.emitOrderChanged.mockImplementation(() => { throw new Error('socket unavailable'); });
+    const ordersService = {
+      updateOrderStatus: jest.fn(),
+      applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}),
+    };
     const service = new MarketplaceOrderIngestionService(
       prisma as never,
       {} as never,
       {} as never,
       {} as never,
       gateway as never,
-      {} as never,
+      ordersService as never,
       {} as never,
       {} as never,
     );
@@ -199,8 +216,68 @@ describe('MarketplaceOrderIngestionService', () => {
       currentStatus: OrderStatus.pending,
     })).resolves.toBeUndefined();
 
-    expect(tx.order.updateMany).toHaveBeenCalledTimes(1);
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledTimes(1);
     expect(tx.orderTimeline.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create timeline, status sync, or realtime side effects for a stale authoritative event', async () => {
+    const tx = {
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = {
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    };
+    const gateway = ordersGatewayStub();
+    const ordersService = {
+      updateOrderStatus: jest.fn(),
+      applyOrderStatusTransitionInTransaction: jest.fn().mockRejectedValue(
+        new ConflictException({ code: 'ORDER_STATUS_STALE' }),
+      ),
+    };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never, {} as never, {} as never, {} as never, gateway as never,
+      ordersService as never, {} as never, {} as never,
+    );
+
+    await expect(reconcileFood99Lifecycle(service, {
+      ...food99LifecycleInput,
+      topic: 'ORDERFINISH',
+      currentStatus: OrderStatus.pending,
+    })).resolves.toBeUndefined();
+
+    expect(tx.orderTimeline.create).not.toHaveBeenCalled();
+    expect(tx.marketplaceOrder.updateMany).not.toHaveBeenCalled();
+    expect(gateway.emitOrderChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not emit realtime when a transactional 99Food side effect fails before commit', async () => {
+    const tx = {
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceOrder: { updateMany: jest.fn().mockRejectedValue(new Error('marketplace sync unavailable')) },
+    };
+    const prisma = {
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    };
+    const gateway = ordersGatewayStub();
+    const ordersService = {
+      updateOrderStatus: jest.fn(),
+      applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never, {} as never, {} as never, {} as never, gateway as never,
+      ordersService as never, {} as never, {} as never,
+    );
+
+    await expect(reconcileFood99Lifecycle(service, {
+      ...food99LifecycleInput,
+      topic: 'ORDERFINISH',
+      currentStatus: OrderStatus.pending,
+    })).rejects.toThrow('marketplace sync unavailable');
+
+    expect(gateway.emitOrderChanged).not.toHaveBeenCalled();
   });
 
   it('does not reopen a terminal 99Food order when an older confirmation is replayed', async () => {

@@ -69,6 +69,20 @@ export type OrderStatusTransitionResult = {
   toStatus: OrderStatus;
 };
 
+/**
+ * The normal lifecycle is the only transition policy available to regular
+ * callers. 99Food is allowed to report a terminal provider fact even when a
+ * preceding event was missed, and ORDERREADY can arrive before ORDERCONFIRM.
+ */
+export type OrderStatusTransitionPolicy = 'canonical' | 'food99_authoritative';
+
+function isFood99AuthoritativeTransitionAllowed(from: OrderStatus, to: OrderStatus): boolean {
+  if (from === OrderStatus.completed || from === OrderStatus.cancelled) return false;
+  if (to === OrderStatus.completed || to === OrderStatus.cancelled) return true;
+  return from === OrderStatus.pending
+    && (to === OrderStatus.ready_for_pickup || to === OrderStatus.ready_for_delivery);
+}
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger('OrdersService');
@@ -1267,6 +1281,7 @@ export class OrdersService {
       expectedCurrentStatus: OrderStatus;
       targetStatus: OrderStatus;
       expectedDeliveryDriverId?: string | null;
+      transitionPolicy?: OrderStatusTransitionPolicy;
     },
   ): Promise<OrderStatusTransitionResult> {
     const order = await tx.order.findFirst({
@@ -1284,7 +1299,11 @@ export class OrdersService {
     ) {
       throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
     }
-    if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(input.targetStatus)) {
+    const transitionPolicy = input.transitionPolicy ?? 'canonical';
+    const isAllowed = transitionPolicy === 'food99_authoritative'
+      ? isFood99AuthoritativeTransitionAllowed(currentStatus, input.targetStatus)
+      : ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(input.targetStatus);
+    if (!isAllowed) {
       throw new BadRequestException(`Transição inválida de ${currentStatus} para ${input.targetStatus}`);
     }
 

@@ -237,6 +237,32 @@ describe('OrdersService transaction-aware status transition primitive', () => {
     expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
   });
 
+  it('allows only the explicit 99Food authoritative policy to reconcile a missed ready event', async () => {
+    const harness = makePrimitiveHarness();
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a',
+      orderId: 'order-1',
+      expectedCurrentStatus: 'pending',
+      targetStatus: 'ready_for_delivery',
+      transitionPolicy: 'food99_authoritative',
+    })).resolves.toMatchObject({ fromStatus: 'pending', toStatus: 'ready_for_delivery' });
+  });
+
+  it('does not allow the 99Food policy to bypass a non-authoritative ready transition', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a',
+      orderId: 'order-1',
+      expectedCurrentStatus: 'confirmed',
+      targetStatus: 'ready_for_delivery',
+      transitionPolicy: 'food99_authoritative',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
   it('returns ORDER_STATUS_STALE when the expected status is no longer authoritative', async () => {
     const harness = makePrimitiveHarness();
     harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });

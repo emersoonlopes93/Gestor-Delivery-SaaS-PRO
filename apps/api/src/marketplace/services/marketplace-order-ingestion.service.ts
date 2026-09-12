@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import {
   MarketplaceDivergenceType,
   MarketplaceEventStatus,
@@ -1064,26 +1064,33 @@ export class MarketplaceOrderIngestionService {
       await this.syncFood99InternalStatus(input.tenantId, input.marketplaceOrderId, targetStatus);
       return;
     }
-    await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.order.updateMany({
-        where: { id: input.internalOrderId, tenantId: input.tenantId, status: input.currentStatus },
-        data: { status: targetStatus },
-      });
-      if (updated.count === 0) return;
-      await tx.orderTimeline.create({
-        data: {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.ordersService.applyOrderStatusTransitionInTransaction(tx, {
           tenantId: input.tenantId,
           orderId: input.internalOrderId,
-          status: targetStatus,
-          note,
-          actorId: null,
-        },
+          expectedCurrentStatus: input.currentStatus,
+          targetStatus,
+          transitionPolicy: 'food99_authoritative',
+        });
+        await tx.orderTimeline.create({
+          data: {
+            tenantId: input.tenantId,
+            orderId: input.internalOrderId,
+            status: targetStatus,
+            note,
+            actorId: null,
+          },
+        });
+        await tx.marketplaceOrder.updateMany({
+          where: { id: input.marketplaceOrderId, tenantId: input.tenantId },
+          data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
+        });
       });
-      await tx.marketplaceOrder.updateMany({
-        where: { id: input.marketplaceOrderId, tenantId: input.tenantId },
-        data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
-      });
-    });
+    } catch (error) {
+      if (this.isOrderStatusStaleError(error)) return;
+      throw error;
+    }
     try {
       this.ordersGateway.emitOrderChanged(input.tenantId, input.internalOrderId, 'status');
     } catch (error) {
@@ -1102,6 +1109,15 @@ export class MarketplaceOrderIngestionService {
       where: { id: marketplaceOrderId, tenantId },
       data: { statusInternal: status, lastSyncedAt: new Date() },
     });
+  }
+
+  private isOrderStatusStaleError(error: unknown): boolean {
+    if (!(error instanceof ConflictException)) return false;
+    const response = error.getResponse();
+    return typeof response === 'object'
+      && response !== null
+      && 'code' in response
+      && response.code === 'ORDER_STATUS_STALE';
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {
