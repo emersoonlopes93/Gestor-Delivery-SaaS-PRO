@@ -163,7 +163,7 @@ export function OrderManagerV2Page() {
       const body: UpdateOrderStatusDTO = { status: action.targetStatus };
       const response = await api.patch<unknown>(`/orders/${order.id}/status`, body);
       if (!response.success) throw new Error('Atualização de status não confirmada.');
-      await reconcile({ eventId: `status-updated:${order.id}:${Date.now()}`, orderId: order.id, reason: 'status', occurredAt: new Date().toISOString() });
+      void reconcile({ eventId: `status-updated:${order.id}:${Date.now()}`, orderId: order.id, reason: 'status', occurredAt: new Date().toISOString() });
       setLastConfirmedAt(Date.now());
       setError(null);
     } catch {

@@ -108,7 +108,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('pointer-events-auto relative z-10');
     expect(details).toContain('Acoes de status do pedido');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('/orders/${order.id}/status');
-    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('await reconcile({ eventId: `status-updated:${order.id}:${Date.now()}`');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('void reconcile({ eventId: `status-updated:${order.id}:${Date.now()}`');
   });
 
   it('wires accessible print actions to the canonical receipt flow', () => {
