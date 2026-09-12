@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { evaluateOwnFleetEligibility } from '../delivery/own-fleet-eligibility';
-import { OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { OrderStatus, Prisma, DineInTable, Order as PrismaOrder, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
@@ -61,6 +61,13 @@ import {
   isPrismaUniqueConstraintError,
 } from './order-idempotency.util';
 import { getOrderOperationalViewModel } from './order-operational-view-model';
+
+export type OrderStatusTransitionResult = {
+  orderBeforeTransition: PrismaOrder;
+  updatedOrder: PrismaOrder;
+  fromStatus: OrderStatus;
+  toStatus: OrderStatus;
+};
 
 @Injectable()
 export class OrdersService {
@@ -1252,6 +1259,45 @@ export class OrdersService {
     };
   }
 
+  async applyOrderStatusTransitionInTransaction(
+    tx: Prisma.TransactionClient,
+    input: {
+      tenantId: string;
+      orderId: string;
+      expectedCurrentStatus: OrderStatus;
+      targetStatus: OrderStatus;
+    },
+  ): Promise<OrderStatusTransitionResult> {
+    const order = await tx.order.findFirst({
+      where: { id: input.orderId, tenantId: input.tenantId },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    const currentStatus = order.status as OrderStatus;
+    if (currentStatus !== input.expectedCurrentStatus) {
+      throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+    }
+    if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(input.targetStatus)) {
+      throw new BadRequestException(`Transição inválida de ${currentStatus} para ${input.targetStatus}`);
+    }
+
+    const transitionedAt = new Date();
+    const transition = await tx.order.updateMany({
+      where: { id: input.orderId, tenantId: input.tenantId, status: currentStatus },
+      data: { status: input.targetStatus, updatedAt: transitionedAt },
+    });
+    if (transition.count !== 1) {
+      throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+    }
+
+    return {
+      orderBeforeTransition: order,
+      updatedOrder: { ...order, status: input.targetStatus, updatedAt: transitionedAt },
+      fromStatus: currentStatus,
+      toStatus: input.targetStatus,
+    };
+  }
+
   async updateOrderStatus(
     orderId: string,
     tenantId: string,
@@ -1293,16 +1339,14 @@ export class OrdersService {
 
     const shouldCreateProductionJobs = nextStatus === 'preparing';
 
+    let tenantName: string | null = null;
     const updated = await this.prisma.$transaction(async (tx) => {
-      const transitionedAt = new Date();
-      const transition = await tx.order.updateMany({
-        where: { id: orderId, tenantId, status: currentStatus },
-        data: { status: nextStatus, updatedAt: transitionedAt },
+      const transition = await this.applyOrderStatusTransitionInTransaction(tx, {
+        tenantId,
+        orderId,
+        expectedCurrentStatus: currentStatus,
+        targetStatus: nextStatus,
       });
-      if (transition.count !== 1) {
-        throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
-      }
-      const updated = { ...order, status: nextStatus, updatedAt: transitionedAt };
 
       // Status side effects
       if (nextStatus === 'completed' || nextStatus === 'cancelled') {
@@ -1369,44 +1413,23 @@ export class OrdersService {
       });
 
       // Emitir via Socket para o storefront (tempo real)
-      if (order.publicTrackingToken) {
-        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, order.orderNumber, nextStatus, dto.note);
-      }
-
       // Se for cancelamento, emitir evento específico para o painel administrativo
       if (nextStatus === 'cancelled') {
         // emitOrderCancelled cobre o room do tenant (painel)
         // emitOrderStatusUpdated já foi enviado acima (linha 1171) para o storefront via publicTrackingToken
-        this.ordersGateway.emitOrderCancelled(tenantId, {
-          orderId,
-          orderNumber: order.orderNumber,
-        });
-
         // Reverter estoque teórico
         await this.inventoryService.reverseOrderDepletionInTransaction(tx, tenantId, orderId);
       }
 
       // Se pedido foi marcado como pronto, emitir notificação especial
-      if (nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery') {
-        this.ordersGateway.emitOrderReady(
-          tenantId,
-          order.orderNumber,
-          order.customerName || undefined,
-          order.fulfillmentType || undefined,
-          orderId,
-        );
-      }
-
       // Disparar notificação WhatsApp (fire-and-forget, não bloqueia a transação)
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
-      if (order.customerPhone && tenant) {
-        this.whatsappService
-          .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, nextStatus, tenant.name)
-          .catch((err) => this.logger.warn(`WhatsApp notification failed: ${err.message}`));
-      }
+      tenantName = tenant?.name ?? null;
 
-      return updated;
+      return transition.updatedOrder;
     });
+
+    this.runOrderStatusPostCommitEffects(order, tenantId, orderId, nextStatus, dto.note, tenantName);
 
     if (shouldCreateProductionJobs) {
       const jobs = await this.kdsService.createProductionJobs(orderId, tenantId);
@@ -1498,6 +1521,48 @@ export class OrdersService {
       }
     }
 
+    return updated;
+  }
+
+  private runOrderStatusPostCommitEffects(
+    order: PrismaOrder,
+    tenantId: string,
+    orderId: string,
+    nextStatus: OrderStatus,
+    note: string | undefined,
+    tenantName: string | null,
+  ): void {
+    const reportRealtimeFailure = (effect: string, error: unknown) => {
+      this.logger.error(`Order status persisted but ${effect} failed for ${orderId}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    };
+
+    try {
+      if (order.publicTrackingToken) {
+        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, order.orderNumber, nextStatus, note);
+      }
+    } catch (error) {
+      reportRealtimeFailure('public tracking notification', error);
+    }
+    try {
+      if (nextStatus === 'cancelled') {
+        this.ordersGateway.emitOrderCancelled(tenantId, { orderId, orderNumber: order.orderNumber });
+      }
+    } catch (error) {
+      reportRealtimeFailure('cancellation notification', error);
+    }
+    try {
+      if (nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery') {
+        this.ordersGateway.emitOrderReady(
+          tenantId,
+          order.orderNumber,
+          order.customerName || undefined,
+          order.fulfillmentType || undefined,
+          orderId,
+        );
+      }
+    } catch (error) {
+      reportRealtimeFailure('ready notification', error);
+    }
     try {
       this.ordersGateway.emitOrderChanged(
         tenantId,
@@ -1509,10 +1574,14 @@ export class OrdersService {
             : 'status',
       );
     } catch (error) {
-      this.logger.error(`Order status persisted but realtime notification failed for ${orderId}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      reportRealtimeFailure('order.changed notification', error);
     }
 
-    return updated;
+    if (order.customerPhone && tenantName) {
+      this.whatsappService
+        .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, nextStatus, tenantName)
+        .catch((error: unknown) => this.logger.warn(`WhatsApp notification failed: ${error instanceof Error ? error.message : 'unknown error'}`));
+    }
   }
 
   async confirmPosOrderInTransaction(

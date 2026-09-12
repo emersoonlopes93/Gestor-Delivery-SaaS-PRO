@@ -98,18 +98,22 @@ describe('OrdersService public checkout atomicity', () => {
 describe('OrdersService cancellation stock reversal atomicity', () => {
   const makeCancellationHarness = (inventoryFailure?: Error) => {
     let committed = false;
+    const order = {
+      id: 'order-1', tenantId: 'tenant-a', status: 'pending', total: 20,
+      sourceChannel: 'direct_online', orderNumber: '#0001', fulfillmentType: 'pickup',
+      deliveryDriverId: null, isScheduled: false, publicTrackingToken: null, customerPhone: null,
+    };
     const tx = {
-      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      order: {
+        findFirst: jest.fn().mockResolvedValue(order),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       dineInTable: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       orderTimeline: { create: jest.fn() },
       tenant: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const prisma = {
-      order: { findFirst: jest.fn().mockResolvedValue({
-        id: 'order-1', tenantId: 'tenant-a', status: 'pending', total: 20,
-        sourceChannel: 'direct_online', orderNumber: '#0001', fulfillmentType: 'pickup',
-        deliveryDriverId: null, isScheduled: false, publicTrackingToken: null, customerPhone: null,
-      }) },
+      order: { findFirst: jest.fn().mockResolvedValue(order) },
       $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => {
         const result = await callback(tx);
         committed = true;
@@ -178,5 +182,97 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
 
     await expect(harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' })).resolves.toMatchObject({ status: 'cancelled' });
     expect(harness.committed).toBe(true);
+  });
+
+  it('still emits order.changed when a sibling post-commit notification fails', async () => {
+    const harness = makeCancellationHarness();
+    harness.gateway.emitOrderCancelled.mockImplementation(() => { throw new Error('socket unavailable'); });
+
+    await harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' });
+
+    expect(harness.committed).toBe(true);
+    expect(harness.gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-1', 'cancelled');
+  });
+});
+
+describe('OrdersService transaction-aware status transition primitive', () => {
+  const makePrimitiveHarness = () => {
+    const order = {
+      id: 'order-1', tenantId: 'tenant-a', status: 'pending', orderNumber: '#0001',
+    };
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue(order),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const service = new OrdersService(
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+    );
+    return { order, service, tx };
+  };
+
+  it('validates and applies a canonical transition using the transaction client CAS write', async () => {
+    const harness = makePrimitiveHarness();
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'pending', targetStatus: 'confirmed',
+    })).resolves.toMatchObject({
+      fromStatus: 'pending', toStatus: 'confirmed', updatedOrder: { status: 'confirmed' },
+    });
+    expect(harness.tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'order-1', tenantId: 'tenant-a', status: 'pending' },
+    }));
+  });
+
+  it('rejects an invalid lifecycle transition before attempting its write', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'confirmed', targetStatus: 'pending',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns ORDER_STATUS_STALE when the expected status is no longer authoritative', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });
+
+    const error = await harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'pending', targetStatus: 'confirmed',
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({ code: 'ORDER_STATUS_STALE' });
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('allows exactly one winner in a stale concurrent transition race', async () => {
+    const harness = makePrimitiveHarness();
+    let persistedStatus = 'pending';
+    harness.tx.order.findFirst.mockImplementation(async () => ({ ...harness.order, status: persistedStatus }));
+    harness.tx.order.updateMany.mockImplementation(async (args: {
+      where: { status: string };
+      data: { status: string };
+    }) => {
+      if (args.where.status !== persistedStatus) return { count: 0 };
+      persistedStatus = args.data.status;
+      return { count: 1 };
+    });
+    const transition = {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'pending' as const, targetStatus: 'confirmed' as const,
+    };
+
+    const results = await Promise.allSettled([
+      harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, transition),
+      harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, transition),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(persistedStatus).toBe('confirmed');
   });
 });
