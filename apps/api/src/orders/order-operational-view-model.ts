@@ -96,7 +96,10 @@ function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalV
     ? collection
     : 'UNKNOWN';
   const customerPaid = finiteNumber(payload, 'customerPaidAmount');
+  const customerActuallyPaid = finiteNumber(payload, 'customerActuallyPaid');
+  const customerNeedsToPay = finiteNumber(payload, 'customerNeedsToPay');
   const amountToCollect = finiteNumber(payload, 'amountToCollect');
+  const merchantEstimatedReceivable = finiteNumber(payload, 'merchantEstimatedReceivable');
   const discountTotal = finiteNumber(payload, 'discountTotal');
   const merchantFundedDiscount = finiteNumber(payload, 'merchantFundedDiscount');
 
@@ -105,6 +108,10 @@ function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalV
     operationalValueLabel: 'Venda dos produtos',
     saleAmount: input.itemsSubtotal,
     customerPaid,
+    customerActuallyPaid,
+    customerActuallyPaidState: customerActuallyPaid === null ? 'UNKNOWN' : 'KNOWN',
+    customerNeedsToPay,
+    customerNeedsToPayState: customerNeedsToPay === null ? 'UNKNOWN' : 'KNOWN',
     paymentState,
     paymentLabel: paymentState === 'PAID'
       ? 'Pago na 99Food'
@@ -116,6 +123,8 @@ function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalV
     collectionResponsibility,
     merchantReceivable: null,
     merchantReceivableState: 'UNKNOWN',
+    merchantEstimatedReceivable,
+    merchantEstimatedReceivableState: merchantEstimatedReceivable === null ? 'UNKNOWN' : 'KNOWN',
     settledReceivable: null,
     settledReceivableState: 'UNKNOWN',
     merchantFundedDiscount,

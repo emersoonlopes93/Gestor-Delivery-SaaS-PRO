@@ -95,9 +95,10 @@ export class FinancialProjectionService {
     const discountMerchant = this.resolveMerchantFundedDiscount(source, normalizedPayload);
     const discountPlatform = this.unknown();
     const refund = this.unknown();
-    const marketplaceFact = source === FinancialProjectionSource.PEDEHUB || source === FinancialProjectionSource.POS
+    const marketplaceFee = source === FinancialProjectionSource.PEDEHUB || source === FinancialProjectionSource.POS
       ? this.notApplicable()
       : this.unknown();
+    const merchantEstimatedReceivable = this.resolveMerchantEstimatedReceivable(source, normalizedPayload);
 
     this.addProvenance(provenance, 'saleGross', saleGross);
     this.addProvenance(provenance, 'discountTotal', discountTotal);
@@ -106,8 +107,8 @@ export class FinancialProjectionService {
     this.addProvenance(provenance, 'customerPaid', customerPayment);
     this.addProvenance(provenance, 'discountMerchant', discountMerchant);
     this.addProvenance(provenance, 'discountPlatform', discountPlatform);
-    this.addProvenance(provenance, 'marketplaceFee', marketplaceFact);
-    this.addProvenance(provenance, 'merchantReceivable', marketplaceFact);
+    this.addProvenance(provenance, 'marketplaceFee', marketplaceFee);
+    this.addProvenance(provenance, 'merchantEstimatedReceivable', merchantEstimatedReceivable);
     this.addProvenance(provenance, 'refundAmount', refund);
     this.addProvenance(provenance, 'cogsSnapshot', cogsSnapshot);
 
@@ -135,10 +136,10 @@ export class FinancialProjectionService {
       customerPaidState: customerPayment.state,
       paymentMethod: customerPayment.paymentMethod,
       paymentChannel: customerPayment.paymentChannel,
-      marketplaceFee: marketplaceFact.value,
-      marketplaceFeeState: marketplaceFact.state,
-      merchantReceivable: marketplaceFact.value,
-      merchantReceivableState: marketplaceFact.state,
+      marketplaceFee: marketplaceFee.value,
+      marketplaceFeeState: marketplaceFee.state,
+      merchantReceivable: merchantEstimatedReceivable.value,
+      merchantReceivableState: merchantEstimatedReceivable.state,
       refundAmount: refund.value,
       refundState: refund.state,
       cogsSnapshot: cogsSnapshot.value,
@@ -186,10 +187,11 @@ export class FinancialProjectionService {
     normalizedPayload: NormalizedMarketplacePayload | null,
   ): MoneyFact {
     if (source === FinancialProjectionSource.FOOD_99) {
-      const value = this.readNumber(normalizedPayload, 'itemsSubtotal');
+      const value = this.readNumber(normalizedPayload, 'grossOrderValue')
+        ?? this.readNumber(normalizedPayload, 'itemsSubtotal');
       return value === null
         ? this.unknown()
-        : this.known(value, '99food.order_price via marketplace.normalizedPayload.itemsSubtotal');
+        : this.known(value, '99food.order_price via marketplace.normalizedPayload.grossOrderValue');
     }
 
     if (source === FinancialProjectionSource.IFOOD) {
@@ -223,6 +225,22 @@ export class FinancialProjectionService {
     return value === null
       ? this.unknown()
       : this.known(value, '99food.promotions[].shop_subside_price (order-level only)');
+  }
+
+  private resolveMerchantEstimatedReceivable(
+    source: FinancialProjectionSource,
+    normalizedPayload: NormalizedMarketplacePayload | null,
+  ): MoneyFact {
+    if (source === FinancialProjectionSource.PEDEHUB || source === FinancialProjectionSource.POS) {
+      return this.notApplicable();
+    }
+    if (source === FinancialProjectionSource.FOOD_99) {
+      const value = this.readNumber(normalizedPayload, 'merchantEstimatedReceivable');
+      return value === null
+        ? this.unknown()
+        : this.known(value, '99food.real_price merchant estimated receivable; not settlement');
+    }
+    return this.unknown();
   }
 
   private resolveOrderCharge(
@@ -264,14 +282,13 @@ export class FinancialProjectionService {
     normalizedPayload: NormalizedMarketplacePayload | null,
   ): MoneyFact & { paymentMethod: PaymentMethod | null; paymentChannel: string | null; observedAt: Date | null } {
     if (source === FinancialProjectionSource.FOOD_99) {
-      const value = this.readNumber(normalizedPayload, 'customerPaidAmount');
-      const paymentStatus = normalizedPayload?.paymentStatus;
+      const value = this.readNumber(normalizedPayload, 'customerActuallyPaid');
       const collectionResponsibility = normalizedPayload?.collectionResponsibility;
-      if (paymentStatus === 'PAID' && value !== null) {
+      if (value !== null) {
         return {
-          ...this.known(value, '99food.customer_need_paying_money confirmed by native online payment mode'),
+          ...this.known(value, '99food.real_pay_price customer actually paid'),
           paymentMethod: order.paymentMethod,
-          paymentChannel: 'MARKETPLACE_99FOOD',
+          paymentChannel: '99FOOD_REPORTED_REAL_PAY_PRICE',
           observedAt: null,
         };
       }

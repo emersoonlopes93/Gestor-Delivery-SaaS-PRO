@@ -328,20 +328,27 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       paymentMethod: this.nativePaymentMethod(order),
       isPrepaid: payment.paymentStatus === 'PAID',
       amountDue: payment.amountToCollect ?? undefined,
+      grossOrderValue: orderPrice,
+      customerActuallyPaid: realPayPrice,
+      customerNeedsToPay: customerPayable,
+      merchantEstimatedReceivable: realPrice,
       customerPaidAmount: payment.customerPaidAmount,
       amountToCollect: payment.amountToCollect,
       paymentStatus: payment.paymentStatus,
       collectionResponsibility: payment.collectionResponsibility,
+      // Keep the legacy generic field unset. The explicit estimate above is
+      // intentionally distinct from any settled payout or account balance.
       merchantReceivable: null,
       merchantFundedDiscount,
       platformFundedDiscount: null,
       platformFees: null,
       providerPriceFields: { realPrice, realPayPrice, shopPaidMoney },
       changeFor: this.minorMoney(order.change_for),
-      // Native price fields are integer centavos. `order_price` is the product
-      // sale value and `customer_need_paying_money` is the customer's payable
-      // total. Payment mode determines whether that amount was paid online or
-      // must still be collected; no merchant receivable is inferred.
+      // Native price fields are integer centavos. The versioned provider
+      // formula is preserved, while official provider support clarifies the
+      // business meanings: order_price is gross sale, real_pay_price is the
+      // customer-paid amount, real_price is an estimated merchant receivable,
+      // and customer_need_paying_money remains the collection reference.
       itemsSubtotal,
       discountTotal: discountValues.length > 0
         ? this.roundMoney(discountValues.reduce((sum, value) => sum + value, 0))

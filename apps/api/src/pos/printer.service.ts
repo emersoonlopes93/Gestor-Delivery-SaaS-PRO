@@ -214,8 +214,9 @@ export class PrinterService {
       lines.push(thinSeparator);
       
       if (format === 'escpos') lines.push(BOLD_ON, FONT_DOUBLE);
-      if (financial?.paymentState === 'PAID' && typeof financial.customerPaid === 'number') {
-        const customerPaid = financial.customerPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const customerActuallyPaid = financial?.customerActuallyPaid ?? financial?.customerPaid;
+      if (financial?.paymentState === 'PAID' && typeof customerActuallyPaid === 'number') {
+        const customerPaid = customerActuallyPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         lines.push(`TOTAL PAGO PELO CLIENTE: ${customerPaid}`);
       } else if (financial?.paymentState === 'PENDING' && typeof financial.amountToCollect === 'number') {
         const amountToCollect = financial.amountToCollect.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

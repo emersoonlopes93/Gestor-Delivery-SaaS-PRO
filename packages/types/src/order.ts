@@ -491,6 +491,11 @@ export interface OrderFinancialSummary {
   operationalValueLabel: string;
   saleAmount: number;
   customerPaid: number | null;
+  /** Additive 99Food provider fact; not inferred from amount-to-collect. */
+  customerActuallyPaid?: number | null;
+  customerActuallyPaidState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  customerNeedsToPay?: number | null;
+  customerNeedsToPayState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
   paymentState: 'UNKNOWN' | 'PENDING' | 'PAID';
   paymentLabel: string;
   amountToCollect?: number | null;
@@ -498,6 +503,9 @@ export interface OrderFinancialSummary {
   collectionResponsibility?: 'MARKETPLACE' | 'MERCHANT' | 'DRIVER' | 'UNKNOWN';
   merchantReceivable?: number | null;
   merchantReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  /** Additive 99Food provider estimate; never a settled payout or balance. */
+  merchantEstimatedReceivable?: number | null;
+  merchantEstimatedReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
   settledReceivable?: number | null;
   settledReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
   merchantFundedDiscount?: number | null;

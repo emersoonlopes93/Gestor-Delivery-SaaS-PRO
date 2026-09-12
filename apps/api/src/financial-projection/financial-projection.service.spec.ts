@@ -32,6 +32,7 @@ type ProjectionWrite = {
   paymentMethod: PaymentMethod | null;
   paymentChannel: string | null;
   marketplaceFeeState: FinancialProjectionValueState;
+  merchantReceivable: Prisma.Decimal | null;
   merchantReceivableState: FinancialProjectionValueState;
   refundState: FinancialProjectionValueState;
   cogsSnapshot: Prisma.Decimal | null;
@@ -148,15 +149,19 @@ describe('FinancialProjectionService', () => {
     expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.UNKNOWN);
   });
 
-  it('keeps 99Food order price distinct from prepaid customer payment', async () => {
-    const { service, upsert } = await setup(orderFixture({
+  it('projects distinct documented 99Food gross, customer-paid, and merchant-estimate facts without ledger writes', async () => {
+    const { service, upsert, prisma } = await setup(orderFixture({
       marketplaceOrders: [{
         id: 'marketplace-99-1',
         provider: MarketplaceProvider.FOOD_99,
         normalizedPayload: {
           itemsSubtotal: 100,
+          grossOrderValue: 68.99,
           total: 90,
           customerPaidAmount: 90,
+          customerActuallyPaid: 40.76,
+          customerNeedsToPay: 40.76,
+          merchantEstimatedReceivable: 51.2,
           paymentStatus: 'PAID',
           collectionResponsibility: 'MARKETPLACE',
           isPrepaid: true,
@@ -173,8 +178,8 @@ describe('FinancialProjectionService', () => {
 
     const write = writeFrom(upsert);
     expect(write.source).toBe(FinancialProjectionSource.FOOD_99);
-    expect(write.saleGross?.toString()).toBe('100');
-    expect(write.customerPaid?.toString()).toBe('90');
+    expect(write.saleGross?.toString()).toBe('68.99');
+    expect(write.customerPaid?.toString()).toBe('40.76');
     expect(write.discountTotal?.toString()).toBe('10');
     expect(write.deliveryCharged?.toString()).toBe('8');
     expect(write.serviceCharged?.toString()).toBe('2');
@@ -183,13 +188,18 @@ describe('FinancialProjectionService', () => {
     expect(write.discountMerchantState).toBe(FinancialProjectionValueState.KNOWN);
     expect(write.discountPlatformState).toBe(FinancialProjectionValueState.UNKNOWN);
     expect(write.marketplaceFeeState).toBe(FinancialProjectionValueState.UNKNOWN);
-    expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.UNKNOWN);
+    expect(write.merchantReceivable?.toString()).toBe('51.2');
+    expect(write.merchantReceivableState).toBe(FinancialProjectionValueState.KNOWN);
     expect(write.sourceFieldProvenance.customerPaid).toEqual({
-      source: '99food.customer_need_paying_money confirmed by native online payment mode',
+      source: '99food.real_pay_price customer actually paid',
+    });
+    expect(write.sourceFieldProvenance.merchantEstimatedReceivable).toEqual({
+      source: '99food.real_price merchant estimated receivable; not settlement',
     });
     expect(write.sourceFieldProvenance.discountMerchant).toEqual({
       source: '99food.promotions[].shop_subside_price (order-level only)',
     });
+    expect(Object.keys(prisma)).toEqual(['order', 'financialProjection']);
   });
 
   it('keeps absent 99Food discounts and customer fees unknown instead of zero', async () => {

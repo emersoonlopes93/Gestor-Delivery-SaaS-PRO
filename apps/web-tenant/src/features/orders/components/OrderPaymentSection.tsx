@@ -112,10 +112,10 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
                 <span className="text-sm font-black uppercase tracking-tight text-foreground">Status do pagamento</span>
                 <span className="text-sm font-black text-foreground">{financialSummary.paymentLabel}</span>
               </div>
-              {typeof financialSummary.customerPaid === 'number' ? (
+              {typeof financialSummary.customerActuallyPaid === 'number' ? (
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="font-medium text-muted-foreground">Total pago pelo cliente</span>
-                  <span className="font-black text-foreground">{fmt(financialSummary.customerPaid)}</span>
+                  <span className="font-black text-foreground">{fmt(financialSummary.customerActuallyPaid)}</span>
                 </div>
               ) : null}
               <div className="flex items-center justify-between gap-3 text-sm">
@@ -132,7 +132,10 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-muted-foreground">Ganho estimado da loja</span>
                 <span className="font-black text-foreground">
-                  {financialValue(financialSummary.merchantReceivableState, financialSummary.merchantReceivable)}
+                  {financialValue(
+                    financialSummary.merchantEstimatedReceivableState,
+                    financialSummary.merchantEstimatedReceivable,
+                  )}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3 text-sm">

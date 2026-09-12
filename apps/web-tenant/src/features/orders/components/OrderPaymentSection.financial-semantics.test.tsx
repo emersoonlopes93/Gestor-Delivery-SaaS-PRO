@@ -37,7 +37,11 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
   it('shows paid online separately from gross and instructs self-delivery not to charge', () => {
     const html = render({
       ...baseFinancial,
-      customerPaid: 42,
+      customerPaid: 999,
+      customerActuallyPaid: 42,
+      customerActuallyPaidState: 'KNOWN',
+      merchantEstimatedReceivable: 51.2,
+      merchantEstimatedReceivableState: 'KNOWN',
       paymentState: 'PAID',
       paymentLabel: 'Pago na 99Food',
       amountToCollect: 0,
@@ -52,6 +56,7 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
     expect(html).toContain('Valor a cobrar');
     expect(html).toContain('Não cobrar na entrega');
     expect(html).toContain('Ganho estimado da loja');
+    expect(html).toContain('51,20');
     expect(html).toContain('Repasse liquidado');
     expect(html).toContain('A confirmar');
     expect(html).toContain('origem não informada');

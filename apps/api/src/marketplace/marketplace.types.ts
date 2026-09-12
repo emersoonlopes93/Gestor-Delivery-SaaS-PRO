@@ -73,6 +73,11 @@ export type NormalizedMarketplaceOrder = {
   paymentMethod?: 'cash' | 'pix' | 'credit_card' | 'debit_card' | 'card_on_delivery' | 'other';
   isPrepaid?: boolean;
   amountDue?: number;
+  /** Explicit 99Food semantic facts. Kept additive to avoid reinterpreting legacy fields. */
+  grossOrderValue?: number | null;
+  customerActuallyPaid?: number | null;
+  customerNeedsToPay?: number | null;
+  merchantEstimatedReceivable?: number | null;
   customerPaidAmount?: number | null;
   amountToCollect?: number | null;
   paymentStatus?: 'PAID' | 'PENDING' | 'UNKNOWN';
