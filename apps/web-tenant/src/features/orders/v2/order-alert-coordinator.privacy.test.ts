@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getOperationalDisplayNumber, OrderAlertCoordinator } from './order-alert-coordinator';
+import { getOperationalDisplayNumber, normalizeOrderNumberForSpeech, OrderAlertCoordinator } from './order-alert-coordinator';
 
 describe('Order Manager V2 voice privacy', () => {
   it('speaks only a human-facing display number and deduplicates the event', async () => {
@@ -18,7 +18,14 @@ describe('Order Manager V2 voice privacy', () => {
     coordinator.enqueue(event, speech);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(phrases).toEqual(['Novo pedido #1042 recebido.']);
+    expect(phrases).toEqual(['Novo pedido 1042 recebido.']);
     expect(getOperationalDisplayNumber('Pedido 550e8400-e29b-41d4-a716-446655440000')).toBeNull();
+  });
+
+  it('normalizes only numeric display numbers for speech', () => {
+    expect(normalizeOrderNumberForSpeech('##0002')).toBe('2');
+    expect(normalizeOrderNumberForSpeech('##0137')).toBe('137');
+    expect(normalizeOrderNumberForSpeech('##0000')).toBe('0');
+    expect(normalizeOrderNumberForSpeech('IFOOD-A12')).toBe('IFOOD-A12');
   });
 });

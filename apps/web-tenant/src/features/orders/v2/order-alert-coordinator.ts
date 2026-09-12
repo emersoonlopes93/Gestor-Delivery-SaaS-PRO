@@ -28,7 +28,8 @@ export class OrderAlertCoordinator {
     const eventId = event.id ?? `${event.type}:${event.title ?? event.orderId ?? safeCreatedAt}`;
     if (this.seen.has(eventId)) return;
     this.seen.set(eventId, safeCreatedAt);
-    const displayNumber = getOperationalDisplayNumber(event.title ?? '');
+    const rawDisplayNumber = getOperationalDisplayNumber(event.title ?? '');
+    const displayNumber = rawDisplayNumber ? normalizeOrderNumberForSpeech(rawDisplayNumber) : null;
     const phrase = event.type === 'order.created'
       ? displayNumber ? `Novo pedido ${displayNumber} recebido.` : 'Novo pedido recebido.'
       : event.type === 'order.ready'
@@ -54,10 +55,17 @@ export class OrderAlertCoordinator {
   }
 }
 
-/** Reads only a human-facing numeric token; a UUID/orderId is never speech input. */
+/** Reads only a human-facing display token; a UUID/orderId is never speech input. */
 export function getOperationalDisplayNumber(title: string): string | null {
   const match = title.match(/#(\d{1,12})\b/);
   return match ? `#${match[1]}` : null;
+}
+
+/** Normalizes only a safely numeric display value; storage, UI and print values remain untouched. */
+export function normalizeOrderNumberForSpeech(displayNumber: string): string {
+  const numeric = displayNumber.match(/^(?:#+)?(\d{1,12})$/)?.[1];
+  if (!numeric) return displayNumber;
+  return String(Number.parseInt(numeric, 10));
 }
 
 export function browserSpeechProvider(): SpeechProvider | null {
