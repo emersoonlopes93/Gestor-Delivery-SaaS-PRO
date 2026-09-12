@@ -1084,7 +1084,13 @@ export class MarketplaceOrderIngestionService {
         data: { statusInternal: targetStatus, lastSyncedAt: new Date() },
       });
     });
-    this.ordersGateway.emitOrderChanged(input.tenantId, input.internalOrderId, 'status');
+    try {
+      this.ordersGateway.emitOrderChanged(input.tenantId, input.internalOrderId, 'status');
+    } catch (error) {
+      this.logger.error(
+        `99Food lifecycle persisted but realtime notification failed for ${input.internalOrderId}: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
   }
 
   private async syncFood99InternalStatus(
