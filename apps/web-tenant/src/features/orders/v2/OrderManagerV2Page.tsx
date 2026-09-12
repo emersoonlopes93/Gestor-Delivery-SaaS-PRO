@@ -128,7 +128,7 @@ export function OrderManagerV2Page() {
     }
   }, []);
 
-  const reconcile = useCallback((hint: OrderChangedEvent) => {
+  const reconcile = useCallback((hint: OrderChangedEvent): Promise<void> => {
     const previous =
       reconcileRef.current.get(hint.orderId) ?? Promise.resolve();
     const request = previous
@@ -153,6 +153,7 @@ export function OrderManagerV2Page() {
       })
       .finally(() => reconcileRef.current.delete(hint.orderId));
     reconcileRef.current.set(hint.orderId, request);
+    return request;
   }, []);
 
   const handleStatusAction = useCallback(async (order: OrderBoardItemDTO, action: OrderOperationalAction) => {
@@ -160,15 +161,9 @@ export function OrderManagerV2Page() {
     setUpdatingOrderId(order.id);
     try {
       const body: UpdateOrderStatusDTO = { status: action.targetStatus };
-      const response = await api.patch<OrderResponseDTO>(`/orders/${order.id}/status`, body);
-      const updatedOrder = response.data ? orderDetailToBoardItem(response.data) : null;
-      if (!updatedOrder) throw new Error('Resposta de atualizacao sem pedido.');
-      setOrders((current) => {
-        const next = reconcileBoardOrder(current, order.id, updatedOrder);
-        ordersRef.current = next;
-        return next;
-      });
-      setSelected(updatedOrder);
+      const response = await api.patch<unknown>(`/orders/${order.id}/status`, body);
+      if (!response.success) throw new Error('Atualização de status não confirmada.');
+      await reconcile({ eventId: `status-updated:${order.id}:${Date.now()}`, orderId: order.id, reason: 'status', occurredAt: new Date().toISOString() });
       setLastConfirmedAt(Date.now());
       setError(null);
     } catch {
