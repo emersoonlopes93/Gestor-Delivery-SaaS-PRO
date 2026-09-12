@@ -249,11 +249,9 @@ export function OrderManagerV2Page() {
           <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
           <Metric label="Delivery" value={intelligence.delivery} />
           <Metric label="Retirada" value={intelligence.pickup} />
-          {[
-            { label: 'PedeHub', count: intelligence.channels.PEDEHUB },
-            { label: 'iFood', count: intelligence.channels.IFOOD },
-            { label: '99Food', count: intelligence.channels.FOOD_99 },
-          ].filter((channel) => channel.count > 0).map((channel) => <span key={channel.label} className="rounded-lg border border-border bg-background px-2 py-1 text-[10px] font-black text-muted-foreground">{channel.label} {channel.count}</span>)}
+          <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} />
+          <Metric label="iFood" value={intelligence.channels.IFOOD} />
+          <Metric label="99Food" value={intelligence.channels.FOOD_99} />
         </div>
         <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-end">
           <div className="hidden">

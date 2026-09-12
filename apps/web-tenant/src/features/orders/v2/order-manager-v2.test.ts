@@ -29,6 +29,13 @@ describe('Order Manager V2 projections', () => {
     const result = getOperationalIntelligence([ready, pending], Date.parse('2026-09-10T12:40:00.000Z'));
     expect(result).toMatchObject({ waitingAction: 1, delayed: 2, ready: 1, delivery: 2, pickup: 0, channels: { PEDEHUB: 1, IFOOD: 1, FOOD_99: 0 } });
   });
+  it('keeps every channel in the same mini-KPI visual system, including zero counts', () => {
+    const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
+    expect(page).toContain('Metric label="PedeHub" value={intelligence.channels.PEDEHUB}');
+    expect(page).toContain('Metric label="iFood" value={intelligence.channels.IFOOD}');
+    expect(page).toContain('Metric label="99Food" value={intelligence.channels.FOOD_99}');
+    expect(page).not.toContain('.filter((channel) => channel.count > 0)');
+  });
   it('searches locally across item composition and short notes without accents', () => {
     const searchable = order('pending', { itemsSummary: 'Pizza Calabresa', searchText: 'Catupiry, bacon, borda cheddar complemento', notes: 'sem cebola' });
     expect(matchesOrderSearch(searchable, 'calabresa')).toBe(true);
