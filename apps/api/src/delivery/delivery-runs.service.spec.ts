@@ -58,12 +58,23 @@ describe('DeliveryRunsService', () => {
     $transaction: jest.fn((operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
   };
   const earnings = { shiftSnapshot: jest.fn(), postDailyRate: jest.fn(), stopSnapshot: jest.fn(), postStop: jest.fn() };
-  const service = new DeliveryRunsService(prisma as never, earnings as never);
+  const gateway = { emitOrderChanged: jest.fn() };
+  const ordersService = { applyOrderStatusTransitionInTransaction: jest.fn() };
+  const service = new DeliveryRunsService(
+    prisma as never,
+    earnings as never,
+    ordersService as never,
+    undefined,
+    gateway as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
     earnings.shiftSnapshot.mockResolvedValue({ dailyRateSnapshot: 0, currencySnapshot: 'BRL', paySnapshotAt: new Date() });
     earnings.stopSnapshot.mockReturnValue({ payAmountSnapshot: 7, payCurrencySnapshot: 'BRL', payAttemptSnapshot: false });
+    ordersService.applyOrderStatusTransitionInTransaction.mockImplementation(async (_tx, input) => ({
+      updatedOrder: { id: input.orderId, status: input.targetStatus },
+    }));
     prisma.$transaction.mockImplementation((operation) => operation(tx));
     tx.deliveryDriver.update.mockResolvedValue({ id: 'driver-a' });
     tx.deliveryRun.updateMany.mockResolvedValue({ count: 1 });
@@ -468,14 +479,24 @@ describe('DeliveryRunsService', () => {
       { id: 'order-a', status: 'ready_for_delivery' },
       { id: 'order-b', status: 'ready_for_delivery' },
     ]);
-    tx.order.updateMany.mockResolvedValue({ count: 2 });
     tx.deliveryRun.update.mockResolvedValue(baseRun({ status: DeliveryRunStatus.IN_PROGRESS, stops }));
 
     await service.startRun('tenant-a', 'run-a', 'driver-a');
-    expect(tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ tenantId: 'tenant-a', id: { in: ['order-a', 'order-b'] } }),
-      data: { status: 'out_for_delivery' },
-    }));
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledTimes(2);
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenNthCalledWith(1, tx, {
+      tenantId: 'tenant-a',
+      orderId: 'order-a',
+      expectedCurrentStatus: 'ready_for_delivery',
+      targetStatus: 'out_for_delivery',
+      expectedDeliveryDriverId: 'driver-a',
+    });
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenNthCalledWith(2, tx, {
+      tenantId: 'tenant-a',
+      orderId: 'order-b',
+      expectedCurrentStatus: 'ready_for_delivery',
+      targetStatus: 'out_for_delivery',
+      expectedDeliveryDriverId: 'driver-a',
+    });
     expect(tx.orderTimeline.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
         expect.objectContaining({ orderId: 'order-a', status: 'out_for_delivery' }),
@@ -485,6 +506,90 @@ describe('DeliveryRunsService', () => {
     expect(tx.deliveryStop.update).toHaveBeenCalledWith({
       where: { id: 'stop-a' }, data: { status: DeliveryStopStatus.CURRENT },
     });
+    expect(gateway.emitOrderChanged).toHaveBeenCalledTimes(2);
+  });
+
+  it('completes an arrived stop through the primitive before persisting stop, earnings, and route effects', async () => {
+    const stop = { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.ARRIVED, payAttemptSnapshot: false };
+    tx.deliveryRun.findFirst
+      .mockResolvedValueOnce(baseRun({ status: DeliveryRunStatus.IN_PROGRESS, stops: [stop] }))
+      .mockResolvedValueOnce(baseRun({ status: DeliveryRunStatus.COMPLETED, stops: [{ ...stop, status: DeliveryStopStatus.DELIVERED }] }));
+    tx.order.findFirst.mockResolvedValue({ id: 'order-a', status: 'out_for_delivery' });
+    tx.deliveryStop.findMany.mockResolvedValue([{ ...stop, status: DeliveryStopStatus.DELIVERED }]);
+    tx.deliveryRun.update.mockResolvedValue(baseRun({ status: DeliveryRunStatus.COMPLETED }));
+
+    await service.completeStop('tenant-a', 'run-a', 'stop-a', 'driver-a');
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledWith(tx, {
+      tenantId: 'tenant-a',
+      orderId: 'order-a',
+      expectedCurrentStatus: 'out_for_delivery',
+      targetStatus: 'completed',
+    });
+    expect(tx.deliveryStop.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'stop-a' },
+      data: expect.objectContaining({ status: DeliveryStopStatus.DELIVERED }),
+    }));
+    expect(earnings.postStop).toHaveBeenCalledTimes(1);
+    expect(gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-a', 'status');
+  });
+
+  it('keeps an already started run idempotent without replaying order transitions', async () => {
+    const stops = [{ id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.CURRENT }];
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({ status: DeliveryRunStatus.IN_PROGRESS, stops }));
+
+    await service.startRun('tenant-a', 'run-a', 'driver-a');
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).not.toHaveBeenCalled();
+    expect(gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-a', 'status');
+  });
+
+  it('keeps an already delivered stop idempotent without replaying the order transition', async () => {
+    const stop = { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.DELIVERED };
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({ status: DeliveryRunStatus.COMPLETED, stops: [stop] }));
+
+    await service.completeStop('tenant-a', 'run-a', 'stop-a', 'driver-a');
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).not.toHaveBeenCalled();
+    expect(gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-a', 'status');
+  });
+
+  it('keeps startRun all-or-nothing when one of multiple canonical transitions is stale', async () => {
+    const stops = [
+      { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.PENDING },
+      { id: 'stop-b', orderId: 'order-b', sequence: 2, status: DeliveryStopStatus.PENDING },
+    ];
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({
+      status: DeliveryRunStatus.ASSIGNED,
+      assignedAt: new Date(),
+      acceptedAt: new Date(),
+      stops,
+    }));
+    tx.order.findMany.mockResolvedValue([
+      { id: 'order-a', status: 'ready_for_delivery' },
+      { id: 'order-b', status: 'ready_for_delivery' },
+    ]);
+    ordersService.applyOrderStatusTransitionInTransaction
+      .mockResolvedValueOnce({ updatedOrder: { id: 'order-a', status: 'out_for_delivery' } })
+      .mockRejectedValueOnce(new ConflictException({ code: 'ORDER_STATUS_STALE' }));
+
+    await expect(service.startRun('tenant-a', 'run-a', 'driver-a')).rejects.toBeInstanceOf(ConflictException);
+
+    expect(tx.deliveryStop.update).not.toHaveBeenCalled();
+    expect(tx.deliveryRun.update).not.toHaveBeenCalled();
+    expect(gateway.emitOrderChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not emit order.changed when a related completeStop mutation aborts the transaction', async () => {
+    const stop = { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.ARRIVED, payAttemptSnapshot: false };
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({ status: DeliveryRunStatus.IN_PROGRESS, stops: [stop] }));
+    tx.order.findFirst.mockResolvedValue({ id: 'order-a', status: 'out_for_delivery' });
+    tx.deliveryStop.update.mockRejectedValueOnce(new Error('stop write failed'));
+
+    await expect(service.completeStop('tenant-a', 'run-a', 'stop-a', 'driver-a')).rejects.toThrow('stop write failed');
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledTimes(1);
+    expect(gateway.emitOrderChanged).not.toHaveBeenCalled();
   });
 
   it('blocks start with an explicit kitchen message while an order is preparing', async () => {

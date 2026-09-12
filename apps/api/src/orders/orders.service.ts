@@ -1266,6 +1266,7 @@ export class OrdersService {
       orderId: string;
       expectedCurrentStatus: OrderStatus;
       targetStatus: OrderStatus;
+      expectedDeliveryDriverId?: string | null;
     },
   ): Promise<OrderStatusTransitionResult> {
     const order = await tx.order.findFirst({
@@ -1277,13 +1278,26 @@ export class OrdersService {
     if (currentStatus !== input.expectedCurrentStatus) {
       throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
     }
+    if (
+      input.expectedDeliveryDriverId !== undefined
+      && order.deliveryDriverId !== input.expectedDeliveryDriverId
+    ) {
+      throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+    }
     if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(input.targetStatus)) {
       throw new BadRequestException(`Transição inválida de ${currentStatus} para ${input.targetStatus}`);
     }
 
     const transitionedAt = new Date();
     const transition = await tx.order.updateMany({
-      where: { id: input.orderId, tenantId: input.tenantId, status: currentStatus },
+      where: {
+        id: input.orderId,
+        tenantId: input.tenantId,
+        status: currentStatus,
+        ...(input.expectedDeliveryDriverId !== undefined
+          ? { deliveryDriverId: input.expectedDeliveryDriverId }
+          : {}),
+      },
       data: { status: input.targetStatus, updatedAt: transitionedAt },
     });
     if (transition.count !== 1) {

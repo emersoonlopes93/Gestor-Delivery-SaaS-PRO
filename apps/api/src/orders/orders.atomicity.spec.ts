@@ -250,6 +250,26 @@ describe('OrdersService transaction-aware status transition primitive', () => {
     expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
   });
 
+  it('returns ORDER_STATUS_STALE when the expected assigned driver changed', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({
+      ...harness.order,
+      deliveryDriverId: 'driver-b',
+    });
+
+    const error = await harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a',
+      orderId: 'order-1',
+      expectedCurrentStatus: 'pending',
+      targetStatus: 'confirmed',
+      expectedDeliveryDriverId: 'driver-a',
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({ code: 'ORDER_STATUS_STALE' });
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
   it('allows exactly one winner in a stale concurrent transition race', async () => {
     const harness = makePrimitiveHarness();
     let persistedStatus = 'pending';

@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import {
   DeliveryRunStatus as SharedDeliveryRunStatus,
@@ -37,6 +39,7 @@ import { DriverEarningsService } from './driver-earnings.service';
 import { RoutingV2Service } from './routing-v2.service';
 import { evaluateOwnFleetEligibility, type MarketplaceOwnershipRecord } from './own-fleet-eligibility';
 import { OrdersGateway } from '../orders/orders.gateway';
+import { OrdersService } from '../orders/orders.service';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -70,6 +73,8 @@ export class DeliveryRunsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly earnings: DriverEarningsService,
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: Pick<OrdersService, 'applyOrderStatusTransitionInTransaction'>,
     @Optional() private readonly routing?: RoutingV2Service,
     @Optional() private readonly ordersGateway?: OrdersGateway,
   ) {}
@@ -618,12 +623,16 @@ export class DeliveryRunsService {
       }
 
       const startedAt = new Date();
-      const updatedOrders = await tx.order.updateMany({
-        where: { tenantId, id: { in: orderIds }, status: 'ready_for_delivery', deliveryDriverId: driverId },
-        data: { status: 'out_for_delivery' },
-      });
       const readyOrders = orders.filter((order) => order.status === 'ready_for_delivery');
-      if (updatedOrders.count !== readyOrders.length) throw new ConflictException('A rota foi alterada durante o início.');
+      for (const order of readyOrders) {
+        await this.ordersService.applyOrderStatusTransitionInTransaction(tx, {
+          tenantId,
+          orderId: order.id,
+          expectedCurrentStatus: 'ready_for_delivery',
+          targetStatus: 'out_for_delivery',
+          expectedDeliveryDriverId: driverId,
+        });
+      }
 
       await tx.orderTimeline.createMany({
         data: readyOrders.map((order) => ({
@@ -767,11 +776,12 @@ export class DeliveryRunsService {
       }
 
       if (!isAlreadyCompleted) {
-        const changed = await tx.order.updateMany({
-          where: { id: order.id, tenantId, status: 'out_for_delivery' },
-          data: { status: 'completed' },
+        await this.ordersService.applyOrderStatusTransitionInTransaction(tx, {
+          tenantId,
+          orderId: order.id,
+          expectedCurrentStatus: 'out_for_delivery',
+          targetStatus: 'completed',
         });
-        if (changed.count !== 1) throw new ConflictException('O pedido foi atualizado durante a conclusão.');
         await tx.orderTimeline.create({
           data: {
             tenantId,
