@@ -1294,10 +1294,15 @@ export class OrdersService {
     const shouldCreateProductionJobs = nextStatus === 'preparing';
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: { status: nextStatus },
+      const transitionedAt = new Date();
+      const transition = await tx.order.updateMany({
+        where: { id: orderId, tenantId, status: currentStatus },
+        data: { status: nextStatus, updatedAt: transitionedAt },
       });
+      if (transition.count !== 1) {
+        throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+      }
+      const updated = { ...order, status: nextStatus, updatedAt: transitionedAt };
 
       // Status side effects
       if (nextStatus === 'completed' || nextStatus === 'cancelled') {

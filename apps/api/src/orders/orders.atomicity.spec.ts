@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { PaymentMethod } from '@gestor/types';
 import { OrdersService } from './orders.service';
 
@@ -99,7 +99,7 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
   const makeCancellationHarness = (inventoryFailure?: Error) => {
     let committed = false;
     const tx = {
-      order: { update: jest.fn().mockResolvedValue({ id: 'order-1', status: 'cancelled', updatedAt: new Date() }) },
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       dineInTable: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       orderTimeline: { create: jest.fn() },
       tenant: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -159,6 +159,15 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
       harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
+    expect(harness.committed).toBe(false);
+  });
+
+  it('returns a controlled conflict when the canonical status changed before the write', async () => {
+    const harness = makeCancellationHarness();
+    harness.tx.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' }))
+      .rejects.toBeInstanceOf(ConflictException);
     expect(harness.committed).toBe(false);
   });
 });
