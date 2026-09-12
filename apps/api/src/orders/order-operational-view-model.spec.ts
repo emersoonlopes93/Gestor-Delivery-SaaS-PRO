@@ -171,7 +171,7 @@ describe('getOrderOperationalViewModel', () => {
   });
 
   it.each([
-    ['PROVIDER', 'Entrega pelo marketplace'],
+    ['PROVIDER', 'Entrega pela iFood'],
     ['UNKNOWN', 'Responsável pela entrega não confirmado'],
   ] as const)('blocks own-fleet actions for %s ownership', (ownership, label) => {
     const result = getOrderOperationalViewModel({

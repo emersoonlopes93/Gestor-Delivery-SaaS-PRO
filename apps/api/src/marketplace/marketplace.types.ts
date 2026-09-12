@@ -40,6 +40,8 @@ export type NormalizedMarketplaceOrderOption = {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  /** Relative depth from the product in provider-supplied nested add-ons. */
+  hierarchyDepth?: number;
 };
 
 export type NormalizedMarketplaceOrderItem = {

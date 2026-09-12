@@ -386,7 +386,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     };
   }
 
-  private normalizeNativeSubItems(value: unknown): NormalizedMarketplaceOrderItem['options'] {
+  private normalizeNativeSubItems(value: unknown, hierarchyDepth = 0): NormalizedMarketplaceOrderItem['options'] {
     if (!Array.isArray(value)) return [];
     const options: NonNullable<NormalizedMarketplaceOrderItem['options']> = [];
     for (const entry of value) {
@@ -399,8 +399,9 @@ export class Food99Provider implements MarketplaceProviderAdapter {
         quantity,
         unitPrice,
         totalPrice: this.minorMoney(item.total_price) ?? this.roundMoney(unitPrice * quantity),
+        hierarchyDepth,
       });
-      options.push(...this.normalizeNativeSubItems(item.sub_item_list));
+      options.push(...this.normalizeNativeSubItems(item.sub_item_list, hierarchyDepth + 1));
     }
     return options;
   }

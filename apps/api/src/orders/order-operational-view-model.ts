@@ -250,7 +250,7 @@ export function getOrderOperationalViewModel(input: OperationalOrderInput): Orde
     : ownership === 'MERCHANT'
       ? 'Entrega própria'
       : ownership === 'PROVIDER'
-        ? 'Entrega pelo marketplace'
+        ? `Entrega pela ${displayChannel}`
         : 'Responsável pela entrega não confirmado';
   const operationState = syncState;
   const operationProvider = isMarketplace ? displayChannel : null;

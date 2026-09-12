@@ -180,7 +180,35 @@ describe('Food99Provider', () => {
     expect(normalized.items[0].options).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'Queijo', quantity: 2, totalPrice: 3 }),
       expect.objectContaining({ name: 'Molho especial' }),
-      expect.objectContaining({ name: 'Pimenta' }),
+      expect.objectContaining({ name: 'Pimenta', hierarchyDepth: 1 }),
+    ]));
+  });
+
+  it('preserves a realistic acai composition for the operational detail instead of reducing it to the base item', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', delivery_type: 2, pay_channel: 153,
+        receive_address: { name: 'Cliente de teste', phone: '5511999999999', poi_address: 'Rua do Acai', street_number: '42', district: 'Centro', city: 'Sao Paulo', state: 'SP', reference: 'Portao azul' },
+        price: { order_price: 2400, customer_need_paying_money: 2400 },
+        order_items: [{
+          app_item_id: 'acai-330', name: 'Copo Acai', amount: 1, sku_price: 2400, total_price: 2400, remark: 'Sem gelo',
+          sub_item_list: [
+            { app_item_id: 'creme', name: 'Creme', amount: 1, sku_price: 0, total_price: 0 },
+            { app_item_id: 'banana', name: 'Banana', amount: 1, sku_price: 0, total_price: 0 },
+            { app_item_id: 'sucrilhos', name: 'Sucrilhos', amount: 1, sku_price: 0, total_price: 0 },
+          ],
+        }],
+      },
+    });
+
+    expect(normalized).toMatchObject({ customerPhone: '5511999999999', amountToCollect: 24, paymentStatus: 'PENDING' });
+    expect(normalized.deliveryAddress).toMatchObject({ street: 'Rua do Acai', number: '42', reference: 'Portao azul' });
+    expect(normalized.items[0]).toMatchObject({ name: 'Copo Acai', notes: 'Sem gelo' });
+    expect(normalized.items[0].options).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Creme' }),
+      expect.objectContaining({ name: 'Banana' }),
+      expect.objectContaining({ name: 'Sucrilhos' }),
     ]));
   });
 

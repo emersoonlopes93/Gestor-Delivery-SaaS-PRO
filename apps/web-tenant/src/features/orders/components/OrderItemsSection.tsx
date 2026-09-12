@@ -23,7 +23,7 @@ function compositionLines(value: string): string[] {
   } catch {
     // New marketplace snapshots are already line-based and readable.
   }
-  return value.split('\n').map((line) => line.trim()).filter(Boolean);
+  return value.split('\n').filter((line) => Boolean(line.trim()));
 }
 
 export const OrderItemsSection = memo(function OrderItemsSection({ items }: OrderItemsSectionProps) {
@@ -57,7 +57,7 @@ export const OrderItemsSection = memo(function OrderItemsSection({ items }: Orde
 
                 {/* Composição / Detalhes do Produto */}
                 {item.snapshotComposition && compositionLines(item.snapshotComposition).map((line, index) => (
-                  <p key={`${item.id}-composition-${index}`} className="text-[11px] text-muted-foreground mt-0.5 italic">
+                  <p key={`${item.id}-composition-${index}`} className="mt-0.5 whitespace-pre-wrap text-[11px] italic text-muted-foreground">
                     {line}
                   </p>
                 ))}

@@ -140,4 +140,14 @@ describe('Order Manager V2 visual contracts', () => {
     expect(printFlow).toContain('printTicketViaPrimaryBluetooth');
     expect(printFlow).toContain('printThermalText');
   });
+
+  it('renders the complete fetched order in V2 details instead of only base item names', () => {
+    const details = readFileSync(resolve(__dirname, 'OrderDetailsModalV2.tsx'), 'utf8');
+    expect(details).toContain("import { OrderCustomerSection } from '../components/OrderCustomerSection'");
+    expect(details).toContain("import { OrderFulfillmentSection } from '../components/OrderFulfillmentSection'");
+    expect(details).toContain("import { OrderItemsSection } from '../components/OrderItemsSection'");
+    expect(details).toContain("import { OrderPaymentSection } from '../components/OrderPaymentSection'");
+    expect(details).toContain("missingPhoneMessage={origin === 'FOOD_99'");
+    expect(details).toContain('financialSummary={detail.operational?.financialSummary}');
+  });
 });

@@ -17,7 +17,7 @@ import { CustomerService } from '../../crm/customer.service';
 import { OrdersGateway } from '../../orders/orders.gateway';
 import { OrdersService } from '../../orders/orders.service';
 import { generatePublicTrackingToken } from '../../common/utils/tracking-token.util';
-import { NormalizedMarketplaceOrder } from '../marketplace.types';
+import { NormalizedMarketplaceOrder, NormalizedMarketplaceOrderItem } from '../marketplace.types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { MarketplaceStatusSyncService } from './marketplace-status-sync.service';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
@@ -649,9 +649,7 @@ export class MarketplaceOrderIngestionService {
             snapshotImage: null,
             snapshotBasePrice: item.unitPrice,
             snapshotExtrasTotal: 0,
-            snapshotComposition: item.options?.length
-              ? item.options.map((option) => `+ ${option.quantity}x ${option.name}`).join('\n')
-              : undefined,
+            snapshotComposition: this.marketplaceSnapshotComposition(item),
           },
         });
       }
@@ -937,9 +935,7 @@ export class MarketplaceOrderIngestionService {
             snapshotImage: null,
             snapshotBasePrice: item.unitPrice,
             snapshotExtrasTotal: 0,
-            snapshotComposition: item.options?.length
-              ? item.options.map((option) => `+ ${option.quantity}x ${option.name}`).join('\n')
-              : undefined,
+            snapshotComposition: this.marketplaceSnapshotComposition(item),
           },
         });
       }
@@ -964,6 +960,13 @@ export class MarketplaceOrderIngestionService {
       });
     });
     this.ordersGateway.emitOrderChanged(tenantId, internalOrderId, 'marketplace');
+  }
+
+  private marketplaceSnapshotComposition(item: NormalizedMarketplaceOrderItem): string | undefined {
+    if (!item.options?.length) return undefined;
+    return item.options
+      .map((option) => `${'  '.repeat(option.hierarchyDepth ?? 0)}+ ${option.quantity}x ${option.name}`)
+      .join('\n');
   }
 
   private async reconcileFood99Lifecycle(input: {
