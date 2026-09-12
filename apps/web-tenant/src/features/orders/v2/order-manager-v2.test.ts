@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OrderBoardItemDTO } from '@gestor/types';
 import { OrderAlertCoordinator } from './order-alert-coordinator';
-import { filterManagerOrders, formatElapsed, groupOrdersForManager, isRunnableStatusAction, matchesOrderSearch, privacySafeOrderPhrase } from './order-manager-v2';
+import { filterManagerOrders, formatElapsed, getOperationalIntelligence, groupOrdersForManager, isRunnableStatusAction, matchesOrderSearch, privacySafeOrderPhrase } from './order-manager-v2';
 
 function order(status: OrderBoardItemDTO['status'], overrides: Partial<OrderBoardItemDTO> = {}): OrderBoardItemDTO {
   return {
@@ -22,6 +22,12 @@ describe('Order Manager V2 projections', () => {
   it('preserves board search and origin filtering', () => {
     expect(filterManagerOrders([order('pending')], '1042', 'PEDEHUB')).toHaveLength(1);
     expect(filterManagerOrders([order('pending')], '1042', 'IFOOD')).toHaveLength(0);
+  });
+  it('derives compact cockpit counts from the reconciled operational board', () => {
+    const ready = order('ready_for_delivery', { fulfillmentType: 'delivery' });
+    const pending = order('pending', { operational: { ...order('pending').operational, origin: 'IFOOD' } });
+    const result = getOperationalIntelligence([ready, pending], Date.parse('2026-09-10T12:40:00.000Z'));
+    expect(result).toMatchObject({ waitingAction: 1, delayed: 2, ready: 1, delivery: 2, pickup: 0, channels: { PEDEHUB: 1, IFOOD: 1, FOOD_99: 0 } });
   });
   it('searches locally across item composition and short notes without accents', () => {
     const searchable = order('pending', { itemsSummary: 'Pizza Calabresa', searchText: 'Catupiry, bacon, borda cheddar complemento', notes: 'sem cebola' });

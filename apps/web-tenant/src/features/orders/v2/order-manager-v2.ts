@@ -1,4 +1,5 @@
 import type { OrderBoardItemDTO, OrderOperationalAction, OrderStatus } from '@gestor/types';
+import { presentOrderTime } from '../order-presenters';
 
 export type OrderManagerLane = 'kitchen' | 'ready' | 'route';
 
@@ -38,6 +39,25 @@ export function filterManagerOrders(orders: readonly OrderBoardItemDTO[], query:
     if (!matchesOrigin) return false;
     return matchesOrderSearch(order, query);
   });
+}
+
+/** Compact, board-wide operational totals. They intentionally ignore local search/origin filters. */
+export function getOperationalIntelligence(orders: readonly OrderBoardItemDTO[], now: number) {
+  const channels = { PEDEHUB: 0, IFOOD: 0, FOOD_99: 0 };
+  let waitingAction = 0;
+  let delayed = 0;
+  let ready = 0;
+  let delivery = 0;
+  let pickup = 0;
+  for (const order of orders) {
+    if (order.operational.origin in channels) channels[order.operational.origin as keyof typeof channels] += 1;
+    if (order.status === 'pending' || ((order.status === 'ready_for_pickup' || order.status === 'ready_for_delivery') && order.operational.primaryAction?.enabled)) waitingAction += 1;
+    if (presentOrderTime(order.createdAt, now).delayed) delayed += 1;
+    if (order.status === 'ready_for_pickup' || order.status === 'ready_for_delivery') ready += 1;
+    if (order.fulfillmentType === 'delivery') delivery += 1;
+    if (order.fulfillmentType === 'pickup') pickup += 1;
+  }
+  return { waitingAction, delayed, ready, delivery, pickup, channels };
 }
 
 export function formatElapsed(createdAt: string, now: number): string {

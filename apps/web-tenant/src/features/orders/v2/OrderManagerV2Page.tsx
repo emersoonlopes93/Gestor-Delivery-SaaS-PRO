@@ -36,6 +36,7 @@ import { OrderCardV2 } from "./OrderCardV2";
 import { OrderDetailsModalV2 } from "./OrderDetailsModalV2";
 import {
   filterManagerOrders,
+  getOperationalIntelligence,
   groupOrdersForManager,
   ORDER_MANAGER_LANES,
 } from "./order-manager-v2";
@@ -215,6 +216,7 @@ export function OrderManagerV2Page() {
     [orders, origin, query],
   );
   const grouped = useMemo(() => groupOrdersForManager(filtered), [filtered]);
+  const intelligence = useMemo(() => getOperationalIntelligence(orders, now), [orders, now]);
   const kpis = useMemo(
     () => ({
       active: filtered.length,
@@ -241,6 +243,14 @@ export function OrderManagerV2Page() {
           <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
         </div>
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-3">
+        <div className="flex flex-wrap gap-2 border-b border-border pb-3" aria-label="Indicadores operacionais">
+          <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
+          <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
+          <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
+          <Metric label="Delivery" value={intelligence.delivery} />
+          <Metric label="Retirada" value={intelligence.pickup} />
+          {[['PedeHub', intelligence.channels.PEDEHUB], ['iFood', intelligence.channels.IFOOD], ['99Food', intelligence.channels.FOOD_99]].filter(([, count]) => count > 0).map(([label, count]) => <span key={label} className="rounded-lg border border-border bg-background px-2 py-1 text-[10px] font-black text-muted-foreground">{label} {count}</span>)}
+        </div>
         <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-end">
           <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
