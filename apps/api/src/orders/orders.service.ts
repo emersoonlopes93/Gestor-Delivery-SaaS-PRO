@@ -889,6 +889,9 @@ export class OrdersService {
       itemsSubtotal: Number(o.itemsSubtotal),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
+      searchText: o.items.map((i) => [i.snapshotName, i.snapshotComposition, i.notes]
+        .filter((value): value is string => Boolean(value?.trim()))
+        .join(' ')).join(' '),
       sourceChannel: o.sourceChannel,
       scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
       isScheduled: o.isScheduled ?? false,

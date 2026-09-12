@@ -67,11 +67,6 @@ const LANE_STYLE = {
     badge: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
     icon: Route,
   },
-  finalization: {
-    rule: "border-t-4 border-t-slate-400",
-    badge: "bg-muted text-muted-foreground",
-    icon: Activity,
-  },
 } as const;
 
 export function OrderManagerV2Page() {
@@ -370,16 +365,16 @@ export function OrderManagerV2Page() {
         </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-          <label className="relative min-w-[min(100%,280px)] flex-1">
+          <label className="relative min-w-[min(100%,280px)] w-full max-w-[440px]">
             <span className="sr-only">
-              Buscar pedido por número, cliente ou motoboy
+              Buscar pedido, cliente ou item
             </span>
             <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <input
-              aria-label="Buscar pedido por número, cliente ou motoboy"
+              aria-label="Buscar pedido, cliente ou item"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar número, cliente ou motoboy"
+              placeholder="Buscar pedido, cliente ou item..."
               className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary"
             />
           </label>
@@ -427,7 +422,7 @@ export function OrderManagerV2Page() {
         </div>
       ) : (
         <section
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 xl:grid xl:grid-cols-4 xl:overflow-visible"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 xl:grid xl:grid-cols-3 xl:overflow-visible"
           aria-label="Kanban operacional horizontal"
         >
           {ORDER_MANAGER_LANES.map((lane) => {

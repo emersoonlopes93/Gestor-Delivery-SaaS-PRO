@@ -1,16 +1,15 @@
 import type { OrderBoardItemDTO, OrderOperationalAction, OrderStatus } from '@gestor/types';
 
-export type OrderManagerLane = 'kitchen' | 'ready' | 'route' | 'finalization';
+export type OrderManagerLane = 'kitchen' | 'ready' | 'route';
 
 export const ORDER_MANAGER_LANES: readonly { id: OrderManagerLane; label: string; statuses: readonly OrderStatus[]; description: string }[] = [
   { id: 'kitchen', label: 'Cozinha', statuses: ['pending', 'confirmed', 'preparing'], description: 'Entrada e preparo' },
   { id: 'ready', label: 'Prontos', statuses: ['ready_for_pickup', 'ready_for_delivery'], description: 'Retirada ou despacho' },
   { id: 'route', label: 'Em rota', statuses: ['out_for_delivery'], description: 'Acompanhamento logístico' },
-  { id: 'finalization', label: 'Finalização', statuses: ['completed', 'cancelled'], description: 'Estados terminais' },
 ] as const;
 
 export function groupOrdersForManager(orders: readonly OrderBoardItemDTO[]): Record<OrderManagerLane, OrderBoardItemDTO[]> {
-  const groups: Record<OrderManagerLane, OrderBoardItemDTO[]> = { kitchen: [], ready: [], route: [], finalization: [] };
+  const groups: Record<OrderManagerLane, OrderBoardItemDTO[]> = { kitchen: [], ready: [], route: [] };
   for (const order of orders) {
     const lane = ORDER_MANAGER_LANES.find((candidate) => candidate.statuses.includes(order.status));
     if (lane) groups[lane.id].push(order);
@@ -18,15 +17,26 @@ export function groupOrdersForManager(orders: readonly OrderBoardItemDTO[]): Rec
   return groups;
 }
 
+export function normalizeOrderSearchText(value: string): string {
+  return value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+}
+
+export function buildOrderSearchText(order: OrderBoardItemDTO): string {
+  return [order.orderNumber, order.customerName, order.customerPhone, order.deliveryDriverName, order.itemsSummary, order.searchText, order.notes]
+    .filter((value): value is string => Boolean(value))
+    .join(' ');
+}
+
+export function matchesOrderSearch(order: OrderBoardItemDTO, query: string): boolean {
+  const normalized = normalizeOrderSearchText(query);
+  return !normalized || normalizeOrderSearchText(buildOrderSearchText(order)).includes(normalized);
+}
+
 export function filterManagerOrders(orders: readonly OrderBoardItemDTO[], query: string, origin: string): OrderBoardItemDTO[] {
-  const normalized = query.trim().toLocaleLowerCase('pt-BR');
   return orders.filter((order) => {
     const matchesOrigin = origin === 'all' || order.operational.origin === origin;
     if (!matchesOrigin) return false;
-    if (!normalized) return true;
-    return [order.orderNumber, order.customerName, order.customerPhone, order.deliveryDriverName]
-      .filter((value): value is string => Boolean(value))
-      .some((value) => value.toLocaleLowerCase('pt-BR').includes(normalized));
+    return matchesOrderSearch(order, query);
   });
 }
 

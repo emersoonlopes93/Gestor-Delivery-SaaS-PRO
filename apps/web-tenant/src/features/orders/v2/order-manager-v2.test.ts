@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OrderBoardItemDTO } from '@gestor/types';
 import { OrderAlertCoordinator } from './order-alert-coordinator';
-import { filterManagerOrders, formatElapsed, groupOrdersForManager, isRunnableStatusAction, privacySafeOrderPhrase } from './order-manager-v2';
+import { filterManagerOrders, formatElapsed, groupOrdersForManager, isRunnableStatusAction, matchesOrderSearch, privacySafeOrderPhrase } from './order-manager-v2';
 
 function order(status: OrderBoardItemDTO['status'], overrides: Partial<OrderBoardItemDTO> = {}): OrderBoardItemDTO {
   return {
@@ -17,11 +17,23 @@ function order(status: OrderBoardItemDTO['status'], overrides: Partial<OrderBoar
 describe('Order Manager V2 projections', () => {
   it('groups only canonical statuses into the operational lanes', () => {
     const groups = groupOrdersForManager([order('preparing'), order('ready_for_delivery'), order('out_for_delivery'), order('completed')]);
-    expect(groups.kitchen).toHaveLength(1); expect(groups.ready).toHaveLength(1); expect(groups.route).toHaveLength(1); expect(groups.finalization).toHaveLength(1);
+    expect(groups.kitchen).toHaveLength(1); expect(groups.ready).toHaveLength(1); expect(groups.route).toHaveLength(1);
   });
   it('preserves board search and origin filtering', () => {
     expect(filterManagerOrders([order('pending')], '1042', 'PEDEHUB')).toHaveLength(1);
     expect(filterManagerOrders([order('pending')], '1042', 'IFOOD')).toHaveLength(0);
+  });
+  it('searches locally across item composition and short notes without accents', () => {
+    const searchable = order('pending', { itemsSummary: 'Pizza Calabresa', searchText: 'Catupiry, bacon, borda cheddar complemento', notes: 'sem cebola' });
+    expect(matchesOrderSearch(searchable, 'calabresa')).toBe(true);
+    expect(matchesOrderSearch(searchable, 'catupiry')).toBe(true);
+    expect(matchesOrderSearch(searchable, 'bacon')).toBe(true);
+    expect(matchesOrderSearch(searchable, 'cheddar')).toBe(true);
+    expect(matchesOrderSearch(searchable, 'complemento')).toBe(true);
+    expect(matchesOrderSearch(searchable, 'CEBOLA')).toBe(true);
+    expect(matchesOrderSearch(order('pending', { customerName: 'Mário' }), 'mario')).toBe(true);
+    expect(matchesOrderSearch(searchable, '')).toBe(true);
+    expect(matchesOrderSearch(searchable, 'inexistente')).toBe(false);
   });
   it('uses a shared clock display and never emits customer data for voice', () => {
     expect(formatElapsed('2026-09-10T12:00:00.000Z', Date.parse('2026-09-10T12:46:00.000Z'))).toBe('46 min');
@@ -52,7 +64,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(source).toContain('overflow-x-auto');
     expect(source).toContain('min-w-[19rem]');
     expect(source).toContain('snap-mandatory');
-    expect(source).toContain('xl:grid-cols-4');
+    expect(source).toContain('xl:grid-cols-3');
   });
 
   it('surfaces alert settings and cross-tab coordination in the control-room strip', () => {
@@ -78,7 +90,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('aria-expanded={!cockpitCollapsed}');
     expect(page).toContain('aria-controls="order-manager-v2-cockpit-expanded"');
     expect(page).toContain('hidden={cockpitCollapsed}');
-    expect(page.indexOf('Buscar pedido por')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
+    expect(page.indexOf('Buscar pedido, cliente ou item')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
     expect(page).toContain('Metric label="Ativos"');
     expect(page).toContain('2xl:justify-end');
   });

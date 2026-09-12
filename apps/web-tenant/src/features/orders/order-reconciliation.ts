@@ -30,6 +30,9 @@ export function orderDetailToBoardItem(order: OrderResponseDTO): OrderBoardItemD
     itemsSubtotal: order.itemsSubtotal,
     itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
     itemsSummary: order.items.map((item) => `${item.quantity}x ${item.snapshotName}`).join(', '),
+    searchText: order.items.map((item) => [item.snapshotName, item.snapshotComposition, item.notes]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(' ')).join(' '),
     sourceChannel: order.sourceChannel,
     createdAt: order.createdAt,
     notes: order.notes,

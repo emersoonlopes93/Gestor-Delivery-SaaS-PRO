@@ -421,6 +421,8 @@ export interface OrderBoardItemDTO {
   itemsSubtotal: number;
   itemCount: number;
   itemsSummary: string; // Ex: "1x Pizza Calabresa, 2x Coca Cola"
+  /** Text derived from already-loaded item snapshots, used only for local board search. */
+  searchText?: string;
   sourceChannel?: string;
   createdAt: string;
   notes?: string | null;
