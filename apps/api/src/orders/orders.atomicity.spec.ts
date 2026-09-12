@@ -46,6 +46,7 @@ describe('OrdersService public checkout atomicity', () => {
       ),
     };
     const cashbackService = { createTransaction: jest.fn() };
+    const gateway = { emitOrderCancelled: jest.fn(), emitOrderChanged: jest.fn() };
     const service = new OrdersService(
       prisma as never,
       checkoutValidator as never,
@@ -131,14 +132,14 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
       {} as never,
       {} as never,
       {} as never,
-      { emitOrderCancelled: jest.fn(), emitOrderChanged: jest.fn() } as never,
+      gateway as never,
       {} as never,
       {} as never,
       { recordOrderStatusEvent: jest.fn() } as never,
       { handleInternalStatusChanged: jest.fn().mockResolvedValue({ deferred: false }) } as never,
       {} as never,
     );
-    return { service, tx, inventoryService, get committed() { return committed; } };
+    return { service, tx, inventoryService, gateway, get committed() { return committed; } };
   };
 
   it('runs own-checkout cancellation and stock reversal through the same transaction', async () => {
@@ -169,5 +170,13 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
     await expect(harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' }))
       .rejects.toBeInstanceOf(ConflictException);
     expect(harness.committed).toBe(false);
+  });
+
+  it('keeps a committed transition successful when realtime notification throws', async () => {
+    const harness = makeCancellationHarness();
+    harness.gateway.emitOrderChanged.mockImplementation(() => { throw new Error('socket unavailable'); });
+
+    await expect(harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' })).resolves.toMatchObject({ status: 'cancelled' });
+    expect(harness.committed).toBe(true);
   });
 });

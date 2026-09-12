@@ -1498,15 +1498,19 @@ export class OrdersService {
       }
     }
 
-    this.ordersGateway.emitOrderChanged(
-      tenantId,
-      orderId,
-      nextStatus === 'cancelled'
-        ? 'cancelled'
-        : nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery'
-          ? 'ready'
-          : 'status',
-    );
+    try {
+      this.ordersGateway.emitOrderChanged(
+        tenantId,
+        orderId,
+        nextStatus === 'cancelled'
+          ? 'cancelled'
+          : nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery'
+            ? 'ready'
+            : 'status',
+      );
+    } catch (error) {
+      this.logger.error(`Order status persisted but realtime notification failed for ${orderId}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
 
     return updated;
   }
