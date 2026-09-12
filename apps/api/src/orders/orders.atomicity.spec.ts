@@ -46,7 +46,6 @@ describe('OrdersService public checkout atomicity', () => {
       ),
     };
     const cashbackService = { createTransaction: jest.fn() };
-    const gateway = { emitOrderCancelled: jest.fn(), emitOrderChanged: jest.fn() };
     const service = new OrdersService(
       prisma as never,
       checkoutValidator as never,
