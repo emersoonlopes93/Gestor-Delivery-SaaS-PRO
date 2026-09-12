@@ -122,6 +122,7 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
         if (inventoryFailure) throw inventoryFailure;
       }),
     };
+    const gateway = { emitOrderCancelled: jest.fn(), emitOrderChanged: jest.fn() };
     const service = new OrdersService(
       prisma as never,
       {} as never,
