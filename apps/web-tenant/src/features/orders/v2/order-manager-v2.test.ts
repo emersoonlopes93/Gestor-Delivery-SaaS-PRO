@@ -72,6 +72,25 @@ describe('Order alert coordinator', () => {
 });
 
 describe('Order Manager V2 visual contracts', () => {
+  it('keeps operational actions and channel selection inside the V2 cockpit', () => {
+    const controlCenter = readFileSync(resolve(__dirname, 'OperationalControlCenter.tsx'), 'utf8');
+    const overlay = readFileSync(resolve(__dirname, 'OperationalOverlay.tsx'), 'utf8');
+    const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
+    const sidebar = readFileSync(resolve(__dirname, '../../../layouts/AppLayout.tsx'), 'utf8');
+    expect(controlCenter).not.toContain('/tenant/store-pause');
+    expect(controlCenter).not.toContain("navigate('");
+    expect(controlCenter).toContain('<OperationalOverlay title="Tempos e taxas"');
+    expect(controlCenter).toContain('<OperationalOverlay title="Radar da frota"');
+    expect(controlCenter).toContain('<OperationalOverlay title="Lançamentos de caixa"');
+    expect(controlCenter).toContain("onTabChange('delivery')");
+    expect(controlCenter).toContain("onTabChange('pickup')");
+    expect(page).toContain('filterOrdersForOperationalTab(filterManagerOrders(orders, query, origin), operationalTab)');
+    expect(page).toContain('OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)');
+    expect(overlay).toContain("event.key === 'Escape'");
+    expect(overlay).toContain('aria-modal="true"');
+    expect(sidebar).toContain('/tenant/store-pause');
+  });
+
   it('keeps the operational lanes horizontally scrollable below desktop', () => {
     const source = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     expect(source).toContain('overflow-x-auto');

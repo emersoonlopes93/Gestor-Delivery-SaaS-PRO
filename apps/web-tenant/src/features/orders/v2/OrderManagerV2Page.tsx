@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
@@ -36,6 +35,7 @@ import { useOrdersRealtimeState } from "../hooks/useOrdersRealtimeState";
 import { OrderCardV2 } from "./OrderCardV2";
 import { OrderDetailsModalV2 } from "./OrderDetailsModalV2";
 import { OperationalControlCenter } from './OperationalControlCenter';
+import { filterOrdersForOperationalTab, OPERATIONAL_TAB_LANES, type OperationalTab } from './operational-control-center';
 import {
   filterManagerOrders,
   getOperationalIntelligence,
@@ -75,12 +75,12 @@ const LANE_STYLE = {
 } as const;
 
 export function OrderManagerV2Page() {
-  const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState<OrderBoardItemDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [origin, setOrigin] = useState<(typeof ORIGINS)[number]>("all");
+  const [operationalTab, setOperationalTab] = useState<OperationalTab>('delivery');
   const [selected, setSelected] = useState<OrderBoardItemDTO | null>(null);
   const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
@@ -263,10 +263,9 @@ export function OrderManagerV2Page() {
     return () => window.clearInterval(interval);
   }, [activeAlerts]);
 
-  const fulfillmentFilter = searchParams.get('fulfillment');
   const filtered = useMemo(
-    () => filterManagerOrders(orders, query, origin).filter((order) => fulfillmentFilter === 'pickup' ? order.fulfillmentType === 'pickup' : fulfillmentFilter === 'delivery' ? order.fulfillmentType === 'delivery' : true),
-    [orders, origin, query, fulfillmentFilter],
+    () => filterOrdersForOperationalTab(filterManagerOrders(orders, query, origin), operationalTab),
+    [orders, origin, query, operationalTab],
   );
   const grouped = useMemo(() => groupOrdersForManager(filtered), [filtered]);
   const intelligence = useMemo(() => getOperationalIntelligence(orders, now), [orders, now]);
@@ -482,7 +481,7 @@ export function OrderManagerV2Page() {
           </span>
         </div>
       </header>
-      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} />
+      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} activeTab={operationalTab} onTabChange={setOperationalTab} />
       {error ? (
         <div
           role="alert"
@@ -502,7 +501,7 @@ export function OrderManagerV2Page() {
           className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 xl:grid xl:grid-cols-3 xl:overflow-visible"
           aria-label="Kanban operacional horizontal"
         >
-          {ORDER_MANAGER_LANES.map((lane) => {
+          {ORDER_MANAGER_LANES.filter((lane) => OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)).map((lane) => {
             const style = LANE_STYLE[lane.id];
             const Icon = style.icon;
             return (
