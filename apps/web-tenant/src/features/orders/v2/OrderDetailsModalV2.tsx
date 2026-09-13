@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, ClipboardList, History, PackageOpen, Printer, Radio } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderOperationalAction, OrderResponseDTO } from '@gestor/types';
+import { DeliveryStopStatus, type DeliveryRunDTO, type OrderBoardItemDTO, type OrderOperationalAction, type OrderResponseDTO } from '@gestor/types';
 import { api } from '../../../lib/api-client';
 import { OrderCustomerSection } from '../components/OrderCustomerSection';
 import { OrderFulfillmentSection } from '../components/OrderFulfillmentSection';
@@ -17,14 +17,28 @@ type Props = {
   onClose: () => void;
   onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void;
   onPrint: (order: OrderBoardItemDTO) => void;
+  onManualDeliveryCompleted: (order: OrderBoardItemDTO) => void;
   isActionPending: boolean;
   isPrinting: boolean;
 };
 
-export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, isActionPending, isPrinting }: Props) {
+const MANUAL_DELIVERY_REASONS = [
+  { code: 'customer_confirmation', label: 'Cliente confirmou o recebimento' },
+  { code: 'courier_unavailable', label: 'Entregador indisponível para concluir' },
+  { code: 'operational_correction', label: 'Correção operacional autorizada' },
+  { code: 'other', label: 'Outro motivo' },
+] as const;
+
+export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, onManualDeliveryCompleted, isActionPending, isPrinting }: Props) {
   const [detail, setDetail] = useState<OrderResponseDTO | null>(null);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [tab, setTab] = useState<'summary' | 'timeline'>('summary');
+  const [deliveryRun, setDeliveryRun] = useState<DeliveryRunDTO | null>(null);
+  const [manualReason, setManualReason] = useState<(typeof MANUAL_DELIVERY_REASONS)[number]['code']>('customer_confirmation');
+  const [manualNote, setManualNote] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualPending, setManualPending] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   useEffect(() => {
     setDetail(null);
@@ -43,6 +57,43 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, is
         setDetailState('error');
       });
   }, [order]);
+
+  useEffect(() => {
+    setDeliveryRun(null);
+    setManualOpen(false);
+    setManualError(null);
+    if (!order || order.status !== 'out_for_delivery' || order.operational.deliveryOwnership !== 'MERCHANT') return;
+    void api.get<DeliveryRunDTO | null>(`/delivery/runs/order/${order.id}`)
+      .then((response) => setDeliveryRun(response.data ?? null))
+      .catch(() => setDeliveryRun(null));
+  }, [order]);
+
+  const manualStop = deliveryRun?.stops.find((stop) => stop.orderId === order?.id);
+  const canCompleteManually = Boolean(manualStop && (manualStop.status === DeliveryStopStatus.CURRENT || manualStop.status === DeliveryStopStatus.ARRIVED));
+  const selectedReason = MANUAL_DELIVERY_REASONS.find((reason) => reason.code === manualReason) ?? MANUAL_DELIVERY_REASONS[0];
+  const submitManualCompletion = async () => {
+    if (!order || !deliveryRun || !manualStop || manualPending) return;
+    const note = manualNote.trim();
+    if (manualReason === 'other' && !note) {
+      setManualError('Descreva o motivo da conclusão manual.');
+      return;
+    }
+    setManualPending(true);
+    setManualError(null);
+    try {
+      const reason = `[manager_manual:${selectedReason.code}] ${selectedReason.label}${note ? ` — ${note}` : ''}`;
+      const response = await api.post<DeliveryRunDTO>(`/delivery/runs/${deliveryRun.id}/stops/${manualStop.id}/complete-manually`, { reason });
+      if (!response.success) throw new Error('Conclusão manual não confirmada.');
+      setDeliveryRun(response.data ?? null);
+      setManualOpen(false);
+      onManualDeliveryCompleted(order);
+    } catch {
+      setManualError('Não foi possível concluir manualmente. O pedido será reconciliado antes de uma nova tentativa.');
+      onManualDeliveryCompleted(order);
+    } finally {
+      setManualPending(false);
+    }
+  };
 
   const title = order?.operational.origin === 'FOOD_99' && order.operational.providerOrderNumber
     ? `Pedido 99Food #${order.operational.providerOrderNumber}`
@@ -64,6 +115,15 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, is
         </section> : null}
         {order ? <section className="mb-5 flex flex-wrap gap-2" aria-label="Acoes de status do pedido">
           {order.operational.availableActions.filter(isRunnableStatusAction).map((action) => <button key={action.type} type="button" disabled={isActionPending} onClick={() => onAction(order, action)} className="border border-primary bg-primary px-3 py-2 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60">{isActionPending ? 'Atualizando...' : action.label}</button>)}
+          {canCompleteManually ? <button type="button" disabled={isActionPending || manualPending} onClick={() => setManualOpen(true)} className="border border-amber-600 bg-amber-500 px-3 py-2 text-xs font-black text-amber-950 hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60">Marcar como entregue</button> : null}
+        </section> : null}
+        {manualOpen ? <section className="mb-5 border border-amber-500/50 bg-amber-500/10 p-4" aria-label="Confirmação de entrega manual">
+          <h3 className="text-sm font-black text-foreground">Confirmar entrega manual</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Esta ação conclui o pedido, registra o gestor responsável e atualiza a rota.</p>
+          <label className="mt-3 block text-xs font-bold text-foreground">Motivo<select value={manualReason} disabled={manualPending} onChange={(event) => setManualReason(event.target.value as typeof manualReason)} className="mt-1 block w-full border border-border bg-background px-3 py-2 text-sm"><option value="customer_confirmation">Cliente confirmou o recebimento</option><option value="courier_unavailable">Entregador indisponível para concluir</option><option value="operational_correction">Correção operacional autorizada</option><option value="other">Outro motivo</option></select></label>
+          <label className="mt-3 block text-xs font-bold text-foreground">Observação{manualReason === 'other' ? ' (obrigatória)' : ' (opcional)'}<textarea value={manualNote} disabled={manualPending} onChange={(event) => setManualNote(event.target.value)} maxLength={120} className="mt-1 block min-h-20 w-full border border-border bg-background px-3 py-2 text-sm" /></label>
+          {manualError ? <p role="alert" className="mt-2 text-xs font-bold text-destructive">{manualError}</p> : null}
+          <div className="mt-4 flex gap-2"><button type="button" disabled={manualPending} onClick={() => setManualOpen(false)} className="border border-border px-3 py-2 text-xs font-black">Cancelar</button><button type="button" disabled={manualPending} onClick={() => void submitManualCompletion()} className="bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{manualPending ? 'Concluindo...' : 'Confirmar entrega'}</button></div>
         </section> : null}
         <div className="mb-6 flex gap-2 border-b border-border">
           <button type="button" onClick={() => setTab('summary')} className={`inline-flex items-center gap-2 border-b-2 px-3 py-3 text-xs font-black ${tab === 'summary' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}><ClipboardList className="h-4 w-4" />Resumo</button>

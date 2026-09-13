@@ -80,14 +80,7 @@ export class PrintingService {
         },
       });
 
-      if (existingStation) {
-        await this.db.printStation.update({
-          where: { id: existingStation.id },
-          data: {
-            isActive: true,
-          },
-        });
-      } else {
+      if (!existingStation) {
         await this.db.printStation.create({
           data: {
             tenantId,

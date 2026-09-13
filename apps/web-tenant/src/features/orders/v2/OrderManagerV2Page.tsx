@@ -204,6 +204,10 @@ export function OrderManagerV2Page() {
     }
   }, [printingOrderId]);
 
+  const handleManualDeliveryCompleted = useCallback((order: OrderBoardItemDTO) => {
+    void reconcile({ eventId: `manual-delivery:${order.id}:${Date.now()}`, orderId: order.id, reason: 'status', occurredAt: new Date().toISOString() });
+  }, [reconcile]);
+
   useEffect(() => {
     void fetchBoard();
     void fetchAlerts();
@@ -549,6 +553,7 @@ export function OrderManagerV2Page() {
         onClose={() => setSelected(null)}
         onAction={handleStatusAction}
         onPrint={handlePrint}
+        onManualDeliveryCompleted={handleManualDeliveryCompleted}
         isActionPending={updatingOrderId === selected?.id}
         isPrinting={printingOrderId === selected?.id}
       />

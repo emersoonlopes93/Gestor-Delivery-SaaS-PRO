@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrderStatus, PrintType } from '@prisma/client';
 import { KdsService } from './kds.service';
 
@@ -17,11 +17,15 @@ describe('KdsService getPrintJob', () => {
       findMany: jest.fn(),
       groupBy: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
       upsert: jest.fn(),
       deleteMany: jest.fn(),
     },
     printerDevice: {
       findFirst: jest.fn(),
+    },
+    printStation: {
+      findMany: jest.fn(),
     },
   });
 
@@ -30,6 +34,7 @@ describe('KdsService getPrintJob', () => {
       db as never,
       { getTenantId: () => tenantId } as never,
       {} as never,
+      { updateOrderStatus: jest.fn() } as never,
     );
 
   it('returns a job only from the active tenant', async () => {
@@ -120,6 +125,7 @@ describe('KdsService getPrintJob', () => {
     db.printJob.groupBy.mockResolvedValue([{ station: 'MAIN' }]);
     db.printJob.findMany.mockResolvedValue([]);
     db.printJob.count.mockResolvedValue(0);
+    db.printStation.findMany.mockResolvedValue([]);
     const service = makeService(db);
 
     await expect(service.getAvailableStations()).resolves.toEqual(['GERAL', 'MAIN']);
@@ -159,6 +165,7 @@ describe('KdsService getPrintJob', () => {
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(1);
+    db.printStation.findMany.mockResolvedValue([]);
     db.order.findUnique.mockResolvedValue({
       id: 'order-1',
       tenantId: 'tenant-a',
@@ -203,6 +210,7 @@ describe('KdsService getPrintJob', () => {
       db as never,
       { getTenantId: () => 'tenant-a' } as never,
       { formatTicket: jest.fn().mockResolvedValue('ticket') } as never,
+      { updateOrderStatus: jest.fn() } as never,
     );
 
     await expect(service.createProductionJobs('order-1')).resolves.toHaveLength(1);
@@ -213,5 +221,40 @@ describe('KdsService getPrintJob', () => {
       where: { idempotencyKey: 'auto_print_order-1_kitchen_GERAL' },
       create: expect.objectContaining({ type: PrintType.kitchen }),
     }));
+  });
+
+  it('blocks production with the item and category when its KDS station is inactive', async () => {
+    const db = makeDb();
+    db.printJob.count.mockResolvedValue(0);
+    db.printStation.findMany.mockResolvedValue([{ name: 'Bebidas', slug: 'bebidas' }]);
+    db.order.findUnique.mockResolvedValue({
+      id: 'order-1', tenantId: 'tenant-a', status: OrderStatus.preparing, items: [{
+        id: 'item-1', lineType: 'product', snapshotName: 'Suco',
+        product: { category: { name: 'Bebidas', templateConfig: { station: 'Bebidas' } } },
+      }],
+    });
+
+    const production = makeService(db).createProductionJobs('order-1');
+    await expect(production).rejects.toBeInstanceOf(BadRequestException);
+    await expect(production).rejects.toThrow('o item "Suco" não pode entrar em produção');
+    expect(db.printJob.upsert).not.toHaveBeenCalled();
+  });
+
+  it('moves an order to ready only after the final kitchen station is completed', async () => {
+    const db = makeDb();
+    const ordersService = { updateOrderStatus: jest.fn().mockResolvedValue({ status: 'ready_for_delivery' }) };
+    db.printJob.findFirst.mockResolvedValue({
+      id: 'job-bebidas', tenantId: 'tenant-a', orderId: 'order-1', status: 'pending',
+      order: { id: 'order-1', status: 'preparing', fulfillmentType: 'delivery' },
+    });
+    db.printJob.update.mockResolvedValue({ id: 'job-bebidas', orderId: 'order-1', status: 'completed' });
+    db.printJob.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    const service = new KdsService(db as never, { getTenantId: () => 'tenant-a' } as never, {} as never, ordersService as never);
+
+    await service.markAsCompleted('job-bebidas');
+    expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+
+    await service.markAsCompleted('job-bebidas');
+    expect(ordersService.updateOrderStatus).toHaveBeenCalledWith('order-1', 'tenant-a', { status: 'ready_for_delivery' });
   });
 });

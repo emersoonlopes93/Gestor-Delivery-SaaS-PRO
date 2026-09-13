@@ -14,6 +14,12 @@ Uma rota pertence a um tenant, um entregador e ao turno ativo desse entregador. 
 
 `Order.status` permanece uma máquina separada e continua obedecendo `ORDER_STATUS_TRANSITIONS`. O início da rota move atomicamente os pedidos de `ready_for_delivery` para `out_for_delivery`. A conclusão de uma parada move somente o pedido correspondente para `completed`. Tentativa sem sucesso não cancela o pedido.
 
+## Conclusão manual autorizada
+
+O painel pode concluir manualmente uma parada de rota própria em andamento por `POST /delivery/runs/:id/stops/:stopId/complete-manually`. A rota e a parada são resolvidas pelo `tenantId` da sessão, a ação exige `delivery.dispatch`, e aceita somente a parada `CURRENT` ou `ARRIVED`. Provider delivery e ownership desconhecido não chegam a rotas próprias e, portanto, não são elegíveis.
+
+O motivo é obrigatório e inclui um código estável `manager_manual:<code>` registrado na timeline do pedido. A operação usa a mesma transação serializável, transição canônica `out_for_delivery` para `completed`, atualização de parada, ledger e avanço/finalização da rota. Repetir após `DELIVERED` é idempotente e não duplica efeitos; falhas abortam a transação. Ao confirmar, o backend publica `order.changed` e um gatilho privado de rota para o entregador.
+
 ## Concorrência e isolamento
 
 Todas as operações recebem `tenantId` explicitamente e executam em transação serializável com retry para conflito de serialização. Constraints parciais no PostgreSQL impedem simultaneamente:

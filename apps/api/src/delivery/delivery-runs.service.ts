@@ -810,6 +810,32 @@ export class DeliveryRunsService {
     return updated;
   }
 
+  async completeStopByManager(tenantId: string, runId: string, stopId: string, actorId: string, reason: string) {
+    if (!reason.trim()) throw new BadRequestException('Informe o motivo da conclusão manual.');
+    const ordersService = this.requireOrdersService();
+    const updated = await this.transaction(async (tx) => {
+      const run = await this.getRun(tx, tenantId, runId);
+      const stop = run.stops.find((item) => item.id === stopId);
+      if (stop?.status === DeliveryStopStatus.DELIVERED) return run;
+      if (run.status !== DeliveryRunStatus.IN_PROGRESS) throw new ConflictException('A rota não está em andamento.');
+      if (!stop || (stop.status !== DeliveryStopStatus.CURRENT && stop.status !== DeliveryStopStatus.ARRIVED)) {
+        throw new ConflictException('A parada não pode ser concluída manualmente neste estado.');
+      }
+      const order = await tx.order.findFirst({ where: { id: stop.orderId, tenantId } });
+      if (!order || order.status !== 'out_for_delivery') throw new ConflictException('O pedido não está em rota para conclusão manual.');
+      const deliveredAt = new Date();
+      await ordersService.applyOrderStatusTransitionInTransaction(tx, { tenantId, orderId: order.id, expectedCurrentStatus: 'out_for_delivery', targetStatus: 'completed' });
+      await tx.orderTimeline.create({ data: { tenantId, orderId: order.id, status: 'completed', note: `Entrega concluída manualmente: ${reason.trim()}`, actorId, actorType: 'tenant_user' } });
+      await tx.deliveryStop.update({ where: { id: stop.id }, data: { status: DeliveryStopStatus.DELIVERED, deliveredAt } });
+      await this.earnings.postStop(tx, { ...stop, run }, 'delivered', stop.payAttemptSnapshot ?? false);
+      await this.advanceOrFinalize(tx, run, stop.id, deliveredAt, 'STOP_DELIVERED_MANUAL', { actorId, reason: reason.trim() });
+      return this.getRun(tx, tenantId, runId);
+    });
+    const completedStop = updated.stops.find((stop) => stop.id === stopId);
+    if (completedStop) this.ordersGateway?.emitOrderChanged(tenantId, completedStop.orderId, 'status');
+    return updated;
+  }
+
   async markFailedAttempt(
     tenantId: string,
     runId: string,

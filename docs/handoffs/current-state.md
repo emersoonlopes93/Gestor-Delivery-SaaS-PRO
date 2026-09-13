@@ -1,3 +1,11 @@
+## Operational flow final close: KDS and manual delivery (2026-09-13)
+
+- KDS agrupa produção por estação e só cria jobs para `preparing`. A conclusão tenant-scoped de um job verifica os demais jobs kitchen e move o pedido uma única vez pelo `OrdersService` quando o último termina; a mesma transição canônica preserva eventos e sincronização provider.
+- Estação KDS desligada permanece desligada durante a sincronização. Pedido que contém item de categoria ligada a essa estação é bloqueado antes de produção parcial, com mensagem de item/categoria/estação.
+- O Gestor de Pedidos V2 oferece confirmação de entrega manual apenas para uma parada `CURRENT`/`ARRIVED` de rota própria. Exige motivo auditável com código estável, usa `delivery.dispatch`, transação serializável, timeline, ledger e reconciliação por `order.changed`; repetição após entrega não duplica efeitos.
+- Documentação atualizada: contratos de operações/delivery e `docs/operations/operational-radar-readiness-matrix.md`. Sem migration, provider real, banco remoto, deploy, GPS, mapa, outbox ou reescrita de adapter.
+- Validação parcial desta sessão: API focused 2 suites/44 testes e build web-tenant passaram. Próximos gates: build API, typecheck, lint, no-any, boundaries, theme, features, diff check, commit, PR e CI no SHA final.
+
 ## 99Food Settlement & Reconciliation (2026-09-12)
 
 - Bill Data e Settlements Data agora possuem adapters read-only separados no host financeiro oficial, paginação de 200 itens, janelas de até 31 dias, backfill manual de até três meses e parsing lossless antes do `JSON.parse`. Acesso sem WhiteList retorna `FINANCE_ACCESS_NOT_ENABLED`; nenhum scheduler ou chamada real foi introduzido.
