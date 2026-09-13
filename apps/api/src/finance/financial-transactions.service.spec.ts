@@ -66,7 +66,7 @@ describe('FinancialTransactionsService account balance effects', () => {
       financialTransaction: tx.financialTransaction,
       $transaction: jest.fn((callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
     };
-    return { service: new FinancialTransactionsService(prisma as never), accounts };
+    return { service: new FinancialTransactionsService(prisma as never), accounts, transactions };
   };
 
   const create = (service: FinancialTransactionsService, type: FinancialTransactionType, status: FinancialStatus, amount: number, accountId = 'account-a') =>
@@ -135,5 +135,17 @@ describe('FinancialTransactionsService account balance effects', () => {
       status: FinancialStatus.PAID, referenceId: 'purchase-a', referenceType: 'purchase',
     })).rejects.toBeInstanceOf(ConflictException);
     expect(accounts[0].balance).toBe(0);
+  });
+
+  it('keeps 99Food settlement ledger entries immutable outside their lifecycle', async () => {
+    const { service, accounts, transactions } = makeHarness();
+    await expect(service.create('tenant-a', {
+      accountId: 'account-a', type: FinancialTransactionType.INCOME, category: 'marketplace_settlement', amount: 10,
+      status: FinancialStatus.PAID, referenceId: 'week-1', referenceType: 'marketplace_settlement_99food',
+    })).rejects.toBeInstanceOf(ConflictException);
+    const transaction = await create(service, FinancialTransactionType.INCOME, FinancialStatus.PAID, 25);
+    transactions[0].referenceType = 'marketplace_settlement_99food';
+    await expect(service.update('tenant-a', transaction.id, { amount: 30 })).rejects.toBeInstanceOf(ConflictException);
+    expect(accounts[0].balance).toBe(25);
   });
 });

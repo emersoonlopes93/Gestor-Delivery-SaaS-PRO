@@ -27,6 +27,9 @@ import { MarketplacePollingService } from './services/marketplace-polling.servic
 import { Food99HttpClientService } from './services/food99-http-client.service';
 import { Food99TokenService } from './services/food99-token.service';
 import { Food99PollingService } from './services/food99-polling.service';
+import { Food99FinancialController } from './controllers/food99-financial.controller';
+import { Food99FinancialClientService } from './services/food99-financial-client.service';
+import { Food99FinancialReconciliationService } from './services/food99-financial-reconciliation.service';
 
 const enableMarketplaceQueue =
   process.env.REDIS_ENABLED !== 'false' &&
@@ -57,7 +60,7 @@ const enableMarketplaceQueue =
         ]
       : []),
   ],
-  controllers: [MarketplaceWebhookController, MarketplaceTenantController],
+  controllers: [MarketplaceWebhookController, MarketplaceTenantController, Food99FinancialController],
   providers: [
     IfoodProvider,
     Food99Provider,
@@ -76,6 +79,8 @@ const enableMarketplaceQueue =
     MarketplaceAdminOperationsService,
     MarketplacePollingService,
     Food99PollingService,
+    Food99FinancialClientService,
+    Food99FinancialReconciliationService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),
   ],
   exports: [

@@ -20,6 +20,7 @@ import { TransactionModal } from './TransactionModal';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { Card } from '../../components/ui/Card';
 import { usePermissions } from '../../hooks/use-tenant-auth';
+import { Food99ReconciliationPanel } from './Food99ReconciliationPanel';
 
 interface DashboardMetrics {
   financial: {
@@ -153,6 +154,8 @@ export function FinancePage() {
       </header>
 
       <ContextualNavigation itemIds={['management.finance', 'cash.home', 'analytics.reports']} />
+
+      <Food99ReconciliationPanel canManage={canManageFinance} />
 
       {canManageFinance && (
         <TransactionModal

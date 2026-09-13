@@ -96,6 +96,8 @@ model Tenant {
   marketplaceOrders              MarketplaceOrder[]
   marketplaceOperations          MarketplaceOperation[]
   marketplaceDivergences         MarketplaceDivergence[]
+  marketplaceBillEntries         MarketplaceBillEntry[]
+  marketplaceSettlements         MarketplaceSettlement[]
   mediaAssets                    MediaAsset[]
   mediaCategories                MediaCategory[]
   optionGroups                   OptionGroup[]
@@ -1937,12 +1939,16 @@ model MarketplaceConnection {
   pollingDuplicateEvents        Int                         @default(0) @map("polling_duplicate_events")
   pollingAcknowledgedEvents     Int                         @default(0) @map("polling_acknowledged_events")
   pollingAcknowledgmentFailures Int                         @default(0) @map("polling_acknowledgment_failures")
+  settlementFinancialAccountId  String?                     @map("settlement_financial_account_id")
   createdAt                     DateTime                    @default(now()) @map("created_at")
   updatedAt                     DateTime                    @updatedAt @map("updated_at")
   tenant                        Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   events                        MarketplaceEventInbox[]
   orders                        MarketplaceOrder[]
   operations                    MarketplaceOperation[]
+  billEntries                   MarketplaceBillEntry[]
+  settlements                   MarketplaceSettlement[]
+  settlementFinancialAccount    FinancialAccount?           @relation("MarketplaceSettlementAccount", fields: [settlementFinancialAccountId], references: [id], onDelete: SetNull)
 
   @@unique([provider, externalMerchantId])
   @@unique([provider, externalStoreId])
@@ -1951,6 +1957,77 @@ model MarketplaceConnection {
   @@index([provider, pollingStatus, pollingNextAttemptAt], map: "marketplace_connections_provider_polling_status_polling_next_at")
   @@index([tenantId, pollingStatus])
   @@map("marketplace_connections")
+}
+
+model MarketplaceBillEntry {
+  id                    String                @id @default(uuid())
+  tenantId              String                @map("tenant_id")
+  provider              MarketplaceProvider
+  connectionId          String                @map("connection_id")
+  orderId               String                @map("order_id") @db.VarChar(120)
+  orderType             Int                   @map("order_type")
+  businessTs            String                @map("business_ts") @db.VarChar(120)
+  businessAt            DateTime?             @map("business_at")
+  dayPaymentId          String                @map("day_payment_id") @db.VarChar(120)
+  commissionAmount      BigInt                @map("commission_amount")
+  settlementAmount      BigInt                @map("settlement_amount")
+  orderAmount           BigInt                @map("order_amount")
+  shopActivityOutcome   BigInt                @map("shop_activity_outcome")
+  shopActivitySubsidy   BigInt                @map("shop_activity_subsidy")
+  expectSettleDate      DateTime?             @map("expect_settle_date")
+  rawPayload            Json?                 @map("raw_payload")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection            MarketplaceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, connectionId, orderId, orderType, businessTs], map: "marketplace_bill_entry_identity_key")
+  @@index([tenantId, provider, connectionId, dayPaymentId], map: "marketplace_bill_entry_day_payment_idx")
+  @@index([tenantId, provider, connectionId, businessAt], map: "marketplace_bill_entry_business_at_idx")
+  @@map("marketplace_bill_entries")
+}
+
+model MarketplaceSettlement {
+  id                     String                      @id @default(uuid())
+  tenantId               String                      @map("tenant_id")
+  provider               MarketplaceProvider
+  connectionId           String                      @map("connection_id")
+  weekPaymentId          String                      @map("week_payment_id") @db.VarChar(120)
+  withdrawAmount         BigInt                      @map("withdraw_amount")
+  withdrawDate           DateTime                    @map("withdraw_date")
+  liability              BigInt                      @default(0)
+  shopId                 String                      @map("shop_id") @db.VarChar(120)
+  settleStartDate        DateTime                    @map("settle_start_date")
+  settleEndDate          DateTime                    @map("settle_end_date")
+  currency               String                      @db.VarChar(12)
+  status                 MarketplaceSettlementStatus @default(LIQUIDATED_UNPOSTED)
+  financialTransactionId String?                     @unique @map("financial_transaction_id")
+  postedAt               DateTime?                   @map("posted_at")
+  compositionDifference  BigInt?                     @map("composition_difference")
+  discrepancyDetails     Json?                       @map("discrepancy_details")
+  rawPayload             Json?                       @map("raw_payload")
+  createdAt              DateTime                    @default(now()) @map("created_at")
+  updatedAt              DateTime                    @updatedAt @map("updated_at")
+  tenant                 Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection             MarketplaceConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  financialTransaction   FinancialTransaction?       @relation("MarketplaceSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  dayPayments            MarketplaceSettlementDayPayment[]
+
+  @@unique([tenantId, provider, weekPaymentId], map: "marketplace_settlement_identity_key")
+  @@index([tenantId, provider, connectionId, withdrawDate], map: "marketplace_settlement_withdraw_date_idx")
+  @@index([tenantId, status], map: "marketplace_settlement_status_idx")
+  @@map("marketplace_settlements")
+}
+
+model MarketplaceSettlementDayPayment {
+  id            String                @id @default(uuid())
+  settlementId  String                @map("settlement_id")
+  dayPaymentId  String                @map("day_payment_id") @db.VarChar(120)
+  settlement    MarketplaceSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@unique([settlementId, dayPaymentId], map: "marketplace_settlement_day_payment_key")
+  @@index([dayPaymentId], map: "marketplace_settlement_day_payment_idx")
+  @@map("marketplace_settlement_day_payments")
 }
 
 model PaymentProviderConnection {
@@ -3145,6 +3222,7 @@ model FinancialAccount {
   tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions FinancialTransaction[]
   purchaseSettlements PurchaseSettlement[]
+  marketplaceSettlementConnections MarketplaceConnection[] @relation("MarketplaceSettlementAccount")
 
   @@index([tenantId])
   @@map("financial_accounts")
@@ -3171,6 +3249,7 @@ model FinancialTransaction {
   reversal      FinancialTransaction?    @relation("FinancialTransactionReversal")
   purchaseSettlement PurchaseSettlement? @relation("PurchaseSettlementTransaction")
   purchaseSettlementReversal PurchaseSettlement? @relation("PurchaseSettlementReversal")
+  marketplaceSettlement MarketplaceSettlement? @relation("MarketplaceSettlementTransaction")
   tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
@@ -4113,6 +4192,12 @@ enum MarketplaceProvider {
   KETTA
   ZE_DELIVERY
   OTHER
+}
+
+enum MarketplaceSettlementStatus {
+  LIQUIDATED_UNPOSTED
+  POSTED
+  RECONCILIATION_DISCREPANCY
 }
 
 enum MarketplaceConnectionStatus {

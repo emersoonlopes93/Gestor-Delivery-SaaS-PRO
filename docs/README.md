@@ -57,6 +57,7 @@
 | [Acertos dos entregadores](./contracts/driver-settlements.md) | Turnos quitados, idempotência e histórico financeiro |
 | [Ganhos dos entregadores](./contracts/driver-earnings.md) | Regras, snapshots, ledger e saldos do entregador |
 | [Marketplace](./contracts/marketplace.md) | iFood, ingestão, sincronização |
+| [Conciliação financeira 99Food](./contracts/99food-financial-reconciliation.md) | Bill Data, repasses, posting manual e idempotência |
 | [Agendamento](./contracts/scheduling.md) | Janelas, slots, timezone, capacidade e checkout |
 | [Tratamento de erros](./contracts/error-handling.md) | Envelopes, filtros, logging |
 

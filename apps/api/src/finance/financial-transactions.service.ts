@@ -121,8 +121,8 @@ export class FinancialTransactionsService {
   }
 
   async create(tenantId: string, dto: CreateFinancialTransactionDTO): Promise<FinancialTransactionDTO> {
-    if (dto.referenceType === 'purchase' || dto.referenceType === 'purchase_reversal') {
-      throw new ConflictException('Lancamentos de compra devem ser gerenciados pelo lifecycle de compras.');
+    if (this.isLifecycleManagedReference(dto.referenceType)) {
+      throw new ConflictException('Lancamentos vinculados devem ser gerenciados pelo lifecycle de origem.');
     }
     if (dto.accountId) {
       const account = await this.prisma.financialAccount.findFirst({
@@ -174,8 +174,8 @@ export class FinancialTransactionsService {
         where: { id, tenantId },
       });
       if (!current) throw new NotFoundException('Financial transaction not found');
-      if (current.referenceType === 'purchase' || current.referenceType === 'purchase_reversal') {
-        throw new ConflictException('Lancamento de compra e imutavel fora do lifecycle de compras.');
+      if (this.isLifecycleManagedReference(current.referenceType)) {
+        throw new ConflictException('Lancamento vinculado e imutavel fora do lifecycle de origem.');
       }
 
       if (dto.accountId !== undefined) {
@@ -225,5 +225,11 @@ export class FinancialTransactionsService {
       amount: Number(t.amount),
       accountName: t.account?.name
     };
+  }
+
+  private isLifecycleManagedReference(referenceType: string | null | undefined): boolean {
+    return referenceType === 'purchase'
+      || referenceType === 'purchase_reversal'
+      || referenceType === 'marketplace_settlement_99food';
   }
 }

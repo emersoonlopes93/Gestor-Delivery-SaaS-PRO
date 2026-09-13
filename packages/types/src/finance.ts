@@ -60,3 +60,77 @@ export interface UpdateFinancialTransactionDTO {
   description?: string;
   amount?: number;
 }
+
+export type MarketplaceSettlementPostingStatus =
+  | 'LIQUIDATED_UNPOSTED'
+  | 'POSTED'
+  | 'RECONCILIATION_DISCREPANCY';
+
+export interface Food99FinancialSyncDTO {
+  connectionId: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface Food99SettlementAccountDTO {
+  accountId: string | null;
+}
+
+export interface Food99BillEntryDTO {
+  id: string;
+  orderId: string;
+  orderType: 1 | 2 | 3 | 4 | 5;
+  businessTs: string;
+  businessAt: string | null;
+  dayPaymentId: string;
+  commissionAmountCents: string;
+  settlementAmountCents: string;
+  orderAmountCents: string;
+  shopActivityOutcomeCents: string;
+  shopActivitySubsidyCents: string;
+  expectSettleDate: string | null;
+}
+
+export interface Food99SettlementDTO {
+  id: string;
+  connectionId: string;
+  connectionName: string | null;
+  weekPaymentId: string;
+  withdrawAmountCents: string;
+  withdrawDate: string;
+  liabilityCents: string;
+  shopId: string;
+  settleStartDate: string;
+  settleEndDate: string;
+  currency: string;
+  status: MarketplaceSettlementPostingStatus;
+  financialTransactionId: string | null;
+  postedAt: string | null;
+  dayPaymentIds: string[];
+  linkedBillEntryCount: number;
+  linkedSettlementAmountCents: string;
+  compositionDifferenceCents: string;
+  hasCompositionDiscrepancy: boolean;
+}
+
+export interface Food99ReconciliationConnectionDTO {
+  id: string;
+  displayName: string | null;
+  appShopId: string | null;
+  settlementFinancialAccountId: string | null;
+}
+
+export interface Food99ReconciliationDTO {
+  connections: Food99ReconciliationConnectionDTO[];
+  settlements: Food99SettlementDTO[];
+  billEntries: Food99BillEntryDTO[];
+}
+
+export interface Food99FinancialSyncResultDTO {
+  billEntriesReceived: number;
+  billEntriesCreated: number;
+  settlementsReceived: number;
+  settlementsCreated: number;
+  settlementsUpdated: number;
+  discrepanciesDetected: number;
+}

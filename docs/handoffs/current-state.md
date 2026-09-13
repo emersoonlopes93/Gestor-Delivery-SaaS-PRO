@@ -1,3 +1,11 @@
+## 99Food Settlement & Reconciliation (2026-09-12)
+
+- Bill Data e Settlements Data agora possuem adapters read-only separados no host financeiro oficial, paginação de 200 itens, janelas de até 31 dias, backfill manual de até três meses e parsing lossless antes do `JSON.parse`. Acesso sem WhiteList retorna `FINANCE_ACCESS_NOT_ENABLED`; nenhum scheduler ou chamada real foi introduzido.
+- A migration `20260912120000_99food_financial_reconciliation` adiciona `MarketplaceBillEntry`, `MarketplaceSettlement`, a relação estruturada de day payments e a conta de destino nullable na conexão. Bills usam identidade tenant/provider/conexão/pedido/tipo/businessTs e nunca alteram saldo; repasses usam weekPaymentId tenant/provider.
+- Posting segue confirmação manual. Conta ativa do mesmo tenant é obrigatória e explicitamente configurada. Uma transaction serializável cria exatamente um lançamento, aplica uma vez o valor líquido assinado e vincula o repasse. Drift posterior marca discrepância sem mutar o lançamento ou saldo; o endpoint genérico também impede criar ou editar lançamentos pertencentes a esse lifecycle.
+- A tela Financeiro ganhou visão de conciliação 99Food com período, eventos, comissão, refunds/ajustes, repasses, composição, divergências, conta e ação manual. Gestor legado e Gestor 2.0 continuam compartilhando `OrderPaymentSection`; FinancialProjection e DRE permanecem sem reclassificação.
+- Validação local: migration fresca com 73/73 migrations; 21 suítes API/195 testes focados; 5 arquivos web/18 testes; PostgreSQL 16 com 3 suítes/13 testes de constraints, concorrência, rollback, compras e estoque; typecheck do repositório, no-any, boundaries, features, theme, lint e builds API/web passaram. O diff Prisma contém apenas quatro renames de índices já preexistentes e fora desta migration. Nenhum provider real, banco remoto, Dokploy ou deploy foi tocado.
+
 ## Purchase Lifecycle Completion (2026-09-10)
 
 - `POST /purchasing/purchases` continua representando recebimento imediato, agora com chave de idempotência tenant-scoped e fingerprint persistente; retries equivalentes retornam a compra existente sem duplicar estoque ou financeiro.
