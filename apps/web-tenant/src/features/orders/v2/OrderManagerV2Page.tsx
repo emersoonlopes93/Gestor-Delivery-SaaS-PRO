@@ -43,6 +43,7 @@ import {
 import { useSharedClock } from "./useSharedClock";
 import { useSoundManager } from "../../../notifications/useSoundManager";
 import { useTenantAuth } from "../../../hooks/use-tenant-auth";
+import { createNotificationEvent, emitNotificationEvent } from "../../../notifications/notificationEvents";
 import {
   browserSpeechProvider,
   isVoiceAlertsEnabled,
@@ -51,6 +52,7 @@ import {
 } from "./order-alert-coordinator";
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
+type OrderAlert = { id: string; orderId: string | null; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
 const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
 const LANE_STYLE = {
   kitchen: {
@@ -80,6 +82,8 @@ export function OrderManagerV2Page() {
   const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<OrderAlert[]>([]);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const [cockpitCollapsed, setCockpitCollapsed] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem(COCKPIT_COLLAPSED_STORAGE_KEY) === "true");
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -110,6 +114,18 @@ export function OrderManagerV2Page() {
   const testVoice = useCallback(async () => {
     const speech = browserSpeechProvider();
     if (speech) await speech.speak("Teste de voz do Gestor de Pedidos.");
+  }, []);
+
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const response = await api.get<OrderAlert[]>("/order-alerts");
+      setAlerts(response.data ?? []);
+    } catch { /* Board stays available if the alert center cannot refresh. */ }
+  }, []);
+
+  const acknowledgeAlert = useCallback(async (alertId: string) => {
+    const response = await api.patch<OrderAlert>(`/order-alerts/${alertId}/acknowledge`, {});
+    if (response.data) setAlerts((current) => current.map((alert) => alert.id === alertId ? response.data as OrderAlert : alert));
   }, []);
 
   const fetchBoard = useCallback(async () => {
@@ -190,17 +206,19 @@ export function OrderManagerV2Page() {
 
   useEffect(() => {
     void fetchBoard();
-  }, [fetchBoard]);
+    void fetchAlerts();
+  }, [fetchAlerts, fetchBoard]);
   useEffect(() => {
     const interval = window.setInterval(
-      () => void fetchBoard(),
+      () => { void fetchBoard(); void fetchAlerts(); },
       realtime.connectionState === "connected" ? 90_000 : 30_000,
     );
     return () => window.clearInterval(interval);
-  }, [fetchBoard, realtime.connectionState]);
+  }, [fetchAlerts, fetchBoard, realtime.connectionState]);
   useEffect(() => {
     const pending = new Map<string, OrderChangedEvent>();
     return subscribeOrdersRealtimeEvents((event) => {
+      if (event.type === 'order.alert.changed') { void fetchAlerts(); return; }
       if (event.type !== "order.changed") return;
       const latest = latestHintForOrder(
         pending.get(event.hint.orderId),
@@ -209,7 +227,34 @@ export function OrderManagerV2Page() {
       pending.set(event.hint.orderId, latest);
       void reconcile(latest);
     });
-  }, [reconcile]);
+  }, [fetchAlerts, reconcile]);
+
+  const activeAlerts = useMemo(() => alerts.filter((alert) => alert.state === 'ACTIVE'), [alerts]);
+
+  useEffect(() => {
+    const lastPlayed = new Map<string, number>();
+    const announce = () => {
+      const timestamp = Date.now();
+      for (const alert of activeAlerts) {
+        if (alert.acknowledgedAt || alert.severity === 'INFO') continue;
+        const cooldown = alert.severity === 'CRITICAL' ? 30_000 : 60_000;
+        if (timestamp - (lastPlayed.get(alert.id) ?? 0) < cooldown) continue;
+        lastPlayed.set(alert.id, timestamp);
+        emitNotificationEvent(createNotificationEvent({
+          id: `order-alert:${alert.id}:${timestamp}`,
+          type: 'order.alert',
+          orderId: alert.orderId ?? undefined,
+          title: alert.title,
+          message: alert.message,
+          priority: alert.severity === 'CRITICAL' ? 'critical' : 'high',
+          source: 'polling',
+        }));
+      }
+    };
+    announce();
+    const interval = window.setInterval(announce, 15_000);
+    return () => window.clearInterval(interval);
+  }, [activeAlerts]);
 
   const filtered = useMemo(
     () => filterManagerOrders(orders, query, origin),
@@ -238,10 +283,26 @@ export function OrderManagerV2Page() {
           <Metric label="Ativos" value={kpis.active} />
           <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Em rota" value={kpis.route} />
+          <button type="button" onClick={() => setAlertsOpen((open) => !open)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-black text-foreground hover:bg-muted" aria-expanded={alertsOpen}>
+            <BellRing className="h-3.5 w-3.5" /> Alertas {activeAlerts.length}
+          </button>
           <span className={`hidden items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold sm:inline-flex ${realtime.connectionState === "connected" ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
           <span className="hidden text-[10px] font-bold text-muted-foreground lg:inline">Alertas: {soundManager.soundPreferenceEnabled ? "som ativo" : "som desligado"}</span>
           <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
         </div>
+        {alertsOpen ? (
+          <section className="mt-3 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
+            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button></div>
+            {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
+              <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
+                <span className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alert.severity}</span>
+                <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
+                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
+                {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
+              </div>
+            ))}
+          </section>
+        ) : null}
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-3">
         <div className="flex flex-wrap gap-2 border-b border-border pb-3" aria-label="Indicadores operacionais">
           <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />

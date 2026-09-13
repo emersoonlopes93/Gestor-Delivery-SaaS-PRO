@@ -1117,6 +1117,7 @@ model Order {
   financialProjections   FinancialProjection[]
   scheduledOrders        ScheduledOrder[]
   stockMovements         StockMovement[]
+  alerts                 OrderAlert[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -1127,6 +1128,33 @@ model Order {
   @@index([tenantId, customerId, createdAt])
   @@index([tenantId, tableId])
   @@map("orders")
+}
+
+model OrderAlert {
+  id                 String             @id @default(uuid())
+  tenantId           String             @map("tenant_id")
+  orderId            String?            @map("order_id")
+  ruleKey            String             @map("rule_key") @db.VarChar(80)
+  severity           OrderAlertSeverity
+  state              OrderAlertState    @default(ACTIVE)
+  fingerprint        String             @db.VarChar(300)
+  occurrence         Int                @default(1)
+  title              String             @db.VarChar(180)
+  message            String             @db.VarChar(500)
+  metadata           Json?
+  firstSeenAt        DateTime           @default(now()) @map("first_seen_at")
+  lastSeenAt         DateTime           @default(now()) @map("last_seen_at")
+  acknowledgedAt     DateTime?          @map("acknowledged_at")
+  acknowledgedById   String?            @map("acknowledged_by_id")
+  recoveredAt        DateTime?          @map("recovered_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  order              Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, state, severity, lastSeenAt])
+  @@index([tenantId, orderId, ruleKey, state])
+  @@unique([tenantId, fingerprint, occurrence])
+  @@map("order_alerts")
 }
 
 model OrderItem {
@@ -4246,6 +4274,17 @@ enum MarketplaceOperationStatus {
   SUCCEEDED
   FAILED
   INTERVENTION_REQUIRED
+}
+
+enum OrderAlertSeverity {
+  INFO
+  ATTENTION
+  CRITICAL
+}
+
+enum OrderAlertState {
+  ACTIVE
+  RECOVERED
 }
 
 enum MarketplaceDivergenceType {

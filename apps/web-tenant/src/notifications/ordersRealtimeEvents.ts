@@ -8,7 +8,8 @@ export type OrdersRealtimeConnectionState =
 
 export type OrdersRealtimeEvent =
   | { type: 'connection'; state: OrdersRealtimeConnectionState; occurredAt: string }
-  | { type: 'order.changed'; hint: OrderChangedEvent };
+  | { type: 'order.changed'; hint: OrderChangedEvent }
+  | { type: 'order.alert.changed'; alertId: string; state: 'ACTIVE' | 'RECOVERED'; reason: 'created' | 'acknowledged' | 'recovered'; occurredAt: string };
 
 const EVENT_NAME = 'tenant:orders-realtime-event';
 let connectionState: OrdersRealtimeConnectionState = 'connecting';

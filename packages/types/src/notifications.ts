@@ -43,6 +43,7 @@ export const NOTIFICATION_DOMAIN_EVENTS = [
   'order.out_for_delivery',
   'order.delivered',
   'order.failed',
+  'order.alert',
   'store.opened',
   'store.closed',
   'store.paused',
