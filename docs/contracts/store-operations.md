@@ -20,6 +20,12 @@ O PDV e o modo garçom aceitam uma mesa somente se o nome normalizado existir no
 
 O fallback obrigatório é do navegador: a UI abre uma visualização térmica legível e aciona `window.print()`. O ticket contém identificação, número/data do pedido, itens e complementos, observações, tipo, mesa/entrega, pagamento e total. QZ Tray e Bluetooth permanecem integrações opcionais; indisponibilidade deles não bloqueia pedido, KDS ou fallback. Bridge USB/rede nativa não faz parte deste contrato.
 
+## KDS multiestação e pronto automático
+
+Jobs `kitchen` são criados somente quando o pedido canônico já está em `preparing`, agrupados pela estação configurada na categoria. Cada job e cada leitura são tenant-scoped. Marcar um job como concluído é idempotente; o pedido só avança uma vez para `ready_for_delivery` ou `ready_for_pickup` depois que não resta nenhum job de cozinha não concluído para aquele pedido. A transição continua sendo feita por `OrdersService`, preservando lifecycle, eventos e sincronização provider já canônicos.
+
+`PrintStation.isActive=false` é uma decisão persistente: a sincronização de estações não a reativa. Se um item aponta para estação desativada, a criação de produção é bloqueada antes de criar jobs parciais e informa estação, categoria e item. Não há pronto automático parcial nem fallback silencioso para outra estação.
+
 ## Relação persistida de mesa: tableId
 
 ```sql

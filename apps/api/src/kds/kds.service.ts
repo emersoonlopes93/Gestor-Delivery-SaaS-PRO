@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
@@ -12,6 +12,7 @@ import {
   PrintType as PrismaPrintType
 } from '@prisma/client';
 import { PrinterService } from '../pos/printer.service';
+import { OrdersService } from '../orders/orders.service';
 import { 
   OrderResponseDTO, 
   PrintType, 
@@ -43,6 +44,7 @@ export class KdsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly printerService: PrinterService,
+    @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
   ) {}
 
   private buildIdempotencyKey(prefix: string, parts: Array<string | number | null | undefined>) {
@@ -318,13 +320,33 @@ export class KdsService {
       throw new Error('Tenant context not found');
     }
 
-    return this.prisma.printJob.update({
+    const printJob = await this.prisma.printJob.findFirst({
+      where: { id: printJobId, tenantId },
+      include: { order: { select: { id: true, status: true, fulfillmentType: true } } },
+    });
+    if (!printJob) throw new NotFoundException('Print job not found');
+    if (printJob.status === PrismaPrintJobStatus.completed) return printJob;
+
+    const completed = await this.prisma.printJob.update({
       where: { id: printJobId, tenantId },
       data: {
         status: PrismaPrintJobStatus.completed,
         printedAt: new Date(),
       },
     });
+    const openJobs = await this.prisma.printJob.count({
+      where: { tenantId, orderId: completed.orderId, type: PrismaPrintType.kitchen, status: { not: PrismaPrintJobStatus.completed } },
+    });
+    if (openJobs === 0 && printJob.order.status === 'preparing') {
+      const targetStatus: OrderStatus = printJob.order.fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
+      try {
+        await this.ordersService.updateOrderStatus(completed.orderId, tenantId, { status: targetStatus });
+      } catch (error) {
+        const order = await this.prisma.order.findFirst({ where: { id: completed.orderId, tenantId }, select: { status: true } });
+        if (order?.status !== targetStatus) throw error;
+      }
+    }
+    return completed;
   }
 
   /**
@@ -613,6 +635,9 @@ export class KdsService {
       }
 
       const stationGroups: Record<string, OrderItem[]> = {};
+      const inactiveStations = new Set((await this.prisma.printStation.findMany({
+        where: { tenantId, isActive: false }, select: { name: true, slug: true },
+      })).flatMap((station) => [station.name.trim().toLocaleLowerCase('pt-BR'), station.slug.trim().toLocaleLowerCase('pt-BR')]));
       
       for (const item of (order as OrderWithItems).items) {
         const category = item.product?.category;
@@ -625,6 +650,9 @@ export class KdsService {
             : 'GERAL';
         }
         
+        if (inactiveStations.has(station.trim().toLocaleLowerCase('pt-BR'))) {
+          throw new BadRequestException(`A estação KDS "${station}" da categoria "${category?.name ?? 'não identificada'}" está desativada; o item "${item.snapshotName}" não pode entrar em produção. Reative-a antes de enviar este pedido.`);
+        }
         if (!stationGroups[station]) stationGroups[station] = [];
         stationGroups[station].push(item);
       }

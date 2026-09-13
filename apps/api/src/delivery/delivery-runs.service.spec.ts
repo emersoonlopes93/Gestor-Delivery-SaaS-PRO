@@ -554,6 +554,38 @@ describe('DeliveryRunsService', () => {
     expect(gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-a', 'status');
   });
 
+  it('completes a current own-fleet stop manually with an auditable manager reason', async () => {
+    const stop = { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.CURRENT, payAttemptSnapshot: false };
+    tx.deliveryRun.findFirst
+      .mockResolvedValueOnce(baseRun({ status: DeliveryRunStatus.IN_PROGRESS, stops: [stop] }))
+      .mockResolvedValueOnce(baseRun({ status: DeliveryRunStatus.COMPLETED, stops: [{ ...stop, status: DeliveryStopStatus.DELIVERED }] }));
+    tx.order.findFirst.mockResolvedValue({ id: 'order-a', status: 'out_for_delivery' });
+    tx.deliveryStop.findMany.mockResolvedValue([{ ...stop, status: DeliveryStopStatus.DELIVERED }]);
+    tx.deliveryRun.update.mockResolvedValue(baseRun({ status: DeliveryRunStatus.COMPLETED }));
+
+    await service.completeStopByManager('tenant-a', 'run-a', 'stop-a', 'manager-a', '[manager_manual:customer_confirmation] Cliente confirmou');
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledWith(tx, expect.objectContaining({
+      tenantId: 'tenant-a', orderId: 'order-a', expectedCurrentStatus: 'out_for_delivery', targetStatus: 'completed',
+    }));
+    expect(tx.orderTimeline.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      actorId: 'manager-a', actorType: 'tenant_user', note: expect.stringContaining('manager_manual:customer_confirmation'),
+    }) }));
+    expect(earnings.postStop).toHaveBeenCalledTimes(1);
+    expect(gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-a', 'status');
+  });
+
+  it('keeps an already delivered stop idempotent when the manager retries manual completion', async () => {
+    const stop = { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.DELIVERED };
+    tx.deliveryRun.findFirst.mockResolvedValue(baseRun({ status: DeliveryRunStatus.COMPLETED, stops: [stop] }));
+
+    await service.completeStopByManager('tenant-a', 'run-a', 'stop-a', 'manager-a', '[manager_manual:other] Conferido');
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).not.toHaveBeenCalled();
+    expect(earnings.postStop).not.toHaveBeenCalled();
+    expect(gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-a', 'status');
+  });
+
   it('keeps startRun all-or-nothing when one of multiple canonical transitions is stale', async () => {
     const stops = [
       { id: 'stop-a', orderId: 'order-a', sequence: 1, status: DeliveryStopStatus.PENDING },

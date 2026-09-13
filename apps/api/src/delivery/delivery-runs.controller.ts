@@ -59,6 +59,20 @@ export class DeliveryRunsController {
     });
   }
 
+  @Post(':id/stops/:stopId/complete-manually')
+  @RequirePermissions('delivery.dispatch')
+  async completeStopManually(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') runId: string,
+    @Param('stopId') stopId: string,
+    @Body() dto: DeliveryRunReasonDTO,
+  ) {
+    const run = await this.deliveryRunsService.completeStopByManager(req.user.tenantId, runId, stopId, req.user.id, dto.reason);
+    const occurredAt = new Date().toISOString();
+    this.deliveryTrackingGateway.emitDriverRouteEvent(req.user.tenantId, run.driverId, { eventId: `delivery.stop_updated:${stopId}:${occurredAt}`, type: 'delivery.stop_updated', change: 'updated', runId, stopId, occurredAt });
+    return run;
+  }
+
   @Get('pay-settings')
   @RequirePermissions('delivery.read', 'delivery.manage_drivers')
   getPaySettings(@Request() req: AuthenticatedRequest) {

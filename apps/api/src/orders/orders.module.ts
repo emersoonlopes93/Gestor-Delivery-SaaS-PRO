@@ -38,7 +38,7 @@ import { OrderAlertsService } from './alerts/order-alerts.service';
     PaymentGatewayModule,
     SchedulingModule,
     forwardRef(() => NotificationsModule),
-    KdsModule,
+    forwardRef(() => KdsModule),
     BillingDomainModule,
     forwardRef(() => MarketplaceModule),
     FeatureControlModule,
