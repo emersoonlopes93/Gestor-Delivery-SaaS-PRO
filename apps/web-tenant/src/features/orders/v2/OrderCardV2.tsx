@@ -46,13 +46,13 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, isActionPen
     : 'Sincronizado';
   const status = ORDER_STATUS_PRESENTATION[order.status];
   return (
-    <article className={`group relative rounded-xl border border-border bg-card p-3 pl-4 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l-xl hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
+    <article className={`group relative rounded-xl border border-border bg-card p-2.5 pl-3.5 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l-xl hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:p-3 sm:pl-4 ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
       <button type="button" className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Abrir pedido ${order.orderNumber}`} onClick={() => onOpen(order)} />
       <div className="pointer-events-none relative">
         <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
           <div className="min-w-0">
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{providerLabel(order.operational)}</p>
-            <h3 className="mt-1 text-xl font-black leading-none text-foreground">#{order.orderNumber}</h3>
+            <h3 className="mt-1 text-lg font-black leading-none text-foreground sm:text-xl">#{order.orderNumber}</h3>
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <button type="button" disabled={isPrinting} title="Imprimir pedido" aria-label={`Imprimir pedido ${order.orderNumber}`} onClick={(event) => { event.stopPropagation(); onPrint(order); }} className="pointer-events-auto relative z-10 grid h-7 w-7 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60"><Printer className="h-3.5 w-3.5" /></button>
@@ -62,7 +62,7 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, isActionPen
             <span className="max-w-28 truncate text-right text-[10px] font-black uppercase tracking-wide text-foreground">{status.label}</span>
           </div>
         </div>
-        <div className="space-y-2 py-3">
+        <div className="space-y-1.5 py-2.5 sm:space-y-2 sm:py-3">
           <p className="flex items-center gap-2 truncate text-sm font-bold text-foreground"><UserRound className="h-3.5 w-3.5 text-muted-foreground" />{order.customerName}</p>
           <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{order.itemCount} itens · {order.itemsSummary}</p>
           <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{deliveryStatement(order.operational, order.fulfillmentType)}</p>

@@ -91,3 +91,4 @@ export function setVoiceAlertsEnabled(enabled: boolean, scopeKey?: string): void
 }
 
 export const sharedOrderAlertCoordinator = new OrderAlertCoordinator();
+export const ORDER_ALERT_CENTER_TOGGLE_EVENT = 'gestor:order-alert-center:toggle';

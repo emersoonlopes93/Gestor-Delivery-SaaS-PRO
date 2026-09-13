@@ -94,16 +94,20 @@ describe('Order Manager V2 visual contracts', () => {
   it('keeps the operational lanes horizontally scrollable below desktop', () => {
     const source = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     expect(source).toContain('overflow-x-auto');
-    expect(source).toContain('min-w-[19rem]');
+    expect(source).toContain('min-w-[calc(100vw-1.5rem)]');
+    expect(source).toContain('sm:min-w-[22rem]');
     expect(source).toContain('snap-mandatory');
     expect(source).toContain('xl:grid-cols-3');
   });
 
-  it('surfaces alert settings and cross-tab coordination in the control-room strip', () => {
+  it('keeps alert settings and cross-tab coordination while moving the trigger to the global topbar', () => {
     const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     const center = readFileSync(resolve(__dirname, '../../../notifications/NotificationCenter.tsx'), 'utf8');
+    const layout = readFileSync(resolve(__dirname, '../../../layouts/AppLayout.tsx'), 'utf8');
+    const topbar = readFileSync(resolve(__dirname, 'OrderAlertTopbarButton.tsx'), 'utf8');
     expect(page).toContain('Central de alertas');
-    expect(page).toContain('uma aba anuncia');
+    expect(page).toContain('ORDER_ALERT_CENTER_TOGGLE_EVENT');
+    expect(page).not.toContain('relógio compartilhado');
     expect(page).toContain('setSoundPreferenceEnabled');
     expect(page).toContain('setVoiceAlertsEnabled');
     expect(page).toContain('soundManager.testSound()');
@@ -114,6 +118,9 @@ describe('Order Manager V2 visual contracts', () => {
     expect(center).toContain('sharedOrderAlertCoordinator.enqueue');
     expect(center).toContain("document.visibilityState === 'visible'");
     expect(center).toContain('if (shouldAnnounce && !isConnectionEvent(event))');
+    expect(layout).toContain('<OrderAlertTopbarButton />');
+    expect(topbar).toContain('ORDER_ALERT_CENTER_TOGGLE_EVENT');
+    expect(topbar).toContain("'/order-alerts'");
   });
 
   it('keeps search and filters outside the persisted collapsible cockpit panel', () => {
@@ -125,6 +132,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page.indexOf('Buscar pedido, cliente ou item')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
     expect(page).toContain('Metric label="Ativos"');
     expect(page).toContain('2xl:justify-end');
+    expect(page).toContain('sm:w-[240px]');
   });
 
   it('labels card scan indicators and repeats operational context in details', () => {
