@@ -1,3 +1,10 @@
+## Operational Control Center (2026-09-13)
+
+- O Gestor V2 passou a reutilizar o board canônico para um cockpit compacto: estado operacional da loja, atalhos permissionados para taxas, Radar, caixa e mesas, e contadores de Delivery, Retirada e Comandas sem pedidos terminais ou dupla contagem.
+- A pausa da loja usa exclusivamente `PATCH /tenant/store-pause` com `settings.manage`. Delivery, taxas, caixa, PDV/mesas e Radar seguem as telas e permissões canônicas já existentes; não houve schema, lifecycle, provider, GPS, mapa novo ou dado de localização sintético.
+- O Radar permanece a superfície Leaflet existente, com localização ausente/desatualizada explicitamente tratada. Retirada abre o Gestor V2 com filtro de fulfillment real pela URL.
+- Validação local: teste focado do read model e TypeScript/build web-tenant passaram. Próximos gates: lint, typecheck global, no-any, boundaries, features, theme, build e diff check antes da PR única.
+
 ## Operational flow final close: KDS and manual delivery (2026-09-13)
 
 - KDS agrupa produção por estação e só cria jobs para `preparing`. A conclusão tenant-scoped de um job verifica os demais jobs kitchen e move o pedido uma única vez pelo `OrdersService` quando o último termina; a mesma transição canônica preserva eventos e sincronização provider.
