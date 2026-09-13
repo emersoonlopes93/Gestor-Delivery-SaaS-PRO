@@ -6,6 +6,11 @@ export type OperationalChannelCounters = {
   dineIn: { active: number };
 };
 
+export type OperationalTab = 'delivery' | 'pickup' | 'dine_in';
+export const OPERATIONAL_TAB_LANES: Record<OperationalTab, readonly ('kitchen' | 'ready' | 'route')[]> = {
+  delivery: ['kitchen', 'ready', 'route'], pickup: ['kitchen', 'ready'], dine_in: ['kitchen', 'ready'],
+};
+
 const ACTIVE = new Set(['pending', 'confirmed', 'preparing', 'ready_for_pickup', 'ready_for_delivery', 'out_for_delivery']);
 const KITCHEN = new Set(['pending', 'confirmed', 'preparing']);
 
@@ -32,4 +37,9 @@ export function getOperationalChannelCounters(orders: readonly OrderBoardItemDTO
     }
   }
   return counters;
+}
+
+/** Applies one operational tab before board grouping so counts and cards share one source. */
+export function filterOrdersForOperationalTab(orders: readonly OrderBoardItemDTO[], tab: OperationalTab): OrderBoardItemDTO[] {
+  return orders.filter((order) => order.fulfillmentType === tab);
 }
