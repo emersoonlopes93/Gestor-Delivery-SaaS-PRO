@@ -156,7 +156,11 @@ export function NotificationCenter() {
       });
 
       if (leaderRef.current?.wasEventPlayed(event.id)) return;
-      const shouldAnnounce = isLeader;
+      // Existing order notifications remain audible in a visible active tab. Alert Engine
+      // repetitions are stricter: they are emitted by the leader only.
+      const shouldAnnounce = event.type === 'order.alert'
+        ? isLeader
+        : isLeader || document.visibilityState === 'visible';
       if (shouldAnnounce && !isConnectionEvent(event)) {
         leaderRef.current?.markEventPlayed(event.id);
         if (shouldShowBrowserNotification(event)) {
