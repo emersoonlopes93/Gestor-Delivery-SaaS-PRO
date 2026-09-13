@@ -55,6 +55,18 @@ export const SOUND_CATALOG: Record<SystemSoundEvent, SoundCatalogEntry> = {
     priority: 'critical',
     cooldownMs: 8_000,
   },
+  'order.alert': {
+    event: 'order.alert',
+    pattern: {
+      steps: [
+        { frequency: 880, durationMs: 160, waveform: ALERT, gain: 0.5, attackMs: 8, releaseMs: 32 },
+        { frequency: 880, durationMs: 160, waveform: ALERT, gain: 0.5, attackMs: 8, releaseMs: 32 },
+      ],
+      gapMs: 110,
+    },
+    priority: 'high',
+    cooldownMs: 30_000,
+  },
   'order.cancelled': {
     event: 'order.cancelled',
     pattern: {

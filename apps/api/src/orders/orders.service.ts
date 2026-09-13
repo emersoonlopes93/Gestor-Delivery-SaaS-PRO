@@ -61,6 +61,7 @@ import {
   isPrismaUniqueConstraintError,
 } from './order-idempotency.util';
 import { getOrderOperationalViewModel } from './order-operational-view-model';
+import { OrderAlertsService } from './alerts/order-alerts.service';
 
 export type OrderStatusTransitionResult = {
   orderBeforeTransition: PrismaOrder;
@@ -214,6 +215,7 @@ export class OrdersService {
     private readonly deliveryTrackingGateway?: DeliveryTrackingGateway,
     @Optional() @Inject(forwardRef(() => DeliveryRunsService))
     private readonly deliveryRunsService?: DeliveryRunsService,
+    private readonly orderAlertsService?: OrderAlertsService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -898,6 +900,8 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    await this.orderAlertsService?.refreshTenant(tenantId);
 
     return orders.map((o) => ({
       id: o.id,

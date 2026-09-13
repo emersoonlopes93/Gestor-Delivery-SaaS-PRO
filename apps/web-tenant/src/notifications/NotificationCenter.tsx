@@ -156,7 +156,7 @@ export function NotificationCenter() {
       });
 
       if (leaderRef.current?.wasEventPlayed(event.id)) return;
-      const shouldAnnounce = isLeader || document.visibilityState === 'visible';
+      const shouldAnnounce = isLeader;
       if (shouldAnnounce && !isConnectionEvent(event)) {
         leaderRef.current?.markEventPlayed(event.id);
         if (shouldShowBrowserNotification(event)) {

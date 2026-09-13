@@ -353,6 +353,11 @@ export function useNotificationAudio(
       emitOrdersRealtimeEvent({ type: 'order.changed', hint: data });
     });
 
+    socket.on('order.alert.changed', (data: { alertId?: string; state?: 'ACTIVE' | 'RECOVERED'; reason?: 'created' | 'acknowledged' | 'recovered'; occurredAt?: string }) => {
+      if (!data.alertId || !data.state || !data.reason || !data.occurredAt) return;
+      emitOrdersRealtimeEvent({ type: 'order.alert.changed', alertId: data.alertId, state: data.state, reason: data.reason, occurredAt: data.occurredAt });
+    });
+
     socketRef.current = socket;
 
     return () => {

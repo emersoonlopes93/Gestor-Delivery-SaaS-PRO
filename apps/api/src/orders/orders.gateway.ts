@@ -170,6 +170,19 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`tenant:${tenantId}`).emit('order.changed', event);
   }
 
+  emitOrderAlertChanged(tenantId: string, alertId: string, state: 'ACTIVE' | 'RECOVERED', reason: 'created' | 'acknowledged' | 'recovered') {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping order.alert.changed.');
+      return;
+    }
+    this.server.to(`tenant:${tenantId}`).emit('order.alert.changed', {
+      alertId,
+      state,
+      reason,
+      occurredAt: new Date().toISOString(),
+    });
+  }
+
   emitOrderAutoAccepted(
     tenantId: string,
     input: { orderId: string; orderNumber: string; customerName?: string; total?: number | string },
