@@ -120,7 +120,7 @@ describe('PrintingService print station bootstrap', () => {
     expect(db.printStation.create).toHaveBeenCalledTimes(1);
   });
 
-  it('reuses an existing station by tenant slug and reactivates it', async () => {
+  it('reuses an existing station by tenant slug without reactivating it', async () => {
     const db = makeDb();
     db.printStation.findFirst.mockResolvedValue({ id: 'station-existing' });
     db.productCategory.findMany.mockResolvedValue([
@@ -133,10 +133,7 @@ describe('PrintingService print station bootstrap', () => {
 
     await makeService(db).ensurePrintStationsForTenant('tenant-1');
 
-    expect(db.printStation.update).toHaveBeenCalledWith({
-      where: { id: 'station-existing' },
-      data: { isActive: true },
-    });
+    expect(db.printStation.update).not.toHaveBeenCalled();
     expect(db.printStation.create).not.toHaveBeenCalled();
   });
 
