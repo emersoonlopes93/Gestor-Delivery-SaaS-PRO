@@ -67,7 +67,9 @@ export function driverMapState(driver: DriverDTO, now = new Date()) {
   return getLocationFreshness(driver.lastLocationAt ?? null, now);
 }
 
-export function formatStopAddress(address: Record<string, unknown> | null): string {
+type OperationalAddress = { street?: unknown; number?: unknown; neighborhood?: unknown; complement?: unknown; city?: unknown; state?: unknown; zipCode?: unknown; reference?: unknown };
+
+export function formatStopAddress(address: OperationalAddress | null): string {
   if (!address) return 'Endereço não informado';
   const street = typeof address.street === 'string' ? address.street : '';
   const number = typeof address.number === 'string' ? address.number : '';

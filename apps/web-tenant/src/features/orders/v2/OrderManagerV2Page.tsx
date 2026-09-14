@@ -244,6 +244,16 @@ export function OrderManagerV2Page() {
   }, [fetchAlerts, reconcile]);
 
   const activeAlerts = useMemo(() => alerts.filter((alert) => alert.state === 'ACTIVE'), [alerts]);
+  const activeAlertSeverityByOrderId = useMemo(() => {
+    const byOrderId = new Map<string, OrderAlert['severity']>();
+    const rank: Record<OrderAlert['severity'], number> = { INFO: 1, ATTENTION: 2, CRITICAL: 3 };
+    for (const alert of activeAlerts) {
+      const currentSeverity = alert.orderId ? byOrderId.get(alert.orderId) : undefined;
+      if (!alert.orderId || (currentSeverity && rank[alert.severity] <= rank[currentSeverity])) continue;
+      byOrderId.set(alert.orderId, alert.severity);
+    }
+    return byOrderId;
+  }, [activeAlerts]);
 
   useEffect(() => {
     const lastPlayed = new Map<string, number>();
@@ -465,7 +475,7 @@ export function OrderManagerV2Page() {
           </span>
         </div>
       </header>
-      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} activeTab={operationalTab} onTabChange={setOperationalTab} />
+      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} activeTab={operationalTab} onTabChange={setOperationalTab} onOpenOrder={setSelected} />
       {error ? (
         <div
           role="alert"
@@ -520,6 +530,8 @@ export function OrderManagerV2Page() {
                       onOpen={setSelected}
                       onAction={handleStatusAction}
                       onPrint={handlePrint}
+                      alertSeverity={activeAlertSeverityByOrderId.get(order.id)}
+                      onOpenAlert={() => window.dispatchEvent(new Event(ORDER_ALERT_CENTER_TOGGLE_EVENT))}
                       isActionPending={updatingOrderId === order.id}
                       isPrinting={printingOrderId === order.id}
                     />

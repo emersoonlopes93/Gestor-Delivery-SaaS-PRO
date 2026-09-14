@@ -4,21 +4,21 @@ import type { OrderBoardItemDTO } from '@gestor/types';
 import { usePermissions } from '../../../hooks/use-tenant-auth';
 import { useTenantCapabilities } from '../../../hooks/useTenantCapabilities';
 import { DeliveryZonesPageRefactored } from '../../delivery/DeliveryZonesPageRefactored';
-import { DeliveryMapPage } from '../../delivery/DeliveryMapPage';
 import CashPage from '../../cash/CashPage';
 import { OperationalOverlay } from './OperationalOverlay';
 import { getOperationalChannelCounters, type OperationalTab } from './operational-control-center';
+import { OperationalRadar } from './OperationalRadar';
 
 type QuickAction = 'rates' | 'radar' | 'cash' | null;
 
-export function OperationalControlCenter({ orders, alertCount, activeTab, onTabChange }: { orders: readonly OrderBoardItemDTO[]; alertCount: number; activeTab: OperationalTab; onTabChange: (tab: OperationalTab) => void }) {
+export function OperationalControlCenter({ orders, alertCount, activeTab, onTabChange, onOpenOrder }: { orders: readonly OrderBoardItemDTO[]; alertCount: number; activeTab: OperationalTab; onTabChange: (tab: OperationalTab) => void; onOpenOrder: (order: OrderBoardItemDTO) => void }) {
   const { has } = usePermissions();
   const { isFeatureEnabled } = useTenantCapabilities();
   const [quickAction, setQuickAction] = useState<QuickAction>(null);
   const counters = useMemo(() => getOperationalChannelCounters(orders), [orders]);
   const action = (label: string, icon: ReactNode, key: Exclude<QuickAction, null>, allowed: boolean) => allowed ? <button type="button" onClick={() => setQuickAction(key)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-black text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="text-primary">{icon}</span>{label}</button> : null;
   return <section className="mb-3 overflow-hidden rounded-2xl border border-border bg-muted/20" aria-label="Controles operacionais">
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-3 py-2" aria-label={`Operação com ${alertCount} alertas ativos`}>
       <p className="text-xs font-black text-foreground">Operação</p>
       <div className="flex flex-wrap gap-1">
         {action('Tempos e taxas', <Clock3 className="h-4 w-4" />, 'rates', has('delivery.manage'))}
@@ -29,10 +29,10 @@ export function OperationalControlCenter({ orders, alertCount, activeTab, onTabC
     <div className="grid grid-cols-3 gap-px bg-border" role="tablist" aria-label="Canais operacionais">
       <Channel title="Delivery" icon={<Truck className="h-4 w-4" />} active={activeTab === 'delivery'} onClick={() => onTabChange('delivery')} primary={`${counters.delivery.active} ativos`} detail={`${counters.delivery.kitchen} cozinha · ${counters.delivery.ready} prontos · ${counters.delivery.route} rota`} />
       <Channel title="Balcão / retirada" icon={<ReceiptText className="h-4 w-4" />} active={activeTab === 'pickup'} onClick={() => onTabChange('pickup')} primary={`${counters.pickup.active} ativos`} detail={`${counters.pickup.kitchen} cozinha · ${counters.pickup.ready} retirar`} />
-      {has('pos.read') && isFeatureEnabled('dine_in') ? <Channel title="Comandas" icon={<ReceiptText className="h-4 w-4" />} active={activeTab === 'dine_in'} onClick={() => onTabChange('dine_in')} primary={`${counters.dineIn.active} ativas`} detail={`${alertCount} alertas operacionais`} /> : null}
+      {has('pos.read') && isFeatureEnabled('dine_in') ? <Channel title="Comandas" icon={<ReceiptText className="h-4 w-4" />} active={activeTab === 'dine_in'} onClick={() => onTabChange('dine_in')} primary={`${counters.dineIn.active} ativas`} detail={`${counters.dineIn.kitchen} cozinha · ${counters.dineIn.ready} prontos`} /> : null}
     </div>
     {quickAction === 'rates' ? <OperationalOverlay title="Tempos e taxas" onClose={() => setQuickAction(null)}><DeliveryZonesPageRefactored /></OperationalOverlay> : null}
-    {quickAction === 'radar' ? <OperationalOverlay title="Radar da frota" onClose={() => setQuickAction(null)} fullscreen><DeliveryMapPage /></OperationalOverlay> : null}
+    {quickAction === 'radar' ? <OperationalOverlay title="Radar da frota" onClose={() => setQuickAction(null)} fullscreen><OperationalRadar orders={orders} onOpenOrder={onOpenOrder} /></OperationalOverlay> : null}
     {quickAction === 'cash' ? <OperationalOverlay title="Lançamentos de caixa" onClose={() => setQuickAction(null)}><CashPage /></OperationalOverlay> : null}
   </section>;
 }

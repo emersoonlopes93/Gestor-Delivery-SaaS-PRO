@@ -13,6 +13,13 @@ describe('Operational Control Center counters', () => {
     ]);
     expect(counters.delivery).toEqual({ active: 3, kitchen: 1, ready: 1, dispatch: 1, route: 1 });
     expect(counters.pickup).toEqual({ active: 1, kitchen: 0, ready: 1 });
+    expect(counters.dineIn).toEqual({ active: 0, kitchen: 0, ready: 0 });
+  });
+
+  it('keeps dine-in counters inside the actual fulfillment projection', () => {
+    const counters = getOperationalChannelCounters([order('preparing', 'dine_in'), order('ready_for_pickup', 'dine_in'), order('out_for_delivery', 'delivery')]);
+    expect(counters.dineIn).toEqual({ active: 2, kitchen: 1, ready: 1 });
+    expect(filterOrdersForOperationalTab([order('preparing', 'dine_in'), order('ready_for_pickup', 'pickup')], 'dine_in')).toHaveLength(1);
   });
 
   it('uses the same fulfillment projection for tabs and their visible lanes', () => {
