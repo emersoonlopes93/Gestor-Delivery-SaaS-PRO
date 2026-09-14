@@ -2549,3 +2549,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Drivers and active routes continue to use their existing tenant-scoped queries and five-second refresh. The existing freshness helper labels current, stale and unavailable GPS explicitly. No dispatch, GPS, route optimization or lifecycle engine was added.
 - Delivery/Pickup/Dine-in remain local board projections. Pickup still has no route lane, and Comandas exposes only real `dine_in` counters (active, kitchen and ready); table/session, partial value and close behavior are deliberately not inferred from order data. Cards expose only canonical primary actions. Active Alert Engine records now produce a compact severity trigger that opens the existing alert center without changing ACK/audio behavior.
 - No API, schema, migration, KDS, printing, provider, RBAC, sidebar, remote database, deploy or provider action changed. Focused API suites: 6/63 PASS. Focused web suites: 4/24 PASS; web typecheck PASS. Package gates and authenticated live acceptance remain pending.
+
+## Operational Control Center mode strip refinement (2026-09-13)
+
+- Branch: `fix/operational-control-mode-strip`, based on `origin/main-copy` / `6d728806ea426690af6f731eba24818f22d87dbd`.
+- Delivery, Balcão and Comandas now render as a compact horizontal mode strip: circular channel icon, active count and compact real-state chips. Delivery exposes kitchen and delivery counts; pickup exposes kitchen and ready-to-collect counts.
+- Comandas intentionally labels its derived order state as `Operação`, not table occupancy: the order board does not carry a canonical occupancy/session fact. The active-state label is derived only from real active `dine_in` orders.
+- The presentation uses existing semantic light/dark tokens and does not alter tabs, counters, lifecycle, Alert Engine, Radar, permissions, API, schema or any provider integration. Focused web tests, typecheck, lint, critical theme check and diff check PASS; visual acceptance remains required.

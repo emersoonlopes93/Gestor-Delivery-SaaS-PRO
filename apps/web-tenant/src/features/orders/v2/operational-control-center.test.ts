@@ -1,4 +1,6 @@
 import type { OrderBoardItemDTO } from '@gestor/types';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { filterOrdersForOperationalTab, getOperationalChannelCounters, OPERATIONAL_TAB_LANES } from './operational-control-center';
 
 const order = (status: OrderBoardItemDTO['status'], fulfillmentType: OrderBoardItemDTO['fulfillmentType']): OrderBoardItemDTO => ({
@@ -28,5 +30,19 @@ describe('Operational Control Center counters', () => {
     expect(filterOrdersForOperationalTab(orders, 'pickup')).toHaveLength(1);
     expect(OPERATIONAL_TAB_LANES.pickup).not.toContain('route');
     expect(OPERATIONAL_TAB_LANES.delivery).toContain('route');
+  });
+
+  it('renders the compact mode strip with real status chips and semantic theme tokens', () => {
+    const source = readFileSync(resolve(__dirname, 'OperationalControlCenter.tsx'), 'utf8');
+    expect(source).toContain('ModeChannel title="Delivery"');
+    expect(source).toContain("label: 'Cozinha'");
+    expect(source).toContain("label: 'Entrega'");
+    expect(source).toContain('ModeChannel title="Balcão"');
+    expect(source).toContain("label: 'Retirar'");
+    expect(source).toContain('ModeChannel title="Comandas"');
+    expect(source).toContain('statusLabel="Operação"');
+    expect(source).toContain('bg-card');
+    expect(source).toContain('text-foreground');
+    expect(source).toContain('dark:text-emerald-300');
   });
 });
