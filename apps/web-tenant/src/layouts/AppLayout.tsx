@@ -18,6 +18,7 @@ import { resolveStoreOperationalStatus } from '../components/store/store-operati
 import toast, { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
 import { NotificationCenter } from '../notifications/NotificationCenter';
+import { OrderAlertTopbarButton } from '../features/orders/v2/OrderAlertTopbarButton';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
 import { filterSidebarNavigation, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
 import type { SidebarNavigationGroup, SidebarNavigationItem } from '../navigation/navigation.types';
@@ -652,6 +653,7 @@ export function AppLayout() {
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
+              {location.pathname === '/orders/manager' ? <OrderAlertTopbarButton /> : null}
               <button
                 type="button"
                 onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
@@ -693,6 +695,7 @@ export function AppLayout() {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {location.pathname === '/orders/manager' ? <OrderAlertTopbarButton /> : null}
               <button
                 type="button"
                 onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}

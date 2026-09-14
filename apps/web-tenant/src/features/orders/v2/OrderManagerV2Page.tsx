@@ -49,6 +49,7 @@ import { createNotificationEvent, emitNotificationEvent } from "../../../notific
 import {
   browserSpeechProvider,
   isVoiceAlertsEnabled,
+  ORDER_ALERT_CENTER_TOGGLE_EVENT,
   setVoiceAlertsEnabled,
   VOICE_ALERTS_CHANGED_EVENT,
 } from "./order-alert-coordinator";
@@ -125,6 +126,12 @@ export function OrderManagerV2Page() {
       setAlerts(response.data ?? []);
     } catch { /* Board stays available if the alert center cannot refresh. */ }
   }, []);
+
+  useEffect(() => {
+    const openAlertCenter = () => { setAlertsOpen(true); void fetchAlerts(); };
+    window.addEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
+    return () => window.removeEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
+  }, [fetchAlerts]);
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     const response = await api.patch<OrderAlert>(`/order-alerts/${alertId}/acknowledge`, {});
@@ -283,23 +290,19 @@ export function OrderManagerV2Page() {
   );
 
   return (
-    <main className="mx-auto max-w-[1800px] space-y-4 p-3 sm:p-5">
-      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-3 shadow-sm sm:p-4">
-        <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/35 px-3 py-2">
-          <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Gestor de Pedidos</p><p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">Operação ao vivo</p></div>
+    <main className="mx-auto max-w-[1800px] space-y-3 p-3 sm:p-4">
+      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-2 shadow-sm sm:p-3">
+        <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/35 px-2 py-1.5">
+          <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Gestor de Pedidos</p></div>
           <Metric label="Ativos" value={kpis.active} />
           <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Em rota" value={kpis.route} />
-          <button type="button" onClick={() => setAlertsOpen((open) => !open)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-black text-foreground hover:bg-muted" aria-expanded={alertsOpen}>
-            <BellRing className="h-3.5 w-3.5" /> Alertas {activeAlerts.length}
-          </button>
           <span className={`hidden items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold sm:inline-flex ${realtime.connectionState === "connected" ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
-          <span className="hidden text-[10px] font-bold text-muted-foreground lg:inline">Alertas: {soundManager.soundPreferenceEnabled ? "som ativo" : "som desligado"}</span>
           <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
         </div>
         {alertsOpen ? (
-          <section className="mt-3 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
-            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button></div>
+          <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
+            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
             {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
               <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
                 <span className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alert.severity}</span>
@@ -310,8 +313,8 @@ export function OrderManagerV2Page() {
             ))}
           </section>
         ) : null}
-        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-3">
-        <div className="flex flex-wrap gap-2 border-b border-border pb-3" aria-label="Indicadores operacionais">
+        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
+        <div className="flex flex-wrap gap-1.5" aria-label="Indicadores operacionais">
           <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
           <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
@@ -321,7 +324,7 @@ export function OrderManagerV2Page() {
           <Metric label="iFood" value={intelligence.channels.IFOOD} />
           <Metric label="99Food" value={intelligence.channels.FOOD_99} />
         </div>
-        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-end">
+        <div className="mt-2 flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-end">
           <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
@@ -339,27 +342,8 @@ export function OrderManagerV2Page() {
             />
             <Metric label="Em rota" value={kpis.route} />
           </div>
-          <div className="flex flex-wrap items-stretch gap-2">
-            <div className="border-l border-border px-3 text-right">
-              <p className="font-mono text-lg font-black tabular-nums text-foreground">
-                {new Date(now).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                relógio compartilhado
-              </p>
-            </div>
+          <div className="flex flex-wrap items-stretch gap-1.5">
             <div className="flex flex-wrap items-center gap-1 border border-border bg-background p-1">
-              <div className="hidden px-2 lg:block">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-foreground">
-                  Central de alertas
-                </p>
-                <p className="text-[9px] font-semibold text-muted-foreground">
-                  uma aba anuncia
-                </p>
-              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -439,18 +423,18 @@ export function OrderManagerV2Page() {
           </div>
         </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-          <label className="relative min-w-[min(100%,280px)] w-full max-w-[440px]">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <label className="relative w-full sm:w-[240px]">
             <span className="sr-only">
               Buscar pedido, cliente ou item
             </span>
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               aria-label="Buscar pedido, cliente ou item"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar pedido, cliente ou item..."
-              className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary"
+              className="h-9 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
             />
           </label>
           <div className="flex flex-wrap gap-1" aria-label="Filtrar origem">
@@ -459,7 +443,7 @@ export function OrderManagerV2Page() {
                 key={candidate}
                 type="button"
                 onClick={() => setOrigin(candidate)}
-                className={`rounded-lg px-3 py-2 text-[11px] font-black ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
+                className={`rounded-lg px-2 py-1.5 text-[10px] font-black ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
               >
                 {candidate === "all" ? "Todos" : candidate}
               </button>
@@ -498,7 +482,7 @@ export function OrderManagerV2Page() {
         </div>
       ) : (
         <section
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 xl:grid xl:grid-cols-3 xl:overflow-visible"
+          className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 sm:mx-0 sm:px-0 xl:grid xl:grid-cols-3 xl:overflow-visible"
           aria-label="Kanban operacional horizontal"
         >
           {ORDER_MANAGER_LANES.filter((lane) => OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)).map((lane) => {
@@ -507,9 +491,9 @@ export function OrderManagerV2Page() {
             return (
               <section
                 key={lane.id}
-                className={`min-h-[360px] min-w-[19rem] snap-start rounded-2xl border border-border bg-muted/15 xl:min-w-0 ${style.rule}`}
+                className={`min-h-[300px] min-w-[calc(100vw-1.5rem)] snap-start rounded-2xl border border-border bg-muted/15 sm:min-w-[22rem] xl:min-w-0 ${style.rule}`}
               >
-                <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-4 py-3">
+                <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-3 py-2">
                   <div className="flex items-start gap-2">
                     <Icon className="mt-0.5 h-4 w-4 text-foreground" />
                     <div>
@@ -527,7 +511,7 @@ export function OrderManagerV2Page() {
                     {grouped[lane.id].length}
                   </span>
                 </header>
-                <div className="space-y-3 p-3">
+                <div className="space-y-2 p-2.5 sm:p-3">
                   {grouped[lane.id].map((order) => (
                     <OrderCardV2
                       key={order.id}
