@@ -302,8 +302,8 @@ export function OrderManagerV2Page() {
   return (
     <main className="mx-auto max-w-[1800px] space-y-3 p-3 sm:p-4">
       <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-2 shadow-sm sm:p-3">
-        <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/35 px-2 py-1.5">
-          <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Painel de Operações</p></div>
+        <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/35 px-2.5 py-2">
+          <div className="mr-auto min-w-[9rem]"><p className="truncate text-sm font-black text-foreground">Painel de Operações</p><p className="hidden text-[10px] font-semibold text-muted-foreground sm:block">Operação em tempo real</p></div>
           <Metric label="Ativos" value={kpis.active} />
           <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Em rota" value={kpis.route} />
@@ -325,7 +325,7 @@ export function OrderManagerV2Page() {
           </section>
         ) : null}
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
-        <div className="flex flex-wrap gap-1.5" aria-label="Indicadores operacionais">
+        <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
           <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
           <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
@@ -434,8 +434,8 @@ export function OrderManagerV2Page() {
           </div>
         </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <label className="relative w-full sm:w-[240px]">
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          <label className="relative w-full sm:w-[260px]">
             <span className="sr-only">
               Buscar pedido, cliente ou item
             </span>
@@ -493,7 +493,7 @@ export function OrderManagerV2Page() {
         </div>
       ) : (
         <section
-          className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 sm:mx-0 sm:px-0 xl:grid xl:grid-cols-3 xl:overflow-visible"
+          className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-px-3 px-3 pb-5 sm:mx-0 sm:px-0 xl:grid xl:grid-cols-3 xl:overflow-visible"
           aria-label="Kanban operacional horizontal"
         >
           {ORDER_MANAGER_LANES.filter((lane) => OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)).map((lane) => {
@@ -502,7 +502,7 @@ export function OrderManagerV2Page() {
             return (
               <section
                 key={lane.id}
-                className={`min-h-[300px] min-w-[calc(100vw-1.5rem)] snap-start rounded-2xl border border-border bg-muted/15 sm:min-w-[22rem] xl:min-w-0 ${style.rule}`}
+                className={`min-h-[300px] min-w-[calc(100vw-2.5rem)] snap-start rounded-2xl border border-border bg-muted/15 sm:min-w-[22rem] xl:min-w-0 ${style.rule}`}
               >
                 <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-3 py-2">
                   <div className="flex items-start gap-2">

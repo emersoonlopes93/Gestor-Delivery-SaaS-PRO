@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
-import { Building2, ChevronRight, Globe, LayoutGrid, LogOut, Menu, Moon, QrCode, Sun, UserCircle } from 'lucide-react';
+import { Building2, ChefHat, ChevronRight, ClipboardList, Globe, LayoutGrid, LogOut, Menu, Moon, MoreHorizontal, QrCode, Sun, Truck, UserCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
@@ -65,6 +65,35 @@ function firstActiveGroupId(groups: readonly SidebarNavigationGroup[], pathname:
     }
   }
   return null;
+}
+
+function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperations, canReadOrders, canUseKds, canReadDelivery }: {
+  pathname: string;
+  navigate: (to: string) => void;
+  onOpenMore: () => void;
+  canUseOperations: boolean;
+  canReadOrders: boolean;
+  canUseKds: boolean;
+  canReadDelivery: boolean;
+}) {
+  const items = [
+    canUseOperations ? { label: 'Operações', to: '/orders/manager', icon: LayoutGrid, active: pathname === '/orders/manager' } : null,
+    canReadOrders ? { label: 'Pedidos', to: '/orders', icon: ClipboardList, active: pathname === '/orders' || pathname === '/orders/board' } : null,
+    canUseKds ? { label: 'Cozinha', to: '/orders/kds', icon: ChefHat, active: pathname === '/orders/kds' } : null,
+    canReadDelivery ? { label: 'Entregas', to: '/delivery/dispatch', icon: Truck, active: pathname.startsWith('/delivery/') } : null,
+  ].filter((item): item is { label: string; to: string; icon: typeof LayoutGrid; active: boolean } => item !== null);
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 pb-[max(0.5rem,var(--safe-area-bottom))] pt-2 shadow-[0_-12px_30px_rgb(0_0_0_/_0.08)] backdrop-blur-xl md:hidden" aria-label="Navegação principal mobile">
+      <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+        {items.slice(0, 4).map((item) => {
+          const Icon = item.icon;
+          return <button key={item.to} type="button" onClick={() => navigate(item.to)} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${item.active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} aria-current={item.active ? 'page' : undefined}><Icon className="h-5 w-5" /><span className="truncate">{item.label}</span></button>;
+        })}
+        <button type="button" onClick={onOpenMore} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-black text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Abrir mais opções"><MoreHorizontal className="h-5 w-5" /><span>Mais</span></button>
+      </div>
+    </nav>
+  );
 }
 
 function SidebarGroupView(props: {
@@ -291,6 +320,10 @@ export function AppLayout() {
   }, [collapsed, openGroups]);
 
   const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
+  const canUseOperations = Boolean(isFeatureVisible?.(undefined, 'order_manager_v2')) && hasPermission(userPermissions, 'orders.use_kanban');
+  const canReadOrders = hasPermission(userPermissions, 'orders.read');
+  const canUseKds = Boolean(isFeatureVisible?.(undefined, 'kds')) && hasPermission(userPermissions, 'kds.use');
+  const canReadDelivery = hasPermission(userPermissions, 'delivery.read');
   const tenantSlug = user?.tenant?.slug;
   const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
 
@@ -711,11 +744,12 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="app-main min-w-0 flex-1 overflow-auto bg-background safe-bottom">
+        <main className="app-main min-w-0 flex-1 overflow-auto bg-background pb-[calc(4.75rem+var(--safe-area-bottom))] safe-bottom md:pb-0">
           <div key={location.pathname} className="h-full">
             <Outlet />
           </div>
         </main>
+        <MobileBottomNavigation pathname={location.pathname} navigate={navigate} onOpenMore={openMobile} canUseOperations={canUseOperations} canReadOrders={canReadOrders} canUseKds={canUseKds} canReadDelivery={canReadDelivery} />
       </div>
     </div>
   );

@@ -2561,3 +2561,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 - Continuing on PR #94 / `fix/operational-control-mode-strip`, the Delivery, Balcão and Comandas mode strip remains below the compact cockpit header. Its layout and counters are unchanged.
 - The existing Tempos e taxas, Radar and Lançamentos actions now sit beside Ativos, Atenção and Em rota in that cockpit. They retain their existing overlays, permission and feature checks. The visible and semantic page title reads `Painel de Operações`.
+
+## Gestor V2 UI polish and mobile navigation (2026-09-14)
+
+- Branch: `feat/gestor-v2-ui-polish-mobile-navigation`, based on the operational UI work rooted at `origin/main-copy` / `6d728806ea426690af6f731eba24818f22d87dbd`.
+- The cockpit is denser without removing behavior: title, compact KPI group, quick-action overlays, synchronization and filters retain their existing contracts. The Delivery, Balcão and Comandas selector has reduced padding/height, and desktop/mobile lanes retain their canonical filtering and horizontal snap behavior with a comfortable mobile lane width.
+- Order-card alert and elapsed-time indicators now share one compact header cluster, preserving alert-centre access, print, status, synchronization and primary-action contracts.
+- `AppLayout` gains a mobile-only, safe-area-aware bottom navigation. It only links to existing permitted/feature-visible routes (Operações, Pedidos, Cozinha and Entregas); More opens the existing filtered mobile drawer. Desktop sidebar/navigation remains unchanged.
+- No API, schema, migration, lifecycle, KDS rules, provider integration, RBAC contract, remote database or deploy action changed. Focused web suites: 3 files / 22 tests PASS; web typecheck, lint, no-any, boundaries, features, critical theme check, Vite build and diff check PASS. Authenticated desktop/mobile visual acceptance and CI remain pending.

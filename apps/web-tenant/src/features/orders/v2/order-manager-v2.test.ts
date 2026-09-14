@@ -97,9 +97,11 @@ describe('Order Manager V2 visual contracts', () => {
   it('keeps the operational lanes horizontally scrollable below desktop', () => {
     const source = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     expect(source).toContain('overflow-x-auto');
-    expect(source).toContain('min-w-[calc(100vw-1.5rem)]');
+    expect(source).toContain('min-w-[calc(100vw-2.5rem)]');
     expect(source).toContain('sm:min-w-[22rem]');
     expect(source).toContain('snap-mandatory');
+    expect(source).toContain('overscroll-x-contain');
+    expect(source).toContain('scroll-px-3');
     expect(source).toContain('xl:grid-cols-3');
   });
 
@@ -135,7 +137,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page.indexOf('Buscar pedido, cliente ou item')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
     expect(page).toContain('Metric label="Ativos"');
     expect(page).toContain('2xl:justify-end');
-    expect(page).toContain('sm:w-[240px]');
+    expect(page).toContain('sm:w-[260px]');
   });
 
   it('labels card scan indicators and repeats operational context in details', () => {
