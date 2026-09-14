@@ -301,9 +301,10 @@ export function OrderManagerV2Page() {
 
   return (
     <main className="mx-auto max-w-[1800px] space-y-3 p-3 sm:p-4">
+      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} activeTab={operationalTab} onTabChange={setOperationalTab} onOpenOrder={setSelected} />
       <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-2 shadow-sm sm:p-3">
         <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/35 px-2 py-1.5">
-          <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Gestor de Pedidos</p></div>
+          <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Painel de Operações</p></div>
           <Metric label="Ativos" value={kpis.active} />
           <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Em rota" value={kpis.route} />
@@ -340,7 +341,7 @@ export function OrderManagerV2Page() {
               Sala de controle · operação ao vivo
             </p>
             <h1 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">
-              Gestor de Pedidos
+              Painel de Operações
             </h1>
           </div>
           <div className="hidden">
@@ -475,7 +476,6 @@ export function OrderManagerV2Page() {
           </span>
         </div>
       </header>
-      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} activeTab={operationalTab} onTabChange={setOperationalTab} onOpenOrder={setSelected} />
       {error ? (
         <div
           role="alert"
