@@ -2579,3 +2579,7 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 - Mobile now has explicit lane tabs below Delivery/Balcão/Comandas. Cozinha, Prontos and Em rota are derived from the selected operational channel and show their canonical card count; pickup and dine-in omit Em rota.
 - Only the selected lane renders below `sm`, removing horizontal kanban scrolling on phones. From `sm` upward, the prior multi-lane scroll/grid behavior remains available.
+
+### Mobile control-strip alignment follow-up (2026-09-14)
+
+- Delivery, Balcão and Comandas are a three-column row on phones. The operation header keeps title, compact synchronization status and expand/collapse control on one line, with the control immediately after the status.

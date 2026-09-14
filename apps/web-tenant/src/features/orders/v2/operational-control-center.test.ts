@@ -45,6 +45,7 @@ describe('Operational Control Center counters', () => {
     expect(source).toContain('text-foreground');
     expect(source).toContain('dark:text-emerald-300');
     expect(source).toContain('grid grid-cols-3 gap-1 sm:flex');
+    expect(source).toContain('grid grid-cols-3 gap-1 bg-background');
     expect(source).toContain('min-h-[44px]');
     expect(source).toContain('ChevronRight');
   });

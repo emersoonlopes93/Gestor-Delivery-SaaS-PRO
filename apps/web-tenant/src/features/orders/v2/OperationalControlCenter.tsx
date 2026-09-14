@@ -33,7 +33,7 @@ export function OperationalControlCenter({ orders, activeTab, onTabChange }: { o
   const { isFeatureEnabled } = useTenantCapabilities();
   const counters = useMemo(() => getOperationalChannelCounters(orders), [orders]);
   return <section className="mb-2 overflow-hidden rounded-2xl border border-border bg-muted/20 sm:mb-3" aria-label="Canais operacionais">
-    <div className="grid gap-1 bg-background p-1 sm:grid-cols-3 sm:gap-2 sm:p-2" role="tablist" aria-label="Canais operacionais">
+    <div className="grid grid-cols-3 gap-1 bg-background p-1 sm:gap-2 sm:p-2" role="tablist" aria-label="Canais operacionais">
       <ModeChannel title="Delivery" icon={<Truck className="h-5 w-5" />} tone="primary" active={activeTab === 'delivery'} onClick={() => onTabChange('delivery')} activeCount={counters.delivery.active} chips={[{ label: 'Cozinha', value: counters.delivery.kitchen, tone: 'amber' }, { label: 'Entrega', value: counters.delivery.ready + counters.delivery.route, tone: 'emerald' }]} />
       <ModeChannel title="Balcão" icon={<ReceiptText className="h-5 w-5" />} tone="sky" active={activeTab === 'pickup'} onClick={() => onTabChange('pickup')} activeCount={counters.pickup.active} chips={[{ label: 'Cozinha', value: counters.pickup.kitchen, tone: 'amber' }, { label: 'Retirar', value: counters.pickup.ready, tone: 'emerald' }]} />
       {has('pos.read') && isFeatureEnabled('dine_in') ? <ModeChannel title="Comandas" icon={<ReceiptText className="h-5 w-5" />} tone="orange" active={activeTab === 'dine_in'} onClick={() => onTabChange('dine_in')} activeCount={counters.dineIn.active} statusLabel="Operação" statusValue={counters.dineIn.active > 0 ? 'Ativa' : 'Sem atividade'} /> : null}
