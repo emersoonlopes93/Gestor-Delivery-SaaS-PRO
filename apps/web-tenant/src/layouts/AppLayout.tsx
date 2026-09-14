@@ -96,6 +96,17 @@ function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperatio
   );
 }
 
+function MobileMoreSheet({ groups, onNavigate, onClose }: { groups: readonly SidebarNavigationGroup[]; onNavigate: (to: string) => void; onClose: () => void }) {
+  const items = groups.flatMap((group) => group.items).filter((item) => !item.isExternal);
+  return <section className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-border bg-card p-4 pb-[max(1rem,var(--safe-area-bottom))] shadow-2xl md:hidden" aria-label="Mais opções de navegação" aria-modal="true" role="dialog">
+    <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/35" />
+    <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-black text-foreground">Mais opções</h2><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">Fechar</button></div>
+    <div className="grid max-h-[55dvh] grid-cols-2 gap-2 overflow-y-auto pr-1">
+      {items.map((item) => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => onNavigate(item.to)} className="flex min-h-16 items-center gap-2 rounded-xl border border-border bg-background px-3 text-left text-xs font-bold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Icon className="h-4 w-4 shrink-0 text-primary" /><span className="line-clamp-2">{item.label}</span></button>; })}
+    </div>
+  </section>;
+}
+
 function SidebarGroupView(props: {
   group: SidebarNavigationGroup;
   collapsed: boolean;
@@ -514,9 +525,10 @@ export function AppLayout() {
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
       ) : null}
 
+      {isMobileOpen ? <MobileMoreSheet groups={groups} onClose={closeMobile} onNavigate={(to) => { closeMobile(); navigate(to); }} /> : null}
+
       <aside
-        className={`tenant-sidebar safe-top safe-bottom safe-drawer-left fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${collapsed ? 'w-[72px]' : 'w-64'
-          } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`tenant-sidebar safe-top safe-bottom hidden flex-col transition-[width,background-color] duration-200 ease-out md:static md:flex ${collapsed ? 'w-[72px]' : 'w-64'}`}
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
       >
@@ -715,17 +727,8 @@ export function AppLayout() {
         <header className="mobile-header safe-top md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="px-4 flex items-center justify-between w-full h-full gap-4">
             <div className="flex items-center gap-2 min-w-0">
-              <button
-                type="button"
-                onClick={openMobile}
-                className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-8 h-8 text-foreground hover:bg-muted transition-all shrink-0"
-                aria-label="Abrir menu"
-              >
-                <Menu className="h-4.5 w-4.5" aria-hidden />
-              </button>
-              <div className="truncate text-xs font-black text-foreground select-none">
-                {breadcrumb.label}
-              </div>
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-xs font-black text-primary-foreground">{(systemName?.charAt(0) || 'P').toUpperCase()}</div>
+              <div className="min-w-0"><p className="truncate text-xs font-black text-foreground select-none">{systemName}</p><p className="truncate text-[10px] font-semibold text-muted-foreground">{breadcrumb.label}</p></div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {location.pathname === '/orders/manager' ? <OrderAlertTopbarButton /> : null}

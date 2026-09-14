@@ -302,14 +302,18 @@ export function OrderManagerV2Page() {
   return (
     <main className="mx-auto max-w-[1800px] space-y-3 p-3 sm:p-4">
       <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-2 shadow-sm sm:p-3">
-        <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/35 px-2.5 py-2">
-          <div className="mr-auto min-w-[9rem]"><p className="truncate text-sm font-black text-foreground">Painel de Operações</p><p className="hidden text-[10px] font-semibold text-muted-foreground sm:block">Operação em tempo real</p></div>
-          <Metric label="Ativos" value={kpis.active} />
-          <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
-          <Metric label="Em rota" value={kpis.route} />
-          <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
-          <span className={`hidden items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold sm:inline-flex ${realtime.connectionState === "connected" ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
-          <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
+        <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2.5 sm:p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="mr-auto min-w-[12rem]"><h1 className="text-lg font-black tracking-tight text-foreground sm:text-xl">Painel de Operações</h1><p className="text-[11px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
+            <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
+            <span className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[10px] font-black sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3.5 w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
+            <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap">
+            <Metric label="Ativos" value={kpis.active} />
+            <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
+            <Metric label="Em rota" value={kpis.route} />
+          </div>
         </div>
         {alertsOpen ? (
           <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">

@@ -15,7 +15,7 @@ export function OperationalQuickActions({ orders, onOpenOrder }: { orders: reado
   const { has } = usePermissions();
   const { isFeatureEnabled } = useTenantCapabilities();
   const [quickAction, setQuickAction] = useState<QuickAction>(null);
-  const action = (label: string, icon: ReactNode, key: Exclude<QuickAction, null>, allowed: boolean) => allowed ? <button type="button" onClick={() => setQuickAction(key)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-black text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="text-primary">{icon}</span>{label}</button> : null;
+  const action = (label: string, icon: ReactNode, key: Exclude<QuickAction, null>, allowed: boolean) => allowed ? <button type="button" onClick={() => setQuickAction(key)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-[10px] font-black text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-10 sm:px-3"><span className="text-primary">{icon}</span>{label}</button> : null;
   return <>
     <div className="flex flex-wrap gap-1" aria-label="Atalhos operacionais">
       {action('Tempos e taxas', <Clock3 className="h-4 w-4" />, 'rates', has('delivery.manage'))}

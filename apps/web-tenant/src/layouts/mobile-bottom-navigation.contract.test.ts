@@ -5,19 +5,23 @@ import { describe, expect, it } from 'vitest';
 const source = readFileSync(resolve(__dirname, 'AppLayout.tsx'), 'utf8');
 
 describe('Mobile bottom navigation contract', () => {
-  it('keeps the navigation mobile-only and leaves desktop navigation intact', () => {
+  it('keeps the bottom navigation mobile-only and leaves the desktop sidebar intact', () => {
     expect(source).toContain('Navegação principal mobile');
     expect(source).toContain('md:hidden');
     expect(source).toContain('md:pb-0');
-    expect(source).toContain('<aside');
+    expect(source).toContain('hidden flex-col');
+    expect(source).toContain('md:static md:flex');
+    expect(source).not.toContain("isMobileOpen ? 'translate-x-0'");
   });
 
-  it('reuses existing operational routes and opens the existing drawer for More', () => {
+  it('reuses existing operational routes and opens a mobile-only More sheet', () => {
     expect(source).toContain("to: '/orders/manager'");
     expect(source).toContain("to: '/orders'");
     expect(source).toContain("to: '/orders/kds'");
     expect(source).toContain("to: '/delivery/dispatch'");
     expect(source).toContain('onOpenMore={openMobile}');
+    expect(source).toContain('<MobileMoreSheet groups={groups}');
+    expect(source).toContain('Mais opções de navegação');
   });
 
   it('does not expose a shortcut without its existing feature and permission gate', () => {
