@@ -149,6 +149,10 @@ describe('Order Manager V2 visual contracts', () => {
     expect(details).toContain('Acoes de status do pedido');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('/orders/${order.id}/status');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('void reconcile({ eventId: `status-updated:${order.id}:${Date.now()}`');
+    expect(card).toContain('alertSeverity');
+    expect(card).toContain('onOpenAlert');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('activeAlertSeverityByOrderId');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('ORDER_ALERT_CENTER_TOGGLE_EVENT');
   });
 
   it('wires accessible print actions to the canonical receipt flow', () => {

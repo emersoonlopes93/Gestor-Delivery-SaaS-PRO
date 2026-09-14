@@ -9,6 +9,8 @@ type Props = {
   onOpen: (order: OrderBoardItemDTO) => void;
   onAction: (order: OrderBoardItemDTO, action: OrderOperationalAction) => void;
   onPrint: (order: OrderBoardItemDTO) => void;
+  alertSeverity?: 'INFO' | 'ATTENTION' | 'CRITICAL';
+  onOpenAlert?: () => void;
   isActionPending: boolean;
   isPrinting: boolean;
 };
@@ -26,9 +28,9 @@ const STATUS_ACCENT: Partial<Record<OrderBoardItemDTO['status'], string>> = {
   cancelled: 'before:bg-destructive',
 };
 
-export function OrderCardV2({ order, now, onOpen, onAction, onPrint, isActionPending, isPrinting }: Props) {
+export function OrderCardV2({ order, now, onOpen, onAction, onPrint, alertSeverity, onOpenAlert, isActionPending, isPrinting }: Props) {
   const action = order.operational.primaryAction;
-  const alert = order.operational.syncState === 'FAILED' || order.status === 'pending';
+  const attention = alertSeverity ?? (order.operational.syncState === 'FAILED' ? 'ATTENTION' : null);
   const fulfillmentLabel = order.fulfillmentType === 'delivery'
     ? 'Entrega'
     : order.fulfillmentType === 'pickup'
@@ -56,9 +58,8 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, isActionPen
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <button type="button" disabled={isPrinting} title="Imprimir pedido" aria-label={`Imprimir pedido ${order.orderNumber}`} onClick={(event) => { event.stopPropagation(); onPrint(order); }} className="pointer-events-auto relative z-10 grid h-7 w-7 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60"><Printer className="h-3.5 w-3.5" /></button>
-            <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${alert ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'border-border bg-muted text-muted-foreground'}`}>
-              {alert ? <AlertTriangle className="h-3 w-3" /> : <Radio className="h-3 w-3" />}{formatElapsed(order.createdAt, now)}
-            </span>
+            {alertSeverity && onOpenAlert ? <button type="button" onClick={(event) => { event.stopPropagation(); onOpenAlert(); }} aria-label={`Abrir alerta ${alertSeverity} do pedido ${order.orderNumber}`} className={`pointer-events-auto relative z-10 inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${alertSeverity === 'CRITICAL' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300'}`}><AlertTriangle className="h-3 w-3" />{alertSeverity}</button> : null}
+            <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${attention ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'border-border bg-muted text-muted-foreground'}`}>{attention ? <AlertTriangle className="h-3 w-3" /> : <Radio className="h-3 w-3" />}{formatElapsed(order.createdAt, now)}</span>
             <span className="max-w-28 truncate text-right text-[10px] font-black uppercase tracking-wide text-foreground">{status.label}</span>
           </div>
         </div>

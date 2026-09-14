@@ -3,7 +3,7 @@ import type { OrderBoardItemDTO } from '@gestor/types';
 export type OperationalChannelCounters = {
   delivery: { active: number; kitchen: number; ready: number; dispatch: number; route: number };
   pickup: { active: number; kitchen: number; ready: number };
-  dineIn: { active: number };
+  dineIn: { active: number; kitchen: number; ready: number };
 };
 
 export type OperationalTab = 'delivery' | 'pickup' | 'dine_in';
@@ -19,7 +19,7 @@ export function getOperationalChannelCounters(orders: readonly OrderBoardItemDTO
   const counters: OperationalChannelCounters = {
     delivery: { active: 0, kitchen: 0, ready: 0, dispatch: 0, route: 0 },
     pickup: { active: 0, kitchen: 0, ready: 0 },
-    dineIn: { active: 0 },
+    dineIn: { active: 0, kitchen: 0, ready: 0 },
   };
   for (const order of orders) {
     if (!ACTIVE.has(order.status)) continue;
@@ -34,6 +34,8 @@ export function getOperationalChannelCounters(orders: readonly OrderBoardItemDTO
       if (order.status === 'ready_for_pickup') counters.pickup.ready += 1;
     } else {
       counters.dineIn.active += 1;
+      if (KITCHEN.has(order.status)) counters.dineIn.kitchen += 1;
+      if (order.status === 'ready_for_pickup') counters.dineIn.ready += 1;
     }
   }
   return counters;
