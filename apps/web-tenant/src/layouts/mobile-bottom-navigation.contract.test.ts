@@ -17,8 +17,8 @@ describe('Mobile bottom navigation contract', () => {
   it('reuses existing operational routes and opens a mobile-only More sheet', () => {
     expect(source).toContain("to: '/orders/manager'");
     expect(source).toContain("to: '/orders'");
-    expect(source).toContain("to: '/orders/kds'");
-    expect(source).toContain("to: '/delivery/dispatch'");
+    expect(source).toContain("to: '/management/finance'");
+    expect(source).toContain("to: '/customers'");
     expect(source).toContain('onOpenMore={openMobile}');
     expect(source).toContain('<MobileMoreSheet groups={groups}');
     expect(source).toContain('Mais opções de navegação');
@@ -27,8 +27,8 @@ describe('Mobile bottom navigation contract', () => {
   it('does not expose a shortcut without its existing feature and permission gate', () => {
     expect(source).toContain("isFeatureVisible?.(undefined, 'order_manager_v2')");
     expect(source).toContain("hasPermission(userPermissions, 'orders.use_kanban')");
-    expect(source).toContain("isFeatureVisible?.(undefined, 'kds')");
-    expect(source).toContain("hasPermission(userPermissions, 'kds.use')");
-    expect(source).toContain("hasPermission(userPermissions, 'delivery.read')");
+    expect(source).toContain("hasPermission(userPermissions, 'finance.read')");
+    expect(source).toContain("hasPermission(userPermissions, 'crm.read')");
+    expect(source).toContain("location.pathname === '/orders/manager' ? 'hidden' : ''");
   });
 });

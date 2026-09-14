@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
-import { Building2, ChefHat, ChevronRight, ClipboardList, Globe, LayoutGrid, LogOut, Menu, Moon, MoreHorizontal, QrCode, Sun, Truck, UserCircle } from 'lucide-react';
+import { Building2, ChevronRight, ClipboardList, Globe, LayoutGrid, LogOut, Menu, Moon, MoreHorizontal, QrCode, Sun, UserCircle, Users, Wallet } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
@@ -67,20 +67,20 @@ function firstActiveGroupId(groups: readonly SidebarNavigationGroup[], pathname:
   return null;
 }
 
-function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperations, canReadOrders, canUseKds, canReadDelivery }: {
+function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperations, canReadOrders, canReadFinance, canReadCustomers }: {
   pathname: string;
   navigate: (to: string) => void;
   onOpenMore: () => void;
   canUseOperations: boolean;
   canReadOrders: boolean;
-  canUseKds: boolean;
-  canReadDelivery: boolean;
+  canReadFinance: boolean;
+  canReadCustomers: boolean;
 }) {
   const items = [
     canUseOperations ? { label: 'Operações', to: '/orders/manager', icon: LayoutGrid, active: pathname === '/orders/manager' } : null,
     canReadOrders ? { label: 'Pedidos', to: '/orders', icon: ClipboardList, active: pathname === '/orders' || pathname === '/orders/board' } : null,
-    canUseKds ? { label: 'Cozinha', to: '/orders/kds', icon: ChefHat, active: pathname === '/orders/kds' } : null,
-    canReadDelivery ? { label: 'Entregas', to: '/delivery/dispatch', icon: Truck, active: pathname.startsWith('/delivery/') } : null,
+    canReadFinance ? { label: 'Financeiro', to: '/management/finance', icon: Wallet, active: pathname.startsWith('/management/finance') } : null,
+    canReadCustomers ? { label: 'Clientes', to: '/customers', icon: Users, active: pathname.startsWith('/customers') } : null,
   ].filter((item): item is { label: string; to: string; icon: typeof LayoutGrid; active: boolean } => item !== null);
 
   return (
@@ -333,8 +333,8 @@ export function AppLayout() {
   const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
   const canUseOperations = Boolean(isFeatureVisible?.(undefined, 'order_manager_v2')) && hasPermission(userPermissions, 'orders.use_kanban');
   const canReadOrders = hasPermission(userPermissions, 'orders.read');
-  const canUseKds = Boolean(isFeatureVisible?.(undefined, 'kds')) && hasPermission(userPermissions, 'kds.use');
-  const canReadDelivery = hasPermission(userPermissions, 'delivery.read');
+  const canReadFinance = hasPermission(userPermissions, 'finance.read');
+  const canReadCustomers = hasPermission(userPermissions, 'crm.read');
   const tenantSlug = user?.tenant?.slug;
   const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
 
@@ -724,7 +724,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="mobile-header safe-top md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+        <header className={`mobile-header safe-top md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors ${location.pathname === '/orders/manager' ? 'hidden' : ''}`} style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="px-4 flex items-center justify-between w-full h-full gap-4">
             <div className="flex items-center gap-2 min-w-0">
               <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-xs font-black text-primary-foreground">{(systemName?.charAt(0) || 'P').toUpperCase()}</div>
@@ -752,7 +752,7 @@ export function AppLayout() {
             <Outlet />
           </div>
         </main>
-        <MobileBottomNavigation pathname={location.pathname} navigate={navigate} onOpenMore={openMobile} canUseOperations={canUseOperations} canReadOrders={canReadOrders} canUseKds={canUseKds} canReadDelivery={canReadDelivery} />
+        <MobileBottomNavigation pathname={location.pathname} navigate={navigate} onOpenMore={openMobile} canUseOperations={canUseOperations} canReadOrders={canReadOrders} canReadFinance={canReadFinance} canReadCustomers={canReadCustomers} />
       </div>
     </div>
   );

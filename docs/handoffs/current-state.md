@@ -2569,3 +2569,8 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Order-card alert and elapsed-time indicators now share one compact header cluster, preserving alert-centre access, print, status, synchronization and primary-action contracts.
 - `AppLayout` gains a mobile-only, safe-area-aware bottom navigation. It only links to existing permitted/feature-visible routes (Operações, Pedidos, Cozinha and Entregas); More opens a compact filtered sheet. The sidebar is hidden below `md` and remains unchanged from `md` upward, preventing two simultaneous mobile navigation systems.
 - No API, schema, migration, lifecycle, KDS rules, provider integration, RBAC contract, remote database or deploy action changed. Focused web suites: 3 files / 22 tests PASS; web typecheck, lint, no-any, boundaries, features, critical theme check, Vite build and diff check PASS. Authenticated desktop/mobile visual acceptance and CI remain pending.
+
+### Mobile reference alignment follow-up (2026-09-14)
+
+- On `/orders/manager`, the mobile global header is hidden so the operation cockpit starts at the top of the viewport. The mobile sequence matches the approved reference: title/synchronization, three quick actions, eight compact KPIs, search/channel filters, compact operational tabs, lanes and bottom navigation.
+- The mobile bottom navigation now uses Operações, Pedidos, Financeiro, Clientes and Mais, each linked only when its existing permission allows it. Desktop navigation and its sidebar behavior remain unchanged.

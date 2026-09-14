@@ -300,16 +300,16 @@ export function OrderManagerV2Page() {
   );
 
   return (
-    <main className="mx-auto max-w-[1800px] space-y-3 p-3 sm:p-4">
-      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-2 shadow-sm sm:p-3">
-        <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2.5 sm:p-3">
+    <main className="mx-auto max-w-[1800px] space-y-2 p-2 sm:space-y-3 sm:p-4">
+      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-1.5 shadow-sm sm:p-3">
+        <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2 sm:p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="mr-auto min-w-[12rem]"><h1 className="text-lg font-black tracking-tight text-foreground sm:text-xl">Painel de Operações</h1><p className="text-[11px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
-            <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
+            <div className="mr-auto min-w-0"><h1 className="text-base font-black tracking-tight text-foreground sm:text-xl">Painel de Operações</h1><p className="text-[9px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
             <span className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[10px] font-black sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3.5 w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
             <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap">
+          <div className="mt-2"><OperationalQuickActions orders={orders} onOpenOrder={setSelected} /></div>
+          <div className="mt-2 hidden grid-cols-3 gap-1.5 sm:grid sm:flex-wrap">
             <Metric label="Ativos" value={kpis.active} />
             <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
             <Metric label="Em rota" value={kpis.route} />
@@ -329,7 +329,7 @@ export function OrderManagerV2Page() {
           </section>
         ) : null}
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
-        <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
+        <div className="grid grid-cols-4 gap-1 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
           <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
           <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
@@ -339,7 +339,7 @@ export function OrderManagerV2Page() {
           <Metric label="iFood" value={intelligence.channels.IFOOD} />
           <Metric label="99Food" value={intelligence.channels.FOOD_99} />
         </div>
-        <div className="mt-2 flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-end">
+        <div className="mt-2 hidden flex-col gap-2 sm:flex 2xl:flex-row 2xl:items-center 2xl:justify-end">
           <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
@@ -438,7 +438,7 @@ export function OrderManagerV2Page() {
           </div>
         </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
           <label className="relative w-full sm:w-[260px]">
             <span className="sr-only">
               Buscar pedido, cliente ou item
@@ -449,7 +449,7 @@ export function OrderManagerV2Page() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar pedido, cliente ou item..."
-              className="h-9 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-xs outline-none focus:border-primary"
+              className="h-8 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-[11px] outline-none focus:border-primary sm:h-9 sm:text-xs"
             />
           </label>
           <div className="flex flex-wrap gap-1" aria-label="Filtrar origem">
@@ -458,7 +458,7 @@ export function OrderManagerV2Page() {
                 key={candidate}
                 type="button"
                 onClick={() => setOrigin(candidate)}
-                className={`rounded-lg px-2 py-1.5 text-[10px] font-black ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
+                className={`rounded-lg px-2 py-1.5 text-[9px] font-black sm:text-[10px] ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
               >
                 {candidate === "all" ? "Todos" : candidate}
               </button>

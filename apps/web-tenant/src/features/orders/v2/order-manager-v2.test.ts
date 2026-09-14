@@ -102,6 +102,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(source).toContain('snap-mandatory');
     expect(source).toContain('overscroll-x-contain');
     expect(source).toContain('scroll-px-3');
+    expect(source).toContain('grid-cols-4');
     expect(source).toContain('xl:grid-cols-3');
   });
 
