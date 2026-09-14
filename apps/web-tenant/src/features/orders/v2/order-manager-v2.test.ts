@@ -94,14 +94,17 @@ describe('Order Manager V2 visual contracts', () => {
     expect(sidebar).toContain('/tenant/store-pause');
   });
 
-  it('keeps the operational lanes horizontally scrollable below desktop', () => {
+  it('uses explicit mobile stage tabs instead of a horizontally scrolling mobile kanban', () => {
     const source = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
-    expect(source).toContain('overflow-x-auto');
-    expect(source).toContain('min-w-[calc(100vw-2.5rem)]');
+    expect(source).toContain('Etapas do kanban');
+    expect(source).toContain('activeMobileLane');
+    expect(source).toContain('setActiveMobileLane');
+    expect(source).toContain('sm:overflow-x-auto');
+    expect(source).not.toContain('min-w-[calc(100vw-2.5rem)]');
     expect(source).toContain('sm:min-w-[22rem]');
-    expect(source).toContain('snap-mandatory');
-    expect(source).toContain('overscroll-x-contain');
-    expect(source).toContain('scroll-px-3');
+    expect(source).toContain('sm:snap-mandatory');
+    expect(source).toContain('sm:overscroll-x-contain');
+    expect(source).toContain('sm:scroll-px-3');
     expect(source).toContain('grid-cols-4');
     expect(source).toContain('xl:grid-cols-3');
   });

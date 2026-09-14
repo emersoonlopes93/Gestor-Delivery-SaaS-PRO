@@ -56,6 +56,7 @@ import {
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
 type OrderAlert = { id: string; orderId: string | null; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
+type BoardLane = 'kitchen' | 'ready' | 'route';
 const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
 const LANE_STYLE = {
   kitchen: {
@@ -82,6 +83,7 @@ export function OrderManagerV2Page() {
   const [query, setQuery] = useState("");
   const [origin, setOrigin] = useState<(typeof ORIGINS)[number]>("all");
   const [operationalTab, setOperationalTab] = useState<OperationalTab>('delivery');
+  const [activeMobileLane, setActiveMobileLane] = useState<BoardLane>('kitchen');
   const [selected, setSelected] = useState<OrderBoardItemDTO | null>(null);
   const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
@@ -285,6 +287,11 @@ export function OrderManagerV2Page() {
     [orders, origin, query, operationalTab],
   );
   const grouped = useMemo(() => groupOrdersForManager(filtered), [filtered]);
+  const operationalLanes = OPERATIONAL_TAB_LANES[operationalTab];
+  const handleOperationalTabChange = useCallback((tab: OperationalTab) => {
+    setOperationalTab(tab);
+    setActiveMobileLane((lane) => OPERATIONAL_TAB_LANES[tab].includes(lane) ? lane : OPERATIONAL_TAB_LANES[tab][0]);
+  }, []);
   const intelligence = useMemo(() => getOperationalIntelligence(orders, now), [orders, now]);
   const kpis = useMemo(
     () => ({
@@ -480,7 +487,14 @@ export function OrderManagerV2Page() {
           </span>
         </div>
       </header>
-      <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={setOperationalTab} />
+      <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={handleOperationalTabChange} />
+      <div className="grid grid-cols-3 gap-1 sm:hidden" role="tablist" aria-label="Etapas do kanban">
+        {ORDER_MANAGER_LANES.filter((lane) => operationalLanes.includes(lane.id)).map((lane) => {
+          const style = LANE_STYLE[lane.id];
+          const selected = activeMobileLane === lane.id;
+          return <button key={lane.id} type="button" role="tab" aria-selected={selected} onClick={() => setActiveMobileLane(lane.id)} className={`min-h-9 rounded-lg border px-1.5 py-1 text-left text-[9px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected ? `${style.badge} border-current/40` : 'border-border bg-card text-muted-foreground'}`}><span className="flex items-center justify-between gap-1"><span className="truncate">{lane.label}</span><span className="grid h-4 min-w-4 place-items-center rounded-full border border-current/20 text-[8px]">{grouped[lane.id].length}</span></span></button>;
+        })}
+      </div>
       {error ? (
         <div
           role="alert"
@@ -497,8 +511,8 @@ export function OrderManagerV2Page() {
         </div>
       ) : (
         <section
-          className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-px-3 px-3 pb-5 sm:mx-0 sm:px-0 xl:grid xl:grid-cols-3 xl:overflow-visible"
-          aria-label="Kanban operacional horizontal"
+          className="space-y-2 pb-5 sm:-mx-3 sm:flex sm:snap-x sm:snap-mandatory sm:gap-3 sm:overflow-x-auto sm:overscroll-x-contain sm:scroll-px-3 sm:px-3 sm:pb-5 xl:mx-0 xl:grid xl:grid-cols-3 xl:overflow-visible xl:px-0"
+          aria-label="Kanban operacional"
         >
           {ORDER_MANAGER_LANES.filter((lane) => OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)).map((lane) => {
             const style = LANE_STYLE[lane.id];
@@ -506,7 +520,7 @@ export function OrderManagerV2Page() {
             return (
               <section
                 key={lane.id}
-                className={`min-h-[300px] min-w-[calc(100vw-2.5rem)] snap-start rounded-2xl border border-border bg-muted/15 sm:min-w-[22rem] xl:min-w-0 ${style.rule}`}
+                className={`${activeMobileLane === lane.id ? 'block' : 'hidden'} min-h-[300px] w-full rounded-2xl border border-border bg-muted/15 sm:block sm:min-w-[22rem] sm:snap-start xl:min-w-0 ${style.rule}`}
               >
                 <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-3 py-2">
                   <div className="flex items-start gap-2">

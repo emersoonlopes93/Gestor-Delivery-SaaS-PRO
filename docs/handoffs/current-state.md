@@ -2574,3 +2574,8 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 - On `/orders/manager`, the mobile global header is hidden so the operation cockpit starts at the top of the viewport. The mobile sequence matches the approved reference: title/synchronization, three quick actions, eight compact KPIs, search/channel filters, compact operational tabs, lanes and bottom navigation.
 - The mobile bottom navigation now uses Operações, Pedidos, Financeiro, Clientes and Mais, each linked only when its existing permission allows it. Desktop navigation and its sidebar behavior remain unchanged.
+
+### Mobile kanban stage navigation follow-up (2026-09-14)
+
+- Mobile now has explicit lane tabs below Delivery/Balcão/Comandas. Cozinha, Prontos and Em rota are derived from the selected operational channel and show their canonical card count; pickup and dine-in omit Em rota.
+- Only the selected lane renders below `sm`, removing horizontal kanban scrolling on phones. From `sm` upward, the prior multi-lane scroll/grid behavior remains available.
