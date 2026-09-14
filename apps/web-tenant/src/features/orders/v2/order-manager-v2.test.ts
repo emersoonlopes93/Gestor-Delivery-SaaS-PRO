@@ -82,7 +82,8 @@ describe('Order Manager V2 visual contracts', () => {
     expect(controlCenter).toContain('<OperationalOverlay title="Tempos e taxas"');
     expect(controlCenter).toContain('<OperationalOverlay title="Radar da frota"');
     expect(page).toContain('Painel de Operações');
-    expect(page.indexOf('<OperationalControlCenter')).toBeLessThan(page.indexOf('<header'));
+    expect(page).toContain('<OperationalQuickActions orders={orders} onOpenOrder={setSelected} />');
+    expect(page.indexOf('<header')).toBeLessThan(page.indexOf('<OperationalControlCenter'));
     expect(controlCenter).toContain('<OperationalOverlay title="Lançamentos de caixa"');
     expect(controlCenter).toContain("onTabChange('delivery')");
     expect(controlCenter).toContain("onTabChange('pickup')");

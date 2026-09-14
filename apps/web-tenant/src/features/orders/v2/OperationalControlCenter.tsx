@@ -11,29 +11,33 @@ import { OperationalRadar } from './OperationalRadar';
 
 type QuickAction = 'rates' | 'radar' | 'cash' | null;
 
-export function OperationalControlCenter({ orders, alertCount, activeTab, onTabChange, onOpenOrder }: { orders: readonly OrderBoardItemDTO[]; alertCount: number; activeTab: OperationalTab; onTabChange: (tab: OperationalTab) => void; onOpenOrder: (order: OrderBoardItemDTO) => void }) {
+export function OperationalQuickActions({ orders, onOpenOrder }: { orders: readonly OrderBoardItemDTO[]; onOpenOrder: (order: OrderBoardItemDTO) => void }) {
   const { has } = usePermissions();
   const { isFeatureEnabled } = useTenantCapabilities();
   const [quickAction, setQuickAction] = useState<QuickAction>(null);
-  const counters = useMemo(() => getOperationalChannelCounters(orders), [orders]);
   const action = (label: string, icon: ReactNode, key: Exclude<QuickAction, null>, allowed: boolean) => allowed ? <button type="button" onClick={() => setQuickAction(key)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-black text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="text-primary">{icon}</span>{label}</button> : null;
-  return <section className="mb-3 overflow-hidden rounded-2xl border border-border bg-muted/20" aria-label="Controles operacionais">
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-3 py-2" aria-label={`Operação com ${alertCount} alertas ativos`}>
-      <p className="text-xs font-black text-foreground">Operação</p>
-      <div className="flex flex-wrap gap-1">
-        {action('Tempos e taxas', <Clock3 className="h-4 w-4" />, 'rates', has('delivery.manage'))}
-        {action('Radar', <Map className="h-4 w-4" />, 'radar', has('delivery.read') && isFeatureEnabled('delivery_live_map'))}
-        {action('Lançamentos', <Banknote className="h-4 w-4" />, 'cash', has('cash.read'))}
-      </div>
+  return <>
+    <div className="flex flex-wrap gap-1" aria-label="Atalhos operacionais">
+      {action('Tempos e taxas', <Clock3 className="h-4 w-4" />, 'rates', has('delivery.manage'))}
+      {action('Radar', <Map className="h-4 w-4" />, 'radar', has('delivery.read') && isFeatureEnabled('delivery_live_map'))}
+      {action('Lançamentos', <Banknote className="h-4 w-4" />, 'cash', has('cash.read'))}
     </div>
+    {quickAction === 'rates' ? <OperationalOverlay title="Tempos e taxas" onClose={() => setQuickAction(null)}><DeliveryZonesPageRefactored /></OperationalOverlay> : null}
+    {quickAction === 'radar' ? <OperationalOverlay title="Radar da frota" onClose={() => setQuickAction(null)} fullscreen><OperationalRadar orders={orders} onOpenOrder={onOpenOrder} /></OperationalOverlay> : null}
+    {quickAction === 'cash' ? <OperationalOverlay title="Lançamentos de caixa" onClose={() => setQuickAction(null)}><CashPage /></OperationalOverlay> : null}
+  </>;
+}
+
+export function OperationalControlCenter({ orders, activeTab, onTabChange }: { orders: readonly OrderBoardItemDTO[]; activeTab: OperationalTab; onTabChange: (tab: OperationalTab) => void }) {
+  const { has } = usePermissions();
+  const { isFeatureEnabled } = useTenantCapabilities();
+  const counters = useMemo(() => getOperationalChannelCounters(orders), [orders]);
+  return <section className="mb-3 overflow-hidden rounded-2xl border border-border bg-muted/20" aria-label="Canais operacionais">
     <div className="grid gap-2 bg-background p-2 sm:grid-cols-3 sm:gap-3 sm:p-3" role="tablist" aria-label="Canais operacionais">
       <ModeChannel title="Delivery" icon={<Truck className="h-5 w-5" />} tone="primary" active={activeTab === 'delivery'} onClick={() => onTabChange('delivery')} activeCount={counters.delivery.active} chips={[{ label: 'Cozinha', value: counters.delivery.kitchen, tone: 'amber' }, { label: 'Entrega', value: counters.delivery.ready + counters.delivery.route, tone: 'emerald' }]} />
       <ModeChannel title="Balcão" icon={<ReceiptText className="h-5 w-5" />} tone="sky" active={activeTab === 'pickup'} onClick={() => onTabChange('pickup')} activeCount={counters.pickup.active} chips={[{ label: 'Cozinha', value: counters.pickup.kitchen, tone: 'amber' }, { label: 'Retirar', value: counters.pickup.ready, tone: 'emerald' }]} />
       {has('pos.read') && isFeatureEnabled('dine_in') ? <ModeChannel title="Comandas" icon={<ReceiptText className="h-5 w-5" />} tone="orange" active={activeTab === 'dine_in'} onClick={() => onTabChange('dine_in')} activeCount={counters.dineIn.active} statusLabel="Operação" statusValue={counters.dineIn.active > 0 ? 'Ativa' : 'Sem atividade'} /> : null}
     </div>
-    {quickAction === 'rates' ? <OperationalOverlay title="Tempos e taxas" onClose={() => setQuickAction(null)}><DeliveryZonesPageRefactored /></OperationalOverlay> : null}
-    {quickAction === 'radar' ? <OperationalOverlay title="Radar da frota" onClose={() => setQuickAction(null)} fullscreen><OperationalRadar orders={orders} onOpenOrder={onOpenOrder} /></OperationalOverlay> : null}
-    {quickAction === 'cash' ? <OperationalOverlay title="Lançamentos de caixa" onClose={() => setQuickAction(null)}><CashPage /></OperationalOverlay> : null}
   </section>;
 }
 

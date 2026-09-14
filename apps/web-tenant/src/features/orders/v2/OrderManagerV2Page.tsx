@@ -34,7 +34,7 @@ import {
 import { useOrdersRealtimeState } from "../hooks/useOrdersRealtimeState";
 import { OrderCardV2 } from "./OrderCardV2";
 import { OrderDetailsModalV2 } from "./OrderDetailsModalV2";
-import { OperationalControlCenter } from './OperationalControlCenter';
+import { OperationalControlCenter, OperationalQuickActions } from './OperationalControlCenter';
 import { filterOrdersForOperationalTab, OPERATIONAL_TAB_LANES, type OperationalTab } from './operational-control-center';
 import {
   filterManagerOrders,
@@ -301,13 +301,13 @@ export function OrderManagerV2Page() {
 
   return (
     <main className="mx-auto max-w-[1800px] space-y-3 p-3 sm:p-4">
-      <OperationalControlCenter orders={orders} alertCount={alerts.filter((alert) => alert.state === 'ACTIVE').length} activeTab={operationalTab} onTabChange={setOperationalTab} onOpenOrder={setSelected} />
       <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-2 shadow-sm sm:p-3">
         <div id="order-manager-v2-cockpit" className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/35 px-2 py-1.5">
           <div className="mr-auto min-w-0"><p className="truncate text-sm font-black text-foreground">Painel de Operações</p></div>
           <Metric label="Ativos" value={kpis.active} />
           <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Em rota" value={kpis.route} />
+          <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
           <span className={`hidden items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold sm:inline-flex ${realtime.connectionState === "connected" ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
           <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
         </div>
@@ -476,6 +476,7 @@ export function OrderManagerV2Page() {
           </span>
         </div>
       </header>
+      <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={setOperationalTab} />
       {error ? (
         <div
           role="alert"

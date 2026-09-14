@@ -2557,7 +2557,7 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Comandas intentionally labels its derived order state as `Operação`, not table occupancy: the order board does not carry a canonical occupancy/session fact. The active-state label is derived only from real active `dine_in` orders.
 - The presentation uses existing semantic light/dark tokens and does not alter tabs, counters, lifecycle, Alert Engine, Radar, permissions, API, schema or any provider integration. Focused web tests, typecheck, lint, critical theme check and diff check PASS; visual acceptance remains required.
 
-## Operational Control Center top placement (2026-09-13)
+## Operational Control Center cockpit action placement (2026-09-13)
 
-- Continuing on PR #94 / `fix/operational-control-mode-strip`, the complete Operational Control Center stays unchanged and is now the first content in the V2 page, above the compact cockpit header.
-- The visible and semantic page title now reads `Painel de Operações`. No operational action, mode counter, lifecycle, API, schema, permission, provider or theme behavior changed.
+- Continuing on PR #94 / `fix/operational-control-mode-strip`, the Delivery, Balcão and Comandas mode strip remains below the compact cockpit header. Its layout and counters are unchanged.
+- The existing Tempos e taxas, Radar and Lançamentos actions now sit beside Ativos, Atenção and Em rota in that cockpit. They retain their existing overlays, permission and feature checks. The visible and semantic page title reads `Painel de Operações`.
