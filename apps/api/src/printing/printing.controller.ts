@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -19,6 +20,7 @@ import {
   AckSpoolerJobDto,
   FailSpoolerJobDto,
   CreateTestPrintDto,
+  UpdatePrintStationDto,
 } from './dto/printing.dto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
@@ -35,9 +37,19 @@ export class PrintingController {
   }
 
   @Get('stations')
-  @RequirePermissions('settings.manage')
+  @RequirePermissions('printing.read')
   async getStations(@Request() req: TenantRequest) {
     return this.printingService.getStations(req.user.tenantId);
+  }
+
+  @Patch('stations/:id')
+  @RequirePermissions('printing.manage')
+  async updateStation(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+    @Body() body: UpdatePrintStationDto,
+  ) {
+    return this.printingService.updateStationActive(req.user.tenantId, id, body.isActive);
   }
 
   @Get('devices')

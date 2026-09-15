@@ -651,15 +651,20 @@ export class KdsService {
         }
         
         if (inactiveStations.has(station.trim().toLocaleLowerCase('pt-BR'))) {
-          throw new BadRequestException(`A estação KDS "${station}" da categoria "${category?.name ?? 'não identificada'}" está desativada; o item "${item.snapshotName}" não pode entrar em produção. Reative-a antes de enviar este pedido.`);
+          this.logger.debug(`createProductionJobs: skipping inactive station ${station} for order ${orderId}.`);
+          continue;
         }
         if (!stationGroups[station]) stationGroups[station] = [];
         stationGroups[station].push(item);
       }
 
       if (Object.keys(stationGroups).length === 0) {
-        this.logger.warn(`createProductionJobs: order ${orderId} has no items. No KDS jobs created.`);
-        return [];
+        const targetStatus: OrderStatus = order.fulfillmentType === 'delivery'
+          ? 'ready_for_delivery'
+          : 'ready_for_pickup';
+        await this.ordersService.updateOrderStatus(orderId, tenantId, { status: targetStatus });
+        this.logger.log(`createProductionJobs: order ${orderId} has no active KDS stations and was marked ready.`);
+        return jobs;
       }
 
       // Para cada estação, criar um job

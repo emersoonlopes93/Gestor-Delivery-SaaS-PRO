@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Info, Printer } from 'lucide-react';
+import { Info, Power, Printer } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { printTicketViaBluetooth } from '../../lib/bluetooth';
 import { EscPosBuilder } from '../../lib/escpos58';
 import { printTextViaQz } from '../../lib/qz-tray-client';
 import { printThermalText } from '../../lib/thermal-print';
 import { useAuthStore } from '../../stores/auth.store';
+import { usePermissions } from '../../hooks/use-tenant-auth';
 import {
   useCreateDevice,
   usePrinterDevices,
   usePrintingStations,
   useTestPrint,
   useUpdateDevice,
+  useUpdatePrintStation,
   type CreateDevicePayload,
   type PrinterDevice,
 } from '../../hooks/usePrinting';
@@ -59,10 +61,12 @@ function newRequestId() {
 export function PrinterSettings() {
   const capabilities = useMemo(() => getPrintingCapabilities(), []);
   const { user } = useAuthStore();
+  const { has } = usePermissions();
   const { data: stations = [] } = usePrintingStations();
   const { data: devices = [] } = usePrinterDevices();
   const createDevice = useCreateDevice();
   const updateDevice = useUpdateDevice();
+  const updateStation = useUpdatePrintStation();
   const testPrint = useTestPrint();
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupStationId, setSetupStationId] = useState<string | undefined>();
@@ -221,6 +225,17 @@ export function PrinterSettings() {
     }
   };
 
+  const toggleStation = async (stationId: string, isActive: boolean) => {
+    try {
+      await updateStation.mutateAsync({ id: stationId, isActive: !isActive });
+      setFeedback(isActive ? 'Estação KDS desativada. Novos tickets param; tickets pendentes, imprimindo ou falhos continuam exigindo resolução.' : 'Estação KDS ativada para novos tickets.');
+      setTechnicalDetail('');
+    } catch (error) {
+      setFeedback(`Não foi possível alterar a estação. ${humanizePrintingError(error)}`);
+      setTechnicalDetail(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const updatePaperWidth = async (paperWidth: PaperWidthMm) => {
     if (!mainPrinter || mainPrinter.paperWidth === paperWidth) return;
     try {
@@ -262,6 +277,22 @@ export function PrinterSettings() {
           <section className="flex flex-col gap-4 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div><h2 className="text-lg font-black text-foreground">Imprimir neste dispositivo</h2><p className="mt-1 text-sm text-muted-foreground">O navegador abrirá a tela de impressão do aparelho.</p></div>
             <button type="button" onClick={browserPrint} className="min-h-11 shrink-0 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-black text-primary">Imprimir pelo navegador</button>
+          </section>
+        ) : null}
+
+        {stations.length > 0 ? (
+          <section className="rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
+            <div className="mb-4"><h2 className="text-xl font-black text-foreground">Estações KDS</h2><p className="mt-1 text-sm text-muted-foreground">Desligar interrompe apenas novos tickets. Tickets pendentes, imprimindo ou falhos continuam visíveis e podem manter pedidos aguardando conclusão.</p></div>
+            <div className="grid gap-3">
+              {stations.map((station) => {
+                const summary = station.kdsJobSummary ?? { pending: 0, printing: 0, failed: 0 };
+                const hasOutstandingWork = summary.pending + summary.printing + summary.failed > 0;
+                return <article key={station.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0"><div className="flex items-center gap-2"><h3 className="font-black text-foreground">{station.name}</h3><span className={`rounded-full px-2 py-0.5 text-xs font-black ${station.isActive ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>{station.isActive ? 'ON' : 'OFF'}</span></div><p className="mt-1 text-sm text-muted-foreground">{station.isActive ? 'Recebe novos tickets de produção.' : 'Não recebe novos tickets de produção.'}</p>{hasOutstandingWork ? <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">Pendentes: {summary.pending} · Imprimindo: {summary.printing} · Falhos: {summary.failed}. Estes tickets continuam bloqueando a conclusão automática.</p> : null}</div>
+                  {has('printing.manage') ? <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 self-start rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground sm:self-auto"><Power className={`h-4 w-4 ${station.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} /><span>{station.isActive ? 'Ativa' : 'Desativada'}</span><input type="checkbox" role="switch" aria-label={`Alternar estação ${station.name}`} checked={station.isActive} disabled={updateStation.isPending} onChange={() => void toggleStation(station.id, station.isActive)} className="h-4 w-8 accent-primary disabled:cursor-not-allowed" /></label> : <p className="text-sm font-bold text-muted-foreground">Somente gestores podem alterar</p>}
+                </article>;
+              })}
+            </div>
           </section>
         ) : null}
 

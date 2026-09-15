@@ -113,3 +113,10 @@ No painel tenant, o evento canônico para essa reconciliação é `order.changed
 na sala autenticada `tenant:<tenantId>`. A UI busca `GET /orders/:id` e reaplica
 o `OrderOperationalViewModel`; durante drag-and-drop, o hint do pedido arrastado
 é adiado e uma leitura autoritativa precede qualquer transição.
+
+## 6. Controle operacional de estações KDS
+
+- Estações KDS são registros persistidos e tenant-scoped de `PrintStation`. A leitura usa `printing.read`; a alteração limitada de `isActive` usa `printing.manage`.
+- Uma estação OFF é excluída apenas da criação de futuros tickets de cozinha. A alteração não cancela, conclui ou oculta tickets preexistentes.
+- Desligar uma estação é permitido mesmo com tickets existentes: eles permanecem visíveis, inalterados e contam para a promoção automática do pedido. A listagem da estação expõe seus totais `pending`, `printing` e `failed`; tickets `failed` continuam um bloqueador explícito da promoção automática para pronto.
+- Quando um pedido contém itens somente de estações OFF, nenhum ticket de cozinha é criado; ele avança pelo `OrdersService` à transição canônica de pronto, sem permanecer em `preparing` sem trabalho de produção.

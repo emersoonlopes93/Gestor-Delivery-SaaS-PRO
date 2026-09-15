@@ -60,7 +60,54 @@ export class PrintingService {
   }
 
   async getStations(tenantId: string) {
-    return this.ensurePrintStationsForTenant(tenantId);
+    const stations = await this.ensurePrintStationsForTenant(tenantId);
+    const jobGroups = await this.db.printJob.groupBy({
+      by: ['station', 'status'],
+      where: {
+        tenantId,
+        type: PrintType.kitchen,
+        status: { in: [PrintJobStatus.pending, PrintJobStatus.printing, PrintJobStatus.failed] },
+      },
+      _count: { _all: true },
+    });
+
+    return stations.map((station) => {
+      const stationKeys = new Set([station.name, station.slug].map((value) => value.trim().toLocaleLowerCase('pt-BR')));
+      const kdsJobSummary = { pending: 0, printing: 0, failed: 0 };
+
+      for (const group of jobGroups) {
+        if (!stationKeys.has(group.station.trim().toLocaleLowerCase('pt-BR'))) continue;
+        if (group.status === PrintJobStatus.pending) kdsJobSummary.pending += group._count._all;
+        if (group.status === PrintJobStatus.printing) kdsJobSummary.printing += group._count._all;
+        if (group.status === PrintJobStatus.failed) kdsJobSummary.failed += group._count._all;
+      }
+
+      return { ...station, kdsJobSummary };
+    });
+  }
+
+  async updateStationActive(tenantId: string, stationId: string, isActive: boolean) {
+    const currentStation = await this.db.printStation.findFirst({
+      where: { id: stationId, tenantId },
+      select: { id: true },
+    });
+
+    if (!currentStation) throw new NotFoundException('Print station not found');
+
+    const updated = await this.db.printStation.updateMany({
+      where: { id: stationId, tenantId },
+      data: { isActive },
+    });
+
+    if (updated.count !== 1) throw new NotFoundException('Print station not found');
+
+    const station = await this.db.printStation.findFirst({
+      where: { id: stationId, tenantId },
+      include: { devices: true },
+    });
+
+    if (!station) throw new NotFoundException('Print station not found');
+    return station;
   }
 
   async ensurePrintStationsForTenant(tenantId: string) {

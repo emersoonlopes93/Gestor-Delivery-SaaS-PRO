@@ -8,6 +8,7 @@ describe('PrintingService print station bootstrap', () => {
       findMany: jest.fn(),
     },
     printJob: {
+      count: jest.fn(),
       groupBy: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
@@ -19,6 +20,7 @@ describe('PrintingService print station bootstrap', () => {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({}),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn(),
       findMany: jest.fn(),
     },
     printerDevice: {
@@ -167,6 +169,62 @@ describe('PrintingService print station bootstrap', () => {
     for (const call of db.printStation.create.mock.calls) {
       expect(call[0].data.tenantId).toBe('tenant-a');
     }
+  });
+
+  it('updates only a same-tenant station while preserving its active kitchen jobs', async () => {
+    const db = makeDb();
+    db.printStation.findFirst
+      .mockResolvedValueOnce({ id: 'station-a' })
+      .mockResolvedValueOnce({ id: 'station-a', tenantId: 'tenant-a', isActive: false, devices: [] });
+    db.printStation.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(makeService(db).updateStationActive('tenant-a', 'station-a', false))
+      .resolves.toMatchObject({ id: 'station-a', isActive: false });
+
+    expect(db.printStation.updateMany).toHaveBeenCalledWith({
+      where: { id: 'station-a', tenantId: 'tenant-a' },
+      data: { isActive: false },
+    });
+  });
+
+  it('turns a station off despite pending or printing kitchen tickets without mutating them', async () => {
+    const db = makeDb();
+    db.printStation.findFirst
+      .mockResolvedValueOnce({ id: 'station-a' })
+      .mockResolvedValueOnce({ id: 'station-a', tenantId: 'tenant-a', isActive: false, devices: [] });
+    db.printStation.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(makeService(db).updateStationActive('tenant-a', 'station-a', false))
+      .resolves.toMatchObject({ id: 'station-a', isActive: false });
+    expect(db.printJob.count).not.toHaveBeenCalled();
+    expect(db.printJob.update).not.toHaveBeenCalled();
+  });
+
+  it('returns pending, printing and failed kitchen-job summaries with each station', async () => {
+    const db = makeDb();
+    db.productCategory.findMany.mockResolvedValue([]);
+    db.printStation.findMany.mockResolvedValue([{ id: 'station-a', tenantId: 'tenant-a', name: 'Cozinha', slug: 'cozinha', isActive: false, devices: [] }]);
+    db.printStation.findFirst.mockResolvedValue({ id: 'station-a' });
+    db.printJob.groupBy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { station: 'Cozinha', status: PrintJobStatus.pending, _count: { _all: 2 } },
+        { station: 'cozinha', status: PrintJobStatus.printing, _count: { _all: 1 } },
+        { station: 'cozinha', status: PrintJobStatus.failed, _count: { _all: 3 } },
+      ]);
+
+    await expect(makeService(db).getStations('tenant-a')).resolves.toEqual([
+      expect.objectContaining({ kdsJobSummary: { pending: 2, printing: 1, failed: 3 } }),
+    ]);
+  });
+
+  it('does not disclose or update a station from another tenant', async () => {
+    const db = makeDb();
+    db.printStation.findFirst.mockResolvedValue(null);
+
+    await expect(makeService(db).updateStationActive('tenant-a', 'foreign-station', false))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(db.printStation.updateMany).not.toHaveBeenCalled();
   });
 
   it('accepts a same-tenant station when creating a device', async () => {

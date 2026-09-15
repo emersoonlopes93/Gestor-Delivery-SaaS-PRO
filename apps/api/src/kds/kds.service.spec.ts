@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { OrderStatus, PrintType } from '@prisma/client';
 import { KdsService } from './kds.service';
 
@@ -223,21 +223,28 @@ describe('KdsService getPrintJob', () => {
     }));
   });
 
-  it('blocks production with the item and category when its KDS station is inactive', async () => {
+  it('skips an inactive KDS station and marks an order ready when it has no active station tickets', async () => {
     const db = makeDb();
     db.printJob.count.mockResolvedValue(0);
     db.printStation.findMany.mockResolvedValue([{ name: 'Bebidas', slug: 'bebidas' }]);
     db.order.findUnique.mockResolvedValue({
-      id: 'order-1', tenantId: 'tenant-a', status: OrderStatus.preparing, items: [{
+      id: 'order-1', tenantId: 'tenant-a', status: OrderStatus.preparing, fulfillmentType: 'delivery', items: [{
         id: 'item-1', lineType: 'product', snapshotName: 'Suco',
         product: { category: { name: 'Bebidas', templateConfig: { station: 'Bebidas' } } },
       }],
     });
 
-    const production = makeService(db).createProductionJobs('order-1');
-    await expect(production).rejects.toBeInstanceOf(BadRequestException);
-    await expect(production).rejects.toThrow('o item "Suco" não pode entrar em produção');
+    const ordersService = { updateOrderStatus: jest.fn().mockResolvedValue({ status: 'ready_for_delivery' }) };
+    const service = new KdsService(
+      db as never,
+      { getTenantId: () => 'tenant-a' } as never,
+      { formatTicket: jest.fn() } as never,
+      ordersService as never,
+    );
+
+    await expect(service.createProductionJobs('order-1')).resolves.toEqual([]);
     expect(db.printJob.upsert).not.toHaveBeenCalled();
+    expect(ordersService.updateOrderStatus).toHaveBeenCalledWith('order-1', 'tenant-a', { status: 'ready_for_delivery' });
   });
 
   it('moves an order to ready only after the final kitchen station is completed', async () => {

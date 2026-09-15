@@ -102,6 +102,11 @@ export class UpdatePrinterDeviceDto {
   isActive?: boolean;
 }
 
+export class UpdatePrintStationDto {
+  @IsBoolean()
+  isActive!: boolean;
+}
+
 export class AckSpoolerJobDto {
   @IsString()
   printerDeviceId: string;

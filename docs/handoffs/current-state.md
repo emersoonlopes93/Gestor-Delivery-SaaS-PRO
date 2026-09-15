@@ -2583,3 +2583,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 ### Mobile control-strip alignment follow-up (2026-09-14)
 
 - Delivery, Balcão and Comandas are a three-column row on phones. The operation header keeps title, compact synchronization status and expand/collapse control on one line, with the control immediately after the status.
+
+## KDS station operational control (2026-09-15)
+
+- `PrintStation.isActive` is exposed in the existing printing settings surface. `printing.read` lists station state and `printing.manage` persists the narrow ON/OFF action; device controls remain unchanged.
+- OFF excludes future KDS kitchen tickets only. It remains available with pending, printing or failed tickets: that existing work is not hidden, cancelled or treated as done and its per-station counts remain visible. Failed tickets remain explicit readiness blockers.
+- Orders containing only OFF-station items advance through `OrdersService` to their canonical ready status, preventing a permanent `preparing` status without active KDS work. No migration, provider, remote database, deploy or device-state change was made.
+- Focused API validation was started for KDS and printing service suites; record the final gate before promotion.

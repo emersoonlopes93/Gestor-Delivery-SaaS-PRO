@@ -33,7 +33,7 @@ describe('PrinterSetupDialog platform UI', () => {
   });
 
   it('preselects the requested station instead of silently falling back to primary', () => {
-    const html = renderToStaticMarkup(<PrinterSetupDialog {...props} stations={[{ id: 'general', name: 'GERAL', slug: 'GENERAL', autoPrintEnabled: true }]} initialStationId="general" capabilities={resolvePrintingCapabilities('desktop-web')} />);
+    const html = renderToStaticMarkup(<PrinterSetupDialog {...props} stations={[{ id: 'general', name: 'GERAL', slug: 'GENERAL', isActive: true, autoPrintEnabled: true }]} initialStationId="general" capabilities={resolvePrintingCapabilities('desktop-web')} />);
     expect(html).toContain('Impressora de setor');
     expect(html).toContain('value="general" selected=""');
   });

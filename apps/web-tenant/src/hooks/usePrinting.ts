@@ -5,7 +5,13 @@ export interface PrintStation {
   id: string;
   name: string;
   slug: string;
+  isActive: boolean;
   autoPrintEnabled: boolean;
+  kdsJobSummary?: {
+    pending: number;
+    printing: number;
+    failed: number;
+  };
 }
 
 export interface PrinterDevice {
@@ -54,6 +60,19 @@ export const usePrinterDevices = () => {
     queryFn: async () => {
       const { data } = await api.get<PrinterDevice[]>('/printing/devices');
       return data;
+    },
+  });
+};
+
+export const useUpdatePrintStation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const { data } = await api.patch<PrintStation>(`/printing/stations/${id}`, { isActive });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['printing-stations'] });
     },
   });
 };
