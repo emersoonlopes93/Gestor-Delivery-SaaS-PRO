@@ -48,14 +48,16 @@ import { useTenantAuth } from "../../../hooks/use-tenant-auth";
 import { createNotificationEvent, emitNotificationEvent } from "../../../notifications/notificationEvents";
 import {
   browserSpeechProvider,
+  getOperationalAlertRepeatIntervalMs,
   isVoiceAlertsEnabled,
   ORDER_ALERT_CENTER_TOGGLE_EVENT,
   setVoiceAlertsEnabled,
+  shouldAnnounceOperationalAlert,
   VOICE_ALERTS_CHANGED_EVENT,
 } from "./order-alert-coordinator";
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
-type OrderAlert = { id: string; orderId: string | null; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
+type OrderAlert = { id: string; orderId: string | null; ruleKey: string; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
 type BoardLane = 'kitchen' | 'ready' | 'route';
 const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
 const LANE_STYLE = {
@@ -93,6 +95,7 @@ export function OrderManagerV2Page() {
   const [cockpitCollapsed, setCockpitCollapsed] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem(COCKPIT_COLLAPSED_STORAGE_KEY) === "true");
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
+  const alertPlayedAtRef = useRef<Map<string, number>>(new Map());
   const now = useSharedClock();
   const realtime = useOrdersRealtimeState(lastConfirmedAt);
   const soundManager = useSoundManager();
@@ -258,12 +261,15 @@ export function OrderManagerV2Page() {
   }, [activeAlerts]);
 
   useEffect(() => {
-    const lastPlayed = new Map<string, number>();
     const announce = () => {
       const timestamp = Date.now();
+      const lastPlayed = alertPlayedAtRef.current;
+      for (const [alertId, playedAt] of lastPlayed) {
+        if (timestamp - playedAt > 5 * 60_000) lastPlayed.delete(alertId);
+      }
       for (const alert of activeAlerts) {
-        if (alert.acknowledgedAt || alert.severity === 'INFO') continue;
-        const cooldown = alert.severity === 'CRITICAL' ? 30_000 : 60_000;
+        if (!shouldAnnounceOperationalAlert(alert)) continue;
+        const cooldown = getOperationalAlertRepeatIntervalMs(alert);
         if (timestamp - (lastPlayed.get(alert.id) ?? 0) < cooldown) continue;
         lastPlayed.set(alert.id, timestamp);
         emitNotificationEvent(createNotificationEvent({

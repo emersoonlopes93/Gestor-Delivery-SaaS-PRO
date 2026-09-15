@@ -7,6 +7,26 @@ export const VOICE_ALERTS_CHANGED_EVENT = 'order-manager:voice-alerts-changed';
 export type SpeechProvider = { speak: (phrase: string) => Promise<void> | void };
 type QueuedAlert = { phrase: string; priority: number; createdAt: number };
 
+export type OperationalAlertForAnnouncement = {
+  ruleKey: string;
+  acknowledgedAt: string | null;
+  severity: 'INFO' | 'ATTENTION' | 'CRITICAL';
+};
+
+export const WAITING_ACCEPTANCE_RULE_KEY = 'ORDER_WAITING_ACTION';
+
+/** Acknowledgement is informational for a pending acceptance, never a resolution. */
+export function shouldAnnounceOperationalAlert(alert: OperationalAlertForAnnouncement): boolean {
+  return alert.severity !== 'INFO'
+    && (!alert.acknowledgedAt || alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY);
+}
+
+export function getOperationalAlertRepeatIntervalMs(alert: OperationalAlertForAnnouncement): number {
+  return alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY || alert.severity === 'CRITICAL'
+    ? 30_000
+    : 60_000;
+}
+
 const PRIORITY: Record<NotificationEvent['priority'], number> = { low: 1, medium: 2, high: 3, critical: 4 };
 
 /**
@@ -36,7 +56,9 @@ export class OrderAlertCoordinator {
         ? displayNumber ? `Pedido ${displayNumber} pronto para a próxima etapa.` : 'Pedido pronto para a próxima etapa.'
         : event.type === 'order.cancelled'
           ? displayNumber ? `Pedido ${displayNumber} cancelado.` : 'Um pedido foi cancelado.'
-          : 'Atualização operacional disponível.';
+          : event.type === 'order.alert' && /aguardando ação/i.test(event.title ?? '')
+            ? displayNumber ? `Pedido ${displayNumber} aguarda aceite.` : 'Um pedido aguarda aceite.'
+            : 'Atualização operacional disponível.';
     this.queue.push({ phrase, priority: PRIORITY[event.priority], createdAt: safeCreatedAt });
     this.queue.sort((left, right) => right.priority - left.priority || left.createdAt - right.createdAt);
     if (!this.playing) void this.flush(provider);

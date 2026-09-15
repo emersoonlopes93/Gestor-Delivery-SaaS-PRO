@@ -16,8 +16,8 @@ describe('OrderAlertsService', () => {
 
   it('creates one active occurrence and recovers it when the condition disappears', async () => {
     const { prisma, gateway, service } = setup();
-    prisma.order.findMany.mockResolvedValueOnce([{ id: 'order-a', orderNumber: '100', status: OrderStatus.pending, createdAt: now, marketplaceOrders: [] }]).mockResolvedValueOnce([]);
-    prisma.orderAlert.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    prisma.order.findMany.mockResolvedValueOnce([{ id: 'order-a', orderNumber: '100', status: OrderStatus.pending, createdAt: new Date(), marketplaceOrders: [] }]).mockResolvedValueOnce([]);
+    prisma.orderAlert.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'alert-a' });
     prisma.orderAlert.create.mockResolvedValue({ id: 'alert-a' });
     prisma.orderAlert.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'alert-a', fingerprint: 'order-a:ORDER_WAITING_ACTION' }]);
     prisma.orderAlert.update.mockResolvedValue({ id: 'alert-a' });
@@ -45,6 +45,31 @@ describe('OrderAlertsService', () => {
     prisma.orderAlert.findFirstOrThrow.mockResolvedValue({ id: 'alert-a', tenantId, state: OrderAlertState.ACTIVE, acknowledgedAt: now });
     await service.acknowledge(tenantId, 'alert-a', 'user-a');
     expect(prisma.orderAlert.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates the same waiting-acceptance occurrence for every pending channel', async () => {
+    const { prisma, service } = setup();
+    prisma.order.findMany.mockResolvedValue([
+      { id: 'pedehub-order', orderNumber: '101', status: OrderStatus.pending, createdAt: new Date(), marketplaceOrders: [] },
+      { id: 'ifood-order', orderNumber: '102', status: OrderStatus.pending, createdAt: new Date(), marketplaceOrders: [{ operations: [], divergences: [] }] },
+      { id: 'food99-order', orderNumber: '103', status: OrderStatus.pending, createdAt: new Date(), marketplaceOrders: [{ operations: [], divergences: [] }] },
+    ]);
+    prisma.orderAlert.findFirst.mockResolvedValue(null);
+    prisma.orderAlert.create.mockResolvedValue({ id: 'alert-a' });
+    prisma.orderAlert.findMany.mockResolvedValue([]);
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).toHaveBeenCalledTimes(3);
+    for (const orderId of ['pedehub-order', 'ifood-order', 'food99-order']) {
+      expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          orderId,
+          ruleKey: 'ORDER_WAITING_ACTION',
+          fingerprint: `${orderId}:ORDER_WAITING_ACTION`,
+        }),
+      }));
+    }
   });
 
   it('creates a critical alert only for an authoritative failed marketplace operation', async () => {

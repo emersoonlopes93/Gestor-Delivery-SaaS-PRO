@@ -264,4 +264,36 @@ describe('KdsService getPrintJob', () => {
     await service.markAsCompleted('job-bebidas');
     expect(ordersService.updateOrderStatus).toHaveBeenCalledWith('order-1', 'tenant-a', { status: 'ready_for_delivery' });
   });
+
+  it('persists KDS-ready locally while the marketplace ready action is deferred', async () => {
+    const db = makeDb();
+    const ordersService = { updateOrderStatus: jest.fn().mockResolvedValue({ status: 'ready_for_delivery' }) };
+    const marketplaceSync = { handleInternalStatusChanged: jest.fn().mockResolvedValue({ deferred: true, operationId: 'operation-1' }) };
+    db.printJob.findFirst.mockResolvedValue({
+      id: 'job-final', tenantId: 'tenant-a', orderId: 'order-1', status: 'pending',
+      order: { id: 'order-1', status: 'preparing', fulfillmentType: 'delivery' },
+    });
+    db.printJob.update.mockResolvedValue({ id: 'job-final', orderId: 'order-1', status: 'completed' });
+    db.printJob.count.mockResolvedValue(0);
+    const service = new KdsService(
+      db as never,
+      { getTenantId: () => 'tenant-a' } as never,
+      {} as never,
+      ordersService as never,
+      marketplaceSync as never,
+    );
+
+    await service.markAsCompleted('job-final');
+
+    expect(marketplaceSync.handleInternalStatusChanged).toHaveBeenCalledWith({
+      tenantId: 'tenant-a', orderId: 'order-1', status: 'ready_for_delivery',
+    });
+    expect(ordersService.updateOrderStatus).toHaveBeenCalledWith(
+      'order-1',
+      'tenant-a',
+      { status: 'ready_for_delivery' },
+      undefined,
+      { marketplaceEvent: true },
+    );
+  });
 });

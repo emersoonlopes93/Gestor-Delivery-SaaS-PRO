@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { PrinterService } from '../pos/printer.service';
 import { OrdersService } from '../orders/orders.service';
+import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
 import { 
   OrderResponseDTO, 
   PrintType, 
@@ -45,6 +46,8 @@ export class KdsService {
     private readonly tenantContext: TenantContextService,
     private readonly printerService: PrinterService,
     @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
+    @Optional() @Inject(forwardRef(() => MarketplaceStatusSyncService))
+    private readonly marketplaceStatusSyncService?: MarketplaceStatusSyncService,
   ) {}
 
   private buildIdempotencyKey(prefix: string, parts: Array<string | number | null | undefined>) {
@@ -340,7 +343,7 @@ export class KdsService {
     if (openJobs === 0 && printJob.order.status === 'preparing') {
       const targetStatus: OrderStatus = printJob.order.fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
       try {
-        await this.ordersService.updateOrderStatus(completed.orderId, tenantId, { status: targetStatus });
+        await this.advanceOrderAfterKitchenCompletion(completed.orderId, tenantId, targetStatus);
       } catch (error) {
         const order = await this.prisma.order.findFirst({ where: { id: completed.orderId, tenantId }, select: { status: true } });
         if (order?.status !== targetStatus) throw error;
@@ -662,7 +665,7 @@ export class KdsService {
         const targetStatus: OrderStatus = order.fulfillmentType === 'delivery'
           ? 'ready_for_delivery'
           : 'ready_for_pickup';
-        await this.ordersService.updateOrderStatus(orderId, tenantId, { status: targetStatus });
+        await this.advanceOrderAfterKitchenCompletion(orderId, tenantId, targetStatus);
         this.logger.log(`createProductionJobs: order ${orderId} has no active KDS stations and was marked ready.`);
         return jobs;
       }
@@ -729,6 +732,38 @@ export class KdsService {
     } finally {
       this.activeJobsCreations.delete(lockKey);
     }
+  }
+
+  /**
+   * Kitchen completion is an internal operational fact. Marketplace actions are still
+   * enqueued first, but their asynchronous acknowledgement must not leave a completed
+   * kitchen ticket represented as `preparing` in the operational board.
+   */
+  private async advanceOrderAfterKitchenCompletion(
+    orderId: string,
+    tenantId: string,
+    targetStatus: OrderStatus,
+  ): Promise<void> {
+    const marketplaceSync = this.marketplaceStatusSyncService
+      ? await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+        tenantId,
+        orderId,
+        status: targetStatus,
+      })
+      : { deferred: false };
+
+    if (marketplaceSync.deferred) {
+      await this.ordersService.updateOrderStatus(
+        orderId,
+        tenantId,
+        { status: targetStatus },
+        undefined,
+        { marketplaceEvent: true },
+      );
+      return;
+    }
+
+    await this.ordersService.updateOrderStatus(orderId, tenantId, { status: targetStatus });
   }
   /**
    * Cria jobs incrementais (ex: quando um item é adicionado a uma mesa)

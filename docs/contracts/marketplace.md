@@ -274,6 +274,24 @@ The raw Swagger formula for `real_price`, `real_pay_price`, and `shop_paid_money
 
 `items_discount`, `delivery_discount` and `others_fees.coupon_discount` establish the total discount but do not identify its funder. `delivery_price` and `others_fees.service_price` are customer charges. Merchant-funded discount, platform-funded discount, and platform fees remain unknown because the native order snapshot does not provide those facts. The normalized snapshot persists these distinctions in the existing JSON field; no new database column or inferred settlement exists.
 
+### Marketplace consistency limitations (2026-09-15)
+
+The verified native 99Food callback and snapshot contract do not provide a canonical
+`courier arrived`, `picked up`, or `out for delivery` event. The adapter accepts only the
+official `orderNew`, `orderConfirm`, `orderReady`, `orderCancel`, `orderPartialCancel`, and
+`orderFinish` lifecycle events. Therefore `deliveryStatus`, numeric values, or elapsed time
+cannot safely transition an order to `out_for_delivery` or create an urgent courier alert.
+Until the provider exposes a supported fact, PedeHub preserves the last confirmed canonical
+state and reports the capability limitation rather than inventing an operational state.
+
+Canonical stock is local and recipe-driven: `OrderItem.productId` resolves product recipes
+and the idempotent depletion/reversal movements. POS and PedeHub storefront orders have this
+canonical identity. Imported iFood and 99Food items currently preserve external IDs only;
+there is no persisted tenant-scoped `provider/externalProductId -> Product or Variant` mapping.
+They must not be matched by name, so marketplace stock depletion/reversal and outbound
+availability synchronization cannot be claimed as implemented. A managed mapped catalog,
+including provider contracts and migration, is separate roadmap scope.
+
 ### Native action activation and privacy-protected names (2026-09-05)
 
 99Food actions initiated from the operational order board require `orders.update_status`, a tenant-scoped `CONNECTED` 99Food connection, `MARKETPLACE_99FOOD_ENABLED=true`, and operational BullMQ. The connected store is the tenant's explicit opt-in for these native actions. The generic beta `marketplace_orders` preset controls marketplace-management surfaces and does not independently block the normal order-status endpoint; iFood retains its provider-specific feature and entitlement gate.
