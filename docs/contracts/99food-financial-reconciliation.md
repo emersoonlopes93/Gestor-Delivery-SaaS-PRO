@@ -11,6 +11,8 @@ Este contrato separa quatro fatos que não podem ser usados como sinônimos:
 
 `FinancialProjection.merchantReceivable` continua sendo estimativa histórica. Bill entries não criam transação financeira e não alteram saldo.
 
+No Dashboard, `Order.total` é sempre exibido como **vendas concluídas (brutas)**. Quando houver Bill Data persistido no período financeiro, a soma assinada de `MarketplaceBillEntry.settlementAmount` é exibida separadamente como **ganhos líquidos estimados 99Food**. Ausência de Bill Data é explícita; nunca é convertida em R$ 0,00 ou em taxa estimada. `withdrawAmount` permanece um fato de liquidação semanal e somente afeta saldo quando o posting manual for concluído.
+
 ## Provider read-only
 
 As leituras usam Bearer token da conexão e os endpoints:

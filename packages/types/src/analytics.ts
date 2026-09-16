@@ -12,7 +12,14 @@ export interface OperationalMetricsDTO {
 }
 
 export interface CommercialMetricsDTO {
+  /** Gross completed sales. This is the amount charged to customers, not the marketplace receivable. */
   totalRevenue: number;
+  /**
+   * Sum of persisted 99Food Bill Data settlement amounts for the financial period.
+   * Null means no reconciled Bill Data is available for the period; it must not be displayed as zero.
+   */
+  food99EstimatedNetReceivable: number | null;
+  food99BillEntryCount: number;
   averageTicket: number;
   totalOrders: number;
   revenueByChannel: Record<string, number>;

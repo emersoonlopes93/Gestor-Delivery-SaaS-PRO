@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '@prisma/client';
-import { OrderStatus as PrismaOrderStatus, StockMovementType } from '@prisma/client';
+import { MarketplaceProvider, OrderStatus as PrismaOrderStatus, StockMovementType } from '@prisma/client';
 import { 
   OperationalMetricsDTO, 
   CommercialMetricsDTO, 
@@ -138,16 +138,35 @@ export class AnalyticsService {
 
     type CommercialOrder = Prisma.OrderGetPayload<{ include: { items: true; coupon: true } }>;
 
-    const orders = await this.prisma.tenantClient.order.findMany({
-      where,
-      include: { items: true, coupon: true },
-    });
+    const [orders, food99BillTotals] = await Promise.all([
+      this.prisma.tenantClient.order.findMany({
+        where,
+        include: { items: true, coupon: true },
+      }),
+      this.prisma.marketplaceBillEntry.aggregate({
+        where: {
+          tenantId,
+          provider: MarketplaceProvider.FOOD_99,
+          businessAt: {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+          },
+        },
+        _sum: { settlementAmount: true },
+        _count: { _all: true },
+      }),
+    ]);
 
     const totalRevenue = (orders as CommercialOrder[]).reduce((acc, order) => acc + Number(order.total), 0);
     const totalOrders = orders.length;
+    const food99BillEntryCount = food99BillTotals._count._all;
 
     const metrics: CommercialMetricsDTO = {
       totalRevenue,
+      food99EstimatedNetReceivable: food99BillEntryCount > 0
+        ? Number(food99BillTotals._sum.settlementAmount ?? 0n) / 100
+        : null,
+      food99BillEntryCount,
       totalOrders,
       averageTicket: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       revenueByChannel: this.aggregateRevenueByField(orders, 'sourceChannel'),

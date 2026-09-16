@@ -19,7 +19,7 @@ const overview: DashboardStatsDTO = {
     peakHours: [{ hour: 12, count: 3 }, { hour: 13, count: 5 }],
   },
   commercial: {
-    totalRevenue: 240, averageTicket: 120, totalOrders: 2, revenueByChannel: {}, revenueByCategory: {},
+    totalRevenue: 240, food99EstimatedNetReceivable: 186.4, food99BillEntryCount: 2, averageTicket: 120, totalOrders: 2, revenueByChannel: {}, revenueByCategory: {},
     topProducts: [{ id: 'p1', name: 'Pizza Margherita', quantity: 4, revenue: 160 }],
     topCombos: [], couponUsage: [], cashbackStats: { earnedTotal: 0, redeemedTotal: 0 },
   },
@@ -35,7 +35,9 @@ describe('OperationsDashboard', () => {
       </MemoryRouter>,
     );
     expect(html).toContain('Loja aberta');
-    expect(html).toContain('Receita concluída');
+    expect(html).toContain('Vendas concluídas (brutas)');
+    expect(html).toContain('Ganhos líquidos estimados 99Food');
+    expect(html).toContain('R$ 186,40');
     expect(html).toContain('Pizza Margherita');
     expect(html).toContain('Detalhamento por hora indisponível');
     expect(html).toContain('operação');
@@ -45,6 +47,24 @@ describe('OperationsDashboard', () => {
     expect(html).not.toContain('Ãƒ');
     expect(html).not.toContain('Tenant ID');
     expect(html).not.toContain('Permissões');
+  });
+
+  it('does not present missing 99Food Bill Data as a zero net receivable', () => {
+    const unavailable: DashboardStatsDTO = {
+      ...overview,
+      commercial: {
+        ...overview.commercial,
+        food99EstimatedNetReceivable: null,
+        food99BillEntryCount: 0,
+      },
+    };
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <OperationsDashboard current={unavailable} previous={null} storeStatus="open" onCopyMenu={() => undefined} onRefresh={() => undefined} refreshing={false} periodLabel="hoje" />
+      </MemoryRouter>,
+    );
+    expect(html).toContain('Dados financeiros 99Food indisponíveis neste período');
+    expect(html).toContain('A confirmar');
   });
 
   it('renders the honest no-order state', () => {

@@ -93,6 +93,8 @@ export function OperationsDashboard({
 }: Props) {
   const total = current?.operational.totalOrders ?? 0;
   const completedRevenue = current?.commercial.totalRevenue ?? 0;
+  const food99EstimatedNetReceivable = current?.commercial.food99EstimatedNetReceivable ?? null;
+  const food99BillEntryCount = current?.commercial.food99BillEntryCount ?? 0;
   const averageTicket = current?.commercial.averageTicket ?? 0;
   const cancellationRate = current?.operational.cancellationRate ?? 0;
   const preparation = current?.operational.averagePreparationTimeMinutes ?? 0;
@@ -109,8 +111,9 @@ export function OperationsDashboard({
 
   const kpis = [
     { label: 'Pedidos', value: number(total), icon: ShoppingBag, comparison: calculateComparison(total, previous?.operational.totalOrders), accent: 'via-sky-500' },
-    { label: 'Receita concluída', value: money(completedRevenue), icon: Banknote, comparison: calculateComparison(completedRevenue, previous?.commercial.totalRevenue), accent: 'via-emerald-500' },
-    { label: 'Ticket concluído', value: money(averageTicket), icon: ReceiptText, comparison: calculateComparison(averageTicket, previous?.commercial.averageTicket), accent: 'via-indigo-500' },
+    { label: 'Vendas brutas', value: money(completedRevenue), icon: Banknote, comparison: calculateComparison(completedRevenue, previous?.commercial.totalRevenue), accent: 'via-emerald-500' },
+    { label: 'Líquido 99Food', value: food99EstimatedNetReceivable === null ? 'A confirmar' : money(food99EstimatedNetReceivable), icon: Banknote, comparison: food99EstimatedNetReceivable === null || previous?.commercial.food99EstimatedNetReceivable == null ? null : calculateComparison(food99EstimatedNetReceivable, previous.commercial.food99EstimatedNetReceivable), accent: 'via-teal-500' },
+    { label: 'Ticket bruto', value: money(averageTicket), icon: ReceiptText, comparison: calculateComparison(averageTicket, previous?.commercial.averageTicket), accent: 'via-indigo-500' },
     { label: 'Cancelamentos', value: `${cancellationRate.toFixed(1)}%`, icon: XCircle, comparison: calculateComparison(cancellationRate, previous?.operational.cancellationRate), inverse: true, accent: 'via-rose-500' },
     { label: 'Preparo médio', value: `${Math.round(preparation)} min`, icon: ChefHat, comparison: calculateComparison(preparation, previous?.operational.averagePreparationTimeMinutes), inverse: true, accent: 'via-amber-500' },
     { label: 'Em andamento', value: number(inProgress), icon: Clock3, comparison: calculateComparison(inProgress, getOrdersInProgress(previous)), accent: 'via-violet-500' },
@@ -157,7 +160,7 @@ export function OperationsDashboard({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         {kpis.map((item) => <Kpi key={item.label} {...item} />)}
       </div>
 
@@ -221,14 +224,31 @@ export function OperationsDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        <Panel title="Receita concluída" subtitle="Somente pedidos concluídos" className="xl:col-span-1">
+        <Panel title="Vendas concluídas (brutas)" subtitle="Total cobrado dos clientes em pedidos concluídos" className="xl:col-span-1">
           <div className="p-4">
             <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{money(completedRevenue)}</p>
             <div className="mt-1"><Comparison value={calculateComparison(completedRevenue, previous?.commercial.totalRevenue)} /></div>
             <div className="mt-4 rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-4">
               <div className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /><p className="text-xs font-semibold">Detalhamento por hora indisponível</p></div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">A API atual não fornece receita horária. O total acima permanece preciso.</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Este total é bruto. Taxas e repasses de marketplace são apurados separadamente.</p>
             </div>
+          </div>
+        </Panel>
+
+        <Panel title="Ganhos líquidos estimados 99Food" subtitle="Bill Data conciliado no período financeiro">
+          <div className="p-4">
+            {food99EstimatedNetReceivable === null ? (
+              <div className="rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-4">
+                <p className="text-sm font-bold text-foreground">Dados financeiros 99Food indisponíveis neste período</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Sincronize o Bill Data após a liberação financeira/WhiteList. O Dashboard não estima taxas nem mostra R$ 0,00 sem dados conciliados.</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{money(food99EstimatedNetReceivable)}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{food99BillEntryCount} lançamento{food99BillEntryCount === 1 ? '' : 's'} financeiro{food99BillEntryCount === 1 ? '' : 's'} conciliado{food99BillEntryCount === 1 ? '' : 's'}.</p>
+                <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">Valor estimado a receber após taxas, subsídios, ajustes e reembolsos. Não representa saldo recebido; este depende da liquidação semanal.</p>
+              </>
+            )}
           </div>
         </Panel>
 
