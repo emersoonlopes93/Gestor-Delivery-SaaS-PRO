@@ -13,12 +13,16 @@ import {
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
   useFood99AuthorizationUrl,
+  useMarketplaceCatalogMappings,
+  useMarketplaceCatalogMappingCandidates,
+  useUpsertMarketplaceCatalogMapping,
 } from '../marketplace/hooks';
 
 let ifoodEnabled = true;
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQuery: () => ({ data: [] }),
 }));
 vi.mock('../marketplace/hooks', () => ({
   useBillingPreview: vi.fn(),
@@ -32,6 +36,9 @@ vi.mock('../marketplace/hooks', () => ({
   useReprocessMarketplaceEvent: vi.fn(),
   useReprocessMarketplaceOrder: vi.fn(),
   useFood99AuthorizationUrl: vi.fn(),
+  useMarketplaceCatalogMappings: vi.fn(),
+  useMarketplaceCatalogMappingCandidates: vi.fn(),
+  useUpsertMarketplaceCatalogMapping: vi.fn(),
 }));
 vi.mock('../../hooks/useTenantCapabilities', () => ({
   useTenantCapabilities: () => ({ isFeatureEnabled: (featureKey: string) => featureKey !== 'ifood_marketplace' || ifoodEnabled }),
@@ -73,6 +80,9 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useReprocessMarketplaceEvent).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceOrder).mockReturnValue(mutation() as never);
     vi.mocked(useFood99AuthorizationUrl).mockReturnValue(mutation() as never);
+    vi.mocked(useMarketplaceCatalogMappings).mockReturnValue({ data: [], isLoading: false } as never);
+    vi.mocked(useMarketplaceCatalogMappingCandidates).mockReturnValue({ data: [], isLoading: false } as never);
+    vi.mocked(useUpsertMarketplaceCatalogMapping).mockReturnValue(mutation() as never);
   });
 
   it('renders multiple merchants with independent status and actions without secrets', () => {

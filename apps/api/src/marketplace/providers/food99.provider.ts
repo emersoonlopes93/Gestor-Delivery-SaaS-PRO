@@ -382,7 +382,9 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const unitPrice = this.minorMoney(item.sku_price) ?? 0;
     const totalPrice = this.minorMoney(item.total_price) ?? this.roundMoney(unitPrice * quantity);
     return {
-      externalItemId: this.readIdentifier(item, ['item_id', 'app_item_id']),
+      // `app_item_id` is the merchant-owned persistent catalog identity. The
+      // 99Food internal item_id can change when a catalog item is recreated.
+      externalItemId: this.readIdentifier(item, ['app_item_id', 'item_id']),
       name: this.readString(item, ['name']) ?? `Item ${index + 1}`,
       quantity,
       unitPrice,
@@ -438,7 +440,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     if (typeof value !== 'string' || !value.trim().startsWith('{')) return null;
     try {
       const identifiersPreserved = value.replace(
-        /("(?:app_id|order_id|shop_id|uid)"\s*:\s*)(-?\d{16,})/g,
+        /("(?:app_id|app_shop_id|order_id|shop_id|timestamp|uid)"\s*:\s*)(-?\d{16,})/g,
         '$1"$2"',
       );
       return this.asRecord(JSON.parse(identifiersPreserved) as unknown);
@@ -656,7 +658,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       const source = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
       try {
         const identifiersPreserved = source.replace(
-          /("(?:app_id|order_id|shop_id)"\s*:\s*)(-?\d+)/g,
+          /("(?:app_id|app_shop_id|order_id|shop_id|timestamp)"\s*:\s*)(-?\d+)/g,
           '$1"$2"',
         );
         const parsed: unknown = JSON.parse(identifiersPreserved);

@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import type { TenantJwtPayload } from '@gestor/types';
-import { MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
+import { MarketplaceCatalogMappingStatus, MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators';
@@ -14,6 +14,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceStatusSyncService } from '../services/marketplace-status-sync.service';
 import { Food99HttpClientService } from '../services/food99-http-client.service';
 import { FeatureControlService } from '../../feature-control/feature-control.service';
+import { MarketplaceCatalogMappingService } from '../services/marketplace-catalog-mapping.service';
 import { randomUUID } from 'crypto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
@@ -31,7 +32,37 @@ export class MarketplaceTenantController {
     private readonly statusSyncService: MarketplaceStatusSyncService,
     private readonly food99Client: Food99HttpClientService,
     private readonly featureControl: FeatureControlService,
+    private readonly catalogMappings: MarketplaceCatalogMappingService,
   ) {}
+
+  @Get('catalog-mappings')
+  @RequirePermissions('settings.manage')
+  async listCatalogMappings(@Req() req: TenantRequest, @Query('connectionId') connectionId?: string) {
+    return this.catalogMappings.list(req.user.tenantId, connectionId?.trim() || undefined);
+  }
+
+  @Get('catalog-mapping-candidates')
+  @RequirePermissions('settings.manage')
+  async listCatalogMappingCandidates(@Req() req: TenantRequest) {
+    return this.catalogMappings.listUnmappedItems(req.user.tenantId);
+  }
+
+  @Post('catalog-mappings')
+  @RequirePermissions('settings.manage')
+  async upsertCatalogMapping(
+    @Req() req: TenantRequest,
+    @Body() body: { connectionId?: string; externalItemId?: string; externalItemName?: string; externalReferenceId?: string; productId?: string; status?: MarketplaceCatalogMappingStatus },
+  ) {
+    if (!body.connectionId || !body.externalItemId || !body.productId) throw new BadRequestException('connectionId, externalItemId and productId are required.');
+    return this.catalogMappings.upsert(req.user.tenantId, {
+      connectionId: body.connectionId,
+      externalItemId: body.externalItemId,
+      externalItemName: body.externalItemName,
+      externalReferenceId: body.externalReferenceId,
+      productId: body.productId,
+      status: body.status,
+    });
+  }
 
   @Post('99food/authorization-url')
   @RequirePermissions('settings.manage')

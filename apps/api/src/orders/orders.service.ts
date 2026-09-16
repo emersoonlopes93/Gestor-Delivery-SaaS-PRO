@@ -80,6 +80,7 @@ export type OrderStatusTransitionPolicy = 'canonical' | 'food99_authoritative';
 function isFood99AuthoritativeTransitionAllowed(from: OrderStatus, to: OrderStatus): boolean {
   if (from === OrderStatus.completed || from === OrderStatus.cancelled) return false;
   if (to === OrderStatus.completed || to === OrderStatus.cancelled) return true;
+  if (to === OrderStatus.out_for_delivery) return true;
   return from === OrderStatus.pending
     && (to === OrderStatus.ready_for_pickup || to === OrderStatus.ready_for_delivery);
 }

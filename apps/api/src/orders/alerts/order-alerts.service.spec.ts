@@ -83,4 +83,28 @@ describe('OrderAlertsService', () => {
 
     expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ruleKey: 'ORDER_SYNC_FAILED', severity: OrderAlertSeverity.CRITICAL }) }));
   });
+
+  it('creates one active courier-arrived alert only for provider-owned 99Food logistics', async () => {
+    const { prisma, service } = setup();
+    prisma.order.findMany.mockResolvedValue([{
+      id: 'order-99', orderNumber: '99', status: OrderStatus.ready_for_delivery, createdAt: now,
+      marketplaceOrders: [{
+        operations: [], divergences: [], provider: 'FOOD_99', deliveryOwnership: 'PROVIDER',
+        normalizedPayload: { logistics: { deliveryStatus: '130' } },
+      }],
+    }]);
+    prisma.orderAlert.findFirst.mockResolvedValue(null);
+    prisma.orderAlert.create.mockResolvedValue({ id: 'alert-99' });
+    prisma.orderAlert.findMany.mockResolvedValue([]);
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        orderId: 'order-99',
+        ruleKey: 'MARKETPLACE_COURIER_ARRIVED',
+        fingerprint: 'order-99:MARKETPLACE_COURIER_ARRIVED',
+      }),
+    }));
+  });
 });

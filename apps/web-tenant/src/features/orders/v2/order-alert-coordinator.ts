@@ -14,15 +14,16 @@ export type OperationalAlertForAnnouncement = {
 };
 
 export const WAITING_ACCEPTANCE_RULE_KEY = 'ORDER_WAITING_ACTION';
+export const MARKETPLACE_COURIER_ARRIVED_RULE_KEY = 'MARKETPLACE_COURIER_ARRIVED';
 
 /** Acknowledgement is informational for a pending acceptance, never a resolution. */
 export function shouldAnnounceOperationalAlert(alert: OperationalAlertForAnnouncement): boolean {
   return alert.severity !== 'INFO'
-    && (!alert.acknowledgedAt || alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY);
+    && (!alert.acknowledgedAt || alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY || alert.ruleKey === MARKETPLACE_COURIER_ARRIVED_RULE_KEY);
 }
 
 export function getOperationalAlertRepeatIntervalMs(alert: OperationalAlertForAnnouncement): number {
-  return alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY || alert.severity === 'CRITICAL'
+  return alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY || alert.ruleKey === MARKETPLACE_COURIER_ARRIVED_RULE_KEY || alert.severity === 'CRITICAL'
     ? 30_000
     : 60_000;
 }
@@ -50,7 +51,10 @@ export class OrderAlertCoordinator {
     this.seen.set(eventId, safeCreatedAt);
     const rawDisplayNumber = getOperationalDisplayNumber(event.title ?? '');
     const displayNumber = rawDisplayNumber ? normalizeOrderNumberForSpeech(rawDisplayNumber) : null;
-    const phrase = event.type === 'order.created'
+    const courierPhrase = event.type === 'order.alert' && /entregador da 99food chegou/i.test(event.title ?? '')
+      ? displayNumber ? `Entregador da 99Food chegou para o pedido ${displayNumber}.` : 'O entregador da 99Food chegou.'
+      : null;
+    const phrase = courierPhrase ?? (event.type === 'order.created'
       ? displayNumber ? `Novo pedido ${displayNumber} recebido.` : 'Novo pedido recebido.'
       : event.type === 'order.ready'
         ? displayNumber ? `Pedido ${displayNumber} pronto para a próxima etapa.` : 'Pedido pronto para a próxima etapa.'
@@ -58,7 +62,7 @@ export class OrderAlertCoordinator {
           ? displayNumber ? `Pedido ${displayNumber} cancelado.` : 'Um pedido foi cancelado.'
           : event.type === 'order.alert' && /aguardando ação/i.test(event.title ?? '')
             ? displayNumber ? `Pedido ${displayNumber} aguarda aceite.` : 'Um pedido aguarda aceite.'
-            : 'Atualização operacional disponível.';
+            : 'Atualização operacional disponível.');
     this.queue.push({ phrase, priority: PRIORITY[event.priority], createdAt: safeCreatedAt });
     this.queue.sort((left, right) => right.priority - left.priority || left.createdAt - right.createdAt);
     if (!this.playing) void this.flush(provider);

@@ -8,6 +8,7 @@ export const ORDER_ALERT_RULES = {
   ORDER_DELAYED: 'ORDER_DELAYED',
   ORDER_SYNC_FAILED: 'ORDER_SYNC_FAILED',
   PROVIDER_RECONCILIATION_FAILED: 'PROVIDER_RECONCILIATION_FAILED',
+  MARKETPLACE_COURIER_ARRIVED: 'MARKETPLACE_COURIER_ARRIVED',
 } as const;
 
 type RuleKey = (typeof ORDER_ALERT_RULES)[keyof typeof ORDER_ALERT_RULES];
@@ -63,6 +64,9 @@ export class OrderAlertsService {
         marketplaceOrders: { select: {
           operations: { where: { status: { in: [MarketplaceOperationStatus.FAILED, MarketplaceOperationStatus.INTERVENTION_REQUIRED] } }, select: { id: true, status: true } },
           divergences: { where: { status: MarketplaceDivergenceStatus.OPEN }, select: { id: true } },
+          provider: true,
+          deliveryOwnership: true,
+          normalizedPayload: true,
         } },
       },
     });
@@ -85,6 +89,18 @@ export class OrderAlertsService {
         title: `Divergência de reconciliação no pedido #${order.orderNumber}`, message: 'A reconciliação do provider exige verificação operacional.', metadata: { orderNumber: order.orderNumber },
       });
     }
+    for (const order of orders) {
+      if (order.marketplaceOrders.some((marketplaceOrder) => this.isFood99CourierAtRestaurant(marketplaceOrder))) {
+        candidates.push({
+          orderId: order.id,
+          ruleKey: ORDER_ALERT_RULES.MARKETPLACE_COURIER_ARRIVED,
+          severity: OrderAlertSeverity.ATTENTION,
+          title: `Entregador da 99Food chegou para o pedido #${order.orderNumber}`,
+          message: 'O entregador parceiro chegou ao estabelecimento e aguarda a retirada.',
+          metadata: { orderNumber: order.orderNumber, provider: '99food' },
+        });
+      }
+    }
     const activeKeys = new Set(candidates.map((candidate) => this.fingerprint(candidate)));
     for (const candidate of candidates) await this.upsertActive(tenantId, candidate);
     const active = await this.prisma.orderAlert.findMany({ where: { tenantId, state: OrderAlertState.ACTIVE }, select: { id: true, fingerprint: true } });
@@ -95,6 +111,19 @@ export class OrderAlertsService {
   }
 
   private fingerprint(candidate: Candidate) { return `${candidate.orderId}:${candidate.ruleKey}`; }
+
+  private isFood99CourierAtRestaurant(marketplaceOrder: {
+    provider: string;
+    deliveryOwnership: string;
+    normalizedPayload: Prisma.JsonValue;
+  }): boolean {
+    if (marketplaceOrder.provider !== 'FOOD_99' || marketplaceOrder.deliveryOwnership !== 'PROVIDER') return false;
+    const payload = marketplaceOrder.normalizedPayload;
+    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
+    const logistics = (payload as Record<string, unknown>).logistics;
+    if (typeof logistics !== 'object' || logistics === null || Array.isArray(logistics)) return false;
+    return (logistics as Record<string, unknown>).deliveryStatus === '130';
+  }
 
   private async upsertActive(tenantId: string, candidate: Candidate) {
     const fingerprint = this.fingerprint(candidate);

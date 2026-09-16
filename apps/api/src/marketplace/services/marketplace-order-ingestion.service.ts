@@ -2,6 +2,7 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import {
   MarketplaceDivergenceType,
+  MarketplaceDeliveryOwnership,
   MarketplaceEventStatus,
   MarketplaceOperationStatus,
   MarketplaceOperationType,
@@ -22,6 +23,9 @@ import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { MarketplaceStatusSyncService } from './marketplace-status-sync.service';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
 import { buildMarketplaceOrderIdempotencyKey } from '../marketplace-idempotency';
+import { MarketplaceCatalogMappingService } from './marketplace-catalog-mapping.service';
+import { TheoreticalStockService } from '../../inventory/theoretical-stock.service';
+import { OrderAlertsService } from '../../orders/alerts/order-alerts.service';
 
 @Injectable()
 export class MarketplaceOrderIngestionService {
@@ -36,6 +40,9 @@ export class MarketplaceOrderIngestionService {
     private readonly ordersService: OrdersService,
     private readonly statusSyncService: MarketplaceStatusSyncService,
     private readonly divergenceService: MarketplaceDivergenceService,
+    private readonly catalogMappings: MarketplaceCatalogMappingService = {} as MarketplaceCatalogMappingService,
+    private readonly theoreticalStockService: TheoreticalStockService = {} as TheoreticalStockService,
+    private readonly orderAlertsService: OrderAlertsService = {} as OrderAlertsService,
   ) {}
 
   async processInboxEvent(eventInboxId: string) {
@@ -120,7 +127,7 @@ export class MarketplaceOrderIngestionService {
         return { processed: true, ignored: true, reason: 'out_of_order' };
       }
 
-      if (existingOrder && this.isNativeFood99LifecycleTopic(inbox.provider, inbox.topic)) {
+      if (existingOrder && this.isFood99WebhookLifecycleTopic(inbox.provider, inbox.topic)) {
         await this.prisma.marketplaceOrder.updateMany({
           where: { connectionId: connection.id, provider: inbox.provider, externalOrderId },
           data: {
@@ -131,7 +138,7 @@ export class MarketplaceOrderIngestionService {
             lastSyncedAt: new Date(),
           },
         });
-        await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic);
+        await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic, inbox.rawPayload);
         await this.markInboxProcessed(inbox.id);
         return { processed: true, lifecycleOnly: true };
       }
@@ -146,12 +153,13 @@ export class MarketplaceOrderIngestionService {
         connection,
         externalOrder,
       });
-      this.assertCompleteFood99Snapshot(normalizedOrder);
+      const catalogResolution = await this.resolveCatalogProducts(normalizedOrder);
+      this.assertCompleteFood99Snapshot(catalogResolution.order);
 
       const marketplaceOrder = await this.upsertMarketplaceOrder(
         connection.tenantId,
         connection.id,
-        normalizedOrder,
+        catalogResolution.order,
         {
           id: inbox.eventId,
           createdAt: inbox.eventCreatedAt,
@@ -159,6 +167,21 @@ export class MarketplaceOrderIngestionService {
           topic: inbox.topic,
         },
       );
+      if (catalogResolution.unmappedExternalItemIds.length > 0) {
+        await this.divergenceService.record({
+          tenantId: connection.tenantId,
+          marketplaceOrderId: marketplaceOrder.id,
+          internalOrderId: marketplaceOrder.internalOrderId,
+          provider: marketplaceOrder.provider,
+          externalOrderId,
+          type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
+          localState: marketplaceOrder.statusInternal,
+          remoteState: marketplaceOrder.statusExternal,
+          reason: `Marketplace catalog items are unmapped: ${catalogResolution.unmappedExternalItemIds.join(', ')}`,
+          recommendedAction: 'Map each marketplace app item ID to a tenant catalog product before inventory can be depleted.',
+          correlationId: inbox.correlationId,
+        });
+      }
       if (marketplaceOrder.confirmationDeadlineAt) {
         const remainingMs = marketplaceOrder.confirmationDeadlineAt.getTime() - Date.now();
         if (remainingMs <= 2 * 60 * 1000) {
@@ -194,13 +217,13 @@ export class MarketplaceOrderIngestionService {
         }
       }
       if (!marketplaceOrder.internalOrderId) {
-        const internalOrderId = await this.createInternalOrderFromNormalized(normalizedOrder);
+        const internalOrderId = await this.createInternalOrderFromNormalized(catalogResolution.order);
         await this.prisma.marketplaceOrder.update({
           where: {
             connectionId_provider_externalOrderId: {
               connectionId: connection.id,
-              provider: normalizedOrder.provider,
-              externalOrderId: normalizedOrder.externalOrderId,
+              provider: catalogResolution.order.provider,
+              externalOrderId: catalogResolution.order.externalOrderId,
             },
           },
           data: {
@@ -230,7 +253,7 @@ export class MarketplaceOrderIngestionService {
         }
       }
 
-      await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic);
+      await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic, inbox.rawPayload);
 
       await this.markInboxProcessed(inbox.id);
     } catch (error) {
@@ -251,12 +274,13 @@ export class MarketplaceOrderIngestionService {
       const repaired = record.provider === MarketplaceProvider.FOOD_99
         ? await this.repairIncompleteFood99Orders(1, tenantId, record.id)
         : 0;
-      if (this.isNativeFood99LifecycleTopic(record.provider, record.lastExternalEventTopic)) {
+      if (this.isFood99WebhookLifecycleTopic(record.provider, record.lastExternalEventTopic)) {
         await this.applyLifecycleForInbox(
           tenantId,
           record.connectionId,
           record.externalOrderId,
           record.lastExternalEventTopic,
+          record.rawPayload,
         );
         return {
           success: true,
@@ -276,7 +300,8 @@ export class MarketplaceOrderIngestionService {
       connection: record.connection,
       externalOrder: this.asRecord(record.rawPayload) ?? {},
     });
-    const internalOrderId = await this.createInternalOrderFromNormalized(normalized);
+    const catalogResolution = await this.resolveCatalogProducts(normalized);
+    const internalOrderId = await this.createInternalOrderFromNormalized(catalogResolution.order);
     await this.prisma.marketplaceOrder.update({
       where: { id: record.id },
       data: {
@@ -299,14 +324,15 @@ export class MarketplaceOrderIngestionService {
         tenantId: true,
         externalOrderId: true,
         topic: true,
+        rawPayload: true,
       },
     });
     if (!inbox) throw new BadRequestException('Marketplace event inbox not found.');
     if (!inbox.connectionId || !inbox.tenantId || !inbox.externalOrderId
-      || !this.isNativeFood99LifecycleTopic(inbox.provider, inbox.topic)) {
+      || !this.isFood99WebhookLifecycleTopic(inbox.provider, inbox.topic)) {
       return { reapplied: false, reason: 'not_replayable_lifecycle_event' };
     }
-    await this.applyLifecycleForInbox(inbox.tenantId, inbox.connectionId, inbox.externalOrderId, inbox.topic);
+    await this.applyLifecycleForInbox(inbox.tenantId, inbox.connectionId, inbox.externalOrderId, inbox.topic, inbox.rawPayload);
     return { reapplied: true, reason: 'lifecycle_reapplied' };
   }
 
@@ -450,9 +476,10 @@ export class MarketplaceOrderIngestionService {
     connectionId: string,
     externalOrderId: string,
     topic?: string | null,
+    rawPayload?: Prisma.JsonValue,
   ): Promise<void> {
     await this.statusSyncService.reconcileExternalEvent({ tenantId, connectionId, externalOrderId, topic });
-    await this.applyExternalLifecycleEvent(tenantId, connectionId, externalOrderId, topic);
+    await this.applyExternalLifecycleEvent(tenantId, connectionId, externalOrderId, topic, rawPayload);
   }
 
   private async markInboxProcessed(inboxId: string): Promise<void> {
@@ -470,6 +497,14 @@ export class MarketplaceOrderIngestionService {
   private isNativeFood99LifecycleTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
     if (provider !== MarketplaceProvider.FOOD_99) return false;
     return ['ORDERCONFIRM', 'ORDERREADY', 'ORDERCANCEL', 'ORDERFINISH'].includes(topic?.trim().toUpperCase() ?? '');
+  }
+
+  private isFood99DeliveryStatusTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
+    return provider === MarketplaceProvider.FOOD_99 && topic?.trim().toUpperCase() === 'DELIVERYSTATUS';
+  }
+
+  private isFood99WebhookLifecycleTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
+    return this.isNativeFood99LifecycleTopic(provider, topic) || this.isFood99DeliveryStatusTopic(provider, topic);
   }
 
   private async upsertMarketplaceOrder(
@@ -654,6 +689,8 @@ export class MarketplaceOrderIngestionService {
         });
       }
 
+      await this.theoreticalStockService.processOrderDepletionInTransaction(tx, tenantId, created.id);
+
       if (normalized.fulfillmentType === 'delivery' && normalized.deliveryAddress) {
         await tx.orderDeliveryAddress.create({
           data: {
@@ -689,6 +726,29 @@ export class MarketplaceOrderIngestionService {
     return order.id;
   }
 
+  private async resolveCatalogProducts(normalized: NormalizedMarketplaceOrder): Promise<{
+    order: NormalizedMarketplaceOrder;
+    unmappedExternalItemIds: string[];
+  }> {
+    const externalItemIds = normalized.items
+      .map((item) => item.externalItemId?.trim() ?? '')
+      .filter(Boolean);
+    const productIds = await this.catalogMappings.resolveProducts(
+      normalized.connection.tenantId,
+      normalized.connection.id,
+      normalized.provider,
+      externalItemIds,
+    );
+    const unmappedExternalItemIds: string[] = [];
+    const items = normalized.items.map((item) => {
+      const externalItemId = item.externalItemId?.trim() ?? '';
+      const productId = externalItemId ? productIds.get(externalItemId) ?? null : null;
+      if (externalItemId && !productId) unmappedExternalItemIds.push(externalItemId);
+      return { ...item, productId };
+    });
+    return { order: { ...normalized, items }, unmappedExternalItemIds };
+  }
+
   private resolveInitialStatus(connection: { settingsJson?: Prisma.JsonValue | null }): OrderStatus {
     const settings = this.asRecord(connection.settingsJson);
     const configured = settings?.importAsStatus;
@@ -720,6 +780,7 @@ export class MarketplaceOrderIngestionService {
     connectionId: string,
     externalOrderId: string,
     topic?: string | null,
+    rawPayload?: Prisma.JsonValue,
   ): Promise<void> {
     const normalizedTopic = topic?.trim().toUpperCase();
     const lifecycleKind = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED' || normalizedTopic === 'ORDERCONFIRM'
@@ -741,6 +802,10 @@ export class MarketplaceOrderIngestionService {
       select: { id: true, internalOrderId: true, provider: true },
     });
     if (!marketplaceOrder?.internalOrderId) return;
+    if (this.isFood99DeliveryStatusTopic(marketplaceOrder.provider, topic) && rawPayload) {
+      await this.applyFood99DeliveryStatus(tenantId, connectionId, externalOrderId, rawPayload);
+      return;
+    }
     const order = await this.prisma.order.findFirst({
       where: { id: marketplaceOrder.internalOrderId, tenantId },
       select: { status: true, fulfillmentType: true },
@@ -846,6 +911,93 @@ export class MarketplaceOrderIngestionService {
     });
   }
 
+  private async applyFood99DeliveryStatus(
+    tenantId: string,
+    connectionId: string,
+    externalOrderId: string,
+    rawPayload: Prisma.JsonValue,
+  ): Promise<void> {
+    const data = this.asRecord(rawPayload)?.data;
+    const delivery = this.asRecord(data);
+    const deliveryStatus = this.readRecordString(delivery, ['delivery_status']);
+    if (!deliveryStatus || !['120', '130', '140', '150', '160', '170', '180'].includes(deliveryStatus)) return;
+
+    const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
+      where: { tenantId, connectionId, provider: MarketplaceProvider.FOOD_99, externalOrderId },
+      select: {
+        id: true,
+        internalOrderId: true,
+        deliveryOwnership: true,
+        normalizedPayload: true,
+      },
+    });
+    if (!marketplaceOrder?.internalOrderId) return;
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: marketplaceOrder.internalOrderId, tenantId },
+      select: { status: true, fulfillmentType: true },
+    });
+    if (!order) return;
+
+    const previousPayload = this.asRecord(marketplaceOrder.normalizedPayload) ?? {};
+    const previousLogistics = this.asRecord(previousPayload.logistics) ?? {};
+    const logistics = {
+      ...previousLogistics,
+      deliveryStatus,
+      riderName: this.readRecordString(delivery, ['rider_name']),
+      riderPhone: this.readRecordString(delivery, ['rider_phone']),
+      riderToBusinessEta: this.readRecordString(delivery, ['rider_to_B_ETA']),
+      updatedAt: new Date().toISOString(),
+    };
+    await this.prisma.marketplaceOrder.updateMany({
+      where: { id: marketplaceOrder.id, tenantId },
+      data: { normalizedPayload: this.toInputJsonValue({ ...previousPayload, logistics }), lastSyncedAt: new Date() },
+    });
+
+    if (order.status === OrderStatus.completed || order.status === OrderStatus.cancelled) {
+      await this.orderAlertsService.refreshTenant(tenantId);
+      return;
+    }
+
+    if (deliveryStatus === '140' && marketplaceOrder.deliveryOwnership === MarketplaceDeliveryOwnership.PROVIDER) {
+      await this.reconcileFood99AuthoritativeStatus({
+        tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        externalOrderId,
+        topic: 'DELIVERYSTATUS:140',
+        currentStatus: order.status,
+        fulfillmentType: order.fulfillmentType,
+      }, OrderStatus.out_for_delivery, '99Food confirmou retirada pelo entregador parceiro.');
+    } else if (deliveryStatus === '160') {
+      await this.reconcileFood99AuthoritativeStatus({
+        tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        externalOrderId,
+        topic: 'DELIVERYSTATUS:160',
+        currentStatus: order.status,
+        fulfillmentType: order.fulfillmentType,
+      }, OrderStatus.completed, '99Food confirmou a entrega concluida.');
+    } else if (deliveryStatus === '170') {
+      await this.divergenceService.record({
+        tenantId,
+        marketplaceOrderId: marketplaceOrder.id,
+        internalOrderId: marketplaceOrder.internalOrderId,
+        provider: MarketplaceProvider.FOOD_99,
+        externalOrderId,
+        type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
+        localState: order.status,
+        remoteState: 'DELIVERY_STATUS_170',
+        reason: '99Food cancelou somente a entrega; o pedido comercial foi preservado para reconciliacao.',
+        recommendedAction: 'Confirme a nova logistica ou resolva a entrega manualmente antes de cancelar o pedido comercial.',
+        correlationId: `food99:${externalOrderId}:delivery:170`,
+      });
+    }
+
+    await this.orderAlertsService.refreshTenant(tenantId);
+  }
+
   private isFood99TerminalTopic(topic?: string | null): boolean {
     const normalized = topic?.trim().toUpperCase();
     return normalized === 'ORDERFINISH' || normalized === 'ORDERCANCEL';
@@ -861,7 +1013,7 @@ export class MarketplaceOrderIngestionService {
       select: { id: true, statusInternal: true },
     });
     if (exact) return exact;
-    if (!/^\d+$/.test(externalOrderId)) return null;
+    if (!/^\d+$/.test(externalOrderId) || !Number.isSafeInteger(Number(externalOrderId))) return null;
 
     const candidates = await this.prisma.marketplaceOrder.findMany({
       where: { tenantId, connectionId, provider: MarketplaceProvider.FOOD_99, internalOrderId: { not: null } },
@@ -870,6 +1022,7 @@ export class MarketplaceOrderIngestionService {
     });
     const roundedMatches = candidates.filter((candidate) => (
       /^\d+$/.test(candidate.externalOrderId)
+      && Number.isSafeInteger(Number(candidate.externalOrderId))
       && Number(candidate.externalOrderId) === Number(externalOrderId)
     ));
     return roundedMatches.length === 1 ? roundedMatches[0] : null;
@@ -1076,6 +1229,9 @@ export class MarketplaceOrderIngestionService {
           targetStatus,
           transitionPolicy: 'food99_authoritative',
         });
+        if (targetStatus === OrderStatus.cancelled) {
+          await this.theoreticalStockService.reverseOrderDepletionInTransaction(tx, input.tenantId, input.internalOrderId);
+        }
         await tx.orderTimeline.create({
           data: {
             tenantId: input.tenantId,
@@ -1142,9 +1298,15 @@ export class MarketplaceOrderIngestionService {
   private readString(value: Prisma.JsonValue, keys: string[]): string | null {
     const record = this.asRecord(value);
     if (!record) return null;
+    return this.readRecordString(record, keys);
+  }
+
+  private readRecordString(record: Record<string, unknown> | null, keys: string[]): string | null {
+    if (!record) return null;
     for (const key of keys) {
       const candidate = record[key];
       if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+      if (typeof candidate === 'number' && Number.isSafeInteger(candidate)) return String(candidate);
     }
     return null;
   }

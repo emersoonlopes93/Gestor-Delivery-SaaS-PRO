@@ -54,6 +54,36 @@ export type MarketplaceOrderDTO = {
 
 export type MarketplaceStatusDTO = MarketplaceConnectionDTO | null;
 
+export type MarketplaceCatalogMappingDTO = {
+  id: string;
+  connectionId: string;
+  provider: string;
+  externalItemId: string;
+  externalItemName: string | null;
+  externalReferenceId: string | null;
+  productId: string;
+  status: 'ACTIVE' | 'DISABLED';
+  connection: Pick<MarketplaceConnectionDTO, 'provider' | 'externalStoreId' | 'displayName'>;
+  product: { id: string; name: string; sku: string | null };
+};
+
+export type UpsertMarketplaceCatalogMappingInput = {
+  connectionId: string;
+  externalItemId: string;
+  externalItemName?: string;
+  externalReferenceId?: string;
+  productId: string;
+  status?: 'ACTIVE' | 'DISABLED';
+};
+
+export type MarketplaceCatalogMappingCandidateDTO = {
+  connectionId: string;
+  provider: string;
+  externalItemId: string;
+  externalItemName: string | null;
+  connection: { displayName: string | null; externalStoreId: string | null };
+};
+
 export type ConnectMarketplaceManualInput = {
   externalMerchantId?: string;
   externalStoreId?: string;
@@ -157,6 +187,41 @@ export function useMarketplaceEvents() {
     queryFn: async () => {
       const res = await api.get<MarketplaceEventInboxDTO[]>('/marketplaces/events');
       return res.data ?? [];
+    },
+  });
+}
+
+export function useMarketplaceCatalogMappings() {
+  return useQuery({
+    queryKey: ['marketplace-catalog-mappings'],
+    queryFn: async () => {
+      const res = await api.get<MarketplaceCatalogMappingDTO[]>('/marketplaces/catalog-mappings');
+      return res.data ?? [];
+    },
+  });
+}
+
+export function useMarketplaceCatalogMappingCandidates() {
+  return useQuery({
+    queryKey: ['marketplace-catalog-mapping-candidates'],
+    queryFn: async () => {
+      const res = await api.get<MarketplaceCatalogMappingCandidateDTO[]>('/marketplaces/catalog-mapping-candidates');
+      return res.data ?? [];
+    },
+  });
+}
+
+export function useUpsertMarketplaceCatalogMapping() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpsertMarketplaceCatalogMappingInput) => {
+      const res = await api.post<MarketplaceCatalogMappingDTO>('/marketplaces/catalog-mappings', input);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-catalog-mappings'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-catalog-mapping-candidates'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-orders'] });
     },
   });
 }
