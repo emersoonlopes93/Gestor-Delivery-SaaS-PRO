@@ -36,6 +36,20 @@ describe('Order Manager V2 voice privacy', () => {
     expect(shouldAnnounceOperationalAlert({ ruleKey: 'ORDER_DELAYED', acknowledgedAt: '2026-09-15T12:00:00.000Z', severity: 'ATTENTION' })).toBe(false);
   });
 
+  it('keeps the courier-arrived condition audible after acknowledgement without rider data', async () => {
+    const courierAcknowledged = { ruleKey: 'MARKETPLACE_COURIER_ARRIVED', acknowledgedAt: '2026-09-15T12:00:00.000Z', severity: 'ATTENTION' as const };
+    expect(shouldAnnounceOperationalAlert(courierAcknowledged)).toBe(true);
+    expect(getOperationalAlertRepeatIntervalMs(courierAcknowledged)).toBe(30_000);
+
+    const phrases: string[] = [];
+    const coordinator = new OrderAlertCoordinator();
+    coordinator.enqueue({
+      id: 'courier-101', type: 'order.alert', title: 'Entregador da 99Food chegou para o pedido #101', priority: 'high', createdAt: '2026-09-15T12:00:00.000Z',
+    }, { speak: async (phrase: string) => { phrases.push(phrase); } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(phrases).toEqual(['Entregador da 99Food chegou para o pedido 101.']);
+  });
+
   it('uses the operational waiting-acceptance voice without customer data', async () => {
     const phrases: string[] = [];
     const coordinator = new OrderAlertCoordinator();

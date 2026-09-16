@@ -30,6 +30,8 @@ import { Food99PollingService } from './services/food99-polling.service';
 import { Food99FinancialController } from './controllers/food99-financial.controller';
 import { Food99FinancialClientService } from './services/food99-financial-client.service';
 import { Food99FinancialReconciliationService } from './services/food99-financial-reconciliation.service';
+import { MarketplaceCatalogMappingService } from './services/marketplace-catalog-mapping.service';
+import { InventoryModule } from '../inventory/inventory.module';
 
 const enableMarketplaceQueue =
   process.env.REDIS_ENABLED !== 'false' &&
@@ -42,6 +44,7 @@ const enableMarketplaceQueue =
     RbacModule,
     CrmModule,
     FeatureControlModule,
+    InventoryModule,
     forwardRef(() => OrdersModule),
     ...(enableMarketplaceQueue
       ? [
@@ -81,6 +84,7 @@ const enableMarketplaceQueue =
     Food99PollingService,
     Food99FinancialClientService,
     Food99FinancialReconciliationService,
+    MarketplaceCatalogMappingService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),
   ],
   exports: [

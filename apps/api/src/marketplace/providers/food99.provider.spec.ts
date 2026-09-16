@@ -94,6 +94,19 @@ describe('Food99Provider', () => {
     });
   });
 
+  it('preserves 64-bit deliveryStatus identifiers without Number conversion', async () => {
+    const rawBody = Buffer.from('{"app_id":5764608647577512345,"app_shop_id":"store-99","type":"deliveryStatus","timestamp":1768815260,"data":{"order_id":5764607618872501234,"delivery_status":130,"rider_name":"Rider"}}');
+    const parsed = await provider.parseWebhookEvent({ headers: {}, rawBody, body: {} });
+
+    expect(parsed).toMatchObject({
+      topic: 'deliveryStatus',
+      externalStoreId: 'store-99',
+      externalOrderId: '5764607618872501234',
+    });
+    expect((parsed.rawPayload.data as Record<string, unknown>).order_id).toBe('5764607618872501234');
+    expect((parsed.rawPayload.data as Record<string, unknown>).delivery_status).toBe(130);
+  });
+
   it('leaves mandatory identifiers null for an unsupported or incomplete payload', async () => {
     const parsed = await provider.parseWebhookEvent({
       headers: {}, rawBody: Buffer.from('{"type":"orderNew","data":{}}'), body: {},

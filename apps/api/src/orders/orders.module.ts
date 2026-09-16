@@ -47,6 +47,6 @@ import { OrderAlertsService } from './alerts/order-alerts.service';
   ],
   controllers: [OrdersController, PublicOrdersController, OrderAlertsController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService, OrderAlertsService],
-  exports: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService],
+  exports: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService, OrderAlertsService],
 })
 export class OrdersModule {}

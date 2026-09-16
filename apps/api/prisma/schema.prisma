@@ -92,6 +92,7 @@ model Tenant {
   invoices                       Invoice[]
   marketingAutomations           MarketingAutomation[]
   marketplaceConnections         MarketplaceConnection[]
+  marketplaceCatalogMappings     MarketplaceCatalogMapping[]
   marketplaceEventInboxes        MarketplaceEventInbox[]
   marketplaceOrders              MarketplaceOrder[]
   marketplaceOperations          MarketplaceOperation[]
@@ -973,6 +974,7 @@ model Product {
   mediaAsset                     MediaAsset?                      @relation(fields: [mediaAssetId], references: [id])
   tenant                         Tenant                           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   upsellItemEntries              UpsellItem[]
+  marketplaceCatalogMappings     MarketplaceCatalogMapping[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -1976,6 +1978,7 @@ model MarketplaceConnection {
   operations                    MarketplaceOperation[]
   billEntries                   MarketplaceBillEntry[]
   settlements                   MarketplaceSettlement[]
+  catalogMappings               MarketplaceCatalogMapping[]
   settlementFinancialAccount    FinancialAccount?           @relation("MarketplaceSettlementAccount", fields: [settlementFinancialAccountId], references: [id], onDelete: SetNull)
 
   @@unique([provider, externalMerchantId])
@@ -1985,6 +1988,28 @@ model MarketplaceConnection {
   @@index([provider, pollingStatus, pollingNextAttemptAt], map: "marketplace_connections_provider_polling_status_polling_next_at")
   @@index([tenantId, pollingStatus])
   @@map("marketplace_connections")
+}
+
+model MarketplaceCatalogMapping {
+  id           String                      @id @default(uuid())
+  tenantId     String                      @map("tenant_id")
+  connectionId String                      @map("connection_id")
+  provider     MarketplaceProvider
+  externalItemId String                    @map("external_item_id") @db.VarChar(180)
+  externalItemName String?                 @map("external_item_name") @db.VarChar(255)
+  externalReferenceId String?              @map("external_reference_id") @db.VarChar(500)
+  productId    String                      @map("product_id")
+  status       MarketplaceCatalogMappingStatus @default(ACTIVE)
+  createdAt    DateTime                    @default(now()) @map("created_at")
+  updatedAt    DateTime                    @updatedAt @map("updated_at")
+  tenant       Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection   MarketplaceConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  product      Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([connectionId, provider, externalItemId])
+  @@index([tenantId, provider, status])
+  @@index([tenantId, productId])
+  @@map("marketplace_catalog_mappings")
 }
 
 model MarketplaceBillEntry {
@@ -4220,6 +4245,11 @@ enum MarketplaceProvider {
   KETTA
   ZE_DELIVERY
   OTHER
+}
+
+enum MarketplaceCatalogMappingStatus {
+  ACTIVE
+  DISABLED
 }
 
 enum MarketplaceSettlementStatus {

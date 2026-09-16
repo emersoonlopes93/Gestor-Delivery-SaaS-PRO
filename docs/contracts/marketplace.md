@@ -274,23 +274,28 @@ The raw Swagger formula for `real_price`, `real_pay_price`, and `shop_paid_money
 
 `items_discount`, `delivery_discount` and `others_fees.coupon_discount` establish the total discount but do not identify its funder. `delivery_price` and `others_fees.service_price` are customer charges. Merchant-funded discount, platform-funded discount, and platform fees remain unknown because the native order snapshot does not provide those facts. The normalized snapshot persists these distinctions in the existing JSON field; no new database column or inferred settlement exists.
 
-### Marketplace consistency limitations (2026-09-15)
+### Marketplace logistics and mapped stock (2026-09-15)
 
-The verified native 99Food callback and snapshot contract do not provide a canonical
-`courier arrived`, `picked up`, or `out for delivery` event. The adapter accepts only the
-official `orderNew`, `orderConfirm`, `orderReady`, `orderCancel`, `orderPartialCancel`, and
-`orderFinish` lifecycle events. Therefore `deliveryStatus`, numeric values, or elapsed time
-cannot safely transition an order to `out_for_delivery` or create an urgent courier alert.
-Until the provider exposes a supported fact, PedeHub preserves the last confirmed canonical
-state and reports the capability limitation rather than inventing an operational state.
+The supported 99Food `deliveryStatus` callback runs through the existing signed webhook,
+inbox, idempotency and stale-event pipeline. Its decimal identifiers are parsed from raw JSON
+as strings. `120` updates courier metadata only; `130` activates the persisted
+`MARKETPLACE_COURIER_ARRIVED` alert; `140` reconciles provider-owned delivery through the
+canonical CAS primitive to `out_for_delivery`; `150` persists the external arrival fact;
+`160` reconciles to `completed`; `170` records a delivery-only reconciliation divergence and
+never cancels the commercial order; `180` refreshes courier metadata and clears the current
+arrival condition until a later `130`. Alerts recover on 140/170/180 and terminal orders.
 
-Canonical stock is local and recipe-driven: `OrderItem.productId` resolves product recipes
-and the idempotent depletion/reversal movements. POS and PedeHub storefront orders have this
-canonical identity. Imported iFood and 99Food items currently preserve external IDs only;
-there is no persisted tenant-scoped `provider/externalProductId -> Product or Variant` mapping.
-They must not be matched by name, so marketplace stock depletion/reversal and outbound
-availability synchronization cannot be claimed as implemented. A managed mapped catalog,
-including provider contracts and migration, is separate roadmap scope.
+Canonical stock remains local and recipe-driven: a tenant-scoped
+`MarketplaceCatalogMapping(connectionId, provider, externalItemId) -> Product` resolves the
+provider item before the existing idempotent `OrderItem.productId` depletion engine runs.
+The exact connection, provider, tenant and external ID are all enforced by lookup and database
+constraints. Unmapped items are persisted and remain operational, but create a divergence and
+never trigger name/fuzzy stock matching. A commercial marketplace cancellation uses the same
+idempotent local reversal engine once; delivery-only status `170` does not restore stock.
+
+The same mapping model can represent iFood only for the exact item identity carried by its
+imported payload. No iFood name-based matching or outbound availability endpoint is enabled;
+the provider's current project contract does not establish an availability write endpoint.
 
 ### Native action activation and privacy-protected names (2026-09-05)
 

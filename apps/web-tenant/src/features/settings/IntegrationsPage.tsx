@@ -15,17 +15,23 @@ import {
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
   useFood99AuthorizationUrl,
+  useMarketplaceCatalogMappings,
+  useMarketplaceCatalogMappingCandidates,
+  useUpsertMarketplaceCatalogMapping,
 } from '../marketplace/hooks';
 import toast from 'react-hot-toast';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Switch } from '../../components/ui/Switch';
 import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
+import { api } from '../../lib/api-client';
 
 type ManualConnectForm = {
   externalMerchantId: string;
   externalStoreId: string;
   displayName: string;
 };
+
+type ProductOption = { id: string; name: string; sku?: string | null };
 
 function formatDateTime(value?: string | null) {
   if (!value) return '—';
@@ -72,11 +78,20 @@ export function IntegrationsPage() {
     externalStoreId: '',
     displayName: 'iFood',
   });
+  const [catalogMappingForm, setCatalogMappingForm] = useState({
+    connectionId: '', externalItemId: '', externalItemName: '', externalReferenceId: '', productId: '',
+  });
 
   const { data: status, isLoading: loadingStatus, refetch: refetchStatus } = useMarketplaceStatus('ifood', canManageIfood);
   const { data: connections, isLoading: loadingConnections, isError: connectionsError, error: connectionsErrorObj, refetch: refetchConnections } = useMarketplaceConnections();
   const { data: orders = [], isLoading: loadingOrders, isError: ordersError, error: ordersErrorObj, refetch: refetchOrders } = useMarketplaceOrders();
   const { data: events = [], isLoading: loadingEvents, isError: eventsError, error: eventsErrorObj, refetch: refetchEvents } = useMarketplaceEvents();
+  const { data: catalogMappings = [], isLoading: loadingCatalogMappings } = useMarketplaceCatalogMappings();
+  const { data: catalogMappingCandidates = [], isLoading: loadingCatalogMappingCandidates } = useMarketplaceCatalogMappingCandidates();
+  const { data: catalogProducts = [] } = useQuery({
+    queryKey: ['marketplace-catalog-products'],
+    queryFn: async () => (await api.get<ProductOption[]>('/catalog/products')).data ?? [],
+  });
   const { data: billingPreview } = useBillingPreview();
 
   const connectMutation = useConnectMarketplaceManual('ifood');
@@ -86,6 +101,7 @@ export function IntegrationsPage() {
   const reprocessEventMutation = useReprocessMarketplaceEvent();
   const reprocessOrderMutation = useReprocessMarketplaceOrder();
   const food99Authorization = useFood99AuthorizationUrl();
+  const upsertCatalogMapping = useUpsertMarketplaceCatalogMapping();
 
   const activeConnection = useMemo(() => status ?? connections?.find((c) => c.provider === 'ifood') ?? null, [status, connections]);
   const isBillingEnabled = Boolean(billingPreview?.includedChannels?.includes('marketplace_ifood'));
@@ -110,6 +126,26 @@ export function IntegrationsPage() {
     refetchOrders(),
     refetchEvents(),
   ]);
+
+  const handleCatalogMappingSave = async () => {
+    if (!catalogMappingForm.connectionId || !catalogMappingForm.externalItemId.trim() || !catalogMappingForm.productId) {
+      toast.error('Selecione a conexão, informe o ID externo e escolha o produto canônico.');
+      return;
+    }
+    try {
+      await upsertCatalogMapping.mutateAsync({
+        connectionId: catalogMappingForm.connectionId,
+        externalItemId: catalogMappingForm.externalItemId.trim(),
+        externalItemName: catalogMappingForm.externalItemName.trim() || undefined,
+        externalReferenceId: catalogMappingForm.externalReferenceId.trim() || undefined,
+        productId: catalogMappingForm.productId,
+      });
+      toast.success('Mapping de catálogo salvo e sincronizado.');
+      setCatalogMappingForm({ connectionId: '', externalItemId: '', externalItemName: '', externalReferenceId: '', productId: '' });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao salvar mapping de catálogo.');
+    }
+  };
 
   const handleManualConnect = async () => {
     if (manualProvider === 'ifood' && !canManageIfood) {
@@ -502,6 +538,25 @@ export function IntegrationsPage() {
           </Card>
         </div>
       </div>
+
+      <Card className="p-6 space-y-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-base font-black text-foreground">Mapping de catálogo e estoque</h2>
+            <p className="text-sm text-muted-foreground">Vincule o item externo ao produto canônico da loja. Sem mapping, o pedido continua operável, mas o estoque não é baixado.</p>
+          </div>
+          <Badge variant="info" size="sm">Atualização sem recarregar</Badge>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 rounded-2xl border border-border bg-muted/20 p-4">
+          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Conexão</span><select value={catalogMappingForm.connectionId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, connectionId: event.target.value }))} className="input-premium"><option value="">Selecione</option>{visibleConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.displayName || connection.provider} {connection.externalStoreId ? `(${connection.externalStoreId})` : ''}</option>)}</select></label>
+          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ID externo</span><input value={catalogMappingForm.externalItemId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, externalItemId: event.target.value }))} className="input-premium" placeholder="app_item_id" /></label>
+          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome externo</span><input value={catalogMappingForm.externalItemName} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, externalItemName: event.target.value }))} className="input-premium" placeholder="Opcional" /></label>
+          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Produto canônico</span><select value={catalogMappingForm.productId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, productId: event.target.value }))} className="input-premium"><option value="">Selecione</option>{catalogProducts.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` (${product.sku})` : ''}</option>)}</select></label>
+          <div className="flex items-end"><button type="button" onClick={handleCatalogMappingSave} disabled={upsertCatalogMapping.isPending} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60">{upsertCatalogMapping.isPending ? 'Salvando...' : 'Salvar mapping'}</button></div>
+        </div>
+        {loadingCatalogMappingCandidates ? <div className="text-sm text-muted-foreground">Carregando itens externos pendentes...</div> : catalogMappingCandidates.length === 0 ? <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">Nenhum item externo pendente de mapping nas importações recentes.</div> : <div className="space-y-2"><div className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Itens externos sem mapping — estoque preservado</div><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{catalogMappingCandidates.map((candidate) => <button key={`${candidate.connectionId}:${candidate.externalItemId}`} type="button" onClick={() => setCatalogMappingForm((current) => ({ ...current, connectionId: candidate.connectionId, externalItemId: candidate.externalItemId, externalItemName: candidate.externalItemName ?? '' }))} className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left hover:bg-amber-500/15"><div className="font-bold text-foreground">{candidate.externalItemName || 'Nome não informado'}</div><div className="text-xs text-muted-foreground">{candidate.provider} · {candidate.connection.displayName || candidate.connection.externalStoreId || 'Loja'} · {candidate.externalItemId}</div></button>)}</div></div>}
+        {loadingCatalogMappings ? <div className="text-sm text-muted-foreground">Carregando mappings...</div> : catalogMappings.length === 0 ? <div className="text-sm text-muted-foreground">Nenhum item externo mapeado ainda.</div> : <div className="overflow-x-auto rounded-2xl border border-border"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Provider / loja</th><th className="p-3">Item externo</th><th className="p-3">Referência</th><th className="p-3">Produto vinculado</th><th className="p-3">Status</th></tr></thead><tbody>{catalogMappings.map((mapping) => <tr key={mapping.id} className="border-t border-border"><td className="p-3 font-bold text-foreground">{mapping.connection.displayName || mapping.provider}<div className="text-xs font-normal text-muted-foreground">{mapping.connection.externalStoreId || 'Store não informada'}</div></td><td className="p-3 text-foreground">{mapping.externalItemName || 'Nome não informado'}<div className="text-xs text-muted-foreground">{mapping.externalItemId}</div></td><td className="p-3 text-muted-foreground">{mapping.externalReferenceId || '—'}</td><td className="p-3 font-bold text-foreground">{mapping.product.name}</td><td className="p-3">{mapping.status === 'ACTIVE' ? <Badge variant="success" size="sm">Mapeado</Badge> : <Badge variant="warning" size="sm">Desativado</Badge>}</td></tr>)}</tbody></table></div>}
+      </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card className="p-6 space-y-4">
