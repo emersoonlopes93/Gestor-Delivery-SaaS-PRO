@@ -17,8 +17,9 @@ const deliveryActive = read('../../../web-delivery/src/pages/ActiveDeliveryPage.
 const deliveryCss = read('../../../web-delivery/src/index.css');
 
 describe('R6 mobile safe-area and theme contracts', () => {
-  it('applies top and bottom safe areas at the mobile drawer root', () => {
-    expect(appLayout).toContain('tenant-sidebar safe-top safe-bottom safe-drawer-left');
+  it('keeps the desktop sidebar hidden on mobile and applies safe insets to the mobile surfaces', () => {
+    expect(appLayout).toContain('tenant-sidebar safe-top safe-bottom hidden');
+    expect(appLayout).toContain('pb-[max(1rem,var(--safe-area-bottom))]');
   });
 
   it('keeps the fixed drawer left inset scoped below the desktop breakpoint', () => {
