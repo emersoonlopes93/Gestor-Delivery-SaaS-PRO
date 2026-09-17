@@ -19,7 +19,7 @@ const overview: DashboardStatsDTO = {
     peakHours: [{ hour: 12, count: 3 }, { hour: 13, count: 5 }],
   },
   commercial: {
-    totalRevenue: 240, food99EstimatedNetReceivable: 186.4, food99BillEntryCount: 2, averageTicket: 120, totalOrders: 2, revenueByChannel: {}, revenueByCategory: {},
+    totalRevenue: 240, food99EstimatedNetReceivable: 186.4, food99BillEntryCount: 2, food99EstimatedNetReceivableSource: 'BILL_DATA', averageTicket: 120, totalOrders: 2, revenueByChannel: {}, revenueByCategory: {},
     topProducts: [{ id: 'p1', name: 'Pizza Margherita', quantity: 4, revenue: 160 }],
     topCombos: [], couponUsage: [], cashbackStats: { earnedTotal: 0, redeemedTotal: 0 },
   },
@@ -56,6 +56,7 @@ describe('OperationsDashboard', () => {
         ...overview.commercial,
         food99EstimatedNetReceivable: null,
         food99BillEntryCount: 0,
+        food99EstimatedNetReceivableSource: 'UNAVAILABLE',
       },
     };
     const html = renderToStaticMarkup(

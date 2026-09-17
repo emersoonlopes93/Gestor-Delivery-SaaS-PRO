@@ -138,7 +138,7 @@ export class AnalyticsService {
 
     type CommercialOrder = Prisma.OrderGetPayload<{ include: { items: true; coupon: true } }>;
 
-    const [orders, food99BillTotals] = await Promise.all([
+    const [orders, food99BillTotals, food99Orders] = await Promise.all([
       this.prisma.tenantClient.order.findMany({
         where,
         include: { items: true, coupon: true },
@@ -155,18 +155,43 @@ export class AnalyticsService {
         _sum: { settlementAmount: true },
         _count: { _all: true },
       }),
+      this.prisma.marketplaceOrder.findMany({
+        where: {
+          tenantId,
+          provider: MarketplaceProvider.FOOD_99,
+          internalOrder: {
+            is: {
+              status: PrismaOrderStatus.completed,
+              createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+            },
+          },
+        },
+        select: { normalizedPayload: true },
+      }),
     ]);
 
     const totalRevenue = (orders as CommercialOrder[]).reduce((acc, order) => acc + Number(order.total), 0);
     const totalOrders = orders.length;
     const food99BillEntryCount = food99BillTotals._count._all;
+    const payloadReceivables = food99Orders
+      .map((order) => this.food99MerchantEstimatedReceivable(order.normalizedPayload))
+      .filter((value): value is number => value !== null);
+    const hasCompletePayloadReceivable = food99Orders.length > 0 && payloadReceivables.length === food99Orders.length;
+    const food99EstimatedNetReceivableSource = food99BillEntryCount > 0
+      ? 'BILL_DATA' as const
+      : hasCompletePayloadReceivable
+        ? 'ORDER_PAYLOAD' as const
+        : 'UNAVAILABLE' as const;
 
     const metrics: CommercialMetricsDTO = {
       totalRevenue,
       food99EstimatedNetReceivable: food99BillEntryCount > 0
         ? Number(food99BillTotals._sum.settlementAmount ?? 0n) / 100
-        : null,
+        : hasCompletePayloadReceivable
+          ? payloadReceivables.reduce((total, value) => total + value, 0)
+          : null,
       food99BillEntryCount,
+      food99EstimatedNetReceivableSource,
       totalOrders,
       averageTicket: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       revenueByChannel: this.aggregateRevenueByField(orders, 'sourceChannel'),
@@ -178,6 +203,12 @@ export class AnalyticsService {
     };
 
     return metrics;
+  }
+
+  private food99MerchantEstimatedReceivable(payload: Prisma.JsonValue | null): number | null {
+    if (!payload || Array.isArray(payload) || typeof payload !== 'object') return null;
+    const value = payload.merchantEstimatedReceivable;
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
 
   async getCostMarginMetrics(tenantId: string, filter: MetricFilterDTO): Promise<CostMarginMetricsDTO> {

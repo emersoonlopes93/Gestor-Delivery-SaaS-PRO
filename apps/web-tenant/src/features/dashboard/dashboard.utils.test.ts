@@ -23,7 +23,7 @@ const stats = {
     cancellationRate: 10,
     peakHours: [],
   },
-  commercial: { totalRevenue: 0, food99EstimatedNetReceivable: null, food99BillEntryCount: 0, averageTicket: 0, totalOrders: 0, revenueByChannel: {}, revenueByCategory: {}, topProducts: [], topCombos: [], couponUsage: [], cashbackStats: { earnedTotal: 0, redeemedTotal: 0 } },
+  commercial: { totalRevenue: 0, food99EstimatedNetReceivable: null, food99BillEntryCount: 0, food99EstimatedNetReceivableSource: 'UNAVAILABLE', averageTicket: 0, totalOrders: 0, revenueByChannel: {}, revenueByCategory: {}, topProducts: [], topCombos: [], couponUsage: [], cashbackStats: { earnedTotal: 0, redeemedTotal: 0 } },
   costs: { estimatedCMV: 0, estimatedGrossMargin: 0, grossMarginPercentage: 0, productPerformance: [] },
   financial: { totalIncome: 0, totalExpenses: 0, cashBalance: 0, netCashFlow: 0 },
 } satisfies DashboardStatsDTO;

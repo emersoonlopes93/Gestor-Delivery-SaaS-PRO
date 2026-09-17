@@ -19,6 +19,7 @@ describe('AnalyticsService commercial marketplace metrics', () => {
         },
       },
       marketplaceBillEntry,
+      marketplaceOrder: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const service = new AnalyticsService(prisma as never);
     Object.defineProperties(service, {
@@ -37,6 +38,7 @@ describe('AnalyticsService commercial marketplace metrics', () => {
       totalRevenue: 240,
       food99EstimatedNetReceivable: 186.4,
       food99BillEntryCount: 2,
+      food99EstimatedNetReceivableSource: 'BILL_DATA',
     });
     expect(marketplaceBillEntry.aggregate).toHaveBeenCalledWith({
       where: {
@@ -61,6 +63,12 @@ describe('AnalyticsService commercial marketplace metrics', () => {
           _count: { _all: 0 },
         }),
       },
+      marketplaceOrder: {
+        findMany: jest.fn().mockResolvedValue([
+          { normalizedPayload: { merchantEstimatedReceivable: 42.89 } },
+          { normalizedPayload: { merchantEstimatedReceivable: 39.76 } },
+        ]),
+      },
     };
     const service = new AnalyticsService(prisma as never);
     Object.defineProperties(service, {
@@ -74,8 +82,9 @@ describe('AnalyticsService commercial marketplace metrics', () => {
       startDate: '2026-09-16T00:00:00.000Z',
       endDate: '2026-09-16T23:59:59.999Z',
     })).resolves.toMatchObject({
-      food99EstimatedNetReceivable: null,
+      food99EstimatedNetReceivable: 82.65,
       food99BillEntryCount: 0,
+      food99EstimatedNetReceivableSource: 'ORDER_PAYLOAD',
     });
   });
 });

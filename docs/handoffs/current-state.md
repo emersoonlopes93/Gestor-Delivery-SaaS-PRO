@@ -2613,3 +2613,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A API do Dashboard inclui, de modo aditivo e tenant-scoped, a soma assinada de `MarketplaceBillEntry.settlementAmount` em centavos por `businessAt` como `food99EstimatedNetReceivable`. O valor somente existe quando há Bill Data conciliado no período; ausência é `null`, jamais R$ 0,00 ou taxa presumida.
 - A interface exibe **Ganhos líquidos estimados 99Food** separadamente e informa que liquidação/recebimento dependem de `withdrawAmount` e do posting financeiro manual. Não foi feita chamada ao provider, sincronização, lançamento, alteração de schema, migration, banco remoto ou deploy.
 - Validação concluída: API focada 2 suites / 4 testes PASS; web focada 2 arquivos / 11 testes PASS; `pnpm check:no-any` e `git diff --check` PASS. API build/lint e as portas completas de typecheck excederam o limite local de 120 s sem saída final; devem ser repetidos antes de promoção.
+
+### Fallback de payload para líquido estimado (2026-09-17)
+
+- Sem Bill Data conciliado, o Dashboard usa `merchantEstimatedReceivable`, preservado de `real_price` no payload normalizado dos pedidos 99Food concluídos. O fallback só é exibido quando todos os pedidos 99Food do período possuem o campo; cobertura parcial continua indisponível, sem somar valor incompleto ou estimar taxa.
+- Bill Data (`settlementAmount`) continua prioritário e `withdrawAmount` continua exclusivo da liquidação semanal. A interface informa a origem da estimativa e não trata nenhum dos dois como saldo recebido.
+- Teste focado de Analytics: 1 suite / 2 testes PASS; teste web focado anterior: 2 arquivos / 11 testes PASS. Nenhum provider, banco remoto, schema, migration ou deploy foi acionado.

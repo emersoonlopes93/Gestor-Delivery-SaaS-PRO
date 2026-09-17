@@ -20,6 +20,7 @@ export interface CommercialMetricsDTO {
    */
   food99EstimatedNetReceivable: number | null;
   food99BillEntryCount: number;
+  food99EstimatedNetReceivableSource: 'BILL_DATA' | 'ORDER_PAYLOAD' | 'UNAVAILABLE';
   averageTicket: number;
   totalOrders: number;
   revenueByChannel: Record<string, number>;
