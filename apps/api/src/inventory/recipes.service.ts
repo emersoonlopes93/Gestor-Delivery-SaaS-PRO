@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpsertRecipeDTO, RecipeIngredientDTO, UnitType } from '@gestor/types';
 import { UnitType as PrismaUnitType } from '@prisma/client';
@@ -42,7 +42,20 @@ export class RecipesService {
   }
 
   async upsertProductRecipe(tenantId: string, productId: string, ingredients: UpsertRecipeDTO[]) {
+    if (ingredients.some((ingredient) => !ingredient.ingredientId || !Number.isFinite(Number(ingredient.quantity)) || Number(ingredient.quantity) <= 0)) {
+      throw new BadRequestException('A ficha técnica possui quantidade inválida.');
+    }
+    const ingredientIds = ingredients.map((ingredient) => ingredient.ingredientId);
+    if (new Set(ingredientIds).size !== ingredientIds.length) {
+      throw new BadRequestException('Um insumo não pode aparecer mais de uma vez na ficha técnica.');
+    }
     return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } });
+      if (!product) throw new NotFoundException('Produto não encontrado para este tenant.');
+      if (ingredientIds.length > 0) {
+        const ingredientCount = await tx.ingredient.count({ where: { id: { in: ingredientIds }, tenantId } });
+        if (ingredientCount !== ingredientIds.length) throw new NotFoundException('Um ou mais insumos não foram encontrados para este tenant.');
+      }
       // Clear existing
       await tx.productRecipeIngredient.deleteMany({
         where: { productId, tenantId },

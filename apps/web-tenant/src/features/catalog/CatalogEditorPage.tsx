@@ -1235,7 +1235,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
           isOpen={isRecipeModalOpen}
           onClose={() => setIsRecipeModalOpen(false)}
           entityId={productId}
-          entityType={isComboMode ? 'combo' : 'product'}
           entityName={productForm.name || 'Produto'}
         />
       )}

@@ -120,6 +120,5 @@ export interface CreateInventoryCountDTO {
 
 export interface CreateInventoryCountItemDTO {
   ingredientId: string;
-  theoreticalStock: number;
   physicalStock: number;
 }

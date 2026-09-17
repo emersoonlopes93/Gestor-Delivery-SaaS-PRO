@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { 
   InventoryCountDTO, 
@@ -49,7 +49,16 @@ export class InventoryCountService {
   }
 
   async create(tenantId: string, dto: CreateInventoryCountDTO): Promise<InventoryCountDTO> {
+    if (!Array.isArray(dto.items) || dto.items.length === 0) {
+      throw new BadRequestException('A contagem precisa ter ao menos um insumo.');
+    }
+    if (dto.items.some((item) => !item.ingredientId || !Number.isFinite(Number(item.physicalStock)) || Number(item.physicalStock) < 0)) {
+      throw new BadRequestException('A contagem possui estoque físico inválido.');
+    }
     const ingredientIds = Array.from(new Set(dto.items.map((item) => item.ingredientId)));
+    if (ingredientIds.length !== dto.items.length) {
+      throw new BadRequestException('Um insumo não pode ser contado mais de uma vez.');
+    }
     const tenantIngredients = await this.prisma.ingredient.findMany({
       where: { id: { in: ingredientIds }, tenantId },
       select: { id: true },
@@ -59,6 +68,20 @@ export class InventoryCountService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const currentIngredients = await tx.ingredient.findMany({
+        where: { id: { in: ingredientIds }, tenantId },
+        select: { id: true, currentStock: true },
+      });
+      if (currentIngredients.length !== ingredientIds.length) {
+        throw new NotFoundException('Um ou mais insumos não foram encontrados para este tenant.');
+      }
+      const stockByIngredientId = new Map(currentIngredients.map((ingredient) => [ingredient.id, Number(ingredient.currentStock)]));
+      const countedItems = dto.items.map((item) => {
+        const theoreticalStock = stockByIngredientId.get(item.ingredientId);
+        if (theoreticalStock === undefined) throw new NotFoundException('Insumo não encontrado para esta contagem.');
+        const physicalStock = Number(item.physicalStock);
+        return { ingredientId: item.ingredientId, theoreticalStock, physicalStock, adjustedQuantity: physicalStock - theoreticalStock };
+      });
       // 1. Create Inventory Session
       const inventoryCount = await tx.inventoryCount.create({
         data: {
@@ -67,12 +90,12 @@ export class InventoryCountService {
           note: dto.note,
           closedAt: new Date(),
           items: {
-            create: dto.items.map(item => ({
+            create: countedItems.map(item => ({
               tenantId,
               ingredientId: item.ingredientId,
               theoreticalStock: item.theoreticalStock,
               physicalStock: item.physicalStock,
-              adjustedQuantity: item.physicalStock - item.theoreticalStock
+              adjustedQuantity: item.adjustedQuantity
             }))
           }
         },
@@ -82,8 +105,8 @@ export class InventoryCountService {
       });
 
       // 2. Process Adjustments
-      for (const item of dto.items) {
-        const adjustment = item.physicalStock - item.theoreticalStock;
+      for (const item of countedItems) {
+        const adjustment = item.adjustedQuantity;
 
         if (adjustment !== 0) {
           // Update ingredient stock

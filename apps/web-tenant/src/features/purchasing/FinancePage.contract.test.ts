@@ -4,9 +4,10 @@ const source = readFileSync(new URL('./FinancePage.tsx', import.meta.url), 'utf8
 const navigationRegistry = readFileSync(new URL('../../navigation/navigationRegistry.ts', import.meta.url), 'utf8');
 
 describe('FinancePage UX contract', () => {
-  it('keeps the one-day dashboard and financial transaction requests unchanged', () => {
+  it('requests the complete local day for dashboard metrics and financial transactions', () => {
     expect(source).toContain("const today = format(new Date(), 'yyyy-MM-dd')");
-    expect(source).toContain('`/analytics/dashboard?startDate=${today}&endDate=${today}`');
+    expect(source).toContain('const endOfToday = `${today}T23:59:59.999`');
+    expect(source).toContain('`/analytics/dashboard?startDate=${today}&endDate=${encodeURIComponent(endOfToday)}`');
     expect(source).toContain("api.get<FinancialTransactionDTO[]>('/finance/transactions')");
     expect(source).not.toContain("api.get<FinancialAccountDTO[]>");
   });

@@ -2619,3 +2619,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Sem Bill Data conciliado, o Dashboard usa `merchantEstimatedReceivable`, preservado de `real_price` no payload normalizado dos pedidos 99Food concluídos. O fallback só é exibido quando todos os pedidos 99Food do período possuem o campo; cobertura parcial continua indisponível, sem somar valor incompleto ou estimar taxa.
 - Bill Data (`settlementAmount`) continua prioritário e `withdrawAmount` continua exclusivo da liquidação semanal. A interface informa a origem da estimativa e não trata nenhum dos dois como saldo recebido.
 - Teste focado de Analytics: 1 suite / 2 testes PASS; teste web focado anterior: 2 arquivos / 11 testes PASS. Nenhum provider, banco remoto, schema, migration ou deploy foi acionado.
+
+## Estoque, compras e receitas - alinhamento de contratos (2026-09-17)
+
+- Fichas técnicas de produtos e combos usam a mesma entidade canônica de produto; a API valida produto/insumos do tenant, quantidades positivas e duplicidade. Uma receita vazia remove a composição.
+- Inventário aceita somente contagem física e captura o saldo teórico no servidor dentro da transação. Entradas iniciais viraram movimento de saldo inicial, sem fabricar compra sem fornecedor.
+- A migration `20260916100000_purchase_item_unit_snapshots` preserva unidade, quantidade-base e custo-base da compra. Recebimentos convertem apenas entre a unidade-base e a unidade de compra configurada, e fornecedores inativos são bloqueados.
+- UI esconde as ações mutáveis de fornecedores e perdas sem permissão correspondente; Financeiro consulta o dia completo. Validação focada: web FinancePage 1 arquivo/5 testes PASS; API compras, perdas e inventário 3 suítes/21 testes PASS. O build API excedeu 120s locais sem resultado final e deve ser reexecutado no CI antes de promoção.

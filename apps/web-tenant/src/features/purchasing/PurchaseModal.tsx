@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, FinancialAccountDTO, PaymentStatus } from '@gestor/types';
+import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, FinancialAccountDTO, PaymentStatus, UnitType } from '@gestor/types';
 import { api } from '../../lib/api-client';
 import { Plus, Trash2, ChevronDown } from 'lucide-react';
 
@@ -21,9 +21,9 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
     ? crypto.randomUUID()
     : `purchase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  const { register, control, handleSubmit, watch, reset, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
+  const { register, control, handleSubmit, watch, reset, setValue, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
     defaultValues: {
-      items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
+      items: [{ ingredientId: '', quantity: 1, purchaseUnit: UnitType.UN, unitCost: 0 }],
       paymentStatus: PaymentStatus.PAID,
       purchaseDate: new Date().toISOString().split('T')[0],
       idempotencyKey: createIdempotencyKey(),
@@ -41,7 +41,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   useEffect(() => {
     if (isOpen) {
       reset({
-        items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
+        items: [{ ingredientId: '', quantity: 1, purchaseUnit: UnitType.UN, unitCost: 0 }],
         paymentStatus: PaymentStatus.PAID,
         purchaseDate: new Date().toISOString().split('T')[0],
         idempotencyKey: createIdempotencyKey(),
@@ -156,7 +156,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Itens da Compra</h3>
             <button
               type="button"
-              onClick={() => append({ ingredientId: '', quantity: 1, unitCost: 0 })}
+              onClick={() => append({ ingredientId: '', quantity: 1, purchaseUnit: UnitType.UN, unitCost: 0 })}
               className="text-primary-600 hover:text-primary-700 font-bold text-sm flex items-center gap-1"
             >
               <Plus className="h-4 w-4" /> Adicionar Item
@@ -169,17 +169,30 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                 <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   <th className="px-2 py-2">Insumo</th>
                   <th className="px-2 py-2 w-32">Quantidade</th>
+                  <th className="px-2 py-2 w-28">Unidade</th>
                   <th className="px-2 py-2 w-40">Custo Unitário</th>
                   <th className="px-2 py-2 w-40 text-right">Subtotal</th>
                   <th className="px-2 py-2 w-16"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {fields.map((field, index) => (
+                {fields.map((field, index) => {
+                  const ingredientId = watch(`items.${index}.ingredientId`);
+                  const selectedIngredient = ingredients.find((ingredient) => ingredient.id === ingredientId);
+                  const allowedUnits = selectedIngredient
+                    ? Array.from(new Set([selectedIngredient.unit, selectedIngredient.purchaseUnit ?? selectedIngredient.unit]))
+                    : [];
+                  const ingredientField = register(`items.${index}.ingredientId` as const, { required: true });
+                  return (
                   <tr key={field.id} className="group">
                     <td className="py-3 px-2">
                       <select
-                        {...register(`items.${index}.ingredientId` as const, { required: true })}
+                        {...ingredientField}
+                        onChange={(event) => {
+                          ingredientField.onChange(event);
+                          const ingredient = ingredients.find((candidate) => candidate.id === event.target.value);
+                          if (ingredient) setValue(`items.${index}.purchaseUnit`, ingredient.purchaseUnit ?? ingredient.unit);
+                        }}
                         className="input-premium text-sm py-1.5"
                       >
                         <option value="">Selecione o insumo</option>
@@ -195,6 +208,16 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                         step="any"
                         className="input-premium text-sm py-1.5"
                       />
+                    </td>
+                    <td className="py-3 px-2">
+                      <select
+                        {...register(`items.${index}.purchaseUnit` as const, { required: true })}
+                        className="input-premium text-sm py-1.5"
+                        aria-label={`Unidade de compra do item ${index + 1}`}
+                      >
+                        {!selectedIngredient && <option value="">Selecione o insumo</option>}
+                        {allowedUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                      </select>
                     </td>
                     <td className="py-3 px-2">
                       <div className="relative">
@@ -223,7 +246,8 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

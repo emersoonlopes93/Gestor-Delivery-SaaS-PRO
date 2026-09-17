@@ -5,8 +5,11 @@ import { SupplierModal } from './SupplierModal';
 import { Truck, Plus, Search, Mail, Phone } from 'lucide-react';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { usePermissions } from '../../hooks/use-tenant-auth';
 
 export function SuppliersPage() {
+  const { has } = usePermissions();
+  const canManage = has('purchasing.manage');
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,7 +85,7 @@ export function SuppliersPage() {
         title="Fornecedores"
         description="Mantenha os parceiros de compra prontos para as próximas entradas."
         icon={Truck}
-        action={<button
+        action={canManage ? <button
           onClick={() => {
             setEditingSupplier(null);
             setIsModalOpen(true);
@@ -91,10 +94,10 @@ export function SuppliersPage() {
         >
           <Plus className="h-5 w-5" />
           Novo Fornecedor
-        </button>}
+        </button> : undefined}
       />
 
-      <button
+      {canManage && <button
         type="button"
         onClick={() => {
           setEditingSupplier(null);
@@ -104,7 +107,7 @@ export function SuppliersPage() {
       >
         <Plus className="h-5 w-5" aria-hidden />
         Novo Fornecedor
-      </button>
+      </button>}
 
       <ContextualNavigation itemIds={['inventory.home', 'management.purchases', 'management.suppliers']} />
 

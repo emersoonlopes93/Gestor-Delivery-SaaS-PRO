@@ -18,9 +18,9 @@ describe('InventoryCountController', () => {
     expect(inventoryCountService.findAll).toHaveBeenCalledWith('tenant-a');
   });
 
-  it('forwards the complete count payload within the authenticated tenant', async () => {
+  it('forwards the physical count payload within the authenticated tenant', async () => {
     const dto = {
-      items: [{ ingredientId: 'ingredient-1', theoreticalStock: 8, physicalStock: 6.5 }],
+      items: [{ ingredientId: 'ingredient-1', physicalStock: 6.5 }],
     };
     inventoryCountService.create.mockResolvedValue({ id: 'count-1' });
 

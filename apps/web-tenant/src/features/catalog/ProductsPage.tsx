@@ -934,7 +934,6 @@ export function ProductsPage() {
             setRecipeTarget(null);
             loadData();
           }}
-          entityType="product"
           entityId={recipeTarget.id}
           entityName={recipeTarget.name}
         />

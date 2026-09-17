@@ -6,7 +6,6 @@ export const INVENTORY_API_PATHS = {
 
 export type InventoryCountSubmissionItem = {
   ingredientId: string;
-  theoreticalStock: number;
   physicalStock: number;
 };
 
@@ -14,7 +13,6 @@ export function createInventoryCountSubmission(items: readonly InventoryCountSub
   return {
     items: items.map((item) => ({
       ingredientId: item.ingredientId,
-      theoreticalStock: item.theoreticalStock,
       physicalStock: item.physicalStock,
     })),
   };

@@ -98,27 +98,6 @@ export class IngredientsService {
         const quantityBase = Number(initialPurchase.quantity) * factor;
         const unitCostBase = Number(initialPurchase.totalCost) / quantityBase;
 
-        // Create Purchase record for history
-        const purchase = await tx.purchase.create({
-          data: {
-            tenantId,
-            supplierId: initialPurchase.supplierId || '', // Handle missing supplier
-            totalValue: initialPurchase.totalCost,
-            status: 'received',
-            purchaseDate: new Date(),
-            items: {
-              create: {
-                tenantId,
-                ingredientId: ingredient.id,
-                quantity: initialPurchase.quantity,
-                unitCost: Number(initialPurchase.totalCost) / Number(initialPurchase.quantity),
-                totalCost: initialPurchase.totalCost,
-              }
-            }
-          },
-          include: { items: { select: { id: true } } },
-        });
-
         // Update Ingredient with initial stock and cost
         await tx.ingredient.update({
           where: { id: ingredient.id },
@@ -133,12 +112,10 @@ export class IngredientsService {
           data: {
             tenantId,
             ingredientId: ingredient.id,
-            purchaseId: purchase.id,
-            purchaseItemId: purchase.items[0].id,
-            type: 'purchase_entry',
+            type: 'in',
             quantity: quantityBase,
             unitCost: unitCostBase,
-            notes: `Entrada inicial via cadastro (Compra #${purchase.id})`,
+            notes: 'Saldo inicial via cadastro de insumo',
           }
         });
       }

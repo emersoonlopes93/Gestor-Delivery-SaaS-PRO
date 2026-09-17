@@ -7,13 +7,12 @@ describe('inventory API contract', () => {
     expect(INVENTORY_API_PATHS.losses).toBe('/losses');
   });
 
-  it('sends both stock values required by an inventory count', () => {
+  it('sends only the physical count because the API snapshots theoretical stock authoritatively', () => {
     expect(createInventoryCountSubmission([{
       ingredientId: 'ingredient-1',
-      theoreticalStock: 8,
       physicalStock: 6.5,
     }])).toEqual({
-      items: [{ ingredientId: 'ingredient-1', theoreticalStock: 8, physicalStock: 6.5 }],
+      items: [{ ingredientId: 'ingredient-1', physicalStock: 6.5 }],
     });
   });
 });

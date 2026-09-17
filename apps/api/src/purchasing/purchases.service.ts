@@ -72,6 +72,9 @@ function validateCreateInput(dto: CreatePurchaseDTO): void {
   if (dto.items.some((item) => !Number.isFinite(Number(item.unitCost)) || Number(item.unitCost) < 0)) {
     throw new BadRequestException('Custo unitario invalido.');
   }
+  if (dto.items.some((item) => !Object.values(UnitType).includes(item.purchaseUnit))) {
+    throw new BadRequestException('Unidade de compra invalida.');
+  }
   if (dto.paymentStatus === PaymentStatus.PARTIAL || dto.paymentStatus === PaymentStatus.CANCELLED) {
     throw new BadRequestException('Status de pagamento nao suportado para uma nova compra.');
   }
@@ -87,6 +90,7 @@ function fingerprintCreate(dto: CreatePurchaseDTO, purchaseDate: Date, paymentSt
     items: dto.items.map((item) => ({
       ingredientId: item.ingredientId,
       quantity: Number(item.quantity),
+      purchaseUnit: item.purchaseUnit,
       unitCost: Number(item.unitCost),
       expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString() : null,
     })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
@@ -135,7 +139,7 @@ export class PurchasesService {
           return existing.id;
         }
 
-        const supplier = await tx.supplier.findFirst({ where: { id: dto.supplierId, tenantId }, select: { id: true } });
+        const supplier = await tx.supplier.findFirst({ where: { id: dto.supplierId, tenantId, isActive: true }, select: { id: true } });
         if (!supplier) throw new NotFoundException('Fornecedor nao encontrado');
 
         if (paymentStatus === PaymentStatus.PAID) {
@@ -160,22 +164,33 @@ export class PurchasesService {
         for (const inputItem of dto.items) {
           const ingredient = await tx.ingredient.findFirst({
             where: { id: inputItem.ingredientId, tenantId },
-            select: { id: true, currentStock: true, currentCost: true },
+            select: { id: true, currentStock: true, currentCost: true, unit: true, purchaseUnit: true, conversionFactor: true },
           });
           if (!ingredient) throw new NotFoundException(`Insumo ${inputItem.ingredientId} nao encontrado`);
           const quantity = Number(inputItem.quantity);
           const unitCost = Number(inputItem.unitCost);
+          const baseUnit = this.mapUnit(ingredient.unit);
+          const configuredPurchaseUnit = ingredient.purchaseUnit ? this.mapUnit(ingredient.purchaseUnit) : baseUnit;
+          if (inputItem.purchaseUnit !== baseUnit && inputItem.purchaseUnit !== configuredPurchaseUnit) {
+            throw new BadRequestException('A unidade da compra deve ser a unidade base ou a unidade de compra configurada para o insumo.');
+          }
+          const conversionFactor = inputItem.purchaseUnit === configuredPurchaseUnit ? Number(ingredient.conversionFactor) : 1;
+          const baseQuantity = quantity * conversionFactor;
+          const baseUnitCost = unitCost / conversionFactor;
           const oldStock = Number(ingredient.currentStock);
           const finalAverageCost = oldStock > 0
-            ? (oldStock * Number(ingredient.currentCost) + quantity * unitCost) / (oldStock + quantity)
-            : unitCost;
+            ? (oldStock * Number(ingredient.currentCost) + baseQuantity * baseUnitCost) / (oldStock + baseQuantity)
+            : baseUnitCost;
           const item = await tx.purchaseItem.create({
             data: {
               tenantId,
               purchaseId: purchase.id,
               ingredientId: inputItem.ingredientId,
               quantity,
+              purchaseUnit: ingredient.purchaseUnit && inputItem.purchaseUnit === configuredPurchaseUnit ? ingredient.purchaseUnit : ingredient.unit,
               unitCost,
+              baseQuantity,
+              baseUnitCost,
               totalCost: quantity * unitCost,
               expiryDate: inputItem.expiryDate,
             },
@@ -183,7 +198,7 @@ export class PurchasesService {
           });
           const updatedIngredient = await tx.ingredient.updateMany({
             where: { id: inputItem.ingredientId, tenantId },
-            data: { currentStock: { increment: quantity }, currentCost: finalAverageCost },
+            data: { currentStock: { increment: baseQuantity }, currentCost: finalAverageCost },
           });
           if (updatedIngredient.count !== 1) throw new NotFoundException('Insumo nao encontrado');
           await tx.stockMovement.create({
@@ -193,8 +208,8 @@ export class PurchasesService {
               purchaseId: purchase.id,
               purchaseItemId: item.id,
               type: PrismaStockMovementType.purchase_entry,
-              quantity,
-              unitCost,
+              quantity: baseQuantity,
+              unitCost: baseUnitCost,
               notes: `Entrada via compra ${purchase.id}`,
             },
           });
@@ -457,7 +472,10 @@ export class PurchasesService {
         purchaseId: item.purchaseId,
         ingredientId: item.ingredientId,
         quantity: Number(item.quantity),
+        purchaseUnit: item.purchaseUnit ? this.mapUnit(item.purchaseUnit) : undefined,
         unitCost: Number(item.unitCost),
+        baseQuantity: item.baseQuantity ? Number(item.baseQuantity) : undefined,
+        baseUnitCost: item.baseUnitCost ? Number(item.baseUnitCost) : undefined,
         totalCost: Number(item.totalCost),
         expiryDate: item.expiryDate ?? undefined,
         ingredientName: item.ingredient?.name,

@@ -1,4 +1,4 @@
-import { PurchaseStatus, PaymentStatus } from './enums';
+import { PurchaseStatus, PaymentStatus, UnitType } from './enums';
 
 export interface SupplierDTO {
   id: string;
@@ -57,7 +57,10 @@ export interface PurchaseItemDTO {
   purchaseId: string;
   ingredientId: string;
   quantity: number;
+  purchaseUnit?: UnitType;
   unitCost: number;
+  baseQuantity?: number;
+  baseUnitCost?: number;
   totalCost: number;
   expiryDate?: Date;
   ingredientName?: string; // Helpful for UI
@@ -91,6 +94,7 @@ export interface PurchaseSettlementDTO {
 export interface CreatePurchaseItemDTO {
   ingredientId: string;
   quantity: number;
+  purchaseUnit: UnitType;
   unitCost: number;
   expiryDate?: Date;
 }

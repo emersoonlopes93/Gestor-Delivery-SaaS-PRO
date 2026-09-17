@@ -3,6 +3,7 @@ import { api } from '@/lib/api-client';
 import { IngredientDTO, UnitType } from '@gestor/types';
 import { ClipboardList, Save, AlertTriangle, CheckCircle2, RefreshCcw } from 'lucide-react';
 import { createInventoryCountSubmission, INVENTORY_API_PATHS } from '../inventory-api-contract';
+import { usePermissions } from '@/hooks/use-tenant-auth';
 
 interface CountItem {
   ingredientId: string;
@@ -13,6 +14,8 @@ interface CountItem {
 }
 
 export function InventoryCountPage() {
+  const { has } = usePermissions();
+  const canAdjustInventory = has('inventory.adjust');
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
   const [countItems, setCountItems] = useState<CountItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +59,6 @@ export function InventoryCountPage() {
     try {
       const items = countItems.map(item => ({
         ingredientId: item.ingredientId,
-        theoreticalStock: item.theoreticalStock,
         physicalStock: Number(item.physicalStock),
       }));
 
@@ -100,7 +102,7 @@ export function InventoryCountPage() {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || ingredients.length === 0}
+            disabled={!canAdjustInventory || isSubmitting || ingredients.length === 0}
             className="bg-primary hover:opacity-90 text-primary-foreground px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
           >
             {isSubmitting ? (

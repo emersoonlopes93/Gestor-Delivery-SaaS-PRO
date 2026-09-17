@@ -63,8 +63,9 @@ export function FinancePage() {
     try {
       setIsLoading(true);
       const today = format(new Date(), 'yyyy-MM-dd');
+      const endOfToday = `${today}T23:59:59.999`;
       const [metricsResult, transactionsResult] = await Promise.allSettled([
-        api.get<DashboardMetrics>(`/analytics/dashboard?startDate=${today}&endDate=${today}`),
+        api.get<DashboardMetrics>(`/analytics/dashboard?startDate=${today}&endDate=${encodeURIComponent(endOfToday)}`),
         api.get<FinancialTransactionDTO[]>('/finance/transactions')
       ]);
 

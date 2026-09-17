@@ -5,6 +5,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { Modal } from '@/components/Modal';
 import { INVENTORY_API_PATHS } from '../inventory-api-contract';
+import { usePermissions } from '@/hooks/use-tenant-auth';
 
 interface LossEntry {
   id: string;
@@ -16,6 +17,8 @@ interface LossEntry {
 }
 
 export function LossesPage() {
+  const { has } = usePermissions();
+  const canAdjustInventory = has('inventory.adjust');
   const [losses, setLosses] = useState<LossEntry[]>([]);
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,13 +84,13 @@ export function LossesPage() {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Monitore e reduza o desperdício de insumos na sua operação.</p>
         </div>
-        <button
+        {canAdjustInventory && <button
           onClick={() => setIsModalOpen(true)}
           className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm flex items-center gap-2 group"
         >
           <Plus className="h-5 w-5" />
           Registrar Perda
-        </button>
+        </button>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

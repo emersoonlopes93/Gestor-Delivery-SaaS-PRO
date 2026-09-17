@@ -9,12 +9,11 @@ import {
 interface RecipeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  entityType: 'product' | 'complement' | 'combo';
   entityId: string;
   entityName: string;
 }
 
-export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName }: RecipeModalProps) {
+export function RecipeModal({ isOpen, onClose, entityId, entityName }: RecipeModalProps) {
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
   const [recipeItems, setRecipeItems] = useState<RecipeIngredientDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +24,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
     try {
       const [ingRes, recipeRes] = await Promise.all([
         api.get<IngredientDTO[]>('/inventory/ingredients'),
-        api.get<RecipeIngredientDTO[]>(`/inventory/recipes/${entityType}/${entityId}`)
+        api.get<RecipeIngredientDTO[]>(`/inventory/recipes/product/${entityId}`)
       ]);
 
       if (ingRes.success) setIngredients(ingRes.data);
@@ -35,7 +34,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
     } finally {
       setIsLoading(false);
     }
-  }, [entityType, entityId]);
+  }, [entityId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -93,7 +92,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
         quantity: Number(item.quantity)
       }));
 
-      await api.post(`/inventory/recipes/${entityType}/${entityId}`, items);
+      await api.post(`/inventory/recipes/product/${entityId}`, items);
       onClose();
     } catch (error) {
       console.error('Erro ao salvar ficha técnica:', error);
@@ -206,7 +205,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving || recipeItems.length === 0}
+              disabled={isSaving}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all disabled:opacity-50 shadow-sm"
             >
               {isSaving ? 'Salvando...' : 'Salvar Alterações'}
