@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, subDays } from 'date-fns';
 import { Link } from 'react-router-dom';
 import {
@@ -58,7 +58,7 @@ export function FinancePage() {
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     const [summaryResult, transactionsResult] = await Promise.allSettled([
@@ -73,9 +73,9 @@ export function FinancePage() {
       setError('Não foi possível carregar os lançamentos. Tente atualizar a página.');
     }
     setIsLoading(false);
-  };
+  }, [endDate, startDate]);
 
-  useEffect(() => { void loadData(); }, [startDate, endDate]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const periodTransactions = useMemo(() => transactions, [transactions]);
   const payable = periodTransactions.filter((transaction) => transaction.type === 'expense' && (transaction.status === FinancialStatus.PENDING || transaction.status === FinancialStatus.OVERDUE));
@@ -121,7 +121,9 @@ export function FinancePage() {
           <label className="text-xs font-semibold text-muted-foreground">De<input aria-label="Data inicial" type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 block min-h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground" /></label>
           <label className="text-xs font-semibold text-muted-foreground">Até<input aria-label="Data final" type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 block min-h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground" /></label>
           <button type="button" onClick={handleExport} disabled={!periodTransactions.length} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"><Download className="h-4 w-4" aria-hidden />Exportar</button>
-          {canManageFinance && <button type="button" onClick={() => setIsNewModalOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Plus className="h-4 w-4" aria-hidden />Novo lançamento</button>}
+          {canManageFinance && (
+            <button type="button" onClick={() => setIsNewModalOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Plus className="h-4 w-4" aria-hidden />Novo lançamento</button>
+          )}
         </div>
       </header>
       <ContextualNavigation itemIds={['management.finance', 'cash.home', 'analytics.reports']} />
