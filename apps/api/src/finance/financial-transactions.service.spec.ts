@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import {
   FinancialStatus as PrismaFinancialStatus,
   FinancialTransactionType as PrismaFinancialTransactionType,
@@ -11,7 +11,7 @@ type Transaction = {
   id: string; tenantId: string; accountId: string | null; type: PrismaFinancialTransactionType;
   category: string; amount: number; status: PrismaFinancialStatus; dueDate: Date | null;
   paymentDate: Date | null; description: string | null; referenceId: string | null;
-  referenceType: string | null; createdAt: Date; updatedAt: Date;
+  referenceType: string | null; idempotencyKey: string | null; createdAt: Date; updatedAt: Date;
 };
 
 describe('FinancialTransactionsService account balance effects', () => {
@@ -24,8 +24,8 @@ describe('FinancialTransactionsService account balance effects', () => {
     const transactions: Transaction[] = [];
     const findAccount = (where: { id?: string; tenantId?: string }) =>
       accounts.find((account) => (!where.id || account.id === where.id) && (!where.tenantId || account.tenantId === where.tenantId)) ?? null;
-    const findTransaction = (where: { id?: string; tenantId?: string }) =>
-      transactions.find((transaction) => (!where.id || transaction.id === where.id) && (!where.tenantId || transaction.tenantId === where.tenantId)) ?? null;
+    const findTransaction = (where: { id?: string; tenantId?: string; idempotencyKey?: string }) =>
+      transactions.find((transaction) => (!where.id || transaction.id === where.id) && (!where.tenantId || transaction.tenantId === where.tenantId) && (!where.idempotencyKey || transaction.idempotencyKey === where.idempotencyKey)) ?? null;
     const withAccount = (transaction: Transaction) => ({ ...transaction, account: findAccount({ id: transaction.accountId ?? undefined }) });
 
     const tx = {
@@ -43,13 +43,13 @@ describe('FinancialTransactionsService account balance effects', () => {
           const transaction: Transaction = {
             ...data, id: `transaction-${transactions.length + 1}`,
             accountId: data.accountId ?? null, dueDate: data.dueDate ?? null, paymentDate: data.paymentDate ?? null,
-            description: data.description ?? null, referenceId: data.referenceId ?? null, referenceType: data.referenceType ?? null,
+            description: data.description ?? null, referenceId: data.referenceId ?? null, referenceType: data.referenceType ?? null, idempotencyKey: data.idempotencyKey ?? null,
             createdAt: new Date(), updatedAt: new Date(),
           };
           transactions.push(transaction);
           return withAccount(transaction);
         }),
-        findFirst: jest.fn(async ({ where }: { where: { id?: string; tenantId?: string } }) => {
+        findFirst: jest.fn(async ({ where }: { where: { id?: string; tenantId?: string; idempotencyKey?: string } }) => {
           const transaction = findTransaction(where);
           return transaction ? withAccount(transaction) : null;
         }),
@@ -86,45 +86,53 @@ describe('FinancialTransactionsService account balance effects', () => {
     expect(accounts[0].balance).toBe(40);
   });
 
-  it('applies pending-to-paid exactly once and uses only the amount delta thereafter', async () => {
+  it('applies pending-to-paid exactly once and preserves the posted amount thereafter', async () => {
     const { service, accounts } = makeHarness();
     const transaction = await create(service, FinancialTransactionType.INCOME, FinancialStatus.PENDING, 100);
     await service.update('tenant-a', transaction.id, { status: FinancialStatus.PAID });
-    await service.update('tenant-a', transaction.id, { amount: 150 });
-    await service.update('tenant-a', transaction.id, { amount: 150 });
-    expect(accounts[0].balance).toBe(150);
+    await expect(service.update('tenant-a', transaction.id, { amount: 150 })).rejects.toBeInstanceOf(ConflictException);
+    expect(accounts[0].balance).toBe(100);
   });
 
-  it('uses the correct delta when a paid expense amount changes', async () => {
+  it('rejects changes to a paid amount or account instead of rewriting the ledger', async () => {
     const { service, accounts } = makeHarness();
     const transaction = await create(service, FinancialTransactionType.EXPENSE, FinancialStatus.PAID, 100);
-    await service.update('tenant-a', transaction.id, { amount: 150 });
-    expect(accounts[0].balance).toBe(-150);
+    await expect(service.update('tenant-a', transaction.id, { amount: 150 })).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.update('tenant-a', transaction.id, { accountId: 'account-b' })).rejects.toBeInstanceOf(ConflictException);
+    expect(accounts[0].balance).toBe(-100);
   });
 
-  it('reverts the old account and applies the new one for a paid transaction', async () => {
-    const { service, accounts } = makeHarness();
-    const transaction = await create(service, FinancialTransactionType.INCOME, FinancialStatus.PAID, 80);
-    await service.update('tenant-a', transaction.id, { accountId: 'account-b' });
-    expect(accounts[0].balance).toBe(0);
-    expect(accounts[1].balance).toBe(80);
-  });
-
-  it('reverts a paid transaction when it becomes pending or cancelled without double application', async () => {
+  it('rejects reopening or cancelling a paid transaction without a dedicated reversal', async () => {
     const { service, accounts } = makeHarness();
     const transaction = await create(service, FinancialTransactionType.INCOME, FinancialStatus.PAID, 90);
-    await service.update('tenant-a', transaction.id, { status: FinancialStatus.PENDING });
-    await service.update('tenant-a', transaction.id, { status: FinancialStatus.PENDING });
-    await service.update('tenant-a', transaction.id, { status: FinancialStatus.PAID });
-    await service.update('tenant-a', transaction.id, { status: FinancialStatus.CANCELLED });
-    expect(accounts[0].balance).toBe(0);
+    await expect(service.update('tenant-a', transaction.id, { status: FinancialStatus.PENDING })).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.update('tenant-a', transaction.id, { status: FinancialStatus.CANCELLED })).rejects.toBeInstanceOf(ConflictException);
+    expect(accounts[0].balance).toBe(90);
+  });
+
+  it('defaults a paid transaction payment date and rejects a paid transaction without an account', async () => {
+    const { service, transactions } = makeHarness();
+    await create(service, FinancialTransactionType.INCOME, FinancialStatus.PAID, 10);
+    expect(transactions[0].paymentDate).toBeInstanceOf(Date);
+    await expect(service.create('tenant-a', { type: FinancialTransactionType.INCOME, category: 'test', amount: 10, status: FinancialStatus.PAID })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('reuses the same manual operation identity while allowing legitimate equal entries', async () => {
+    const { service, transactions, accounts } = makeHarness();
+    const base = { accountId: 'account-a', type: FinancialTransactionType.INCOME, category: 'test', amount: 10, status: FinancialStatus.PAID };
+    const first = await service.create('tenant-a', { ...base, idempotencyKey: 'operation-1' });
+    const retry = await service.create('tenant-a', { ...base, idempotencyKey: 'operation-1' });
+    await service.create('tenant-a', { ...base, idempotencyKey: 'operation-2' });
+    expect(retry.id).toBe(first.id);
+    expect(transactions).toHaveLength(2);
+    expect(accounts[0].balance).toBe(20);
   });
 
   it('rejects a cross-tenant account change without mutating either balance', async () => {
     const { service, accounts } = makeHarness();
-    const transaction = await create(service, FinancialTransactionType.INCOME, FinancialStatus.PAID, 50);
+    const transaction = await create(service, FinancialTransactionType.INCOME, FinancialStatus.PENDING, 50);
     await expect(service.update('tenant-a', transaction.id, { accountId: 'account-other' })).rejects.toBeInstanceOf(NotFoundException);
-    expect(accounts[0].balance).toBe(50);
+    expect(accounts[0].balance).toBe(0);
     expect(accounts[2].balance).toBe(0);
   });
 

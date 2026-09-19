@@ -3294,6 +3294,7 @@ model FinancialTransaction {
   description   String?
   referenceId   String?                  @map("reference_id")
   referenceType String?                  @map("reference_type")
+  idempotencyKey String?                 @map("idempotency_key") @db.VarChar(120)
   reversalOfTransactionId String?        @unique @map("reversal_of_transaction_id")
   createdAt     DateTime                 @default(now()) @map("created_at")
   updatedAt     DateTime                 @updatedAt @map("updated_at")
@@ -3308,6 +3309,7 @@ model FinancialTransaction {
   @@index([tenantId])
   @@index([accountId])
   @@index([dueDate])
+  @@unique([tenantId, idempotencyKey], map: "financial_transactions_tenant_idempotency_key")
   @@map("financial_transactions")
 }
 

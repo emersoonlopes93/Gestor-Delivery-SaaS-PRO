@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { 
   FinancialTransactionDTO, 
@@ -7,7 +7,7 @@ import {
   FinancialStatus,
   FinancialTransactionType
 } from '@gestor/types';
-import { FinancialStatus as PrismaFinancialStatus, FinancialTransactionType as PrismaFinancialTransactionType, Prisma } from '@prisma/client';
+import { FinancialStatus as PrismaFinancialStatus, FinancialTransactionType as PrismaFinancialTransactionType, MarketplaceProvider, MarketplaceSettlementStatus, OrderStatus, Prisma } from '@prisma/client';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
@@ -100,9 +100,28 @@ export class FinancialTransactionsService {
     }
   }
 
+  private normalizePaymentDate(status: PrismaFinancialStatus, paymentDate: Date | string | undefined): Date | null {
+    if (status !== PrismaFinancialStatus.paid) return null;
+    if (paymentDate === undefined) return new Date();
+    const normalized = paymentDate instanceof Date ? paymentDate : new Date(paymentDate);
+    if (Number.isNaN(normalized.getTime())) {
+      throw new BadRequestException('Informe uma data de pagamento válida.');
+    }
+    return normalized;
+  }
+
+  private normalizeIdempotencyKey(key: string | undefined): string | undefined {
+    if (key === undefined) return undefined;
+    const normalized = key.trim();
+    if (!normalized || normalized.length > 120) {
+      throw new BadRequestException('A identificação da operação é inválida.');
+    }
+    return normalized;
+  }
+
   async findAll(
     tenantId: string,
-    filters?: { accountId?: string; type?: FinancialTransactionType; status?: FinancialStatus },
+    filters?: { accountId?: string; type?: FinancialTransactionType; status?: FinancialStatus; startDate?: Date; endDate?: Date },
   ): Promise<FinancialTransactionDTO[]> {
     const transactions = await this.prisma.financialTransaction.findMany({
       where: { 
@@ -110,6 +129,7 @@ export class FinancialTransactionsService {
         ...(filters?.accountId ? { accountId: filters.accountId } : {}),
         ...(filters?.type ? { type: this.toPrismaType(filters.type) } : {}),
         ...(filters?.status ? { status: this.toPrismaStatus(filters.status) } : {}),
+        ...(filters?.startDate || filters?.endDate ? { createdAt: { ...(filters.startDate ? { gte: filters.startDate } : {}), ...(filters.endDate ? { lte: filters.endDate } : {}) } } : {}),
       },
       include: {
         account: true
@@ -120,9 +140,68 @@ export class FinancialTransactionsService {
     return transactions.map(t => this.mapToDTO(t));
   }
 
+  /**
+   * Financial read model deliberately keeps commercial sales, recorded receipts,
+   * account balances and provider settlements separate. It is available to
+   * finance.read users and does not depend on reports.read.
+   */
+  async getSummary(tenantId: string, startDate?: Date, endDate?: Date) {
+    const createdAt = startDate || endDate
+      ? { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) }
+      : undefined;
+    const paymentDate = createdAt;
+    const dueDate = createdAt;
+    const now = new Date();
+    const [completedSales, paidIncome, paidExpenses, accountBalances, pendingPayables, overduePayables, food99Receivable, food99Posted, food99Divergences, paidWithoutPaymentDate] = await Promise.all([
+      this.prisma.order.aggregate({ where: { tenantId, status: OrderStatus.completed, ...(createdAt ? { createdAt } : {}) }, _sum: { total: true } }),
+      this.prisma.financialTransaction.aggregate({ where: { tenantId, status: PrismaFinancialStatus.paid, type: PrismaFinancialTransactionType.income, ...(paymentDate ? { paymentDate } : {}) }, _sum: { amount: true } }),
+      this.prisma.financialTransaction.aggregate({ where: { tenantId, status: PrismaFinancialStatus.paid, type: PrismaFinancialTransactionType.expense, ...(paymentDate ? { paymentDate } : {}) }, _sum: { amount: true } }),
+      this.prisma.financialAccount.aggregate({ where: { tenantId, active: true }, _sum: { balance: true } }),
+      this.prisma.financialTransaction.aggregate({ where: { tenantId, type: PrismaFinancialTransactionType.expense, status: PrismaFinancialStatus.pending, ...(dueDate ? { dueDate } : {}), AND: [{ OR: [{ dueDate: null }, { dueDate: { gte: now } }] }] }, _sum: { amount: true }, _count: true }),
+      this.prisma.financialTransaction.aggregate({ where: { tenantId, type: PrismaFinancialTransactionType.expense, ...(dueDate ? { dueDate } : {}), OR: [{ status: PrismaFinancialStatus.overdue }, { status: PrismaFinancialStatus.pending, dueDate: { lt: now } }] }, _sum: { amount: true }, _count: true }),
+      this.prisma.marketplaceSettlement.aggregate({ where: { tenantId, provider: MarketplaceProvider.FOOD_99, status: MarketplaceSettlementStatus.LIQUIDATED_UNPOSTED, ...(createdAt ? { withdrawDate: createdAt } : {}) }, _sum: { withdrawAmount: true }, _count: true }),
+      this.prisma.marketplaceSettlement.aggregate({ where: { tenantId, provider: MarketplaceProvider.FOOD_99, status: MarketplaceSettlementStatus.POSTED, ...(createdAt ? { withdrawDate: createdAt } : {}) }, _sum: { withdrawAmount: true }, _count: true }),
+      this.prisma.marketplaceSettlement.count({ where: { tenantId, provider: MarketplaceProvider.FOOD_99, status: MarketplaceSettlementStatus.RECONCILIATION_DISCREPANCY, ...(createdAt ? { withdrawDate: createdAt } : {}) } }),
+      this.prisma.financialTransaction.count({ where: { tenantId, status: PrismaFinancialStatus.paid, paymentDate: null } }),
+    ]);
+
+    return {
+      period: { startDate: startDate?.toISOString() ?? null, endDate: endDate?.toISOString() ?? null },
+      completedSales: Number(completedSales._sum.total ?? 0),
+      recordedReceipts: Number(paidIncome._sum.amount ?? 0),
+      recordedPayments: Number(paidExpenses._sum.amount ?? 0),
+      currentAccountsBalance: Number(accountBalances._sum.balance ?? 0),
+      payables: {
+        pending: Number(pendingPayables._sum.amount ?? 0),
+        pendingCount: pendingPayables._count,
+        overdue: Number(overduePayables._sum.amount ?? 0),
+        overdueCount: overduePayables._count,
+      },
+      food99: {
+        documentedReceivable: Number(food99Receivable._sum.withdrawAmount ?? 0) / 100,
+        documentedReceivableCount: food99Receivable._count,
+        received: Number(food99Posted._sum.withdrawAmount ?? 0) / 100,
+        receivedCount: food99Posted._count,
+        discrepancyCount: food99Divergences,
+      },
+      dataQuality: { paidWithoutPaymentDate },
+      notes: {
+        accountsBalance: 'Saldo atual das contas; não depende do período selecionado.',
+        posCash: 'O caixa operacional do PDV é acompanhado separadamente e não é somado ao saldo das contas.',
+        food99: 'Somente repasses 99Food importados e conciliados aparecem aqui. iFood não possui repasse financeiro comprovado neste painel.',
+      },
+    };
+  }
+
   async create(tenantId: string, dto: CreateFinancialTransactionDTO): Promise<FinancialTransactionDTO> {
     if (this.isLifecycleManagedReference(dto.referenceType)) {
       throw new ConflictException('Lancamentos vinculados devem ser gerenciados pelo lifecycle de origem.');
+    }
+    const status = dto.status ? this.toPrismaStatus(dto.status) : PrismaFinancialStatus.pending;
+    const paymentDate = this.normalizePaymentDate(status, dto.paymentDate);
+    const idempotencyKey = this.normalizeIdempotencyKey(dto.idempotencyKey);
+    if (status === PrismaFinancialStatus.paid && !dto.accountId) {
+      throw new BadRequestException('Selecione a conta em que o valor foi recebido ou pago.');
     }
     if (dto.accountId) {
       const account = await this.prisma.financialAccount.findFirst({
@@ -132,7 +211,14 @@ export class FinancialTransactionsService {
       if (!account) throw new NotFoundException('Conta financeira nÃ£o encontrada');
     }
 
-    return runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+    try {
+      return await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      if (idempotencyKey) {
+        const existing = await tx.financialTransaction.findFirst({
+          where: { tenantId, idempotencyKey }, include: { account: true },
+        });
+        if (existing) return this.mapToDTO(existing);
+      }
       const transaction = await tx.financialTransaction.create({
         data: {
           tenantId,
@@ -140,12 +226,13 @@ export class FinancialTransactionsService {
           type: this.toPrismaType(dto.type),
           category: dto.category,
           amount: dto.amount,
-          status: dto.status ? this.toPrismaStatus(dto.status) : PrismaFinancialStatus.pending,
+          status,
           dueDate: dto.dueDate,
-          paymentDate: dto.paymentDate,
+          paymentDate,
           description: dto.description,
           referenceId: dto.referenceId,
           referenceType: dto.referenceType,
+          idempotencyKey,
         },
         include: {
           account: true
@@ -158,8 +245,17 @@ export class FinancialTransactionsService {
         this.getAccountBalanceEffect(transaction),
       );
 
-      return this.mapToDTO(transaction);
-    });
+        return this.mapToDTO(transaction);
+      });
+    } catch (error) {
+      if (idempotencyKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const existing = await this.prisma.financialTransaction.findFirst({
+          where: { tenantId, idempotencyKey }, include: { account: true },
+        });
+        if (existing) return this.mapToDTO(existing);
+      }
+      throw error;
+    }
   }
 
   async update(tenantId: string, id: string, dto: UpdateFinancialTransactionDTO): Promise<FinancialTransactionDTO> {
@@ -178,6 +274,21 @@ export class FinancialTransactionsService {
         throw new ConflictException('Lancamento vinculado e imutavel fora do lifecycle de origem.');
       }
 
+      const requestedStatus = dto.status === undefined ? current.status : this.toPrismaStatus(dto.status);
+      if (current.status === PrismaFinancialStatus.cancelled) {
+        throw new ConflictException('Um lançamento cancelado não pode ser alterado. Crie um novo lançamento se necessário.');
+      }
+      if (current.status === PrismaFinancialStatus.paid && requestedStatus !== PrismaFinancialStatus.paid) {
+        throw new ConflictException('Um lançamento pago não pode ser cancelado ou reaberto. Registre um estorno separado.');
+      }
+      if (current.status === PrismaFinancialStatus.paid && (dto.amount !== undefined || dto.accountId !== undefined)) {
+        throw new ConflictException('O valor ou a conta de um lançamento pago não podem ser alterados. Registre um ajuste separado.');
+      }
+      const nextAccountId = dto.accountId === undefined ? current.accountId : dto.accountId;
+      if (requestedStatus === PrismaFinancialStatus.paid && !nextAccountId) {
+        throw new BadRequestException('Selecione a conta em que o valor foi recebido ou pago.');
+      }
+
       if (dto.accountId !== undefined) {
         await this.ensureAccountBelongsToTenant(tx, tenantId, dto.accountId);
       }
@@ -186,8 +297,9 @@ export class FinancialTransactionsService {
         where: { id, tenantId },
         data: {
           ...(dto.accountId !== undefined && { accountId: dto.accountId }),
-          ...(dto.status !== undefined && { status: this.toPrismaStatus(dto.status) }),
-          ...(dto.paymentDate !== undefined && { paymentDate: dto.paymentDate }),
+          ...(dto.status !== undefined && { status: requestedStatus }),
+          ...(requestedStatus === PrismaFinancialStatus.paid && { paymentDate: this.normalizePaymentDate(requestedStatus, dto.paymentDate === undefined ? current.paymentDate ?? undefined : dto.paymentDate) }),
+          ...(requestedStatus !== PrismaFinancialStatus.paid && { paymentDate: null }),
           ...(dto.description !== undefined && { description: dto.description }),
           ...(dto.amount !== undefined && { amount: dto.amount }),
         },

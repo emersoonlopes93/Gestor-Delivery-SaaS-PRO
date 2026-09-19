@@ -51,6 +51,8 @@ export interface CreateFinancialTransactionDTO {
   description?: string;
   referenceId?: string;
   referenceType?: string;
+  /** Identifica uma tentativa de envio manual. Repetir a mesma chave não cria outro lançamento. */
+  idempotencyKey?: string;
 }
 
 export interface UpdateFinancialTransactionDTO {
