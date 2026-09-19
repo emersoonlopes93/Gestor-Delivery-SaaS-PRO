@@ -80,7 +80,7 @@ export class MarketplaceCatalogMappingService {
       const items = Array.isArray(payload?.items) ? payload.items : [];
       for (const value of items) {
         const item = this.asRecord(value);
-        const externalItemId = typeof item?.externalItemId === 'string' ? item.externalItemId.trim() : '';
+        const externalItemId = typeof item?.catalogIdentity === 'string' ? item.catalogIdentity.trim() : '';
         if (!externalItemId) continue;
         const key = `${order.connectionId}:${order.provider}:${externalItemId}`;
         if (!mapped.has(key) && !candidates.has(key)) candidates.set(key, {
@@ -107,7 +107,63 @@ export class MarketplaceCatalogMappingService {
       where: { tenantId, connectionId, provider, status: MarketplaceCatalogMappingStatus.ACTIVE, externalItemId: { in: ids } },
       select: { externalItemId: true, productId: true },
     });
-    return new Map(rows.map((row) => [row.externalItemId, row.productId]));
+    const resolved = new Map(rows.map((row) => [row.externalItemId, row.productId]));
+    const unresolvedIds = ids.filter((id) => !resolved.has(id));
+    if (unresolvedIds.length === 0) return resolved;
+
+    // A provider code is accepted only when it identifies exactly one active
+    // product in this tenant. Names and arbitrary order item IDs never enter
+    // this path, avoiding cross-store or ambiguous inventory depletion.
+    const products = await this.prisma.product.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [
+          { id: { in: unresolvedIds } },
+          { sku: { in: unresolvedIds } },
+        ],
+      },
+      select: { id: true, sku: true },
+    });
+    const candidatesByIdentity = new Map<string, Set<string>>();
+    for (const product of products) {
+      if (unresolvedIds.includes(product.id)) {
+        const candidates = candidatesByIdentity.get(product.id) ?? new Set<string>();
+        candidates.add(product.id);
+        candidatesByIdentity.set(product.id, candidates);
+      }
+      if (product.sku && unresolvedIds.includes(product.sku)) {
+        const candidates = candidatesByIdentity.get(product.sku) ?? new Set<string>();
+        candidates.add(product.id);
+        candidatesByIdentity.set(product.sku, candidates);
+      }
+    }
+    const automaticMappings = unresolvedIds.flatMap((externalItemId) => {
+      const candidates = candidatesByIdentity.get(externalItemId);
+      if (!candidates || candidates.size !== 1) return [];
+      const [productId] = candidates;
+      return [{
+        tenantId,
+        connectionId,
+        provider,
+        externalItemId,
+        productId,
+        status: MarketplaceCatalogMappingStatus.ACTIVE,
+        externalReferenceId: 'auto:exact-product-code',
+      }];
+    });
+    if (automaticMappings.length === 0) return resolved;
+
+    await this.prisma.marketplaceCatalogMapping.createMany({
+      data: automaticMappings,
+      skipDuplicates: true,
+    });
+    const persistedRows = await this.prisma.marketplaceCatalogMapping.findMany({
+      where: { tenantId, connectionId, provider, status: MarketplaceCatalogMappingStatus.ACTIVE, externalItemId: { in: automaticMappings.map((mapping) => mapping.externalItemId) } },
+      select: { externalItemId: true, productId: true },
+    });
+    for (const row of persistedRows) resolved.set(row.externalItemId, row.productId);
+    return resolved;
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {

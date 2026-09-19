@@ -85,20 +85,18 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useUpsertMarketplaceCatalogMapping).mockReturnValue(mutation() as never);
   });
 
-  it('renders multiple merchants with independent status and actions without secrets', () => {
+  it('renders the simple channel journey without exposing technical identifiers', () => {
     const html = renderToStaticMarkup(<IntegrationsPage />);
 
-    expect(html).toContain('Loja Centro');
-    expect(html).toContain('Merchant: merchant-a');
-    expect(html).toContain('Loja Shopping');
-    expect(html).toContain('Merchant: merchant-b');
-    expect(html).toContain('Ativo');
-    expect(html).toContain('Reautenticação necessária');
-    expect(html).toContain('Desconectar');
-    expect(html).toContain('Reconectar');
-    expect(html).toContain('Adicionar loja iFood');
+    expect(html).toContain('Canais de venda');
+    expect(html).toContain('Conecte suas lojas para receber os pedidos em um só lugar.');
     expect(html).toContain('99Food');
-    expect(html).toContain('Autorizar');
+    expect(html).toContain('iFood');
+    expect(html).toContain('Gerenciar');
+    expect(html).toContain('Produtos que precisam de atenção');
+    expect(html).toContain('Atividade e ajuda');
+    expect(html).not.toContain('merchant-a');
+    expect(html).not.toContain('store-a');
     expect(html).not.toContain('accessToken');
     expect(html).not.toContain('refreshToken');
   });
@@ -117,21 +115,18 @@ describe('IntegrationsPage multi-iFood connections', () => {
     } as never);
 
     const html = renderToStaticMarkup(<IntegrationsPage />);
-    expect(html).toContain('Falhou');
-    expect(html).not.toContain('Offline');
+    expect(html).toContain('Atividade e ajuda');
+    expect(html).not.toContain('Incomplete order detail.');
   });
 
   it('keeps the generic marketplace page and 99Food available without exposing iFood administration', () => {
     ifoodEnabled = false;
     const html = renderToStaticMarkup(<IntegrationsPage />);
 
-    expect(html).toContain('Integrações Marketplace');
+    expect(html).toContain('Canais de venda');
     expect(html).toContain('99Food');
-    expect(html).toContain('Autorizar');
-    expect(html).toContain('Adicionar loja 99Food');
-    expect(html).not.toContain('Adicionar loja iFood');
-    expect(html).not.toContain('Loja Centro');
-    expect(html).not.toContain('Loja Shopping');
+    expect(html).toContain('Conectar loja');
+    expect(html).not.toContain('iFood');
     expect(useMarketplaceStatus).toHaveBeenCalledWith('ifood', false);
   });
 
@@ -139,8 +134,8 @@ describe('IntegrationsPage multi-iFood connections', () => {
     ifoodEnabled = true;
     const html = renderToStaticMarkup(<IntegrationsPage />);
 
-    expect(html).toContain('Adicionar loja iFood');
-    expect(html).toContain('Loja Centro');
+    expect(html).toContain('iFood');
+    expect(html).toContain('Gerenciar');
     expect(useMarketplaceStatus).toHaveBeenCalledWith('ifood', true);
   });
 });

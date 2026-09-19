@@ -297,6 +297,22 @@ The same mapping model can represent iFood only for the exact item identity carr
 imported payload. No iFood name-based matching or outbound availability endpoint is enabled;
 the provider's current project contract does not establish an availability write endpoint.
 
+### Automatic exact product-code association (2026-09-19)
+
+For newly ingested marketplace orders, PedeHub may create the existing
+`MarketplaceCatalogMapping` automatically only when the provider supplies a trusted catalog
+identity and it identifies exactly one active product in the same tenant. 99Food uses only
+`app_item_id`; its volatile `item_id` never drives inventory. iFood uses only the supplied
+merchant SKU. The trusted identity can equal the tenant product UUID or SKU, but names,
+arbitrary order item IDs and unvalidated provider JSON never match inventory.
+
+The resulting mapping remains scoped to the existing connection, provider and tenant. A
+missing code, duplicate product code, unsupported identity, or item with provider options
+leaves that item unmapped: the order remains operational, a divergence is recorded, and no
+incorrect recipe depletion occurs. Existing canonical depletion and cancellation reversal
+remain idempotent. Creating a mapping later is forward-looking; it never silently depletes an
+older imported order. No outbound marketplace availability synchronization is claimed.
+
 ### Native action activation and privacy-protected names (2026-09-05)
 
 99Food actions initiated from the operational order board require `orders.update_status`, a tenant-scoped `CONNECTED` 99Food connection, `MARKETPLACE_99FOOD_ENABLED=true`, and operational BullMQ. The connected store is the tenant's explicit opt-in for these native actions. The generic beta `marketplace_orders` preset controls marketplace-management surfaces and does not independently block the normal order-status endpoint; iFood retains its provider-specific feature and entitlement gate.

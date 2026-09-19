@@ -385,6 +385,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       // `app_item_id` is the merchant-owned persistent catalog identity. The
       // 99Food internal item_id can change when a catalog item is recreated.
       externalItemId: this.readIdentifier(item, ['app_item_id', 'item_id']),
+      catalogIdentity: this.readIdentifier(item, ['app_item_id']),
       name: this.readString(item, ['name']) ?? `Item ${index + 1}`,
       quantity,
       unitPrice,

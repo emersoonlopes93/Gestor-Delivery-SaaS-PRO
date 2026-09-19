@@ -731,7 +731,8 @@ export class MarketplaceOrderIngestionService {
     unmappedExternalItemIds: string[];
   }> {
     const externalItemIds = normalized.items
-      .map((item) => item.externalItemId?.trim() ?? '')
+      .filter((item) => (item.options?.length ?? 0) === 0)
+      .map((item) => item.catalogIdentity?.trim() ?? '')
       .filter(Boolean);
     const productIds = await this.catalogMappings.resolveProducts(
       normalized.connection.tenantId,
@@ -741,10 +742,13 @@ export class MarketplaceOrderIngestionService {
     );
     const unmappedExternalItemIds: string[] = [];
     const items = normalized.items.map((item) => {
-      const externalItemId = item.externalItemId?.trim() ?? '';
+      const externalItemId = item.catalogIdentity?.trim() ?? '';
+      const hasAmbiguousOptions = (item.options?.length ?? 0) > 0;
       const productId = externalItemId ? productIds.get(externalItemId) ?? null : null;
-      if (externalItemId && !productId) unmappedExternalItemIds.push(externalItemId);
-      return { ...item, productId };
+      if (!externalItemId || hasAmbiguousOptions || !productId) {
+        unmappedExternalItemIds.push(externalItemId || item.externalItemId?.trim() || item.name);
+      }
+      return { ...item, productId: hasAmbiguousOptions ? null : productId };
     });
     return { order: { ...normalized, items }, unmappedExternalItemIds };
   }
