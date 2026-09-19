@@ -2626,6 +2626,12 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Correção: `Food99Provider.fetchOrderDetails()` mantém a consulta de detalhe como preferência, mas quando ela falha com `Food99ApiError` reutiliza exclusivamente o snapshot nativo de `orderNew`. Eventos sem snapshot continuam falhando, sem inventar pedido incompleto.
 - Validação: provider + cliente HTTP 2 suites / 50 testes PASS; `check:no-any` e `git diff --check` PASS. Nenhum reprocessamento, banco remoto, provider mutation, deploy ou restart foi feito.
 
+### Correção de build da API (2026-09-19)
+
+- O build Docker falhava no typecheck de `purchases.postgres.integration-test.ts`: o DTO de compra passou a exigir `purchaseUnit`, mas os fixtures legados não a forneciam.
+- Os fixtures agora usam explicitamente `PurchaseUnitType.UN`, do mesmo enum público do DTO; o enum Prisma continua restrito ao seed de ingredientes. Sem mudança em schema, migration ou regra de negócio.
+- `pnpm --filter @gestor/api exec tsc -p tsconfig.build.json --noEmit --pretty false` e `pnpm --filter @gestor/api build` PASS.
+
 ## Estoque, compras e receitas - alinhamento de contratos (2026-09-17)
 
 - Fichas técnicas de produtos e combos usam a mesma entidade canônica de produto; a API valida produto/insumos do tenant, quantidades positivas e duplicidade. Uma receita vazia remove a composição.

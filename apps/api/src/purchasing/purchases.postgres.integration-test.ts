@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { ConflictException } from '@nestjs/common';
-import { PaymentStatus } from '@gestor/types';
+import { PaymentStatus, UnitType as PurchaseUnitType } from '@gestor/types';
 import {
   FinancialStatus,
   PrismaClient,
@@ -59,7 +59,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
       idempotencyKey: `purchase-create-${suffix}`,
       purchaseDate: '2026-09-10',
       paymentStatus: PaymentStatus.PENDING,
-      items: [{ ingredientId: ingredient.id, quantity: 10, purchaseUnit: UnitType.un, unitCost: 10 }],
+      items: [{ ingredientId: ingredient.id, quantity: 10, purchaseUnit: PurchaseUnitType.UN, unitCost: 10 }],
     };
 
     const [createdA, createdB] = await Promise.all([
@@ -110,7 +110,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
       idempotencyKey: `purchase-paid-create-${suffix}`,
       paymentStatus: PaymentStatus.PAID,
       accountId: account.id,
-      items: [{ ingredientId: ingredient.id, quantity: 2, purchaseUnit: UnitType.un, unitCost: 50 }],
+      items: [{ ingredientId: ingredient.id, quantity: 2, purchaseUnit: PurchaseUnitType.UN, unitCost: 50 }],
     };
     const [createdA, createdB] = await Promise.all([
       service.create(tenant.id, paidDto),
@@ -137,7 +137,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
       supplierId: supplier.id,
       idempotencyKey: `purchase-insufficient-${suffix}`,
       paymentStatus: PaymentStatus.PENDING,
-      items: [{ ingredientId: ingredient.id, quantity: 10, purchaseUnit: UnitType.un, unitCost: 4 }],
+      items: [{ ingredientId: ingredient.id, quantity: 10, purchaseUnit: PurchaseUnitType.UN, unitCost: 4 }],
     });
     await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 2 } });
     const beforeMovements = await prisma.stockMovement.count({ where: { tenantId: tenant.id } });
@@ -177,7 +177,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
     const purchase = await service.create(tenant.id, {
       supplierId: supplier.id, idempotencyKey: `purchase-pay-rollback-${suffix}`,
       paymentStatus: PaymentStatus.PENDING,
-      items: [{ ingredientId: ingredient.id, quantity: 1, purchaseUnit: UnitType.un, unitCost: 100 }],
+      items: [{ ingredientId: ingredient.id, quantity: 1, purchaseUnit: PurchaseUnitType.UN, unitCost: 100 }],
     });
     await prisma.$executeRawUnsafe("CREATE OR REPLACE FUNCTION fail_purchase_settlement_test() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'injected settlement failure'; END; $$ LANGUAGE plpgsql");
     await prisma.$executeRawUnsafe('CREATE TRIGGER fail_purchase_settlement_test BEFORE INSERT ON purchase_settlements FOR EACH ROW EXECUTE FUNCTION fail_purchase_settlement_test()');
@@ -198,7 +198,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
     const purchase = await service.create(tenant.id, {
       supplierId: supplier.id, idempotencyKey: `purchase-stock-rollback-${suffix}`,
       paymentStatus: PaymentStatus.PENDING,
-      items: [{ ingredientId: ingredient.id, quantity: 3, purchaseUnit: UnitType.un, unitCost: 10 }],
+      items: [{ ingredientId: ingredient.id, quantity: 3, purchaseUnit: PurchaseUnitType.UN, unitCost: 10 }],
     });
     await prisma.$executeRawUnsafe("CREATE OR REPLACE FUNCTION fail_purchase_stock_reversal_test() RETURNS trigger AS $$ BEGIN IF NEW.type = 'purchase_reversal' THEN RAISE EXCEPTION 'injected stock reversal failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql");
     await prisma.$executeRawUnsafe('CREATE TRIGGER fail_purchase_stock_reversal_test BEFORE INSERT ON stock_movements FOR EACH ROW EXECUTE FUNCTION fail_purchase_stock_reversal_test()');
@@ -219,7 +219,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
     const purchase = await service.create(tenant.id, {
       supplierId: supplier.id, idempotencyKey: `purchase-finance-rollback-${suffix}`,
       paymentStatus: PaymentStatus.PAID, accountId: account.id,
-      items: [{ ingredientId: ingredient.id, quantity: 4, purchaseUnit: UnitType.un, unitCost: 25 }],
+      items: [{ ingredientId: ingredient.id, quantity: 4, purchaseUnit: PurchaseUnitType.UN, unitCost: 25 }],
     });
     await prisma.$executeRawUnsafe("CREATE OR REPLACE FUNCTION fail_purchase_financial_reversal_test() RETURNS trigger AS $$ BEGIN IF NEW.category = 'purchase_reversal' THEN RAISE EXCEPTION 'injected financial reversal failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql");
     await prisma.$executeRawUnsafe('CREATE TRIGGER fail_purchase_financial_reversal_test BEFORE INSERT ON financial_transactions FOR EACH ROW EXECUTE FUNCTION fail_purchase_financial_reversal_test()');
