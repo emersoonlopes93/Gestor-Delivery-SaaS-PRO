@@ -5,9 +5,9 @@ describe('MarketplaceCatalogMappingService', () => {
   function setup() {
     const prisma = {
       marketplaceConnection: { findFirst: jest.fn() },
-      product: { findFirst: jest.fn() },
-      marketplaceCatalogMapping: { upsert: jest.fn(), findMany: jest.fn() },
+      marketplaceCatalogMapping: { upsert: jest.fn(), findMany: jest.fn(), createMany: jest.fn() },
       marketplaceOrder: { findMany: jest.fn() },
+      product: { findFirst: jest.fn(), findMany: jest.fn() },
     };
     return { prisma, service: new MarketplaceCatalogMappingService(prisma as never) };
   }
@@ -46,11 +46,42 @@ describe('MarketplaceCatalogMappingService', () => {
     }));
   });
 
+  it('creates and resolves an automatic mapping only for one exact tenant product code', async () => {
+    const { prisma, service } = setup();
+    prisma.marketplaceCatalogMapping.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ externalItemId: 'pizza-01', productId: 'product-a' }]);
+    prisma.product.findMany.mockResolvedValue([{ id: 'product-a', sku: 'pizza-01' }]);
+
+    await expect(service.resolveProducts('tenant-a', 'conn-a', MarketplaceProvider.FOOD_99, ['pizza-01'])).resolves.toEqual(
+      new Map([['pizza-01', 'product-a']]),
+    );
+    expect(prisma.product.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ tenantId: 'tenant-a', deletedAt: null }),
+    }));
+    expect(prisma.marketplaceCatalogMapping.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ tenantId: 'tenant-a', connectionId: 'conn-a', provider: MarketplaceProvider.FOOD_99, externalItemId: 'pizza-01', productId: 'product-a' })],
+      skipDuplicates: true,
+    }));
+  });
+
+  it('does not match a duplicated product code', async () => {
+    const { prisma, service } = setup();
+    prisma.marketplaceCatalogMapping.findMany.mockResolvedValue([]);
+    prisma.product.findMany.mockResolvedValue([
+      { id: 'product-a', sku: 'pizza-01' },
+      { id: 'product-b', sku: 'pizza-01' },
+    ]);
+
+    await expect(service.resolveProducts('tenant-a', 'conn-a', MarketplaceProvider.FOOD_99, ['pizza-01'])).resolves.toEqual(new Map());
+    expect(prisma.marketplaceCatalogMapping.createMany).not.toHaveBeenCalled();
+  });
+
   it('lists unmapped identities only for the requesting tenant and exact connection identity', async () => {
     const { prisma, service } = setup();
     prisma.marketplaceOrder.findMany.mockResolvedValue([{
       connectionId: 'conn-a', provider: MarketplaceProvider.FOOD_99,
-      normalizedPayload: { items: [{ externalItemId: 'app-item-a', name: 'Pizza externa' }] },
+      normalizedPayload: { items: [{ catalogIdentity: 'app-item-a', externalItemId: 'ignored-item-id', name: 'Pizza externa' }] },
       connection: { displayName: 'Loja 99', externalStoreId: 'store-a' },
     }]);
     prisma.marketplaceCatalogMapping.findMany.mockResolvedValue([]);
@@ -59,5 +90,17 @@ describe('MarketplaceCatalogMappingService', () => {
       connectionId: 'conn-a', provider: MarketplaceProvider.FOOD_99, externalItemId: 'app-item-a', externalItemName: 'Pizza externa',
     })]);
     expect(prisma.marketplaceOrder.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 'tenant-a' } }));
+  });
+
+  it('does not offer an unsupported volatile order item ID as a product association candidate', async () => {
+    const { prisma, service } = setup();
+    prisma.marketplaceOrder.findMany.mockResolvedValue([{
+      connectionId: 'conn-a', provider: MarketplaceProvider.FOOD_99,
+      normalizedPayload: { items: [{ externalItemId: 'volatile-item-id', name: 'Pizza externa' }] },
+      connection: { displayName: 'Loja 99', externalStoreId: 'store-a' },
+    }]);
+    prisma.marketplaceCatalogMapping.findMany.mockResolvedValue([]);
+
+    await expect(service.listUnmappedItems('tenant-a')).resolves.toEqual([]);
   });
 });

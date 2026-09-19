@@ -190,6 +190,7 @@ describe('Food99Provider', () => {
       merchantFundedDiscount: null, platformFundedDiscount: null, platformFees: null,
     });
     expect(normalized.items[0]).toMatchObject({ name: 'HambÃºrguer', notes: 'Bem passado', totalPrice: 35.99 });
+    expect(normalized.items[0].catalogIdentity).toBe('burger');
     expect(normalized.items[0].options).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'Queijo', quantity: 2, totalPrice: 3 }),
       expect.objectContaining({ name: 'Molho especial' }),

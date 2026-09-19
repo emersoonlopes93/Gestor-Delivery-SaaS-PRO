@@ -1,665 +1,91 @@
-import { useMemo, useState } from 'react';
-import { AlertCircle, Building2, Clock3, Link2, Loader2, RefreshCw, RotateCcw, Settings2, ShieldCheck, ShoppingBag, Unplug } from 'lucide-react';
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, ChevronRight, CircleHelp, Clock3, Link2, Loader2, PackageSearch, RefreshCw, Store, Unplug, X } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import {
-  useBillingPreview,
-  useConnectMarketplaceManual,
-  useDisconnectMarketplace,
-  useMarketplaceConnections,
-  useMarketplaceEvents,
-  useMarketplaceOrders,
-  useMarketplaceStatus,
-  useReconnectMarketplace,
-  useReprocessMarketplaceEvent,
-  useReprocessMarketplaceOrder,
-  useFood99AuthorizationUrl,
-  useMarketplaceCatalogMappings,
-  useMarketplaceCatalogMappingCandidates,
-  useUpsertMarketplaceCatalogMapping,
-} from '../marketplace/hooks';
+import { useConnectMarketplaceManual, useDisconnectMarketplace, useFood99AuthorizationUrl, useMarketplaceCatalogMappingCandidates, useMarketplaceConnections, useMarketplaceEvents, useMarketplaceOrders, useMarketplaceStatus, useReconnectMarketplace, useReprocessMarketplaceEvent, useReprocessMarketplaceOrder, useUpsertMarketplaceCatalogMapping } from '../marketplace/hooks';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Switch } from '../../components/ui/Switch';
 import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
 import { api } from '../../lib/api-client';
 
-type ManualConnectForm = {
-  externalMerchantId: string;
-  externalStoreId: string;
-  displayName: string;
-};
-
+type Provider = 'ifood' | '99food';
+type Overlay = 'connect' | 'stores' | 'products' | 'activity' | null;
+type ManualConnectForm = { externalMerchantId: string; externalStoreId: string; displayName: string };
 type ProductOption = { id: string; name: string; sku?: string | null };
+const providerName = (provider: Provider) => provider === 'ifood' ? 'iFood' : '99Food';
+let overlayDepth = 0;
 
-function formatDateTime(value?: string | null) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function connectionState(status?: string | null) {
+  const normalized = String(status ?? '').toUpperCase();
+  if (normalized === 'CONNECTED' || normalized === 'PROCESSED') return { label: 'Conectada', variant: 'success' as const };
+  if (normalized.includes('TOKEN_EXPIRED')) return { label: 'Precisa de atenção', variant: 'warning' as const };
+  if (normalized.includes('PAUSED')) return { label: 'Pausada', variant: 'warning' as const };
+  if (normalized.includes('FAILED') || normalized.includes('ERROR') || normalized.includes('DISCONNECTED')) return { label: 'Não conectada', variant: 'destructive' as const };
+  return { label: normalized.includes('PROCESS') ? 'Em andamento' : 'Não conectada', variant: 'info' as const };
 }
 
-function formatCurrency(value?: string | number | null) {
-  const n = typeof value === 'string' ? Number(value) : value ?? 0;
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(n) ? n : 0);
-}
-
-function statusBadge(status?: string | null) {
-  const tone = String(status || '').toUpperCase();
-  if (tone.includes('TOKEN_EXPIRED')) return <Badge variant="warning" size="sm">Reautenticação necessária</Badge>;
-  if (tone.includes('PAUSED')) return <Badge variant="warning" size="sm">Pausada</Badge>;
-  if (tone.includes('PROCESSED') || tone === 'CONNECTED') return <Badge variant="success" size="sm">Ativo</Badge>;
-  if (tone.includes('PROCESS')) return <Badge variant="warning" size="sm">Processando</Badge>;
-  if (tone.includes('FAILED') || tone.includes('ERROR') || tone.includes('DISCONNECTED')) return <Badge variant="destructive" size="sm">Offline</Badge>;
-  return <Badge variant="info" size="sm">{status || '—'}</Badge>;
-}
-
-function eventStatusBadge(status?: string | null) {
-  const tone = String(status || '').toUpperCase();
-  if (tone === 'PROCESSED') return <Badge variant="success" size="sm">Processado</Badge>;
-  if (tone === 'PROCESSING' || tone === 'QUEUED' || tone === 'RECEIVED') return <Badge variant="warning" size="sm">Processando</Badge>;
-  if (tone === 'FAILED') return <Badge variant="destructive" size="sm">Falhou</Badge>;
-  if (tone === 'IGNORED') return <Badge variant="info" size="sm">Ignorado</Badge>;
-  return <Badge variant="info" size="sm">{status || '—'}</Badge>;
+function OverlayShell({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    overlayDepth += 1;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); return; }
+      if (event.key !== 'Tab') return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable?.length) { event.preventDefault(); return; }
+      const first = focusable[0]; const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === dialogRef.current || document.activeElement === first)) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => { window.removeEventListener('keydown', onKeyDown); overlayDepth -= 1; if (overlayDepth === 0) document.body.style.overflow = previousOverflow; restoreFocusRef.current?.focus(); };
+  }, []);
+  const dismiss = () => closeRef.current();
+  return <div className="fixed inset-0 z-50 flex items-end bg-foreground/35 p-0 sm:items-center sm:justify-center sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismiss(); }}><section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className="max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl border border-border bg-card shadow-2xl outline-none sm:max-w-2xl sm:rounded-3xl"><header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card px-5 py-4 sm:px-6"><h2 id={titleId} className="min-w-0 text-lg font-black text-foreground">{title}</h2><button type="button" onClick={dismiss} className="shrink-0 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary" aria-label="Fechar"><X className="h-5 w-5" /></button></header><div className="p-5 sm:p-6">{children}</div></section></div>;
 }
 
 export function IntegrationsPage() {
   const queryClient = useQueryClient();
   const { isFeatureEnabled } = useTenantCapabilities();
   const canManageIfood = isFeatureEnabled('ifood_marketplace');
-  const [showManualForm, setShowManualForm] = useState(false);
-  const [manualProvider, setManualProvider] = useState<'ifood' | '99food'>('ifood');
-  const [manualForm, setManualForm] = useState<ManualConnectForm>({
-    externalMerchantId: '',
-    externalStoreId: '',
-    displayName: 'iFood',
-  });
-  const [catalogMappingForm, setCatalogMappingForm] = useState({
-    connectionId: '', externalItemId: '', externalItemName: '', externalReferenceId: '', productId: '',
-  });
-
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const [showSupportDetails, setShowSupportDetails] = useState(false);
+  const [manualProvider, setManualProvider] = useState<Provider>('ifood');
+  const [manualForm, setManualForm] = useState<ManualConnectForm>({ externalMerchantId: '', externalStoreId: '', displayName: 'iFood' });
+  const [catalogMappingForm, setCatalogMappingForm] = useState({ connectionId: '', externalItemId: '', externalItemName: '', externalReferenceId: '', productId: '' });
   const { data: status, isLoading: loadingStatus, refetch: refetchStatus } = useMarketplaceStatus('ifood', canManageIfood);
   const { data: connections, isLoading: loadingConnections, isError: connectionsError, error: connectionsErrorObj, refetch: refetchConnections } = useMarketplaceConnections();
   const { data: orders = [], isLoading: loadingOrders, isError: ordersError, error: ordersErrorObj, refetch: refetchOrders } = useMarketplaceOrders();
-  const { data: events = [], isLoading: loadingEvents, isError: eventsError, error: eventsErrorObj, refetch: refetchEvents } = useMarketplaceEvents();
-  const { data: catalogMappings = [], isLoading: loadingCatalogMappings } = useMarketplaceCatalogMappings();
+  const { data: events = [], isError: eventsError, error: eventsErrorObj, refetch: refetchEvents } = useMarketplaceEvents();
   const { data: catalogMappingCandidates = [], isLoading: loadingCatalogMappingCandidates } = useMarketplaceCatalogMappingCandidates();
-  const { data: catalogProducts = [] } = useQuery({
-    queryKey: ['marketplace-catalog-products'],
-    queryFn: async () => (await api.get<ProductOption[]>('/catalog/products')).data ?? [],
-  });
-  const { data: billingPreview } = useBillingPreview();
-
-  const connectMutation = useConnectMarketplaceManual('ifood');
-  const connectFood99Mutation = useConnectMarketplaceManual('99food');
-  const disconnectMutation = useDisconnectMarketplace();
-  const reconnectMutation = useReconnectMarketplace();
-  const reprocessEventMutation = useReprocessMarketplaceEvent();
-  const reprocessOrderMutation = useReprocessMarketplaceOrder();
-  const food99Authorization = useFood99AuthorizationUrl();
-  const upsertCatalogMapping = useUpsertMarketplaceCatalogMapping();
-
-  const activeConnection = useMemo(() => status ?? connections?.find((c) => c.provider === 'ifood') ?? null, [status, connections]);
-  const isBillingEnabled = Boolean(billingPreview?.includedChannels?.includes('marketplace_ifood'));
-
-  const includedChannels = billingPreview?.includedChannels ?? [];
-  const visibleConnections = useMemo(
-    () => connections?.filter((connection) => canManageIfood || connection.provider !== 'ifood') ?? [],
-    [canManageIfood, connections],
-  );
-  const visibleEvents = useMemo(
-    () => events.filter((event) => canManageIfood || event.provider !== 'ifood'),
-    [canManageIfood, events],
-  );
-  const visibleOrders = useMemo(
-    () => orders.filter((order) => canManageIfood || order.provider !== 'ifood'),
-    [canManageIfood, orders],
-  );
-
-  const refreshMarketplace = () => Promise.all([
-    ...(canManageIfood ? [refetchStatus()] : []),
-    refetchConnections(),
-    refetchOrders(),
-    refetchEvents(),
-  ]);
-
-  const handleCatalogMappingSave = async () => {
-    if (!catalogMappingForm.connectionId || !catalogMappingForm.externalItemId.trim() || !catalogMappingForm.productId) {
-      toast.error('Selecione a conexão, informe o ID externo e escolha o produto canônico.');
-      return;
-    }
-    try {
-      await upsertCatalogMapping.mutateAsync({
-        connectionId: catalogMappingForm.connectionId,
-        externalItemId: catalogMappingForm.externalItemId.trim(),
-        externalItemName: catalogMappingForm.externalItemName.trim() || undefined,
-        externalReferenceId: catalogMappingForm.externalReferenceId.trim() || undefined,
-        productId: catalogMappingForm.productId,
-      });
-      toast.success('Mapping de catálogo salvo e sincronizado.');
-      setCatalogMappingForm({ connectionId: '', externalItemId: '', externalItemName: '', externalReferenceId: '', productId: '' });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Falha ao salvar mapping de catálogo.');
-    }
-  };
-
-  const handleManualConnect = async () => {
-    if (manualProvider === 'ifood' && !canManageIfood) {
-      toast.error('A integração iFood não está habilitada para este tenant.');
-      return;
-    }
-    if (!manualForm.externalMerchantId.trim() || !manualForm.externalStoreId.trim()) {
-      toast.error('Preencha merchant e store id para criar a conexão manual.');
-      return;
-    }
-
-    try {
-      const selectedMutation = manualProvider === '99food' ? connectFood99Mutation : connectMutation;
-      await selectedMutation.mutateAsync({
-        externalMerchantId: manualForm.externalMerchantId.trim(),
-        externalStoreId: manualForm.externalStoreId.trim(),
-        displayName: manualForm.displayName.trim() || (manualProvider === '99food' ? '99Food' : 'iFood'),
-        authType: manualProvider === '99food' ? 'oauth2_client_credentials' : 'manual',
-        settingsJson: {
-          autoConfirmOrders: false,
-          pollingFallbackEnabled: manualProvider === '99food',
-          presenceMode: manualProvider === '99food' ? 'POLLING' : 'WEBHOOK',
-          importAsStatus: 'pending',
-        },
-      });
-      toast.success(`Conexão ${manualProvider === '99food' ? '99Food' : 'iFood'} atualizada.`);
-      setShowManualForm(false);
-      setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: manualProvider === '99food' ? '99Food' : 'iFood' });
-      await refreshMarketplace();
-      queryClient.invalidateQueries({ queryKey: ['marketplace-billing-preview'] });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao conectar o marketplace.';
-      toast.error(message);
-    }
-  };
-
-  const handleDisconnect = async (connectionId: string) => {
-    try {
-      await disconnectMutation.mutateAsync(connectionId);
-      toast.success('Conexão iFood desconectada.');
-      if (canManageIfood) await refetchStatus();
-      await refetchConnections();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao desconectar.';
-      toast.error(message);
-    }
-  };
-
-  const handleReconnect = async (connectionId: string) => {
-    try {
-      await reconnectMutation.mutateAsync(connectionId);
-      toast.success('Loja iFood reconectada.');
-      if (canManageIfood) await refetchStatus();
-      await refetchConnections();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao reconectar.';
-      toast.error(message);
-    }
-  };
-
-  const channelLabel = isBillingEnabled ? 'Incluído no billing' : 'Excluído do billing';
-  const channelTone = isBillingEnabled ? 'success' : 'warning';
-  const sections = [
-    ...(canManageIfood ? [{ id: 'ifood', label: 'iFood', provider: 'ifood' as const, comingSoon: false }] : []),
-    { id: 'rappi', label: 'Rappi', provider: 'rappi' as const, comingSoon: true },
-    { id: 'ubereats', label: 'Uber Eats', provider: 'ubereats' as const, comingSoon: true },
-    { id: '99food', label: '99Food', provider: '99food' as const, comingSoon: false },
-  ];
-
-  return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      <PageHeader
-        title="Integrações Marketplace"
-        description="Central de conexão, ingestão e acompanhamento dos marketplaces deste tenant."
-        icon={Link2}
-        action={
-          <button
-            type="button"
-            onClick={refreshMarketplace}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Atualizar
-          </button>
-        }
-      />
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {canManageIfood ? <Card className="p-6 xl:col-span-2 space-y-5">
-          {connectionsError || ordersError || eventsError ? (
-            <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-              <div className="font-black">Falha ao carregar marketplace</div>
-              <div className="mt-1 text-sm opacity-90">
-                {(connectionsErrorObj as Error | undefined)?.message ||
-                  (ordersErrorObj as Error | undefined)?.message ||
-                  (eventsErrorObj as Error | undefined)?.message ||
-                  'Não foi possível carregar os dados da integração.'}
-              </div>
-            </div>
-          ) : null}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Badge variant="info" size="sm">iFood</Badge>
-            {statusBadge(activeConnection?.status)}
-            {loadingStatus ? <Badge variant="info" size="sm">Carregando</Badge> : null}
-          </div>
-              <h2 className="text-xl font-black text-foreground">Status da conexão</h2>
-              <p className="text-sm text-muted-foreground">
-                Conexão manual, importação de pedidos e reprocessamento de inbox em um só lugar.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setManualProvider('ifood');
-                  setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: 'iFood' });
-                  setShowManualForm((v) => !v);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 transition-all"
-              >
-                <Settings2 className="w-4 h-4" />
-                {showManualForm ? 'Fechar' : 'Adicionar loja iFood'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setManualProvider('99food');
-                  setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: '99Food' });
-                  setShowManualForm(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-black text-foreground hover:bg-muted transition-all"
-              >
-                <Settings2 className="w-4 h-4" />
-                Adicionar loja 99Food
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div className="rounded-2xl border border-border bg-muted/30 p-4">
-              <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Merchant / Loja</div>
-              <div className="mt-2 text-sm font-bold text-foreground break-words">{activeConnection?.externalMerchantId || 'Não informado'}</div>
-            </div>
-            <div className="rounded-2xl border border-border bg-muted/30 p-4">
-              <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Store ID</div>
-              <div className="mt-2 text-sm font-bold text-foreground break-words">{activeConnection?.externalStoreId || 'Não informado'}</div>
-            </div>
-            <div className="rounded-2xl border border-border bg-muted/30 p-4">
-              <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Display name</div>
-              <div className="mt-2 text-sm font-bold text-foreground break-words">{activeConnection?.displayName || 'iFood'}</div>
-            </div>
-            <div className="rounded-2xl border border-border bg-muted/30 p-4">
-              <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Última atualização</div>
-              <div className="mt-2 text-sm font-bold text-foreground">{formatDateTime(activeConnection?.updatedAt)}</div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-border p-4 bg-card space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Billing</div>
-                <div className="text-sm font-bold text-foreground">{channelLabel}</div>
-              </div>
-              <Badge variant={channelTone} size="sm">
-                {includedChannels.length > 0 ? includedChannels.join(', ') : 'Sem preview disponível'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3">
-              <div>
-                <div className="text-sm font-bold text-foreground">Marketplace iFood entra na cobrança</div>
-                <div className="text-xs text-muted-foreground">
-                  A regra final continua no SaaS Admin. Aqui mostramos o estado atual do preview.
-                </div>
-              </div>
-              <Switch
-                checked={isBillingEnabled}
-                onCheckedChange={() => undefined}
-                disabled
-                aria-label="Marketplace iFood incluído na cobrança"
-                title="Configuração controlada pelo SaaS Admin"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border bg-background p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pedidos</div>
-                <div className="mt-1 text-sm font-black text-foreground">{billingPreview?.ordersCount ?? 0}</div>
-              </div>
-              <div className="rounded-xl border border-border bg-background p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Valor bruto</div>
-                <div className="mt-1 text-sm font-black text-foreground">{formatCurrency(billingPreview?.grossOrdersAmount)}</div>
-              </div>
-              <div className="rounded-xl border border-border bg-background p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Faturável</div>
-                <div className="mt-1 text-sm font-black text-foreground">{formatCurrency(billingPreview?.billableAmount)}</div>
-              </div>
-            </div>
-          </div>
-
-          {showManualForm && (
-            <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-4">
-              <div className="flex items-center gap-2 text-sm font-black text-foreground">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-                Adicionar loja {manualProvider === '99food' ? '99Food' : 'iFood'}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Merchant ID</span>
-                  <input
-                    value={manualForm.externalMerchantId}
-                    onChange={(e) => setManualForm((prev) => ({ ...prev, externalMerchantId: e.target.value }))}
-                    className="input-premium"
-                    placeholder="merchant..."
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Store ID</span>
-                  <input
-                    value={manualForm.externalStoreId}
-                    onChange={(e) => setManualForm((prev) => ({ ...prev, externalStoreId: e.target.value }))}
-                    className="input-premium"
-                    placeholder="store..."
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome exibido</span>
-                  <input
-                    value={manualForm.displayName}
-                    onChange={(e) => setManualForm((prev) => ({ ...prev, displayName: e.target.value }))}
-                    className="input-premium"
-                    placeholder={manualProvider === '99food' ? '99Food' : 'iFood'}
-                  />
-                </label>
-              </div>
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowManualForm(false)}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted transition-all"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleManualConnect}
-                  disabled={connectMutation.isPending || connectFood99Mutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-                >
-                  {connectMutation.isPending || connectFood99Mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                  Salvar conexão
-                </button>
-              </div>
-            </div>
-          )}
-        </Card> : <Card className="p-6 xl:col-span-2">
-          <div className="space-y-1">
-            <h2 className="text-xl font-black text-foreground">Marketplaces habilitados</h2>
-            <p className="text-sm text-muted-foreground">Gerencie as conexões disponíveis para este tenant.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setManualProvider('99food');
-                setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: '99Food' });
-                setShowManualForm(true);
-              }}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-black text-foreground hover:bg-muted transition-all"
-            >
-              <Settings2 className="w-4 h-4" />
-              Adicionar loja 99Food
-            </button>
-          </div>
-          {showManualForm ? <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-black text-foreground"><ShieldCheck className="w-4 h-4 text-primary" />Adicionar loja 99Food</div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Merchant ID</span><input value={manualForm.externalMerchantId} onChange={(e) => setManualForm((prev) => ({ ...prev, externalMerchantId: e.target.value }))} className="input-premium" placeholder="merchant..." /></label>
-              <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Store ID</span><input value={manualForm.externalStoreId} onChange={(e) => setManualForm((prev) => ({ ...prev, externalStoreId: e.target.value }))} className="input-premium" placeholder="store..." /></label>
-              <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome exibido</span><input value={manualForm.displayName} onChange={(e) => setManualForm((prev) => ({ ...prev, displayName: e.target.value }))} className="input-premium" placeholder="99Food" /></label>
-            </div>
-            <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => setShowManualForm(false)} className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted transition-all">Cancelar</button><button type="button" onClick={handleManualConnect} disabled={connectFood99Mutation.isPending} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all">{connectFood99Mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}Salvar conexão</button></div>
-          </div> : null}
-        </Card>}
-
-        <div className="space-y-6">
-          <Card className="p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <Settings2 className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-black text-foreground">Providers</h3>
-            </div>
-            <div className="space-y-2">
-              {sections.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/20 p-3">
-                  <div>
-                    <div className="text-sm font-black text-foreground">{item.label}</div>
-                    <div className="text-xs text-muted-foreground">{item.comingSoon ? 'Em breve' : 'Disponível agora'}</div>
-                  </div>
-                  {item.id === '99food' ? (
-                    <button
-                      type="button"
-                      disabled={food99Authorization.isPending}
-                      onClick={async () => {
-                        const appShopId = manualForm.externalStoreId.trim();
-                        if (!appShopId) {
-                          toast.error('Informe o Store ID da 99Food antes de autorizar.');
-                          return;
-                        }
-                        try {
-                          const url = await food99Authorization.mutateAsync(appShopId);
-                          window.open(url, '_blank', 'noopener,noreferrer');
-                          toast.success('Autorizacao 99Food aberta em uma nova aba.');
-                        } catch (error) {
-                          toast.error(error instanceof Error ? error.message : 'Credenciais 99Food indisponiveis.');
-                        }
-                      }}
-                      className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50"
-                    >
-                      {food99Authorization.isPending ? 'Abrindo...' : 'Autorizar'}
-                    </button>
-                  ) : item.comingSoon ? <Badge variant="info" size="sm">Em breve</Badge> : <Badge variant="success" size="sm">Ativo</Badge>}
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-black text-foreground">Conexões</h3>
-            </div>
-            <div className="space-y-3">
-              {loadingConnections ? (
-                <div className="text-sm text-muted-foreground">Carregando conexões...</div>
-              ) : visibleConnections.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Nenhuma conexão encontrada.</div>
-              ) : (
-                visibleConnections.map((connection) => (
-                  <div key={connection.id} className="rounded-2xl border border-border bg-muted/20 p-3 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-black text-foreground">{connection.displayName || connection.provider}</div>
-                        <div className="text-xs text-muted-foreground">Merchant: {connection.externalMerchantId || 'não informado'}</div>
-                        {connection.externalStoreId ? <div className="text-xs text-muted-foreground">Store: {connection.externalStoreId}</div> : null}
-                      </div>
-                      {statusBadge(connection.status)}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      {connection.status === 'CONNECTED' ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDisconnect(connection.id)}
-                          disabled={disconnectMutation.isPending}
-                          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50"
-                        >
-                          <Unplug className="h-3.5 w-3.5" />
-                          Desconectar
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleReconnect(connection.id)}
-                          disabled={reconnectMutation.isPending}
-                          className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                        >
-                          <Link2 className="h-3.5 w-3.5" />
-                          Reconectar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <Clock3 className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-black text-foreground">Resumo</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl border border-border bg-muted/20 p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pedidos importados</div>
-                <div className="mt-1 text-lg font-black text-foreground">{visibleOrders.length}</div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/20 p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Eventos inbox</div>
-                <div className="mt-1 text-lg font-black text-foreground">{visibleEvents.length}</div>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      <Card className="p-6 space-y-5">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-base font-black text-foreground">Mapping de catálogo e estoque</h2>
-            <p className="text-sm text-muted-foreground">Vincule o item externo ao produto canônico da loja. Sem mapping, o pedido continua operável, mas o estoque não é baixado.</p>
-          </div>
-          <Badge variant="info" size="sm">Atualização sem recarregar</Badge>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 rounded-2xl border border-border bg-muted/20 p-4">
-          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Conexão</span><select value={catalogMappingForm.connectionId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, connectionId: event.target.value }))} className="input-premium"><option value="">Selecione</option>{visibleConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.displayName || connection.provider} {connection.externalStoreId ? `(${connection.externalStoreId})` : ''}</option>)}</select></label>
-          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ID externo</span><input value={catalogMappingForm.externalItemId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, externalItemId: event.target.value }))} className="input-premium" placeholder="app_item_id" /></label>
-          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome externo</span><input value={catalogMappingForm.externalItemName} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, externalItemName: event.target.value }))} className="input-premium" placeholder="Opcional" /></label>
-          <label className="space-y-1"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Produto canônico</span><select value={catalogMappingForm.productId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, productId: event.target.value }))} className="input-premium"><option value="">Selecione</option>{catalogProducts.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` (${product.sku})` : ''}</option>)}</select></label>
-          <div className="flex items-end"><button type="button" onClick={handleCatalogMappingSave} disabled={upsertCatalogMapping.isPending} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60">{upsertCatalogMapping.isPending ? 'Salvando...' : 'Salvar mapping'}</button></div>
-        </div>
-        {loadingCatalogMappingCandidates ? <div className="text-sm text-muted-foreground">Carregando itens externos pendentes...</div> : catalogMappingCandidates.length === 0 ? <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">Nenhum item externo pendente de mapping nas importações recentes.</div> : <div className="space-y-2"><div className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Itens externos sem mapping — estoque preservado</div><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{catalogMappingCandidates.map((candidate) => <button key={`${candidate.connectionId}:${candidate.externalItemId}`} type="button" onClick={() => setCatalogMappingForm((current) => ({ ...current, connectionId: candidate.connectionId, externalItemId: candidate.externalItemId, externalItemName: candidate.externalItemName ?? '' }))} className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left hover:bg-amber-500/15"><div className="font-bold text-foreground">{candidate.externalItemName || 'Nome não informado'}</div><div className="text-xs text-muted-foreground">{candidate.provider} · {candidate.connection.displayName || candidate.connection.externalStoreId || 'Loja'} · {candidate.externalItemId}</div></button>)}</div></div>}
-        {loadingCatalogMappings ? <div className="text-sm text-muted-foreground">Carregando mappings...</div> : catalogMappings.length === 0 ? <div className="text-sm text-muted-foreground">Nenhum item externo mapeado ainda.</div> : <div className="overflow-x-auto rounded-2xl border border-border"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="p-3">Provider / loja</th><th className="p-3">Item externo</th><th className="p-3">Referência</th><th className="p-3">Produto vinculado</th><th className="p-3">Status</th></tr></thead><tbody>{catalogMappings.map((mapping) => <tr key={mapping.id} className="border-t border-border"><td className="p-3 font-bold text-foreground">{mapping.connection.displayName || mapping.provider}<div className="text-xs font-normal text-muted-foreground">{mapping.connection.externalStoreId || 'Store não informada'}</div></td><td className="p-3 text-foreground">{mapping.externalItemName || 'Nome não informado'}<div className="text-xs text-muted-foreground">{mapping.externalItemId}</div></td><td className="p-3 text-muted-foreground">{mapping.externalReferenceId || '—'}</td><td className="p-3 font-bold text-foreground">{mapping.product.name}</td><td className="p-3">{mapping.status === 'ACTIVE' ? <Badge variant="success" size="sm">Mapeado</Badge> : <Badge variant="warning" size="sm">Desativado</Badge>}</td></tr>)}</tbody></table></div>}
-      </Card>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Card className="p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-primary" />
-              <h3 className="text-base font-black text-foreground">Eventos recentes</h3>
-            </div>
-            <button type="button" onClick={() => refetchEvents()} className="text-xs font-black uppercase tracking-widest text-primary hover:opacity-80">
-              Recarregar
-            </button>
-          </div>
-
-          {loadingEvents ? (
-            <div className="text-sm text-muted-foreground">Carregando eventos...</div>
-          ) : visibleEvents.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Nenhum evento importado ainda.</div>
-          ) : (
-            <div className="space-y-3">
-              {visibleEvents.slice(0, 8).map((event) => (
-                <div key={event.id} className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="space-y-1">
-                      <div className="text-sm font-black text-foreground break-words">{event.eventId || event.externalOrderId || event.id}</div>
-                      <div className="text-xs text-muted-foreground">Recebido em {formatDateTime(event.receivedAt)}</div>
-                    </div>
-                    {eventStatusBadge(event.status)}
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <Badge variant="info" size="sm">{event.provider}</Badge>
-                    <Badge variant="info" size="sm">Tentativas: {event.attempts}</Badge>
-                    {event.lastError ? <Badge variant="destructive" size="sm">Com erro</Badge> : <Badge variant="success" size="sm">OK</Badge>}
-                  </div>
-                  {event.lastError ? (
-                    <pre className="whitespace-pre-wrap text-xs text-foreground bg-background border border-border rounded-xl p-3 overflow-auto max-h-28">
-                      {event.lastError}
-                    </pre>
-                  ) : null}
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={() => reprocessEventMutation.mutate(event.id)}
-                      disabled={reprocessEventMutation.isPending}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-all"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Reprocessar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-primary" />
-              <h3 className="text-base font-black text-foreground">Pedidos importados</h3>
-            </div>
-            <button type="button" onClick={() => refetchOrders()} className="text-xs font-black uppercase tracking-widest text-primary hover:opacity-80">
-              Recarregar
-            </button>
-          </div>
-
-          {loadingOrders ? (
-            <div className="text-sm text-muted-foreground">Carregando pedidos...</div>
-          ) : visibleOrders.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Nenhum pedido marketplace importado ainda.</div>
-          ) : (
-            <div className="space-y-3">
-              {visibleOrders.slice(0, 8).map((order) => (
-                <div key={order.id} className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="space-y-1">
-                      <div className="text-sm font-black text-foreground break-words">{order.externalDisplayId || order.externalOrderId}</div>
-                      <div className="text-xs text-muted-foreground">Interno: {order.internalOrderId || 'ainda não importado'}</div>
-                    </div>
-                    {statusBadge(order.statusInternal)}
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <Badge variant="info" size="sm">{order.provider}</Badge>
-                    {order.internalOrderId ? <Badge variant="success" size="sm">Integrado</Badge> : <Badge variant="warning" size="sm">Pendente</Badge>}
-                    <Badge variant="info" size="sm">{formatDateTime(order.createdAt)}</Badge>
-                  </div>
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={() => reprocessOrderMutation.mutate(order.id)}
-                      disabled={reprocessOrderMutation.isPending}
-                      className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-muted transition-all"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Reprocessar pedido
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-    </div>
-  );
+  const { data: catalogProducts = [] } = useQuery({ queryKey: ['marketplace-catalog-products'], queryFn: async () => (await api.get<ProductOption[]>('/catalog/products')).data ?? [] });
+  const connectIfood = useConnectMarketplaceManual('ifood'); const connectFood99 = useConnectMarketplaceManual('99food');
+  const disconnect = useDisconnectMarketplace(); const reconnect = useReconnectMarketplace(); const reprocessEvent = useReprocessMarketplaceEvent(); const reprocessOrder = useReprocessMarketplaceOrder(); const food99Authorization = useFood99AuthorizationUrl(); const saveProductAssociation = useUpsertMarketplaceCatalogMapping();
+  const visibleConnections = useMemo(() => (connections ?? []).filter((item) => canManageIfood || item.provider !== 'ifood'), [connections, canManageIfood]);
+  const visibleEvents = useMemo(() => events.filter((item) => canManageIfood || item.provider !== 'ifood'), [events, canManageIfood]);
+  const visibleOrders = useMemo(() => orders.filter((item) => canManageIfood || item.provider !== 'ifood'), [orders, canManageIfood]);
+  const firstConnection = (provider: Provider) => provider === 'ifood' ? status ?? visibleConnections.find((item) => item.provider === provider) : visibleConnections.find((item) => item.provider === provider);
+  const refresh = () => Promise.all([...(canManageIfood ? [refetchStatus()] : []), refetchConnections(), refetchOrders(), refetchEvents()]);
+  const openConnect = (provider: Provider) => { setManualProvider(provider); setManualForm({ externalMerchantId: '', externalStoreId: '', displayName: providerName(provider) }); setOverlay('connect'); };
+  const handleManualConnect = async () => { if (!manualForm.externalMerchantId.trim() || !manualForm.externalStoreId.trim()) { toast.error('Informe os dados da loja para continuar.'); return; } try { await (manualProvider === '99food' ? connectFood99 : connectIfood).mutateAsync({ externalMerchantId: manualForm.externalMerchantId.trim(), externalStoreId: manualForm.externalStoreId.trim(), displayName: manualForm.displayName.trim() || providerName(manualProvider), authType: manualProvider === '99food' ? 'oauth2_client_credentials' : 'manual', settingsJson: { autoConfirmOrders: false, pollingFallbackEnabled: manualProvider === '99food', presenceMode: manualProvider === '99food' ? 'POLLING' : 'WEBHOOK', importAsStatus: 'pending' } }); toast.success(`${providerName(manualProvider)} conectada.`); setOverlay(null); await refresh(); queryClient.invalidateQueries({ queryKey: ['marketplace-billing-preview'] }); } catch { toast.error('Não foi possível conectar a loja. Tente novamente.'); } };
+  const handleDisconnect = async (id: string) => { try { await disconnect.mutateAsync(id); toast.success('Loja desconectada.'); await refresh(); } catch { toast.error('Não foi possível desconectar. Tente novamente.'); } };
+  const handleReconnect = async (id: string) => { try { await reconnect.mutateAsync(id); toast.success('Conexão atualizada.'); await refresh(); } catch { toast.error('Não foi possível reconectar. Tente novamente.'); } };
+  const handleSaveAssociation = async () => { if (!catalogMappingForm.connectionId || !catalogMappingForm.externalItemId || !catalogMappingForm.productId) { toast.error('Escolha o produto correspondente para continuar.'); return; } try { await saveProductAssociation.mutateAsync({ ...catalogMappingForm, externalItemId: catalogMappingForm.externalItemId.trim(), externalItemName: catalogMappingForm.externalItemName.trim() || undefined, externalReferenceId: catalogMappingForm.externalReferenceId.trim() || undefined }); toast.success('Produto associado para os próximos pedidos.'); setCatalogMappingForm({ connectionId: '', externalItemId: '', externalItemName: '', externalReferenceId: '', productId: '' }); } catch { toast.error('Não foi possível salvar agora. Tente novamente.'); } };
+  const providerCard = (provider: Provider) => { const connection = firstConnection(provider); const state = connectionState(connection?.status); const primaryLabel = !connection ? 'Conectar loja' : state.variant === 'success' ? 'Gerenciar' : 'Tentar novamente'; return <Card key={provider} className="flex min-h-52 flex-col justify-between p-5 sm:p-6"><div className="space-y-4"><div className="flex items-start justify-between gap-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-lg font-black text-primary">{provider === 'ifood' ? 'iF' : '99'}</div><div><h2 className="text-lg font-black text-foreground">{providerName(provider)}</h2><p className="text-sm text-muted-foreground">Receba pedidos nesta loja.</p></div></div><Badge variant={state.variant} size="sm">{loadingStatus && provider === 'ifood' ? 'Verificando' : state.label}</Badge></div><p className="text-sm leading-6 text-muted-foreground">{connection?.displayName ? state.variant === 'success' ? `${connection.displayName} está pronta para receber pedidos.` : `${connection.displayName} precisa de atenção antes de receber pedidos.` : 'Conecte sua loja em poucos passos.'}</p></div><button type="button" onClick={() => connection ? setOverlay('stores') : openConnect(provider)} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground transition hover:bg-primary/90"><Link2 className="h-4 w-4" />{primaryLabel}</button></Card>; };
+  const hasError = connectionsError || ordersError || eventsError;
+  return <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6"><PageHeader title="Canais de venda" description="Conecte suas lojas para receber os pedidos em um só lugar." icon={Store} action={<button type="button" onClick={refresh} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted"><RefreshCw className="h-4 w-4" />Atualizar</button>} />{hasError ? <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" /><div><p className="font-bold">Não foi possível atualizar algumas informações.</p><button type="button" onClick={() => { setOverlay('activity'); setShowSupportDetails(true); }} className="mt-1 font-bold text-primary hover:underline">Ver informações para suporte</button></div></div> : null}<section aria-label="Canais disponíveis" className="grid grid-cols-1 gap-4 md:grid-cols-2">{providerCard('99food')}{canManageIfood ? providerCard('ifood') : null}</section><section aria-label="Mais opções" className="grid gap-3 sm:grid-cols-3"><button type="button" onClick={() => setOverlay('stores')} className="group flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-left hover:border-primary/40"><span><span className="block font-bold text-foreground">Lojas conectadas</span><span className="text-sm text-muted-foreground">Veja e ajuste suas conexões</span></span><ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary" /></button><button type="button" onClick={() => setOverlay('products')} className="group flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-left hover:border-amber-500/50"><span><span className="block font-bold text-foreground">Produtos que precisam de atenção</span><span className="text-sm text-muted-foreground">{catalogMappingCandidates.length ? `${catalogMappingCandidates.length} item(ns) para revisar` : 'Tudo certo por enquanto'}</span></span><ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-amber-600" /></button><button type="button" onClick={() => setOverlay('activity')} className="group flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-left hover:border-primary/40"><span><span className="block font-bold text-foreground">Atividade e ajuda</span><span className="text-sm text-muted-foreground">Acompanhe os últimos pedidos</span></span><ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary" /></button></section>
+    {overlay === 'connect' ? <OverlayShell title={`Conectar ${providerName(manualProvider)}`} onClose={() => setOverlay(null)}><div className="space-y-5">{manualProvider === '99food' ? <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-foreground"><p className="font-bold">Antes de continuar: encontre o código da sua loja.</p><p className="mt-1 text-muted-foreground">Use o código da loja que aparece no portal 99Food. Ele identifica a loja que receberá seus pedidos; não é necessário entender termos técnicos.</p></div> : <p className="text-sm leading-6 text-muted-foreground">Informe os dados da sua loja iFood para concluir a conexão.</p>}<div className="grid gap-4 sm:grid-cols-2"><label className="space-y-1.5 text-sm font-bold text-foreground"><span>Código da empresa</span><input className="input-premium" value={manualForm.externalMerchantId} onChange={(event) => setManualForm((current) => ({ ...current, externalMerchantId: event.target.value }))} placeholder="Informe o código" /></label><label className="space-y-1.5 text-sm font-bold text-foreground"><span>Código da loja</span><input className="input-premium" value={manualForm.externalStoreId} onChange={(event) => setManualForm((current) => ({ ...current, externalStoreId: event.target.value }))} placeholder="Informe o código da loja" /></label></div><label className="block space-y-1.5 text-sm font-bold text-foreground"><span>Como você quer chamar esta loja?</span><input className="input-premium" value={manualForm.displayName} onChange={(event) => setManualForm((current) => ({ ...current, displayName: event.target.value }))} placeholder={providerName(manualProvider)} /></label>{manualProvider === '99food' ? <button type="button" disabled={!manualForm.externalStoreId.trim() || food99Authorization.isPending} onClick={async () => { try { const url = await food99Authorization.mutateAsync(manualForm.externalStoreId.trim()); window.open(url, '_blank', 'noopener,noreferrer'); } catch { toast.error('Não foi possível abrir a autorização. Tente novamente.'); } }} className="text-sm font-bold text-primary disabled:cursor-not-allowed disabled:opacity-50">{food99Authorization.isPending ? 'Abrindo autorização...' : 'Autorizar no 99Food'}</button> : null}<button type="button" disabled={!manualForm.externalMerchantId.trim() || !manualForm.externalStoreId.trim() || (manualProvider === '99food' ? connectFood99.isPending : connectIfood.isPending)} onClick={handleManualConnect} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">{(connectIfood.isPending || connectFood99.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}Conectar loja</button></div></OverlayShell> : null}
+    {overlay === 'stores' ? <OverlayShell title="Lojas conectadas" onClose={() => setOverlay(null)}><div className="space-y-4"><div className="rounded-2xl border border-border bg-muted/20 p-4"><p className="font-bold text-foreground">Adicionar outra loja</p><p className="mt-1 text-sm text-muted-foreground">Cada canal pode ter mais de uma loja conectada.</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => openConnect('99food')} className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary">Adicionar 99Food</button>{canManageIfood ? <button type="button" onClick={() => openConnect('ifood')} className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary">Adicionar iFood</button> : null}</div></div>{loadingConnections ? <p className="text-sm text-muted-foreground">Carregando lojas...</p> : visibleConnections.length === 0 ? <p className="text-sm text-muted-foreground">Você ainda não conectou nenhuma loja.</p> : visibleConnections.map((connection) => { const state = connectionState(connection.status); return <article key={connection.id} className="rounded-2xl border border-border p-4"><div className="flex items-start justify-between gap-4"><div><p className="font-bold text-foreground">{connection.displayName || connection.provider}</p><p className="mt-1 text-sm text-muted-foreground">{providerName(connection.provider as Provider)}</p></div><Badge variant={state.variant} size="sm">{state.label}</Badge></div><div className="mt-4 flex justify-end gap-2">{state.variant === 'success' ? <button type="button" onClick={() => handleDisconnect(connection.id)} disabled={disconnect.isPending} className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"><Unplug className="h-4 w-4" />Desconectar</button> : <button type="button" onClick={() => handleReconnect(connection.id)} disabled={reconnect.isPending} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary"><RefreshCw className="h-4 w-4" />Tentar novamente</button>}</div></article>; })}</div></OverlayShell> : null}
+    {overlay === 'products' ? <OverlayShell title="Produtos que precisam de atenção" onClose={() => setOverlay(null)}><div className="space-y-4">{loadingCatalogMappingCandidates ? <p className="text-sm text-muted-foreground">Carregando produtos...</p> : catalogMappingCandidates.length === 0 ? <div className="rounded-2xl bg-emerald-500/10 p-5 text-sm text-foreground"><CheckCircle2 className="mb-2 h-6 w-6 text-emerald-600" /><p className="font-bold">Nenhum produto precisa da sua atenção.</p><p className="mt-1 text-muted-foreground">Os próximos pedidos continuarão funcionando normalmente.</p></div> : <><p className="text-sm leading-6 text-muted-foreground">Quando não for possível reconhecer um item com segurança, o pedido continua operável e pedimos sua ajuda antes de qualquer ajuste.</p>{catalogMappingCandidates.map((candidate) => <button key={`${candidate.connectionId}:${candidate.externalItemId}`} type="button" onClick={() => setCatalogMappingForm({ connectionId: candidate.connectionId, externalItemId: candidate.externalItemId, externalItemName: candidate.externalItemName ?? '', externalReferenceId: '', productId: '' })} className={`w-full rounded-2xl border p-4 text-left focus-visible:ring-2 focus-visible:ring-primary ${catalogMappingForm.connectionId === candidate.connectionId && catalogMappingForm.externalItemId === candidate.externalItemId ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}><PackageSearch className="mb-2 h-5 w-5 text-amber-600" /><p className="font-bold text-foreground">Este item corresponde a qual produto do seu cardápio?</p><p className="mt-1 text-sm text-muted-foreground">{candidate.externalItemName || 'Item sem nome informado'}</p><p className="mt-2 text-xs font-medium text-muted-foreground">{providerName(candidate.provider as Provider)} · {candidate.connection.displayName || 'Sua loja'}</p></button>)}{catalogMappingForm.connectionId ? <div className="rounded-2xl border border-border bg-muted/20 p-4"><label className="block text-sm font-bold text-foreground">Produto do cardápio<select className="input-premium mt-2" value={catalogMappingForm.productId} onChange={(event) => setCatalogMappingForm((current) => ({ ...current, productId: event.target.value }))}><option value="">Escolha um produto</option>{catalogProducts.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` (${product.sku})` : ''}</option>)}</select></label><button type="button" onClick={handleSaveAssociation} disabled={saveProductAssociation.isPending} className="mt-3 w-full rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50">{saveProductAssociation.isPending ? 'Salvando...' : 'Confirmar produto'}</button></div> : null}</>}</div></OverlayShell> : null}
+    {overlay === 'activity' ? <OverlayShell title="Atividade e ajuda" onClose={() => setOverlay(null)}><div className="space-y-5"><section><div className="mb-3 flex items-center gap-2"><Clock3 className="h-5 w-5 text-primary" /><h3 className="font-bold text-foreground">Pedidos recentes</h3></div>{loadingOrders ? <p className="text-sm text-muted-foreground">Carregando pedidos...</p> : visibleOrders.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum pedido recebido ainda.</p> : <div className="space-y-2">{visibleOrders.slice(0, 6).map((order) => <article key={order.id} className="rounded-xl border border-border p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-foreground">Pedido {order.externalDisplayId || order.externalOrderId || 'recebido'}</p><p className="mt-1 text-xs text-muted-foreground">{order.createdAt ? new Date(order.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Recebido recentemente'} · {providerName(order.provider as Provider)}</p></div><Badge variant={order.internalOrderId ? 'success' : 'warning'} size="sm">{order.internalOrderId ? 'Processado' : 'Pendente'}</Badge></div>{!order.internalOrderId ? <button type="button" onClick={() => reprocessOrder.mutate(order.id)} disabled={reprocessOrder.isPending} className="mt-3 text-xs font-bold text-primary hover:underline disabled:opacity-50">Tentar novamente este pedido</button> : null}</article>)}</div>}</section><section className="border-t border-border pt-5"><div className="mb-3 flex items-center gap-2"><CircleHelp className="h-5 w-5 text-primary" /><h3 className="font-bold text-foreground">Ajuda</h3></div><p className="text-sm leading-6 text-muted-foreground">Se algo não funcionar como esperado, tente atualizar a conexão. Nossa equipe de suporte pode usar os detalhes abaixo para ajudar.</p><button type="button" onClick={() => setShowSupportDetails((value) => !value)} className="mt-3 text-sm font-bold text-primary hover:underline">Ver informações para suporte</button>{showSupportDetails ? <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3 text-sm"><p>{visibleEvents.length} atividade(s) recente(s) disponível(is).</p>{visibleEvents.filter((event) => event.status === 'FAILED').slice(0, 3).map((event) => <div key={event.id} className="rounded-lg bg-card p-2"><p className="font-bold">Não foi possível concluir uma atualização.</p>{event.lastError ? <p className="mt-1 break-words text-xs text-muted-foreground">{event.lastError}</p> : null}<button type="button" onClick={() => reprocessEvent.mutate(event.id)} className="mt-2 text-xs font-bold text-primary">Tentar novamente</button></div>)}{(connectionsErrorObj || ordersErrorObj || eventsErrorObj) ? <p className="break-words text-xs text-muted-foreground">{(connectionsErrorObj as Error | undefined)?.message || (ordersErrorObj as Error | undefined)?.message || (eventsErrorObj as Error | undefined)?.message}</p> : null}</div> : null}</section></div></OverlayShell> : null}
+  </div>;
 }

@@ -126,6 +126,9 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       const totalPrice = this.toNumber(record.totalPrice) || unitPrice * quantity;
       return {
         externalItemId: this.readString(record, ['id', 'itemId', 'sku']),
+        // Only the merchant SKU can be safely matched with a PedeHub product
+        // code. iFood's order item ID is not a catalog identity.
+        catalogIdentity: this.readString(record, ['sku']),
         name: this.readString(record, ['name', 'displayName']) ?? `Item ${index + 1}`,
         quantity,
         unitPrice,

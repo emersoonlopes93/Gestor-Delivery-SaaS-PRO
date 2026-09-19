@@ -88,6 +88,7 @@ describe('IfoodProvider', () => {
         items: [
           {
             id: 'item-1',
+            sku: 'PDV-PIZZA-01',
             name: 'Pizza',
             quantity: 2,
             unitPrice: 30,
@@ -98,6 +99,7 @@ describe('IfoodProvider', () => {
     });
 
     expect(normalized.externalOrderId).toBe('ext-order-1');
+    expect(normalized.items[0]).toMatchObject({ externalItemId: 'item-1', catalogIdentity: 'PDV-PIZZA-01' });
     expect(normalized.customerName).toBe('Maria');
     expect(normalized.items).toHaveLength(1);
     expect(normalized.items[0].totalPrice).toBe(60);

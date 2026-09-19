@@ -46,6 +46,12 @@ export type NormalizedMarketplaceOrderOption = {
 
 export type NormalizedMarketplaceOrderItem = {
   externalItemId?: string | null;
+  /**
+   * Provider identity that is stable enough to be compared with a PedeHub
+   * product code. It is deliberately separate from the display/order item ID:
+   * some provider item IDs are recreated and must never drive stock depletion.
+   */
+  catalogIdentity?: string | null;
   name: string;
   quantity: number;
   unitPrice: number;
