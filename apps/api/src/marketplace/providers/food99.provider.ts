@@ -11,6 +11,7 @@ import type {
 } from '../marketplace.types';
 import { Food99HttpClientService } from '../services/food99-http-client.service';
 import { MarketplaceCredentialService } from '../services/marketplace-credential.service';
+import { Food99ApiError } from './food99-api.error';
 
 @Injectable()
 export class Food99Provider implements MarketplaceProviderAdapter {
@@ -103,9 +104,17 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     externalOrderId: string;
     eventPayload: Record<string, unknown>;
   }): Promise<ExternalMarketplaceOrder> {
-    const remote = await this.client.fetchOrderDetails(input.connection, input.externalOrderId, `event:${input.externalOrderId}`);
-    const remoteOrder = this.extractNativeOrder(remote);
     const webhookOrder = this.extractNativeOrder(input.eventPayload);
+    let remote: ExternalMarketplaceOrder;
+    try {
+      remote = await this.client.fetchOrderDetails(input.connection, input.externalOrderId, `event:${input.externalOrderId}`);
+    } catch (error) {
+      // Native orderNew already carries data.order_info. A rejected detail
+      // lookup must not discard that signed, persisted order snapshot.
+      if (error instanceof Food99ApiError && webhookOrder) return webhookOrder;
+      throw error;
+    }
+    const remoteOrder = this.extractNativeOrder(remote);
     if (!remoteOrder) return webhookOrder ?? remote;
     if (!webhookOrder) return remoteOrder;
 

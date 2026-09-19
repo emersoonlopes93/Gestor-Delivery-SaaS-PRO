@@ -1,6 +1,7 @@
 import { MarketplaceProvider } from '@prisma/client';
 import { createHash } from 'crypto';
 import { Food99Provider } from './food99.provider';
+import { Food99ApiError } from './food99-api.error';
 
 describe('Food99Provider', () => {
   const client = {
@@ -340,6 +341,23 @@ describe('Food99Provider', () => {
 
     expect(normalized).toMatchObject({ externalOrderId: '5764656197621845665', customerName: 'Marina' });
     expect(normalized.items).toEqual([expect.objectContaining({ name: 'Pizza', totalPrice: 35.99 })]);
+  });
+
+  it('imports the signed orderNew snapshot when the detail API rejects the lookup', async () => {
+    client.fetchOrderDetails.mockRejectedValueOnce(new Food99ApiError('99Food native request failed.', false, 200, '10002'));
+    const fetched = await provider.fetchOrderDetails({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrderId: '5764687144849312796',
+      eventPayload: {
+        data: {
+          order_info: {
+            order_id: '5764687144849312796', order_items: [], price: { order_price: 3599 },
+          },
+        },
+      },
+    });
+
+    expect(fetched).toMatchObject({ order_id: '5764687144849312796' });
   });
 
   it.each([

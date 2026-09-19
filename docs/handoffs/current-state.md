@@ -2620,6 +2620,12 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Bill Data (`settlementAmount`) continua prioritário e `withdrawAmount` continua exclusivo da liquidação semanal. A interface informa a origem da estimativa e não trata nenhum dos dois como saldo recebido.
 - Teste focado de Analytics: 1 suite / 2 testes PASS; teste web focado anterior: 2 arquivos / 11 testes PASS. Nenhum provider, banco remoto, schema, migration ou deploy foi acionado.
 
+## 99Food: importação resiliente a falha do detalhe (2026-09-17)
+
+- Incidente: callbacks `orderNew` chegavam assinados e enfileirados, mas a consulta adicional `POST /v1/order/order/detail` retornava HTTP 200 com `errno=10002`; o erro abortava a ingestão mesmo quando o webhook já continha `data.order_info` completo.
+- Correção: `Food99Provider.fetchOrderDetails()` mantém a consulta de detalhe como preferência, mas quando ela falha com `Food99ApiError` reutiliza exclusivamente o snapshot nativo de `orderNew`. Eventos sem snapshot continuam falhando, sem inventar pedido incompleto.
+- Validação: provider + cliente HTTP 2 suites / 50 testes PASS; `check:no-any` e `git diff --check` PASS. Nenhum reprocessamento, banco remoto, provider mutation, deploy ou restart foi feito.
+
 ## Estoque, compras e receitas - alinhamento de contratos (2026-09-17)
 
 - Fichas técnicas de produtos e combos usam a mesma entidade canônica de produto; a API valida produto/insumos do tenant, quantidades positivas e duplicidade. Uma receita vazia remove a composição.
