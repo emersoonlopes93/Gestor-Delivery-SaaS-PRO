@@ -99,11 +99,12 @@ export class MarketplaceOrderIngestionService {
       }
 
       const existingOrder = await this.prisma.marketplaceOrder.findFirst({
-        where: { connectionId: connection.id, provider: inbox.provider, externalOrderId },
+        where: { tenantId: connection.tenantId, connectionId: connection.id, provider: inbox.provider, externalOrderId },
         select: {
           lastExternalEventAt: true,
           lastExternalEventSequence: true,
           lastExternalEventTopic: true,
+          normalizedPayload: true,
         },
       });
       if (existingOrder && this.isOlderEvent(inbox, existingOrder)) {
@@ -126,10 +127,17 @@ export class MarketplaceOrderIngestionService {
         });
         return { processed: true, ignored: true, reason: 'out_of_order' };
       }
+      if (existingOrder && this.isRegressiveFood99DeliveryStatus(inbox.provider, inbox.topic, inbox.rawPayload, existingOrder.normalizedPayload)) {
+        await this.prisma.marketplaceEventInbox.update({
+          where: { id: inbox.id },
+          data: { status: MarketplaceEventStatus.IGNORED, processedAt: new Date(), lastError: 'regressive_delivery_status_suppressed' },
+        });
+        return { processed: true, ignored: true, reason: 'regressive_delivery_status' };
+      }
 
       if (existingOrder && this.isFood99WebhookLifecycleTopic(inbox.provider, inbox.topic)) {
         await this.prisma.marketplaceOrder.updateMany({
-          where: { connectionId: connection.id, provider: inbox.provider, externalOrderId },
+          where: { tenantId: connection.tenantId, connectionId: connection.id, provider: inbox.provider, externalOrderId },
           data: {
             lastExternalEventAt: inbox.eventCreatedAt ?? new Date(),
             lastExternalEventId: inbox.eventId,
@@ -503,6 +511,22 @@ export class MarketplaceOrderIngestionService {
     return provider === MarketplaceProvider.FOOD_99 && topic?.trim().toUpperCase() === 'DELIVERYSTATUS';
   }
 
+  private isRegressiveFood99DeliveryStatus(
+    provider: MarketplaceProvider,
+    topic: string | null,
+    rawPayload: Prisma.JsonValue,
+    normalizedPayload: Prisma.JsonValue,
+  ): boolean {
+    if (!this.isFood99DeliveryStatusTopic(provider, topic)) return false;
+    const data = this.asRecord(this.asRecord(rawPayload)?.data);
+    const logistics = this.asRecord(this.asRecord(normalizedPayload)?.logistics);
+    const incoming = this.readRecordString(data, ['delivery_status']);
+    const previous = this.readRecordString(logistics, ['deliveryStatus']);
+    const progressive = ['120', '130', '140', '150', '160'];
+    return Boolean(incoming && previous && progressive.includes(incoming) && progressive.includes(previous)
+      && Number(incoming) < Number(previous));
+  }
+
   private isFood99WebhookLifecycleTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
     return this.isNativeFood99LifecycleTopic(provider, topic) || this.isFood99DeliveryStatusTopic(provider, topic);
   }
@@ -591,6 +615,7 @@ export class MarketplaceOrderIngestionService {
     if (normalized.includes('CANCEL')) return 70;
     if (normalized === 'ORDERCANCEL') return 70;
     if (normalized === 'ORDERFINISH') return 60;
+    if (normalized === 'DELIVERYSTATUS') return 55;
     if (normalized === 'ORDERREADY') return 40;
     if (normalized === 'ORDERCONFIRM') return 20;
     if (normalized.includes('CONCLUD') || normalized.includes('COMPLET')) return 60;
@@ -787,6 +812,10 @@ export class MarketplaceOrderIngestionService {
     rawPayload?: Prisma.JsonValue,
   ): Promise<void> {
     const normalizedTopic = topic?.trim().toUpperCase();
+    if (normalizedTopic === 'DELIVERYSTATUS') {
+      if (rawPayload) await this.applyFood99DeliveryStatus(tenantId, connectionId, externalOrderId, rawPayload);
+      return;
+    }
     const lifecycleKind = normalizedTopic === 'CONFIRMED' || normalizedTopic === 'ORDER_CONFIRMED' || normalizedTopic === 'ORDERCONFIRM'
       ? 'confirmed'
       : normalizedTopic === 'READY_FOR_PICKUP' || normalizedTopic === 'READY_TO_PICKUP' || normalizedTopic === 'ORDERREADY'
@@ -806,10 +835,6 @@ export class MarketplaceOrderIngestionService {
       select: { id: true, internalOrderId: true, provider: true },
     });
     if (!marketplaceOrder?.internalOrderId) return;
-    if (this.isFood99DeliveryStatusTopic(marketplaceOrder.provider, topic) && rawPayload) {
-      await this.applyFood99DeliveryStatus(tenantId, connectionId, externalOrderId, rawPayload);
-      return;
-    }
     const order = await this.prisma.order.findFirst({
       where: { id: marketplaceOrder.internalOrderId, tenantId },
       select: { status: true, fulfillmentType: true },
@@ -935,16 +960,22 @@ export class MarketplaceOrderIngestionService {
         normalizedPayload: true,
       },
     });
-    if (!marketplaceOrder?.internalOrderId) return;
+    if (!marketplaceOrder?.internalOrderId) {
+      throw new Error('99Food delivery callback has no correlated internal order yet.');
+    }
 
     const order = await this.prisma.order.findFirst({
       where: { id: marketplaceOrder.internalOrderId, tenantId },
       select: { status: true, fulfillmentType: true },
     });
-    if (!order) return;
+    if (!order) throw new Error('99Food delivery callback internal order is unavailable.');
 
     const previousPayload = this.asRecord(marketplaceOrder.normalizedPayload) ?? {};
     const previousLogistics = this.asRecord(previousPayload.logistics) ?? {};
+    const previousDeliveryStatus = this.readRecordString(previousLogistics, ['deliveryStatus']);
+    if (['120', '130', '140', '150', '160'].includes(deliveryStatus)
+      && previousDeliveryStatus && ['120', '130', '140', '150', '160'].includes(previousDeliveryStatus)
+      && Number(deliveryStatus) < Number(previousDeliveryStatus)) return;
     const logistics = {
       ...previousLogistics,
       deliveryStatus,

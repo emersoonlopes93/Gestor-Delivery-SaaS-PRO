@@ -6,6 +6,7 @@ import {
 } from '@prisma/client';
 import { MarketplaceStatusSyncService, type MarketplaceStatusJob } from './marketplace-status-sync.service';
 import { IfoodApiError } from '../providers/ifood-api.error';
+import { Food99ApiError } from '../providers/food99-api.error';
 
 describe('MarketplaceStatusSyncService', () => {
   const marketplaceOrder = {
@@ -48,7 +49,7 @@ describe('MarketplaceStatusSyncService', () => {
     const queue = withQueue ? { add: jest.fn().mockResolvedValue({}) } : undefined;
     const divergenceService = { record: jest.fn().mockResolvedValue({}), resolveForOperation: jest.fn().mockResolvedValue(undefined) };
     return {
-      prisma, provider, queue, featureControl,
+      prisma, provider, queue, featureControl, divergenceService,
       service: new MarketplaceStatusSyncService(
         prisma as never,
         registry as never,
@@ -157,6 +158,28 @@ describe('MarketplaceStatusSyncService', () => {
       operation: MarketplaceOperationType.CONFIRM,
     }), expect.objectContaining({ jobId: expect.stringContaining('food_99-confirm-tenant-1') }));
     expect(featureControl.resolveTenantFeature).not.toHaveBeenCalled();
+  });
+
+  it('records a persistent 99Food provider 401 as remote intervention, not a tenant PATCH authorization result', async () => {
+    const { service, prisma, provider, divergenceService } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...persistedOperation,
+      provider: MarketplaceProvider.FOOD_99,
+      marketplaceOrder: { ...marketplaceOrder, provider: MarketplaceProvider.FOOD_99 },
+    });
+    provider.confirmOrder.mockRejectedValueOnce(new Food99ApiError('99Food native request failed.', false, 401, 'UNAUTHORIZED'));
+    const job: MarketplaceStatusJob = {
+      tenantId: 'tenant-1', orderId: 'order-1', externalOrderId: 'external-1',
+      operation: MarketplaceOperationType.CONFIRM, correlationId: 'corr-1', payloadVersion: 1, operationId: 'operation-1',
+    };
+
+    await expect(service.processStatusSyncJob(job)).resolves.toEqual({ accepted: false, interventionRequired: true });
+    expect(prisma.marketplaceOperation.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MarketplaceOperationStatus.INTERVENTION_REQUIRED, httpStatus: 401 }),
+    }));
+    expect(divergenceService.record).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: 'tenant-1', type: 'AUTHENTICATION_FAILURE',
+    }));
   });
 
   it('queues a native 99Food ready action without the generic marketplace preset', async () => {

@@ -84,6 +84,19 @@ describe('OrderAlertsService', () => {
     expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ruleKey: 'ORDER_SYNC_FAILED', severity: OrderAlertSeverity.CRITICAL }) }));
   });
 
+  it('does not classify a 14-minute-old order as CRITICAL just because of elapsed time', async () => {
+    const { prisma, service } = setup();
+    prisma.order.findMany.mockResolvedValue([{
+      id: 'order-14m', orderNumber: '210004', status: OrderStatus.preparing,
+      createdAt: new Date(Date.now() - 14 * 60_000), marketplaceOrders: [{ operations: [], divergences: [] }],
+    }]);
+    prisma.orderAlert.findMany.mockResolvedValue([]);
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).not.toHaveBeenCalled();
+  });
+
   it('creates one active courier-arrived alert only for provider-owned 99Food logistics', async () => {
     const { prisma, service } = setup();
     prisma.order.findMany.mockResolvedValue([{

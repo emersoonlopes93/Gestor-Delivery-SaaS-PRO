@@ -6,6 +6,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { Food99FinancialReconciliationService } from './food99-financial-reconciliation.service';
+import { Food99ApiError } from '../providers/food99-api.error';
 
 const baseBill = {
   orderId: '5764609487470920339',
@@ -79,6 +80,34 @@ describe('Food99FinancialReconciliationService', () => {
     const service = new Food99FinancialReconciliationService(prisma as never, client as never);
     return { service, prisma, client, tx };
   }
+
+  it('exposes persistent provider 401 as a remote financial error without posting a repasse', async () => {
+    const { service, client, prisma } = setup();
+    client.fetchBillEntries.mockRejectedValueOnce(new Food99ApiError(
+      'A 99Food nao autorizou a consulta financeira apos renovar o acesso.', false, 401, 'FINANCE_PROVIDER_UNAUTHORIZED',
+    ));
+    await expect(service.sync('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-1')).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'FINANCE_PROVIDER_UNAUTHORIZED' }),
+    });
+    expect(prisma.marketplaceBillEntry.upsert).not.toHaveBeenCalled();
+    expect(prisma.financialAccount.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('surfaces rejected finance sign-in without posting or importing a settlement', async () => {
+    const { service, client, prisma } = setup();
+    client.fetchBillEntries.mockRejectedValueOnce(new Food99ApiError(
+      'A 99Food nao autorizou o acesso financeiro do aplicativo.', false, 401, 'FINANCE_AUTH_REJECTED',
+    ));
+    await expect(service.sync('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-1')).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'FINANCE_AUTH_REJECTED' }),
+    });
+    expect(prisma.marketplaceBillEntry.upsert).not.toHaveBeenCalled();
+    expect(prisma.financialAccount.findFirst).not.toHaveBeenCalled();
+  });
 
   it.each([1, 2, 3, 4, 5])('ingests orderType %s without changing provider money signs', async (orderType) => {
     const settlementAmount = orderType === 2 || orderType === 3 || orderType === 4 ? '-1000' : '5000';

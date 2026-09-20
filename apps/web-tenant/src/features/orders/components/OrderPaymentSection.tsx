@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { CreditCard, Wallet, Banknote, Ticket, Sparkles, type LucideIcon } from 'lucide-react';
-import type { OrderFinancialSummary } from '@gestor/types';
+import type { OrderFinancialSummary, OrderOrigin } from '@gestor/types';
 
 interface OrderPaymentSectionProps {
   itemsSubtotal: number;
@@ -13,6 +13,7 @@ interface OrderPaymentSectionProps {
   couponCode?: string | null;
   cashbackUsed?: number | null;
   financialSummary?: OrderFinancialSummary;
+  origin?: OrderOrigin;
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: LucideIcon; color: string }> = {
@@ -37,6 +38,7 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
   couponCode,
   cashbackUsed,
   financialSummary,
+  origin,
 }: OrderPaymentSectionProps) {
   
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -138,6 +140,11 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
                   )}
                 </span>
               </div>
+              {origin === 'FOOD_99' ? <p className="text-xs leading-relaxed text-muted-foreground">{financialSummary.merchantEstimatedReceivableState === 'KNOWN' && typeof financialSummary.merchantEstimatedReceivable === 'number'
+                ? 'Valor de loja informado pela 99Food no pedido. Não recalculamos cupons, taxas ou entrega; confirme o repasse no Financeiro.'
+                : 'A 99Food não informou um ganho de loja confiável neste pedido. Confira o valor quando os dados financeiros estiverem disponíveis.'}</p> : null}
+              {origin === 'FOOD_99' ? <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium text-muted-foreground">Repasse previsto</span><span className="font-black text-foreground">A confirmar</span></div> : null}
+              {origin === 'FOOD_99' ? <p className="text-xs leading-relaxed text-muted-foreground">O pedido não informa um valor previsto de repasse verificável. Consulte a conciliação financeira.</p> : null}
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-muted-foreground">Repasse liquidado</span>
                 <span className="font-black text-foreground">

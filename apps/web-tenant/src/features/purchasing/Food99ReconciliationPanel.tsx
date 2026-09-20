@@ -6,9 +6,11 @@ import type {
   Food99ReconciliationDTO,
   Food99SettlementDTO,
 } from '@gestor/types';
-import { AlertTriangle, CheckCircle2, RefreshCw, WalletCards } from 'lucide-react';
+import { FinancialAccountType } from '@gestor/types';
+import { AlertTriangle, CheckCircle2, Plus, RefreshCw, WalletCards } from 'lucide-react';
 import { ApiError, api } from '../../lib/api-client';
 import { Card } from '../../components/ui/Card';
+import { ModalShell } from '../orders/v2/ModalShell';
 
 type Props = { canManage: boolean; startDate?: string; endDate?: string };
 
@@ -17,6 +19,12 @@ const emptyReconciliation: Food99ReconciliationDTO = {
   settlements: [],
   billEntries: [],
 };
+
+function safeSupportDetails(caught: unknown): string {
+  if (!(caught instanceof ApiError)) return 'Sem resposta HTTP · sem código';
+  const code = caught.code && /^[A-Z][A-Z0-9_]{1,48}$/.test(caught.code) ? caught.code : 'sem código';
+  return `HTTP ${caught.status} · ${code}`;
+}
 
 export function Food99ReconciliationPanel({ canManage, startDate: providedStartDate, endDate: providedEndDate }: Props) {
   const defaultPeriod = useMemo(() => {
@@ -35,6 +43,11 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessNotEnabled, setAccessNotEnabled] = useState(false);
+  const [supportDetails, setSupportDetails] = useState<string | null>(null);
+  const [createAccountOpen, setCreateAccountOpen] = useState(false);
+  const [accountName, setAccountName] = useState('');
+  const [accountType, setAccountType] = useState<FinancialAccountType>(FinancialAccountType.BANK);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<Food99FinancialSyncResultDTO | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -56,8 +69,8 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
         setAccountId(selected?.settlementFinancialAccountId ?? '');
       }
       if (accountsResponse.success) setAccounts(accountsResponse.data.filter((account) => account.active));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Falha ao carregar a conciliação 99Food.');
+    } catch {
+      setError('Não foi possível carregar os repasses da 99Food. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -72,6 +85,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
     setWorking(true);
     setError(null);
     setAccessNotEnabled(false);
+    setSupportDetails(null);
     try {
       const response = await api.post<Food99FinancialSyncResultDTO>('/finance/marketplaces/99food/sync', {
         connectionId,
@@ -81,10 +95,15 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
       if (response.success) setSyncSummary(response.data);
       await load(connectionId);
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'FINANCE_ACCESS_NOT_ENABLED') {
+      if (caught instanceof ApiError && (caught.code === 'FINANCE_ACCESS_NOT_ENABLED' || caught.code === 'FINANCE_PROVIDER_UNAUTHORIZED' || caught.code === 'FINANCE_AUTH_REJECTED' || /99Food financial request failed with HTTP 401/i.test(caught.message))) {
         setAccessNotEnabled(true);
+        setSupportDetails(safeSupportDetails(caught));
+      } else if (caught instanceof ApiError && caught.status === 404) {
+        setError('Não foi possível encontrar a loja selecionada ou o recurso de sincronização nesta versão da API. Confira a loja e peça ao suporte para verificar a publicação.');
+        setSupportDetails(safeSupportDetails(caught));
       } else {
-        setError(caught instanceof Error ? caught.message : 'Falha ao sincronizar a 99Food.');
+        setError('Não foi possível atualizar os repasses agora. Tente novamente ou peça ajuda ao suporte.');
+        setSupportDetails(safeSupportDetails(caught));
       }
     } finally {
       setWorking(false);
@@ -100,8 +119,8 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
         accountId: accountId || null,
       });
       await load(connectionId);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Falha ao configurar a conta de destino.');
+    } catch {
+      setError('Não foi possível salvar a conta de destino. Confira a loja selecionada e tente novamente.');
     } finally {
       setWorking(false);
     }
@@ -113,8 +132,28 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
     try {
       await api.post(`/finance/marketplaces/99food/settlements/${settlement.id}/post`);
       await load(connectionId);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Falha ao registrar o repasse.');
+    } catch {
+      setError('Não foi possível confirmar o registro do repasse. Atualize a lista antes de tentar novamente.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const createAccount = async () => {
+    if (!canManage || !accountName.trim() || working) return;
+    setWorking(true);
+    setAccountError(null);
+    try {
+      const response = await api.post<FinancialAccountDTO>('/finance/accounts', {
+        name: accountName.trim(), type: accountType, initialBalance: 0,
+      });
+      if (!response.success || !response.data.active) throw new Error('Conta não confirmada como ativa.');
+      await load(connectionId || undefined);
+      setAccountId(response.data.id);
+      setAccountName('');
+      setCreateAccountOpen(false);
+    } catch {
+      setAccountError('Não foi possível criar a conta. Confira os dados ou tente novamente.');
     } finally {
       setWorking(false);
     }
@@ -153,7 +192,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando conciliação...</p>
           ) : data.connections.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma integração 99Food disponível para este tenant.</p>
+            <p className="text-sm text-muted-foreground">Nenhuma loja 99Food conectada para este restaurante. Confira a conexão em Canais de venda.</p>
           ) : (
             <>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -161,8 +200,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 <Summary label="Recebido" value={summary.posted} tone="success" />
                 <Summary label="Com divergência" value={summary.divergence} tone="danger" />
               </div>
-              <button type="button" onClick={() => setShowDetails((current) => !current)} className="min-h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{showDetails ? 'Fechar detalhes' : 'Ver detalhes e suporte'}</button>
-              {!showDetails ? <p className="text-sm text-muted-foreground">Use os detalhes para configurar a conta de destino, sincronizar ou registrar um repasse. IDs e composição ficam nesta área de suporte.</p> : <>
+              <p className="text-sm text-muted-foreground">Escolha a loja e a conta para acompanhar os repasses. Os registros detalhados ficam em "Ver detalhes e suporte".</p>
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                 <label className="text-xs font-medium text-muted-foreground">
                   Integração
@@ -195,22 +233,31 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 )}
               </div>
 
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+                <p>Selecione uma conta ativa para receber repasses confirmados. Criar ou escolher uma conta não registra o repasse.</p>
+                {canManage ? <button type="button" onClick={() => { setAccountError(null); setCreateAccountOpen(true); }} className="inline-flex min-h-10 items-center gap-1 font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Plus className="h-4 w-4" aria-hidden /> Criar conta financeira</button> : null}
+              </div>
+
               {accessNotEnabled && (
                 <div role="alert" className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-foreground">
                   <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-                  <p><strong>Integração financeira indisponível.</strong> A 99Food requer liberação/WhiteList para Bill Data e Settlements Data.</p>
+                  <p><strong>Consulta financeira não autorizada pela 99Food.</strong> Peça ao suporte para verificar a autorização da loja e a habilitação do acesso financeiro. Atualize a lista antes de tentar novamente.</p>
                 </div>
               )}
               {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+              {supportDetails && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-semibold text-primary">Ver informações para suporte</summary><p className="mt-2 break-all font-mono">{supportDetails}</p></details>}
               {syncSummary && (
-                <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> Sincronização concluída: {syncSummary.billEntriesReceived} eventos e {syncSummary.settlementsReceived} repasses recebidos.</p>
+                <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> Consulta concluída: {syncSummary.billEntriesReceived} registros diários e {syncSummary.settlementsReceived} fechamentos importados. Isso não confirma o recebimento na conta.</p>
               )}
+
+              <button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="min-h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{showDetails ? 'Fechar detalhes' : 'Ver detalhes e suporte'}</button>
+              {showDetails ? <>
 
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Repasses processados</h3>
                 <div className="mt-2 overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-full divide-y divide-border text-sm">
-                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">weekPaymentId</th><th className="px-3 py-2">Desembolso</th><th className="px-3 py-2">Valor</th><th className="px-3 py-2">Composição Bill</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Ação</th></tr></thead>
+                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Referência do repasse</th><th className="px-3 py-2">Desembolso</th><th className="px-3 py-2">Valor</th><th className="px-3 py-2">Total dos pedidos</th><th className="px-3 py-2">Situação</th><th className="px-3 py-2">Ação</th></tr></thead>
                     <tbody className="divide-y divide-border">
                       {data.settlements.length === 0 ? <tr><td className="px-3 py-5 text-muted-foreground" colSpan={6}>Nenhum repasse no período.</td></tr> : data.settlements.map((settlement) => (
                         <tr key={settlement.id}>
@@ -238,7 +285,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 <h3 className="text-sm font-semibold text-foreground">Eventos do Bill Data</h3>
                 <div className="mt-2 overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-full divide-y divide-border text-sm">
-                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Pedido</th><th className="px-3 py-2">Evento</th><th className="px-3 py-2">dayPaymentId</th><th className="px-3 py-2">Comissão</th><th className="px-3 py-2">Valor final</th><th className="px-3 py-2">Previsão</th></tr></thead>
+                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Pedido</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Referência diária</th><th className="px-3 py-2">Comissão</th><th className="px-3 py-2">Valor final</th><th className="px-3 py-2">Previsão</th></tr></thead>
                     <tbody className="divide-y divide-border">
                       {data.billEntries.length === 0 ? <tr><td className="px-3 py-5 text-muted-foreground" colSpan={6}>Nenhum evento financeiro no período.</td></tr> : data.billEntries.map((entry) => (
                         <tr key={entry.id}>
@@ -254,11 +301,20 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                   </table>
                 </div>
               </div>
-              </>}
+              </> : null}
             </>
           )}
         </div>
       </Card>
+      {canManage && <ModalShell open={createAccountOpen} title="Criar conta financeira" onClose={() => { if (!working) setCreateAccountOpen(false); }} size="standard">
+        <form className="space-y-4 p-5 sm:p-6" onSubmit={(event) => { event.preventDefault(); void createAccount(); }}>
+          <p className="text-sm text-muted-foreground">Cadastre uma conta ativa para receber repasses. O saldo começa em zero; nenhum repasse será registrado agora.</p>
+          <label className="block text-sm font-semibold text-foreground">Nome da conta<input autoFocus required maxLength={100} value={accountName} disabled={working} onChange={(event) => setAccountName(event.target.value)} placeholder="Ex.: Banco da loja" className="mt-1 block min-h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground" /></label>
+          <label className="block text-sm font-semibold text-foreground">Tipo de conta<select value={accountType} disabled={working} onChange={(event) => setAccountType(event.target.value as FinancialAccountType)} className="mt-1 block min-h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"><option value={FinancialAccountType.BANK}>Conta bancária</option><option value={FinancialAccountType.DIGITAL_WALLET}>Carteira digital</option><option value={FinancialAccountType.CASH}>Dinheiro</option></select></label>
+          {accountError && <p role="alert" className="text-sm text-destructive">{accountError}</p>}
+          <div className="flex justify-end gap-2"><button type="button" disabled={working} onClick={() => setCreateAccountOpen(false)} className="min-h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground">Cancelar</button><button type="submit" disabled={working || !accountName.trim()} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{working ? 'Criando...' : 'Criar e selecionar'}</button></div>
+        </form>
+      </ModalShell>}
     </section>
   );
 }
@@ -275,7 +331,7 @@ function Summary({ label, value, tone }: { label: string; value: number; tone: '
 }
 
 function orderTypeLabel(type: 1 | 2 | 3 | 4 | 5): string {
-  return ({ 1: 'Receita', 2: 'Refund total', 3: 'Refund parcial na venda', 4: 'Refund pós-venda', 5: 'Ajuste' })[type];
+  return ({ 1: 'Receita', 2: 'Estorno total', 3: 'Estorno parcial na venda', 4: 'Estorno após a venda', 5: 'Ajuste' })[type];
 }
 
 function formatCents(rawCents: string, currency: string): string {

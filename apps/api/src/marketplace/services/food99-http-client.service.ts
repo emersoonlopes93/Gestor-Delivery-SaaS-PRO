@@ -139,14 +139,22 @@ export class Food99HttpClientService {
     input: { method: 'GET' | 'POST'; path: string; externalOrderId: string; correlationId: string },
   ): Promise<T> {
     this.assertDecimalIdentifier(input.externalOrderId);
-    const token = await this.tokens.getAccessToken(connection);
-    const url = new URL(`${this.baseUrl()}${input.path}`);
-    if (input.method === 'GET') {
-      url.searchParams.set('auth_token', token);
-      url.searchParams.set('order_id', input.externalOrderId);
+    const send = (token: string) => {
+      const url = new URL(`${this.baseUrl()}${input.path}`);
+      if (input.method === 'GET') {
+        url.searchParams.set('auth_token', token);
+        url.searchParams.set('order_id', input.externalOrderId);
+      }
+      const body = input.method === 'POST' ? this.losslessOrderBody(token, input.externalOrderId) : undefined;
+      return this.executeNative(connection, url, input.method, body, input);
+    };
+    let token = await this.tokens.getAccessToken(connection);
+    let response = await send(token);
+    if (response.status === 401) {
+      token = await this.tokens.getAccessToken(connection, true);
+      response = await send(token);
+      if (response.status === 401) await this.tokens.markAuthenticationFailed(connection);
     }
-    const body = input.method === 'POST' ? this.losslessOrderBody(token, input.externalOrderId) : undefined;
-    const response = await this.executeNative(connection, url, input.method, body, input);
     const payload = this.asRecord(await this.readNativeUnknown(response));
     if (response.status !== 200 || payload?.errno !== 0) {
       this.logNativeRejection({ endpoint: input.path, correlationId: input.correlationId, httpStatus: response.status, payload });

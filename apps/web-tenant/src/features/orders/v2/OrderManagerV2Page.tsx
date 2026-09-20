@@ -199,7 +199,7 @@ export function OrderManagerV2Page() {
       setLastConfirmedAt(Date.now());
       setError(null);
     } catch {
-      setError('Nao foi possivel atualizar o status. O pedido sera reconciliado antes da proxima tentativa.');
+      setError('Não foi possível confirmar a atualização. Confira o estado do pedido antes de tentar novamente.');
       void reconcile({ eventId: `action-failed:${order.id}:${Date.now()}`, orderId: order.id, reason: 'status', occurredAt: new Date().toISOString() });
     } finally {
       setUpdatingOrderId(null);
@@ -334,7 +334,7 @@ export function OrderManagerV2Page() {
             {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
               <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
                 <span className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alert.severity}</span>
-                <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
+                <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="mt-1 text-xs leading-relaxed text-foreground">{alert.message}</p><p className="mt-1 text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
                 {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
                 {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
               </div>

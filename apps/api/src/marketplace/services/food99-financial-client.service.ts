@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketplaceConnection } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
-import { Food99TokenService } from './food99-token.service';
+import { Food99FinancialTokenService } from './food99-financial-token.service';
 
 export type Food99FinancialRecord = Record<string, unknown>;
 
@@ -100,7 +100,7 @@ export function splitFood99FinancialBackfill(
 export class Food99FinancialClientService {
   constructor(
     private readonly config: ConfigService,
-    private readonly tokens: Food99TokenService,
+    private readonly tokens: Food99FinancialTokenService,
   ) {}
 
   fetchBillEntries(
@@ -154,7 +154,7 @@ export class Food99FinancialClientService {
       );
     }
 
-    let token = await this.tokens.getAccessToken(connection);
+    let token = await this.tokens.getAccessToken();
     const all: Food99FinancialRecord[] = [];
     let pageNo = 1;
     let totalPages = 1;
@@ -168,9 +168,9 @@ export class Food99FinancialClientService {
       };
       let response = await this.execute(connection, token, path, correlationId, body);
       if (response.status === 401) {
-        token = await this.tokens.getAccessToken(connection, true);
+        token = await this.tokens.getAccessToken(true);
         response = await this.execute(connection, token, path, correlationId, body);
-        if (response.status === 401) await this.tokens.markAuthenticationFailed(connection);
+        if (response.status === 401) this.tokens.invalidate();
       }
       const raw = await response.text();
       const payload = this.asRecord(this.tryParse(raw));
@@ -288,13 +288,16 @@ export class Food99FinancialClientService {
       .find((value): value is string => typeof value === 'string');
     const whitelistDenied = httpStatus === 403
       || Boolean(providerMessage?.toLowerCase().includes('whitelist'));
+    const authorizationRejected = httpStatus === 401 && !whitelistDenied;
     return new Food99ApiError(
       whitelistDenied
         ? 'A integracao financeira da 99Food requer liberacao/WhiteList.'
+        : authorizationRejected
+          ? 'A 99Food nao autorizou a consulta financeira apos renovar o acesso. Verifique a autorizacao da loja e a liberacao financeira com o suporte.'
         : `99Food financial request failed with HTTP ${httpStatus}.`,
       httpStatus === 429 || httpStatus >= 500,
       httpStatus,
-      whitelistDenied ? 'FINANCE_ACCESS_NOT_ENABLED' : providerMessage,
+      whitelistDenied ? 'FINANCE_ACCESS_NOT_ENABLED' : authorizationRejected ? 'FINANCE_PROVIDER_UNAUTHORIZED' : providerMessage,
     );
   }
 

@@ -58,9 +58,15 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const timestamp = this.readIdentifier(payload, ['timestamp']);
     const externalOrderId = this.readIdentifier(data, ['order_id']);
     const externalMerchantId = this.readIdentifier(shop, ['shop_id']);
+    const deliveryStatus = eventType?.toUpperCase() === 'DELIVERYSTATUS'
+      ? this.readIdentifier(data, ['delivery_status'])
+      : null;
+    const eventIdentity = deliveryStatus
+      ? [appId, appShopId, eventType, timestamp, externalOrderId, deliveryStatus]
+      : [appId, appShopId, eventType, timestamp, externalOrderId];
     const eventId = appId && appShopId && eventType && timestamp && externalOrderId
       ? `food99:${createHash('sha256')
-        .update(JSON.stringify([appId, appShopId, eventType, timestamp, externalOrderId]))
+        .update(JSON.stringify(eventIdentity))
         .digest('hex')}`
       : null;
     return {

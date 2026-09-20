@@ -16,7 +16,7 @@ describe('Food99FinancialClientService', () => {
   });
 
   function makeService() {
-    const tokens = { getAccessToken: jest.fn().mockResolvedValue('shop-token') };
+    const tokens = { getAccessToken: jest.fn().mockResolvedValue('finance-token'), invalidate: jest.fn() };
     const service = new Food99FinancialClientService({
       get: jest.fn((key: string) => ({
         MARKETPLACE_99FOOD_FINANCE_API_BASE_URL: 'https://food99-finance.test',
@@ -76,7 +76,7 @@ describe('Food99FinancialClientService', () => {
 
     const [url, request] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://food99-finance.test/v3/finance/finance/getShopBillDetail');
-    expect(request.headers).toMatchObject({ authorization: 'Bearer shop-token' });
+    expect(request.headers).toMatchObject({ authorization: 'Bearer finance-token' });
     expect(JSON.parse(String(request.body))).toEqual({
       acceptor_code: '5764608924570091908',
       start_date: '20260901',
@@ -131,7 +131,7 @@ describe('Food99FinancialClientService', () => {
       { startDate: '2026-09-01', endDate: '2026-09-12' },
       'correlation-1',
     )).resolves.toEqual([]);
-    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, connection, true);
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, true);
     expect((global.fetch as jest.Mock).mock.calls[1][1].headers).toMatchObject({
       authorization: 'Bearer fresh-token',
     });
@@ -151,6 +151,21 @@ describe('Food99FinancialClientService', () => {
     await expect(promise).rejects.toMatchObject<Partial<Food99ApiError>>({
       providerCode: 'FINANCE_ACCESS_NOT_ENABLED',
     });
+  });
+
+  it('keeps a persistent 401 distinct from PedeHub RBAC and uncertain whitelist denial', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":401}', { status: 401 }));
+    const { service, connection, tokens } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-1',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      httpStatus: 401,
+      providerCode: 'FINANCE_PROVIDER_UNAUTHORIZED',
+    });
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, true);
+    expect(tokens.invalidate).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces provider failures instead of returning an empty dataset', async () => {

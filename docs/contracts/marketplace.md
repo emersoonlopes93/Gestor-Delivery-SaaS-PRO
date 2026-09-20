@@ -285,6 +285,17 @@ canonical CAS primitive to `out_for_delivery`; `150` persists the external arriv
 never cancels the commercial order; `180` refreshes courier metadata and clears the current
 arrival condition until a later `130`. Alerts recover on 140/170/180 and terminal orders.
 
+`deliveryStatus` must reach the logistics handler before the ordinary order-topic filter.
+The signed callback's derived inbox identity includes `delivery_status`, so 130 and 140
+for the same order and provider second remain distinct; other callback identities keep
+their previous format. Older timestamps and regressive progressive delivery states are
+ignored without advancing the order's last-event cursor. Only a provider-owned 140
+can advance the canonical order to `out_for_delivery` through tenant-scoped CAS and
+emit `order.changed` after commit. A prior stored callback is not silently replayed
+against production orders when this code is deployed.
+An authenticated callback without an imported internal order stays failed/retryable in
+the inbox instead of being marked successfully processed.
+
 Canonical stock remains local and recipe-driven: a tenant-scoped
 `MarketplaceCatalogMapping(connectionId, provider, externalItemId) -> Product` resolves the
 provider item before the existing idempotent `OrderItem.productId` depletion engine runs.

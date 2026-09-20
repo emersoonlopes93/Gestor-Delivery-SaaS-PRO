@@ -238,6 +238,15 @@ describe('MarketplaceOrderIngestionService', () => {
     expect(alerts.refreshTenant).toHaveBeenCalledWith('tenant-1');
   });
 
+  it('keeps an uncorrelated 99Food delivery callback retryable instead of marking it processed', async () => {
+    const prisma = { marketplaceOrder: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const { service } = makeFood99LifecycleService(prisma);
+    await expect(applyFood99DeliveryStatus(service, {
+      tenantId: 'tenant-1', connectionId: 'conn-1', externalOrderId: '5764607618872501234',
+      rawPayload: { data: { delivery_status: 140 } },
+    })).rejects.toThrow('no correlated internal order');
+  });
+
   it('preserves the commercial order when 99Food cancels only delivery', async () => {
     const divergence = { record: jest.fn().mockResolvedValue({}) };
     const prisma = {

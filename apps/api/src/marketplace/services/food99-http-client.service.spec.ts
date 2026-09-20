@@ -6,7 +6,7 @@ describe('Food99HttpClientService native V1 actions', () => {
   afterEach(() => { global.fetch = originalFetch; jest.restoreAllMocks(); });
 
   function makeService() {
-    const tokens = { getAccessToken: jest.fn().mockResolvedValue('shop-token') };
+    const tokens = { getAccessToken: jest.fn().mockResolvedValue('shop-token'), markAuthenticationFailed: jest.fn().mockResolvedValue(undefined) };
     const service = new Food99HttpClientService({
       get: jest.fn((key: string) => key === 'MARKETPLACE_99FOOD_API_BASE_URL' ? 'https://food99.test' : undefined),
     } as never, tokens as never);
@@ -25,6 +25,28 @@ describe('Food99HttpClientService native V1 actions', () => {
     const request = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
     expect(String(request.body)).toContain(`"order_id":${orderId}`);
     expect(String(request.body)).not.toContain(`"order_id":"${orderId}"`);
+  });
+
+  it('refreshes once on native HTTP 401 without repeating a successful confirmation', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(new Response('{"errno":401}', { status: 401 }))
+      .mockResolvedValueOnce(new Response('{"errno":0,"data":true}', { status: 200 }));
+    const { service, connection, tokens } = makeService();
+    tokens.getAccessToken.mockResolvedValueOnce('expired').mockResolvedValueOnce('refreshed');
+    await expect(service.confirmOrder(connection, '5764656197621845665', 'correlation-1'))
+      .resolves.toEqual({ accepted: true, httpStatus: 200 });
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, connection, true);
+    expect(String((global.fetch as jest.Mock).mock.calls[1][1].body)).toContain('"auth_token":"refreshed"');
+    expect(tokens.markAuthenticationFailed).not.toHaveBeenCalled();
+  });
+
+  it('marks shop authentication failed only after a second native HTTP 401', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":401}', { status: 401 }));
+    const { service, connection, tokens } = makeService();
+    await expect(service.confirmOrder(connection, '5764656197621845665', 'correlation-1'))
+      .rejects.toMatchObject({ httpStatus: 401, retryable: false });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(tokens.markAuthenticationFailed).toHaveBeenCalledWith(connection);
   });
 
   it.each([

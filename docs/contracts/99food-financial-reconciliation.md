@@ -13,7 +13,13 @@ Este contrato separa quatro fatos que não podem ser usados como sinônimos:
 
 ## Provider read-only
 
-As leituras usam Bearer token da conexão e os endpoints:
+As leituras usam um token exclusivo da Financial API, distinto do token de pedidos
+da loja. Antes da primeira consulta, o aplicativo faz
+`POST https://openapi.99food.com/v3/auth/authtoken/signIn` com
+`retailer=app_id` e `secret=app_secret`; lê `accessToken` e `expiresIn`, mantém
+o token em cache até antes da expiração e compartilha autenticações simultâneas.
+O limite informado para o sign-in é 100 requisições por minuto. O token e o
+segredo nunca são registrados em logs. As consultas usam os endpoints:
 
 - `POST https://openapi.99food.com/v3/finance/finance/getShopBillDetail`;
 - `POST https://openapi.99food.com/v3/finance/finance/getShopBillWeek`.
@@ -21,6 +27,13 @@ As leituras usam Bearer token da conexão e os endpoints:
 O body envia `acceptor_code=app_shop_id`, datas `YYYYMMDD`, `page_no` e `page_size=200`. Uma requisição cobre no máximo 31 dias; um backfill manual cobre no máximo três meses e é dividido em janelas não sobrepostas. Não há scheduler automático enquanto rate limits oficiais não estiverem disponíveis.
 
 Os dois endpoints exigem WhiteList especial. Negação de acesso é `FINANCE_ACCESS_NOT_ENABLED`, nunca uma coleção vazia nem um valor de R$ 0,00.
+
+Após uma resposta HTTP 401, o cliente renova o token uma vez. Se a 99Food ainda
+recusar a consulta, a API informa `FINANCE_PROVIDER_UNAUTHORIZED`, distinto da
+permissão `finance.manage` do PedeHub e sem inferir se a causa remota é credencial
+ou habilitação financeira. A orientação ao gestor é verificar a autorização da loja
+e o acesso financeiro com o suporte; uma falha não prova que janelas anteriores de
+uma sincronização de várias janelas não foram importadas.
 
 IDs e timestamps de identidade (`orderId`, `dayPaymentId`, `weekPaymentId`, `shopId`, `businessTs`) são strings lossless desde o texto HTTP. O adapter protege também IDs numéricos dentro de `dayPaymentIDList` antes do `JSON.parse`. Valores monetários são strings inteiras no adapter e `BigInt` em centavos no banco; o sinal recebido é preservado.
 

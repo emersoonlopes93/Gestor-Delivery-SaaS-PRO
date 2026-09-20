@@ -23,9 +23,21 @@ export function normalizeOrderSearchText(value: string): string {
 }
 
 export function buildOrderSearchText(order: OrderBoardItemDTO): string {
-  return [order.orderNumber, order.customerName, order.customerPhone, order.deliveryDriverName, order.itemsSummary, order.searchText, order.notes]
+  return [order.orderNumber, getProviderOrderNumber(order), order.customerName, order.customerPhone, order.deliveryDriverName, order.itemsSummary, order.searchText, order.notes]
     .filter((value): value is string => Boolean(value))
     .join(' ');
+}
+
+export function formatOrderDisplayNumber(value: string): string {
+  return `#${value.trim().replace(/^#+\s*/, '')}`;
+}
+
+/** A platform display number is distinct from the provider's technical order ID. */
+export function getProviderOrderNumber(order: Pick<OrderBoardItemDTO, 'id' | 'operational'>): string | null {
+  if (order.operational.origin === 'PEDEHUB') return null;
+  const value = order.operational.providerOrderNumber?.trim().replace(/^#+\s*/, '');
+  if (!value || value === order.id || /^[0-9]{16,}$/.test(value) || /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value)) return null;
+  return value;
 }
 
 export function matchesOrderSearch(order: OrderBoardItemDTO, query: string): boolean {
