@@ -10,7 +10,7 @@ import { AlertTriangle, CheckCircle2, RefreshCw, WalletCards } from 'lucide-reac
 import { ApiError, api } from '../../lib/api-client';
 import { Card } from '../../components/ui/Card';
 
-type Props = { canManage: boolean };
+type Props = { canManage: boolean; startDate?: string; endDate?: string };
 
 const emptyReconciliation: Food99ReconciliationDTO = {
   connections: [],
@@ -18,15 +18,15 @@ const emptyReconciliation: Food99ReconciliationDTO = {
   billEntries: [],
 };
 
-export function Food99ReconciliationPanel({ canManage }: Props) {
+export function Food99ReconciliationPanel({ canManage, startDate: providedStartDate, endDate: providedEndDate }: Props) {
   const defaultPeriod = useMemo(() => {
     const end = new Date();
     const start = new Date(end);
     start.setDate(start.getDate() - 30);
     return { start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') };
   }, []);
-  const [startDate, setStartDate] = useState(defaultPeriod.start);
-  const [endDate, setEndDate] = useState(defaultPeriod.end);
+  const startDate = providedStartDate ?? defaultPeriod.start;
+  const endDate = providedEndDate ?? defaultPeriod.end;
   const [data, setData] = useState<Food99ReconciliationDTO>(emptyReconciliation);
   const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
   const [connectionId, setConnectionId] = useState('');
@@ -36,6 +36,7 @@ export function Food99ReconciliationPanel({ canManage }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [accessNotEnabled, setAccessNotEnabled] = useState(false);
   const [syncSummary, setSyncSummary] = useState<Food99FinancialSyncResultDTO | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const load = useCallback(async (selectedConnectionId?: string) => {
     setLoading(true);
@@ -119,24 +120,30 @@ export function Food99ReconciliationPanel({ canManage }: Props) {
     }
   };
 
+  const summary = useMemo(() => ({
+    awaiting: data.settlements.filter((settlement) => settlement.status === 'LIQUIDATED_UNPOSTED').length,
+    posted: data.settlements.filter((settlement) => settlement.status === 'POSTED').length,
+    divergence: data.settlements.filter((settlement) => settlement.status === 'RECONCILIATION_DISCREPANCY').length,
+  }), [data.settlements]);
+
   return (
-    <section className="mb-6" aria-labelledby="food99-reconciliation-title">
+    <section className="mt-6" aria-labelledby="food99-reconciliation-title">
       <Card className="overflow-hidden">
         <div className="border-b border-border bg-muted/35 px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">99Food</p>
               <h2 id="food99-reconciliation-title" className="mt-1 text-lg font-semibold text-foreground">Conciliação de repasses</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Bill Data explica os eventos; somente um repasse confirmado altera o saldo.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Os detalhes explicam os repasses; somente um repasse confirmado altera o saldo.</p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <label className="text-xs font-medium text-muted-foreground">
                 Início
-                <input className="mt-1 block min-h-10 rounded-md border border-border bg-card px-2 text-sm text-foreground" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+                <input className="mt-1 block min-h-10 rounded-md border border-border bg-card px-2 text-sm text-foreground" type="date" value={startDate} readOnly aria-label="Início do período selecionado no Financeiro" />
               </label>
               <label className="text-xs font-medium text-muted-foreground">
                 Fim
-                <input className="mt-1 block min-h-10 rounded-md border border-border bg-card px-2 text-sm text-foreground" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+                <input className="mt-1 block min-h-10 rounded-md border border-border bg-card px-2 text-sm text-foreground" type="date" value={endDate} readOnly aria-label="Fim do período selecionado no Financeiro" />
               </label>
             </div>
           </div>
@@ -149,6 +156,13 @@ export function Food99ReconciliationPanel({ canManage }: Props) {
             <p className="text-sm text-muted-foreground">Nenhuma integração 99Food disponível para este tenant.</p>
           ) : (
             <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Summary label="Aguardando registro" value={summary.awaiting} tone="attention" />
+                <Summary label="Recebido" value={summary.posted} tone="success" />
+                <Summary label="Com divergência" value={summary.divergence} tone="danger" />
+              </div>
+              <button type="button" onClick={() => setShowDetails((current) => !current)} className="min-h-10 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{showDetails ? 'Fechar detalhes' : 'Ver detalhes e suporte'}</button>
+              {!showDetails ? <p className="text-sm text-muted-foreground">Use os detalhes para configurar a conta de destino, sincronizar ou registrar um repasse. IDs e composição ficam nesta área de suporte.</p> : <>
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                 <label className="text-xs font-medium text-muted-foreground">
                   Integração
@@ -240,6 +254,7 @@ export function Food99ReconciliationPanel({ canManage }: Props) {
                   </table>
                 </div>
               </div>
+              </>}
             </>
           )}
         </div>
@@ -252,6 +267,11 @@ function SettlementStatus({ settlement }: { settlement: Food99SettlementDTO }) {
   if (settlement.status === 'POSTED') return <span className="text-emerald-700 dark:text-emerald-400">Conciliado</span>;
   if (settlement.status === 'RECONCILIATION_DISCREPANCY') return <span className="text-destructive">Divergência do provedor</span>;
   return <span className="text-amber-700 dark:text-amber-400">Aguardando registro financeiro</span>;
+}
+
+function Summary({ label, value, tone }: { label: string; value: number; tone: 'success' | 'attention' | 'danger' }) {
+  const valueClass = tone === 'success' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'danger' ? 'text-destructive' : 'text-amber-700 dark:text-amber-400';
+  return <div className="rounded-lg border border-border bg-muted/25 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className={`mt-1 text-xl font-semibold tabular-nums ${valueClass}`}>{value}</p></div>;
 }
 
 function orderTypeLabel(type: 1 | 2 | 3 | 4 | 5): string {

@@ -1,56 +1,49 @@
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('./FinancePage.tsx', import.meta.url), 'utf8');
+const modal = readFileSync(new URL('./TransactionModal.tsx', import.meta.url), 'utf8');
 const navigationRegistry = readFileSync(new URL('../../navigation/navigationRegistry.ts', import.meta.url), 'utf8');
 
 describe('FinancePage UX contract', () => {
-  it('keeps the one-day dashboard and financial transaction requests unchanged', () => {
-    expect(source).toContain("const today = format(new Date(), 'yyyy-MM-dd')");
-    expect(source).toContain('`/analytics/dashboard?startDate=${today}&endDate=${today}`');
-    expect(source).toContain("api.get<FinancialTransactionDTO[]>('/finance/transactions')");
-    expect(source).not.toContain("api.get<FinancialAccountDTO[]>");
+  it('uses the finance-read summary and one selected range for summary, transactions, and export', () => {
+    expect(source).toContain('/finance/summary?startDate=${startDate}&endDate=${endDate}');
+    expect(source).toContain('/finance/transactions?startDate=${startDate}&endDate=${endDate}');
+    expect(source).not.toContain('/analytics/dashboard');
+    expect(source).toContain('financeiro_${startDate}_a_${endDate}.csv');
   });
 
-  it('keeps financial transactions usable when analytics metrics are unavailable', () => {
-    expect(source).toContain('Promise.allSettled([');
-    expect(source).toContain("metricsResult.status === 'fulfilled'");
-    expect(source).toContain("transactionsResult.status === 'fulfilled'");
-    expect(source).toContain('setTransactions(transactionsResult.value.data)');
+  it('keeps sales, recorded receipts, documented receivables, and current balance distinct', () => {
+    expect(source).toContain('Vendas concluídas');
+    expect(source).toContain('Recebido nas contas');
+    expect(source).toContain('A receber confirmado');
+    expect(source).toContain('Saldo das contas financeiras');
+    expect(source).toContain('summary?.currentAccountsBalance');
+    expect(source).toContain('iFood não está disponível aqui');
   });
 
-  it('preserves finance actions, four overview values, DRE, and in-memory pending composition', () => {
-    expect(source).toContain('handleExport');
-    expect(source).toContain('TransactionModal');
-    expect(source).toContain('onSave={loadData}');
-    expect(source).toContain('<PrimaryBalance value={formatCurrency(metrics?.financial.cashBalance)}');
-    expect(source).toContain('<SummaryMetric label="Entradas"');
-    expect(source).toContain('<SummaryMetric label="Saídas"');
-    expect(source).toContain('<SummaryMetric label="Lucro operacional"');
-    expect(source).toContain('DRE gerencial');
-    expect(source).toContain("transactions.filter((transaction) => transaction.type === 'expense' && transaction.status !== 'paid')");
-    expect(source).toContain('pendingExpenses.slice(0, 5)');
+  it('shows only pending and overdue expenses as payables and calls out cancelled records', () => {
+    expect(source).toContain("transaction.status === FinancialStatus.PENDING || transaction.status === FinancialStatus.OVERDUE");
+    expect(source).toContain('Canceladas não entram');
+    expect(source).toContain('Vencido');
   });
 
-  it('keeps existing guarded destinations and accessible responsive structure', () => {
-    expect(source).toContain("['management.finance', 'cash.home', 'analytics.reports']");
-    expect(source).toContain('aria-label="Contas e pendências"');
-    expect(source).toContain('focus-visible:ring-2');
-    expect(source).toContain('grid grid-cols-1 gap-px bg-border sm:grid-cols-2 xl:col-span-7 xl:grid-cols-3');
-    expect(source).toContain('grid grid-cols-1 xl:grid-cols-12');
+  it('keeps cash operationally separate and preserves the guarded cash destination', () => {
+    expect(source).toContain('Caixa operacional');
+    expect(source).toContain('Não é somado às contas financeiras nesta tela');
+    expect(source).toContain('to="/cash"');
     expect(navigationRegistry).toContain("id: 'cash.home'");
-    expect(navigationRegistry).toContain("path: '/cash'");
-    expect(navigationRegistry).toContain("id: 'analytics.reports'");
-    expect(navigationRegistry).toContain("path: '/analytics/reports'");
   });
 
-  it('keeps financial unknown states and mobile reading safeguards explicit', () => {
-    expect(source).toContain('const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false)');
-    expect(source).toContain("transactionsResult.status === 'fulfilled' && transactionsResult.value.success");
-    expect(source).toContain('setHasLoadedTransactions(true)');
-    expect(source).toContain('isLoading || !hasLoadedTransactions');
-    expect(source).toContain('Carregando pendências...');
-    expect(source).toContain('break-words text-xl');
-    expect(source).not.toContain('truncate text-2xl');
-    expect(source.match(/<h1/g)).toHaveLength(1);
+  it('makes a paid creation attributable and avoids unsupported paid-value edits', () => {
+    expect(modal).toContain('crypto.randomUUID()');
+    expect(modal).toContain('idempotencyKey');
+    expect(modal).toContain('Selecione a conta financeira');
+    expect(modal).toContain('disabled={isPaidRecord}');
+    expect(modal).toContain('Este lançamento já movimentou uma conta');
+  });
+
+  it('keeps historical paid records without a date visible for individual review', () => {
+    expect(source).toContain('paidWithoutPaymentDate');
+    expect(source).toContain('não foram alterados automaticamente');
   });
 });

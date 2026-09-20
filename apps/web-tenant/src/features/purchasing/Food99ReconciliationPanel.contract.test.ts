@@ -7,9 +7,9 @@ const v2Details = readFileSync(new URL('../orders/v2/OrderDetailsModalV2.tsx', i
 
 describe('99Food financial reconciliation UI contract', () => {
   it('adds a finance-only reconciliation surface without changing order calculations', () => {
-    expect(financePage).toContain('<Food99ReconciliationPanel canManage={canManageFinance} />');
+    expect(financePage).toContain('<Food99ReconciliationPanel canManage={canManageFinance} startDate={startDate} endDate={endDate} />');
     expect(panel).toContain('Conciliação de repasses');
-    expect(panel).toContain('Bill Data explica os eventos; somente um repasse confirmado altera o saldo.');
+    expect(panel).toContain('Os detalhes explicam os repasses; somente um repasse confirmado altera o saldo.');
     expect(panel).not.toContain('FinancialProjection');
   });
 
@@ -34,6 +34,7 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('Divergência');
     expect(panel).toContain('weekPaymentId');
     expect(panel).toContain('dayPaymentId');
+    expect(panel).toContain('Ver detalhes e suporte');
   });
 
   it('preserves the shared legacy/V2 order payment contract', () => {
