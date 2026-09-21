@@ -338,6 +338,7 @@ export class Food99FinancialClientService {
     const providerBusinessCode = this.readBusinessCode(payload?.errno)
       ?? this.readBusinessCode(payload?.code)
       ?? this.readBusinessCode(payload?.error_code);
+    const providerReportedBusinessError = providerBusinessCode !== null || Boolean(providerMessage);
     const whitelistDenied = httpStatus === 403
       || Boolean(providerMessage?.toLowerCase().includes('whitelist'));
     const authorizationRejected = httpStatus === 401 && !whitelistDenied;
@@ -346,6 +347,8 @@ export class Food99FinancialClientService {
         ? 'A integracao financeira da 99Food requer liberacao/WhiteList.'
         : authorizationRejected
           ? 'A 99Food nao autorizou a consulta financeira apos renovar o acesso. Verifique a autorizacao da loja e a liberacao financeira com o suporte.'
+        : providerReportedBusinessError
+          ? 'A 99Food informou um erro ao consultar os dados financeiros desta loja. Confira a configuracao e a liberacao financeira com o suporte. Nenhum repasse foi registrado.'
         : httpStatus >= 200 && httpStatus < 300
           ? 'A 99Food respondeu a consulta financeira, mas o formato do retorno nao foi reconhecido. Nenhum repasse foi registrado.'
           : `99Food financial request failed with HTTP ${httpStatus}.`,

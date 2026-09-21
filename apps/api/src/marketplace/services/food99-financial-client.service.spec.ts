@@ -186,7 +186,7 @@ describe('Food99FinancialClientService', () => {
   it('classifies the observed HTTP 200 error_code envelope as a provider business error', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     global.fetch = jest.fn().mockResolvedValue(new Response(
-      '{"error_code":"40001","error_description":"provider diagnostic","Details":"provider details","request_id":"provider-request"}',
+      '{"error_code":"10050","error_description":"provider diagnostic","Details":"provider details","request_id":"provider-request"}',
       { status: 200, headers: { 'content-type': 'application/json' } },
     ));
     const { service, connection } = makeService();
@@ -195,12 +195,13 @@ describe('Food99FinancialClientService', () => {
       { startDate: '2026-09-01', endDate: '2026-09-12' },
       'correlation-error-code-envelope',
     )).rejects.toMatchObject<Partial<Food99ApiError>>({
-      providerCode: 'FINANCE_PROVIDER_BUSINESS_40001',
+      providerCode: 'FINANCE_PROVIDER_BUSINESS_10050',
       httpStatus: 200,
+      message: 'A 99Food informou um erro ao consultar os dados financeiros desta loja. Confira a configuracao e a liberacao financeira com o suporte. Nenhum repasse foi registrado.',
     });
     expect(warn).toHaveBeenCalledWith(expect.objectContaining({
       message: 'food99_financial_provider_rejected',
-      errorCode: 40001,
+      errorCode: 10050,
       hasErrorCode: true,
       hasProviderMessage: true,
       rootKeys: ['Details', 'error_code', 'error_description', 'request_id'],

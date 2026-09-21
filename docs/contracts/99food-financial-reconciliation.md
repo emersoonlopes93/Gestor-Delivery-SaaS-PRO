@@ -49,6 +49,11 @@ nunca registra as descrições ou o request ID. Não há evidência de que
 `error_code=0` seja um envelope de sucesso; sucesso continua exigindo os
 marcadores contratuais acima e `data` paginada.
 
+O código `10050` foi observado nesse envelope em 2026-09-21. Não há significado
+oficial disponível no contrato ou na documentação pública consultada; ele deve
+ser encaminhado ao suporte 99Food como código de negócio, sem ser traduzido como
+token inválido, WhiteList ausente ou inexistência de repasses.
+
 Após uma resposta HTTP 401, o cliente renova o token uma vez. Se a 99Food ainda
 recusar a consulta, a API informa `FINANCE_PROVIDER_UNAUTHORIZED`, distinto da
 permissão `finance.manage` do PedeHub e sem inferir se a causa remota é credencial

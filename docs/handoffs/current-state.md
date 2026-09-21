@@ -2662,3 +2662,7 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 
 - Logs publicados confirmaram HTTP 200 de `bill_detail` com `error_code`, `error_description`, `Details` e `request_id`, sem envelope de dados. Isto é erro de negócio explícito, não token inválido, conjunto vazio ou sucesso. `error_code` numérico agora gera `FINANCE_PROVIDER_BUSINESS_<código>`; texto remoto e request ID não são expostos para UI/log.
 - A interface passa a dizer que a 99Food informou um erro de consulta, sem afirmar recusa/WhiteList. Nenhum BillEntry, settlement, lançamento ou saldo é criado nesse caminho. Teste de fixture sanitizada cobre a forma observada; ainda falta consultar o suporte 99Food ou uma resposta autorizada para interpretar o código específico e confirmar a habilitação financeira da loja.
+
+### PR #99: `FINANCE_PROVIDER_BUSINESS_10050` (2026-09-21)
+
+- Logs posteriores confirmaram `errorCode=10050` no envelope de erro HTTP 200. O significado do código não consta no contrato ou na documentação pública disponível; a aplicação agora informa corretamente erro de negócio 99Food, sem alegar formato desconhecido, token inválido, WhiteList ausente ou ausência de repasse. `GET /finance/marketplaces/99food/sync` continua intencionalmente 404: a leitura que pode persistir fatos de conciliação é exclusivamente `POST` sob `finance.manage`.
