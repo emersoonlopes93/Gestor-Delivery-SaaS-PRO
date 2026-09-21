@@ -153,6 +153,35 @@ describe('Food99FinancialClientService', () => {
     });
   });
 
+  it('accepts a successful financial envelope whose business code is a string', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"code":"0","data":{"records":[],"totalPage":"0"}}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchSettlements(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-string-code',
+    )).resolves.toEqual([]);
+  });
+
+  it('rejects an HTTP 200 business error without exposing provider text or persisting an inferred result', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"code":"100401","message":"merchant-specific diagnostic","data":null}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-business-error',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_PROVIDER_BUSINESS_100401',
+      httpStatus: 200,
+    });
+  });
+
   it('keeps a persistent 401 distinct from PedeHub RBAC and uncertain whitelist denial', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":401}', { status: 401 }));
     const { service, connection, tokens } = makeService();

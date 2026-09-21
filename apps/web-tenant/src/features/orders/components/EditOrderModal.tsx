@@ -10,6 +10,7 @@ import { api } from '../../../lib/api-client';
 import { PosItemConfiguratorModal } from '../../pos/components/PosItemConfiguratorModal';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { formatOrderNumber } from '../order-presenters';
 
 export interface EditOrderModalProps {
   order: OrderResponseDTO | null;
@@ -245,7 +246,7 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
         
         <header className="px-8 py-6 border-b border-border flex items-center justify-between bg-muted/50 shrink-0">
           <div>
-            <h2 className="text-xl font-black text-foreground">Editar Pedido #{order.orderNumber}</h2>
+            <h2 className="text-xl font-black text-foreground">Editar Pedido {formatOrderNumber(order.orderNumber)}</h2>
             <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">Gerenciamento de Itens e Quantidades</p>
           </div>
           <button onClick={onClose} disabled={isSaving} className="p-3 hover:bg-muted rounded-2xl transition-all">

@@ -1,4 +1,4 @@
-import { MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus } from '@prisma/client';
+import { MarketplaceDivergenceType, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus } from '@prisma/client';
 import { OrderAlertsService } from './order-alerts.service';
 
 describe('OrderAlertsService', () => {
@@ -82,6 +82,51 @@ describe('OrderAlertsService', () => {
     await service.refreshTenant(tenantId);
 
     expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ruleKey: 'ORDER_SYNC_FAILED', severity: OrderAlertSeverity.CRITICAL }) }));
+  });
+
+  it('keeps an unmapped catalog item visible without calling it a critical reconciliation failure', async () => {
+    const { prisma, service } = setup();
+    prisma.order.findMany.mockResolvedValue([{
+      id: 'order-catalog', orderNumber: '#0246', status: OrderStatus.ready_for_delivery, createdAt: now,
+      marketplaceOrders: [{
+        operations: [],
+        divergences: [{ id: 'divergence-catalog', type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE, reason: 'Marketplace catalog items are unmapped: Copo Açai 330 ml' }],
+      }],
+    }]);
+    prisma.orderAlert.findFirst.mockResolvedValue(null);
+    prisma.orderAlert.create.mockResolvedValue({ id: 'alert-catalog' });
+    prisma.orderAlert.findMany.mockResolvedValue([]);
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      ruleKey: 'MARKETPLACE_CATALOG_MAPPING_REQUIRED', severity: OrderAlertSeverity.INFO,
+      title: 'Produto do marketplace precisa de associação no pedido #0246',
+    }) }));
+    expect(prisma.orderAlert.create).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      ruleKey: 'PROVIDER_RECONCILIATION_FAILED', severity: OrderAlertSeverity.CRITICAL,
+    }) }));
+  });
+
+  it('keeps a permanent provider rejection critical and formats a stored number with one hash', async () => {
+    const { prisma, service } = setup();
+    prisma.order.findMany.mockResolvedValue([{
+      id: 'order-provider', orderNumber: '#0151', status: OrderStatus.preparing, createdAt: now,
+      marketplaceOrders: [{
+        operations: [],
+        divergences: [{ id: 'divergence-provider', type: MarketplaceDivergenceType.PERMANENT_PROVIDER_REJECTION, reason: 'Provider rejected the action.' }],
+      }],
+    }]);
+    prisma.orderAlert.findFirst.mockResolvedValue(null);
+    prisma.orderAlert.create.mockResolvedValue({ id: 'alert-provider' });
+    prisma.orderAlert.findMany.mockResolvedValue([]);
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      ruleKey: 'PROVIDER_RECONCILIATION_FAILED', severity: OrderAlertSeverity.CRITICAL,
+      title: 'Divergência de reconciliação no pedido #0151',
+    }) }));
   });
 
   it('does not classify a 14-minute-old order as CRITICAL just because of elapsed time', async () => {

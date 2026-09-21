@@ -28,6 +28,13 @@ O body envia `acceptor_code=app_shop_id`, datas `YYYYMMDD`, `page_no` e `page_si
 
 Os dois endpoints exigem WhiteList especial. Negação de acesso é `FINANCE_ACCESS_NOT_ENABLED`, nunca uma coleção vazia nem um valor de R$ 0,00.
 
+HTTP 200 confirma somente o transporte. O adapter valida também o envelope de
+negócio: `errno` ou `code` numérico (inclusive quando serializado como string)
+precisa indicar sucesso antes de ler `data`. Um erro de negócio retorna um código
+sanitizado para suporte, sem registrar token, mensagem remota, PII ou payload
+financeiro bruto. `data.records=[]` é um resultado vazio válido quando o envelope
+indica sucesso; nunca cria repasse, lançamento ou altera saldo.
+
 Após uma resposta HTTP 401, o cliente renova o token uma vez. Se a 99Food ainda
 recusar a consulta, a API informa `FINANCE_PROVIDER_UNAUTHORIZED`, distinto da
 permissão `finance.manage` do PedeHub e sem inferir se a causa remota é credencial

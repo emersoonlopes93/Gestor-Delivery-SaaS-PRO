@@ -3,6 +3,7 @@ import type { OrderResponseDTO } from '@gestor/types';
 import { printTicketViaPrimaryBluetooth } from '../../lib/bluetooth';
 import { api } from '../../lib/api-client';
 import { printThermalText } from '../../lib/thermal-print';
+import { formatOrderNumber } from './order-presenters';
 
 export type OrderPrintResult = { order: OrderResponseDTO; target: 'bluetooth' | 'browser' };
 
@@ -22,7 +23,7 @@ export async function printOrderCustomerReceipt(orderId: string): Promise<OrderP
     return { order, target: 'bluetooth' };
   }
 
-  if (!printThermalText(content, { title: `Pedido #${order.orderNumber}`, paperWidthMm: 58 })) {
+  if (!printThermalText(content, { title: `Pedido ${formatOrderNumber(order.orderNumber)}`, paperWidthMm: 58 })) {
     throw new Error('A janela de impressão foi bloqueada.');
   }
   return { order, target: 'browser' };

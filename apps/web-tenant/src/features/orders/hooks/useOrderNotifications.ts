@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { OrderBoardItemDTO } from '@gestor/types';
 import { createNotificationEvent, emitNotificationEvent } from '../../../notifications/notificationEvents';
 import { useSoundManager } from '../../../notifications/useSoundManager';
+import { formatOrderNumber } from '../order-presenters';
 
 export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
   const prevOrdersRef = useRef<OrderBoardItemDTO[]>([]);
@@ -22,7 +23,7 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
         id: `polling:order.created:${order.id}`,
         type: 'order.created',
         orderId: order.id,
-        title: `Novo pedido #${order.orderNumber}`,
+        title: `Novo pedido ${formatOrderNumber(order.orderNumber)}`,
         message: `${order.customerName} - fallback do painel operacional.`,
         priority: 'critical',
         source: 'polling',
@@ -38,7 +39,7 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
           id: `polling:order.cancelled:${order.id}`,
           type: 'order.cancelled',
           orderId: order.id,
-          title: `Pedido #${order.orderNumber} cancelado`,
+          title: `Pedido ${formatOrderNumber(order.orderNumber)} cancelado`,
           message: 'Atualizacao recebida pelo polling do painel.',
           priority: 'high',
           source: 'polling',
@@ -50,7 +51,7 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
           id: `polling:order.ready:${order.id}`,
           type: 'order.ready',
           orderId: order.id,
-          title: `Pedido #${order.orderNumber} pronto`,
+          title: `Pedido ${formatOrderNumber(order.orderNumber)} pronto`,
           message: 'Atualizacao recebida pelo polling do painel.',
           priority: 'high',
           source: 'polling',

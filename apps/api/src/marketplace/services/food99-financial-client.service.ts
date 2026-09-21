@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketplaceConnection } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
@@ -98,6 +98,8 @@ export function splitFood99FinancialBackfill(
 
 @Injectable()
 export class Food99FinancialClientService {
+  private readonly logger = new Logger(Food99FinancialClientService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly tokens: Food99FinancialTokenService,
@@ -175,6 +177,7 @@ export class Food99FinancialClientService {
       const raw = await response.text();
       const payload = this.asRecord(this.tryParse(raw));
       if (!response.ok || !this.isProviderSuccess(payload)) {
+        this.logProviderOutcome(response.status, path, correlationId, payload);
         throw this.toFinancialError(response.status, payload);
       }
       const data = this.asRecord(payload?.data);
@@ -229,9 +232,20 @@ export class Food99FinancialClientService {
 
   private isProviderSuccess(payload: Record<string, unknown> | null): boolean {
     if (!payload) return false;
-    if (typeof payload.errno === 'number') return payload.errno === 0;
-    if (typeof payload.code === 'number') return payload.code === 0 || payload.code === 200;
+    const errno = this.readBusinessCode(payload.errno);
+    if (errno !== null) return errno === 0;
+    const code = this.readBusinessCode(payload.code);
+    if (code !== null) return code === 0 || code === 200;
     return payload.data !== undefined;
+  }
+
+  private readBusinessCode(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isInteger(value)) return value;
+    if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+      const parsed = Number(value);
+      return Number.isSafeInteger(parsed) ? parsed : null;
+    }
+    return null;
   }
 
   private readRows(data: Record<string, unknown> | null): Food99FinancialRecord[] {
@@ -286,6 +300,7 @@ export class Food99FinancialClientService {
   ): Food99ApiError {
     const providerMessage = [payload?.errmsg, payload?.message]
       .find((value): value is string => typeof value === 'string');
+    const providerBusinessCode = this.readBusinessCode(payload?.errno) ?? this.readBusinessCode(payload?.code);
     const whitelistDenied = httpStatus === 403
       || Boolean(providerMessage?.toLowerCase().includes('whitelist'));
     const authorizationRejected = httpStatus === 401 && !whitelistDenied;
@@ -294,11 +309,38 @@ export class Food99FinancialClientService {
         ? 'A integracao financeira da 99Food requer liberacao/WhiteList.'
         : authorizationRejected
           ? 'A 99Food nao autorizou a consulta financeira apos renovar o acesso. Verifique a autorizacao da loja e a liberacao financeira com o suporte.'
-        : `99Food financial request failed with HTTP ${httpStatus}.`,
+        : httpStatus >= 200 && httpStatus < 300
+          ? 'A 99Food recusou a consulta financeira. Confira a liberacao da loja ou fale com o suporte.'
+          : `99Food financial request failed with HTTP ${httpStatus}.`,
       httpStatus === 429 || httpStatus >= 500,
       httpStatus,
-      whitelistDenied ? 'FINANCE_ACCESS_NOT_ENABLED' : authorizationRejected ? 'FINANCE_PROVIDER_UNAUTHORIZED' : providerMessage,
+      whitelistDenied
+        ? 'FINANCE_ACCESS_NOT_ENABLED'
+        : authorizationRejected
+          ? 'FINANCE_PROVIDER_UNAUTHORIZED'
+          : providerBusinessCode !== null
+            ? `FINANCE_PROVIDER_BUSINESS_${providerBusinessCode}`
+            : providerMessage ? 'FINANCE_PROVIDER_REJECTED' : undefined,
     );
+  }
+
+  private logProviderOutcome(
+    httpStatus: number,
+    path: string,
+    correlationId: string,
+    payload: Record<string, unknown> | null,
+  ): void {
+    const data = this.asRecord(payload?.data);
+    this.logger.warn({
+      message: 'food99_financial_provider_rejected',
+      correlationId,
+      httpStatus,
+      endpoint: path.endsWith('getShopBillDetail') ? 'bill_detail' : 'week_settlement',
+      errno: this.readBusinessCode(payload?.errno),
+      code: this.readBusinessCode(payload?.code),
+      dataShape: data ? Object.keys(data).sort().slice(0, 12) : null,
+      hasProviderMessage: typeof payload?.errmsg === 'string' || typeof payload?.message === 'string',
+    });
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {

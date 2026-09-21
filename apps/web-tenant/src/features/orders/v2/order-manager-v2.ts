@@ -80,9 +80,10 @@ export function formatElapsed(createdAt: string, now: number): string {
 }
 
 export function privacySafeOrderPhrase(order: Pick<OrderBoardItemDTO, 'orderNumber' | 'operational'>): string {
+  const displayNumber = formatOrderDisplayNumber(order.orderNumber);
   return order.operational.syncState === 'FAILED'
-    ? `Atenção: pedido ${order.orderNumber} precisa de verificação.`
-    : `Novo evento operacional no pedido ${order.orderNumber}.`;
+    ? `Atenção: pedido ${displayNumber} precisa de verificação.`
+    : `Novo evento operacional no pedido ${displayNumber}.`;
 }
 
 export function isRunnableStatusAction(action: OrderOperationalAction | null | undefined): action is OrderOperationalAction & { targetStatus: OrderStatus } {

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import type { OrderResponseDTO } from '@gestor/types';
+import { formatOrderNumber } from '../order-presenters';
 
 interface OrderPrintTemplateProps {
   order: OrderResponseDTO;
@@ -13,7 +14,7 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
     // @allow-theme-risk: impressão térmica exige fundo branco e tinta preta independentemente do tema da tela.
     <div className="print-template p-4 text-black bg-white font-mono text-sm leading-tight max-w-[80mm] mx-auto">
       <div className="text-center mb-4">
-        <h1 className="text-xl font-bold uppercase">Pedido #{order.orderNumber}</h1>
+        <h1 className="text-xl font-bold uppercase">Pedido {formatOrderNumber(order.orderNumber)}</h1>
         <p className="text-xs">{fmtDate(order.createdAt)}</p>
         <div className="border-b border-dashed border-black my-2" />
         <p className="font-bold uppercase">{order.fulfillmentType === 'delivery' ? 'Entrega' : order.fulfillmentType === 'pickup' ? 'Retirada' : 'Mesa'}</p>

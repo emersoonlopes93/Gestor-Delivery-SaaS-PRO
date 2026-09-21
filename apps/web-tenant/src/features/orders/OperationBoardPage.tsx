@@ -18,7 +18,7 @@ import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 import { resolveKanbanDropAction } from './operational-actions';
-import { matchesBoardFilter, matchesBoardSearch, ORDER_TIME_THRESHOLDS_MINUTES, type BoardFilter } from './order-presenters';
+import { formatOrderNumber, matchesBoardFilter, matchesBoardSearch, ORDER_TIME_THRESHOLDS_MINUTES, type BoardFilter } from './order-presenters';
 import { subscribeOrdersRealtimeEvents } from '../../notifications/ordersRealtimeEvents';
 import { OrdersFreshnessStatus } from './components/OrdersFreshnessStatus';
 import { useOrdersRealtimeState } from './hooks/useOrdersRealtimeState';
@@ -179,7 +179,7 @@ export function OperationBoardPage() {
           toast.success('Impressão enviada para a Bluetooth principal.');
           return;
         }
-        printThermalText(content, { title: `Pedido #${orderRes.data.orderNumber}`, paperWidthMm: 58 });
+        printThermalText(content, { title: `Pedido ${formatOrderNumber(orderRes.data.orderNumber)}`, paperWidthMm: 58 });
         setIsPrinting(false);
         setOrderToPrint(null);
         toast.success('Imprimindo ticket...');
@@ -351,7 +351,7 @@ export function OperationBoardPage() {
         const elapsedMin = Math.floor((now - new Date(order.createdAt).getTime()) / 60000);
         if (elapsedMin >= ORDER_TIME_THRESHOLDS_MINUTES.delayed && !alreadyAlertedDelayed.current.has(order.id)) {
           alreadyAlertedDelayed.current.add(order.id);
-          toast(`⏰ Pedido #${order.orderNumber} está atrasado (${elapsedMin}m)`, {
+          toast(`⏰ Pedido ${formatOrderNumber(order.orderNumber)} está atrasado (${elapsedMin}m)`, {
             duration: 10000,
             icon: '⚠️',
             style: {
