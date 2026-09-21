@@ -41,7 +41,6 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, alertSeveri
     : order.operational.deliveryOwnership === 'PROVIDER'
       ? `Logistica ${order.operational.displayChannel}`
       : 'Logistica a confirmar';
-  const syncLabel = order.operational.syncState === 'FAILED' ? 'Falha de sincronizacao' : 'Sincronizando';
   const providerNumber = getProviderOrderNumber(order);
   const displayNumber = formatOrderDisplayNumber(providerNumber ?? order.orderNumber);
   const externalWithoutNumber = order.operational.origin !== 'PEDEHUB' && !providerNumber;
@@ -74,7 +73,7 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, alertSeveri
             <span className="inline-flex items-center gap-1 border border-border px-2 py-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
               <MapPin className="h-3 w-3" />{ownershipLabel}
             </span>
-            {order.operational.syncState !== 'NONE' ? <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[11px] font-black uppercase tracking-wide ${order.operational.syncState === 'FAILED' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300'}`}><Radio className="h-3 w-3" />{syncLabel}</span> : null}
+            {order.operational.syncState === 'FAILED' ? <span className="inline-flex items-center gap-1 border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-destructive"><Radio className="h-3 w-3" />Falha de sincronizacao</span> : null}
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-border pt-3">

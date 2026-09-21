@@ -48,6 +48,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState<FinancialAccountType>(FinancialAccountType.BANK);
   const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<Food99FinancialSyncResultDTO | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -117,11 +118,13 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
     if (!connectionId) return;
     setWorking(true);
     setError(null);
+    setAccountNotice(null);
     try {
       await api.put(`/finance/marketplaces/99food/connections/${connectionId}/settlement-account`, {
         accountId: accountId || null,
       });
       await load(connectionId);
+      setAccountNotice(accountId ? 'Conta de destino salva. Nenhum repasse foi registrado.' : 'Conta de destino removida. Nenhum repasse foi alterado.');
     } catch {
       setError('Não foi possível salvar a conta de destino. Confira a loja selecionada e tente novamente.');
     } finally {
@@ -143,20 +146,33 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
   };
 
   const createAccount = async () => {
-    if (!canManage || !accountName.trim() || working) return;
+    if (!canManage || !connectionId || !accountName.trim() || working) return;
     setWorking(true);
     setAccountError(null);
+    setAccountNotice(null);
+    let createdAccount: FinancialAccountDTO | null = null;
     try {
       const response = await api.post<FinancialAccountDTO>('/finance/accounts', {
         name: accountName.trim(), type: accountType, initialBalance: 0,
       });
       if (!response.success || !response.data.active) throw new Error('Conta não confirmada como ativa.');
+      createdAccount = response.data;
+      await api.put(`/finance/marketplaces/99food/connections/${connectionId}/settlement-account`, {
+        accountId: createdAccount.id,
+      });
       await load(connectionId || undefined);
-      setAccountId(response.data.id);
+      setAccountId(createdAccount.id);
       setAccountName('');
       setCreateAccountOpen(false);
+      setAccountNotice('Conta criada e definida como destino dos repasses. Nenhum repasse foi registrado.');
     } catch {
-      setAccountError('Não foi possível criar a conta. Confira os dados ou tente novamente.');
+      if (createdAccount) {
+        await load(connectionId);
+        setAccountId(createdAccount.id);
+      }
+      setAccountError(createdAccount
+        ? 'A conta foi criada, mas não foi possível defini-la como destino. Selecione-a e salve a conta de destino antes de registrar repasses.'
+        : 'Não foi possível criar a conta. Confira os dados ou tente novamente.');
     } finally {
       setWorking(false);
     }
@@ -238,8 +254,9 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
                 <p>Selecione uma conta ativa para receber repasses confirmados. Criar ou escolher uma conta não registra o repasse.</p>
-                {canManage ? <button type="button" onClick={() => { setAccountError(null); setCreateAccountOpen(true); }} className="inline-flex min-h-10 items-center gap-1 font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Plus className="h-4 w-4" aria-hidden /> Criar conta financeira</button> : null}
+                {canManage ? <button type="button" disabled={!connectionId} title={connectionId ? undefined : 'Selecione primeiro a integração da 99Food'} onClick={() => { setAccountError(null); setCreateAccountOpen(true); }} className="inline-flex min-h-10 items-center gap-1 font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" aria-hidden /> Criar conta financeira</button> : null}
               </div>
+              {!connectionId && canManage ? <p className="text-xs text-muted-foreground">Selecione a integração da 99Food antes de configurar a conta de destino.</p> : null}
 
               {accessNotEnabled && (
                 <div role="alert" className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-foreground">
@@ -248,6 +265,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 </div>
               )}
               {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+              {accountNotice && <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-300">{accountNotice}</p>}
               {supportDetails && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-semibold text-primary">Ver informações para suporte</summary><p className="mt-2 break-all font-mono">{supportDetails}</p></details>}
               {syncSummary && (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> Consulta concluída: {syncSummary.billEntriesReceived} registros diários e {syncSummary.settlementsReceived} fechamentos importados. Isso não confirma o recebimento na conta.</p>

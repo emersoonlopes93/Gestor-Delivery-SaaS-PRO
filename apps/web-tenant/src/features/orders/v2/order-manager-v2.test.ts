@@ -165,7 +165,8 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('PedeHub {formatOrderDisplayNumber(order.orderNumber)}');
     expect(card).toContain('Número da plataforma não informado');
     expect(card).toContain("externalWithoutNumber ? 'PedeHub ' : ''");
-    expect(card).toContain("order.operational.syncState !== 'NONE'");
+    expect(card).toContain("order.operational.syncState === 'FAILED'");
+    expect(card).not.toContain("syncState !== 'NONE'");
     expect(card).not.toContain("'Sincronizado'");
     expect(details).toContain('Resumo operacional do pedido');
     expect(details.indexOf('Resumo operacional do pedido')).toBeLessThan(details.indexOf('Diagnóstico do pedido'));

@@ -45,8 +45,13 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('Ver detalhes e suporte');
     expect(panel).toContain('Criar conta financeira');
     expect(panel).toContain("api.post<FinancialAccountDTO>('/finance/accounts'");
+    expect(panel).toContain("api.put(`/finance/marketplaces/99food/connections/${connectionId}/settlement-account`");
+    expect(panel).toContain('accountId: createdAccount.id');
+    expect(panel).toContain('Conta criada e definida como destino dos repasses. Nenhum repasse foi registrado.');
     expect(panel).toContain('initialBalance: 0');
     expect(panel).toContain('Criar ou escolher uma conta não registra o repasse');
+    expect(panel).toContain('Selecione a integração da 99Food antes de configurar a conta de destino.');
+    expect(panel).toContain('A conta foi criada, mas não foi possível defini-la como destino.');
   });
 
   it('preserves the shared legacy/V2 order payment contract', () => {
