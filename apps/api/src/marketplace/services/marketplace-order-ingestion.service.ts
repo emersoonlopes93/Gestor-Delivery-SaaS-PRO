@@ -55,6 +55,17 @@ export class MarketplaceOrderIngestionService {
       return { processed: true, duplicate: true };
     }
 
+    // Historical signed shopStatus callbacks are store notifications, not orders.
+    if (inbox.provider === MarketplaceProvider.FOOD_99
+      && inbox.topic?.toUpperCase() === 'SHOPSTATUS'
+      && !inbox.externalOrderId) {
+      await this.prisma.marketplaceEventInbox.updateMany({
+        where: { id: inbox.id, status: { in: [MarketplaceEventStatus.RECEIVED, MarketplaceEventStatus.QUEUED, MarketplaceEventStatus.FAILED] } },
+        data: { status: MarketplaceEventStatus.IGNORED, processedAt: new Date(), lastError: 'non_order_shop_status' },
+      });
+      return { processed: true, ignored: true, reason: 'non_order_shop_status' };
+    }
+
     const connection = inbox.connection ?? await this.connectionService.resolveConnection({
       provider: inbox.provider,
       externalMerchantId: inbox.externalMerchantId,
@@ -418,6 +429,7 @@ export class MarketplaceOrderIngestionService {
     const candidates = await this.prisma.marketplaceOrder.findMany({
       where: {
         provider: MarketplaceProvider.FOOD_99,
+        externalOrderId: { not: 'unknown-order' },
         internalOrderId: { not: null },
         internalOrder: {
           is: {
@@ -443,6 +455,8 @@ export class MarketplaceOrderIngestionService {
     for (const candidate of candidates) {
       const internalOrder = candidate.internalOrder;
       if (!internalOrder || (!this.isPrivacyProtectedCustomerName(internalOrder.customerName) && internalOrder._count.items > 0)) continue;
+      // An unsafe numeric snapshot cannot recover the exact 64-bit provider ID.
+      if (!/^\d+$/.test(candidate.externalOrderId)) continue;
       try {
         const provider = this.providerRegistry.get(MarketplaceProvider.FOOD_99);
         const persistedPayload = this.asRecord(candidate.rawPayload) ?? {};

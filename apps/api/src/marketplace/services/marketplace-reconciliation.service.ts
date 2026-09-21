@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   MarketplaceDivergenceType,
+  MarketplaceEventStatus,
   MarketplaceOperationStatus,
   MarketplaceOperationType,
   MarketplaceProvider,
@@ -132,6 +133,42 @@ export class MarketplaceReconciliationService implements OnModuleInit {
       data: { lastAttemptAt: claimedAt },
     });
     if (claim.count === 0) return { resolved: false, alerted: false };
+
+    // A processed, exact orderFinish received after this confirmation is stronger
+    // evidence than the 99Food detail response, whose status is numeric.
+    if (operation.provider === MarketplaceProvider.FOOD_99
+      && operation.operation === MarketplaceOperationType.CONFIRM
+      && operation.marketplaceOrder.internalOrder?.status === OrderStatus.completed
+      && operation.marketplaceOrder.lastExternalEventTopic?.toUpperCase() === 'ORDERFINISH') {
+      const finish = await this.prisma.marketplaceEventInbox.findFirst({
+        where: {
+          tenantId,
+          connectionId: operation.connectionId,
+          provider: MarketplaceProvider.FOOD_99,
+          externalOrderId: operation.externalOrderId,
+          topic: { in: ['orderFinish', 'ORDERFINISH'] },
+          status: MarketplaceEventStatus.PROCESSED,
+          eventCreatedAt: { gte: operation.createdAt },
+        },
+        select: { id: true },
+      });
+      if (finish) {
+        const result = await this.prisma.marketplaceOperation.updateMany({
+          where: { id: operation.id, tenantId, status: MarketplaceOperationStatus.ACCEPTED },
+          data: {
+            status: MarketplaceOperationStatus.SUCCEEDED,
+            completedAt: new Date(),
+            providerCode: 'RECONCILED_ORDERFINISH',
+            lastError: null,
+          },
+        });
+        if (result.count === 1) {
+          await this.divergences.resolveForOperation(tenantId, operation.id, 'Confirmed by processed 99Food orderFinish.');
+          return { resolved: true, alerted: false, remoteState: 'ORDERFINISH' };
+        }
+        return { resolved: false, alerted: false };
+      }
+    }
 
     const provider = this.providers.get(operation.provider);
     if (!provider.fetchCurrentOrder) {

@@ -50,6 +50,7 @@ describe('MarketplaceReconciliationService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      marketplaceEventInbox: { findFirst: jest.fn().mockResolvedValue(null) },
       marketplaceConnection: { findMany: jest.fn().mockResolvedValue([{ tenantId: 'tenant-1' }]) },
       $transaction: jest.fn().mockResolvedValue([]),
     };
@@ -120,6 +121,53 @@ describe('MarketplaceReconciliationService', () => {
       remoteState: 'PLACED',
     });
     expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('resolves a 99Food confirmation only with a processed exact terminal event and completed local order', async () => {
+    const { service, prisma, provider, ordersService, divergences } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...operation,
+      provider: MarketplaceProvider.FOOD_99,
+      externalOrderId: '5764686451388255673',
+      marketplaceOrder: {
+        ...operation.marketplaceOrder,
+        statusExternal: 'ORDERFINISH',
+        lastExternalEventTopic: 'orderFinish',
+        internalOrder: { id: 'order-1', status: OrderStatus.completed },
+      },
+    });
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce({ id: 'finish-1' });
+    await expect(service.reconcileOperation('tenant-1', 'operation-1', 'reconcile-finish')).resolves.toEqual({
+      resolved: true, alerted: false, remoteState: 'ORDERFINISH',
+    });
+    expect(prisma.marketplaceEventInbox.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        tenantId: 'tenant-1', connectionId: 'connection-1', externalOrderId: '5764686451388255673',
+        status: 'PROCESSED', eventCreatedAt: { gte: operation.createdAt },
+      }),
+    }));
+    expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+    expect(provider.fetchCurrentOrder).not.toHaveBeenCalled();
+    expect(divergences.resolveForOperation).toHaveBeenCalledWith('tenant-1', 'operation-1', expect.stringContaining('orderFinish'));
+  });
+
+  it('does not infer a terminal state from the local order without a processed exact callback', async () => {
+    const { service, prisma, provider, divergences } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...operation,
+      provider: MarketplaceProvider.FOOD_99,
+      marketplaceOrder: {
+        ...operation.marketplaceOrder,
+        lastExternalEventTopic: 'orderFinish',
+        internalOrder: { id: 'order-1', status: OrderStatus.completed },
+      },
+    });
+    provider.fetchCurrentOrder.mockResolvedValueOnce({ status: 5 });
+    await expect(service.reconcileOperation('tenant-1', 'operation-1', 'reconcile-no-proof')).resolves.toEqual({
+      resolved: false, alerted: true, remoteState: null,
+    });
+    expect(prisma.marketplaceOperation.updateMany).toHaveBeenCalledTimes(1);
+    expect(divergences.record).toHaveBeenCalledWith(expect.objectContaining({ type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE }));
   });
 
   it('records an operation timeout after the confirmation deadline', async () => {

@@ -83,6 +83,46 @@ const food99LifecycleInput = {
 };
 
 describe('MarketplaceOrderIngestionService', () => {
+  it('does not retry an unrecoverable historical 99Food order without an exact external ID', async () => {
+    const prisma = {
+      marketplaceOrder: { findMany: jest.fn().mockResolvedValue([{
+        id: 'historical-1', externalOrderId: 'unknown-order', rawPayload: { order_id: 5764686607160512000 },
+        internalOrder: { id: 'order-1', customerName: 'privacy protection', _count: { items: 0 } },
+      }]) },
+    };
+    const { service } = makeFood99LifecycleService(prisma);
+    await expect(service.repairIncompleteFood99Orders(10)).resolves.toBe(0);
+    expect(prisma.marketplaceOrder.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ provider: MarketplaceProvider.FOOD_99, externalOrderId: { not: 'unknown-order' } }),
+    }));
+  });
+
+  it('ignores a historical shopStatus inbox without inventing an order ID', async () => {
+    const prisma = {
+      marketplaceEventInbox: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'shop-1', provider: MarketplaceProvider.FOOD_99, topic: 'shopStatus',
+          status: MarketplaceEventStatus.FAILED, externalOrderId: null, connection: null,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const connectionResolver = { resolveConnection: jest.fn() };
+    const providerRegistry = { get: jest.fn() };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never, providerRegistry as never, connectionResolver as never, {} as never,
+      ordersGatewayStub() as never, {} as never, {} as never, {} as never,
+    );
+    await expect(service.processInboxEvent('shop-1')).resolves.toEqual({
+      processed: true, ignored: true, reason: 'non_order_shop_status',
+    });
+    expect(prisma.marketplaceEventInbox.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MarketplaceEventStatus.IGNORED }),
+    }));
+    expect(connectionResolver.resolveConnection).not.toHaveBeenCalled();
+    expect(providerRegistry.get).not.toHaveBeenCalled();
+  });
+
   it('accepts a complete 99Food snapshot even when the provider withholds the customer name', () => {
     const { service } = makeFood99LifecycleService({});
 
