@@ -183,6 +183,32 @@ describe('Food99FinancialClientService', () => {
     });
   });
 
+  it('classifies the observed HTTP 200 error_code envelope as a provider business error', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"error_code":"40001","error_description":"provider diagnostic","Details":"provider details","request_id":"provider-request"}',
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-error-code-envelope',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_PROVIDER_BUSINESS_40001',
+      httpStatus: 200,
+    });
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'food99_financial_provider_rejected',
+      errorCode: 40001,
+      hasErrorCode: true,
+      hasProviderMessage: true,
+      rootKeys: ['Details', 'error_code', 'error_description', 'request_id'],
+    }));
+    expect(warn.mock.calls.flat().join('')).not.toContain('provider diagnostic');
+    expect(warn.mock.calls.flat().join('')).not.toContain('provider details');
+  });
+
   it('keeps an HTTP 200 empty body distinct from a legitimate empty dataset', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response('', {
       status: 200,

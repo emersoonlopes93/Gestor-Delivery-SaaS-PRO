@@ -34,6 +34,7 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('caught.status === 404');
     expect(panel).toContain("caught.code === 'FINANCE_RESPONSE_UNRECOGNIZED'");
     expect(panel).toContain("caught.code === 'FINANCE_EMPTY_RESPONSE'");
+    expect(panel).toContain('A 99Food informou um erro ao consultar os dados financeiros desta loja.');
     expect(panel).not.toContain("accessNotEnabled ? 'R$ 0,00'");
   });
 

@@ -42,6 +42,13 @@ tipo e nomes de chaves do envelope/dados. A confirmação de um formato novo exi
 uma captura autenticada desses metadados e contrato oficial antes de o adapter
 aceitá-lo.
 
+Em 2026-09-21, `bill_detail` devolveu HTTP 200 com envelope de erro
+`error_code`, `error_description`, `Details` e `request_id`, sem `data`. O
+adapter trata `error_code` numérico diferente de zero como erro de negócio e
+nunca registra as descrições ou o request ID. Não há evidência de que
+`error_code=0` seja um envelope de sucesso; sucesso continua exigindo os
+marcadores contratuais acima e `data` paginada.
+
 Após uma resposta HTTP 401, o cliente renova o token uma vez. Se a 99Food ainda
 recusar a consulta, a API informa `FINANCE_PROVIDER_UNAUTHORIZED`, distinto da
 permissão `finance.manage` do PedeHub e sem inferir se a causa remota é credencial

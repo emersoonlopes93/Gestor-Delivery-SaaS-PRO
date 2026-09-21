@@ -269,6 +269,8 @@ export class Food99FinancialClientService {
     if (errno !== null) return errno === 0;
     const code = this.readBusinessCode(payload.code);
     if (code !== null) return code === 0 || code === 200;
+    const errorCode = this.readBusinessCode(payload.error_code);
+    if (errorCode !== null && errorCode !== 0) return false;
     return payload.data !== undefined;
   }
 
@@ -331,9 +333,11 @@ export class Food99FinancialClientService {
     httpStatus: number,
     payload: Record<string, unknown> | null,
   ): Food99ApiError {
-    const providerMessage = [payload?.errmsg, payload?.message]
+    const providerMessage = [payload?.errmsg, payload?.message, payload?.error_description, payload?.Details]
       .find((value): value is string => typeof value === 'string');
-    const providerBusinessCode = this.readBusinessCode(payload?.errno) ?? this.readBusinessCode(payload?.code);
+    const providerBusinessCode = this.readBusinessCode(payload?.errno)
+      ?? this.readBusinessCode(payload?.code)
+      ?? this.readBusinessCode(payload?.error_code);
     const whitelistDenied = httpStatus === 403
       || Boolean(providerMessage?.toLowerCase().includes('whitelist'));
     const authorizationRejected = httpStatus === 401 && !whitelistDenied;
@@ -371,8 +375,13 @@ export class Food99FinancialClientService {
       endpoint: path.endsWith('getShopBillDetail') ? 'bill_detail' : 'week_settlement',
       errno: this.readBusinessCode(payload?.errno),
       code: this.readBusinessCode(payload?.code),
+      errorCode: this.readBusinessCode(payload?.error_code),
+      hasErrorCode: Object.prototype.hasOwnProperty.call(payload ?? {}, 'error_code'),
       ...metadata,
-      hasProviderMessage: typeof payload?.errmsg === 'string' || typeof payload?.message === 'string',
+      hasProviderMessage: typeof payload?.errmsg === 'string'
+        || typeof payload?.message === 'string'
+        || typeof payload?.error_description === 'string'
+        || typeof payload?.Details === 'string',
     });
   }
 
