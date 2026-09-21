@@ -11,6 +11,16 @@ export type Food99FinancialWindow = {
   endDate: string;
 };
 
+type Food99FinancialResponseMetadata = {
+  contentType: string | null;
+  bodyBytes: number;
+  bodyPresent: boolean;
+  rootType: string;
+  rootKeys: string[] | null;
+  dataType: string | null;
+  dataKeys: string[] | null;
+};
+
 const FINANCIAL_IDENTIFIER_FIELDS = [
   'orderId',
   'dayPaymentId',
@@ -175,14 +185,46 @@ export class Food99FinancialClientService {
         if (response.status === 401) this.tokens.invalidate();
       }
       const raw = await response.text();
-      const payload = this.asRecord(this.tryParse(raw));
+      const metadata = this.responseMetadata(raw, response.headers.get('content-type'));
+      if (!metadata.bodyPresent) {
+        this.logInvalidResponse(response.status, path, correlationId, { ...metadata, rootType: 'empty' });
+        throw new Food99ApiError(
+          '99Food financial API returned an empty response.',
+          false,
+          502,
+          'FINANCE_EMPTY_RESPONSE',
+        );
+      }
+      let parsed: unknown;
+      try {
+        parsed = this.tryParse(raw);
+      } catch {
+        this.logInvalidResponse(response.status, path, correlationId, {
+          ...metadata,
+          rootType: 'invalid_json',
+        });
+        throw new Food99ApiError(
+          '99Food financial API returned invalid JSON.',
+          false,
+          502,
+          'INVALID_RESPONSE',
+        );
+      }
+      const payload = this.asRecord(parsed);
+      const responseMetadata = this.responseMetadata(raw, response.headers.get('content-type'), parsed);
       if (!response.ok || !this.isProviderSuccess(payload)) {
-        this.logProviderOutcome(response.status, path, correlationId, payload);
+        this.logProviderOutcome(response.status, path, correlationId, payload, responseMetadata);
         throw this.toFinancialError(response.status, payload);
       }
       const data = this.asRecord(payload?.data);
-      const rows = this.readRows(data);
-      totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
+      let rows: Food99FinancialRecord[];
+      try {
+        rows = this.readRows(data);
+        totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
+      } catch (error) {
+        this.logInvalidResponse(response.status, path, correlationId, responseMetadata);
+        throw error;
+      }
       all.push(...rows);
       if (rows.length === 0) break;
       pageNo += 1;
@@ -218,16 +260,7 @@ export class Food99FinancialClientService {
   }
 
   private tryParse(raw: string): unknown {
-    try {
-      return parseFood99FinancialJson(raw);
-    } catch {
-      throw new Food99ApiError(
-        '99Food financial API returned invalid JSON.',
-        false,
-        502,
-        'INVALID_RESPONSE',
-      );
-    }
+    return parseFood99FinancialJson(raw);
   }
 
   private isProviderSuccess(payload: Record<string, unknown> | null): boolean {
@@ -310,7 +343,7 @@ export class Food99FinancialClientService {
         : authorizationRejected
           ? 'A 99Food nao autorizou a consulta financeira apos renovar o acesso. Verifique a autorizacao da loja e a liberacao financeira com o suporte.'
         : httpStatus >= 200 && httpStatus < 300
-          ? 'A 99Food recusou a consulta financeira. Confira a liberacao da loja ou fale com o suporte.'
+          ? 'A 99Food respondeu a consulta financeira, mas o formato do retorno nao foi reconhecido. Nenhum repasse foi registrado.'
           : `99Food financial request failed with HTTP ${httpStatus}.`,
       httpStatus === 429 || httpStatus >= 500,
       httpStatus,
@@ -320,7 +353,7 @@ export class Food99FinancialClientService {
           ? 'FINANCE_PROVIDER_UNAUTHORIZED'
           : providerBusinessCode !== null
             ? `FINANCE_PROVIDER_BUSINESS_${providerBusinessCode}`
-            : providerMessage ? 'FINANCE_PROVIDER_REJECTED' : undefined,
+            : providerMessage ? 'FINANCE_PROVIDER_REJECTED' : 'FINANCE_RESPONSE_UNRECOGNIZED',
     );
   }
 
@@ -329,8 +362,8 @@ export class Food99FinancialClientService {
     path: string,
     correlationId: string,
     payload: Record<string, unknown> | null,
+    metadata: Food99FinancialResponseMetadata,
   ): void {
-    const data = this.asRecord(payload?.data);
     this.logger.warn({
       message: 'food99_financial_provider_rejected',
       correlationId,
@@ -338,9 +371,48 @@ export class Food99FinancialClientService {
       endpoint: path.endsWith('getShopBillDetail') ? 'bill_detail' : 'week_settlement',
       errno: this.readBusinessCode(payload?.errno),
       code: this.readBusinessCode(payload?.code),
-      dataShape: data ? Object.keys(data).sort().slice(0, 12) : null,
+      ...metadata,
       hasProviderMessage: typeof payload?.errmsg === 'string' || typeof payload?.message === 'string',
     });
+  }
+
+  private logInvalidResponse(
+    httpStatus: number,
+    path: string,
+    correlationId: string,
+    metadata: Food99FinancialResponseMetadata,
+  ): void {
+    this.logger.warn({
+      message: 'food99_financial_response_invalid',
+      correlationId,
+      httpStatus,
+      endpoint: path.endsWith('getShopBillDetail') ? 'bill_detail' : 'week_settlement',
+      ...metadata,
+    });
+  }
+
+  private responseMetadata(
+    raw: string,
+    contentType: string | null,
+    parsed?: unknown,
+  ): Food99FinancialResponseMetadata {
+    const root = this.asRecord(parsed);
+    const data = this.asRecord(root?.data);
+    return {
+      contentType: contentType?.split(';', 1)[0]?.trim() || null,
+      bodyBytes: Buffer.byteLength(raw, 'utf8'),
+      bodyPresent: raw.trim().length > 0,
+      rootType: this.valueType(parsed),
+      rootKeys: root ? Object.keys(root).sort().slice(0, 12) : null,
+      dataType: root && Object.prototype.hasOwnProperty.call(root, 'data') ? this.valueType(root.data) : null,
+      dataKeys: data ? Object.keys(data).sort().slice(0, 12) : null,
+    };
+  }
+
+  private valueType(value: unknown): string {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    return typeof value;
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {

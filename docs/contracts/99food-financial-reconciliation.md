@@ -35,6 +35,13 @@ sanitizado para suporte, sem registrar token, mensagem remota, PII ou payload
 financeiro bruto. `data.records=[]` é um resultado vazio válido quando o envelope
 indica sucesso; nunca cria repasse, lançamento ou altera saldo.
 
+Uma resposta vazia, JSON inválido ou JSON sem os marcadores contratuais não é
+tratada como recusa, lista vazia ou sucesso. Ela retorna erro de formato e o log
+sanitizado registra somente status HTTP, content-type, tamanho/presença do corpo,
+tipo e nomes de chaves do envelope/dados. A confirmação de um formato novo exige
+uma captura autenticada desses metadados e contrato oficial antes de o adapter
+aceitá-lo.
+
 Após uma resposta HTTP 401, o cliente renova o token uma vez. Se a 99Food ainda
 recusar a consulta, a API informa `FINANCE_PROVIDER_UNAUTHORIZED`, distinto da
 permissão `finance.manage` do PedeHub e sem inferir se a causa remota é credencial

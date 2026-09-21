@@ -99,7 +99,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
       if (caught instanceof ApiError && (caught.code === 'FINANCE_ACCESS_NOT_ENABLED' || caught.code === 'FINANCE_PROVIDER_UNAUTHORIZED' || caught.code === 'FINANCE_AUTH_REJECTED' || /99Food financial request failed with HTTP 401/i.test(caught.message))) {
         setAccessNotEnabled(true);
         setSupportDetails(safeSupportDetails(caught));
-      } else if (caught instanceof ApiError && (caught.code === 'FINANCE_PROVIDER_REJECTED' || /^FINANCE_PROVIDER_BUSINESS_\d+$/.test(caught.code ?? ''))) {
+      } else if (caught instanceof ApiError && (caught.code === 'FINANCE_PROVIDER_REJECTED' || caught.code === 'FINANCE_RESPONSE_UNRECOGNIZED' || caught.code === 'FINANCE_EMPTY_RESPONSE' || caught.code === 'INVALID_RESPONSE' || /^FINANCE_PROVIDER_BUSINESS_\d+$/.test(caught.code ?? ''))) {
         setError('A 99Food recusou esta consulta financeira. Confira a liberação financeira da loja e, se necessário, fale com o suporte. Nenhum repasse foi registrado.');
         setSupportDetails(safeSupportDetails(caught));
       } else if (caught instanceof ApiError && caught.status === 404) {

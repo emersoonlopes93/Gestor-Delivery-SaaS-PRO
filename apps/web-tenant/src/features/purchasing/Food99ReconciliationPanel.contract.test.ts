@@ -32,6 +32,8 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('return `HTTP ${caught.status} · ${code}`');
     expect(panel).toContain('Ver informações para suporte');
     expect(panel).toContain('caught.status === 404');
+    expect(panel).toContain("caught.code === 'FINANCE_RESPONSE_UNRECOGNIZED'");
+    expect(panel).toContain("caught.code === 'FINANCE_EMPTY_RESPONSE'");
     expect(panel).not.toContain("accessNotEnabled ? 'R$ 0,00'");
   });
 

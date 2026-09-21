@@ -1,4 +1,5 @@
 import { MarketplaceProvider } from '@prisma/client';
+import { Logger } from '@nestjs/common';
 import { Food99ApiError } from '../providers/food99-api.error';
 import {
   Food99FinancialClientService,
@@ -180,6 +181,50 @@ describe('Food99FinancialClientService', () => {
       providerCode: 'FINANCE_PROVIDER_BUSINESS_100401',
       httpStatus: 200,
     });
+  });
+
+  it('keeps an HTTP 200 empty body distinct from a legitimate empty dataset', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-empty-body',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_EMPTY_RESPONSE',
+      httpStatus: 502,
+    });
+  });
+
+  it('reports an HTTP 200 envelope without contract markers as unrecognized without logging its body', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    global.fetch = jest.fn().mockResolvedValue(new Response('{}', {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    }));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-unrecognized-envelope',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_RESPONSE_UNRECOGNIZED',
+      httpStatus: 200,
+    });
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'food99_financial_provider_rejected',
+      contentType: 'application/json',
+      bodyBytes: 2,
+      bodyPresent: true,
+      rootType: 'object',
+      rootKeys: [],
+      dataType: null,
+      dataKeys: null,
+    }));
+    expect(warn.mock.calls.flat().join('')).not.toContain('{}');
   });
 
   it('keeps a persistent 401 distinct from PedeHub RBAC and uncertain whitelist denial', async () => {
