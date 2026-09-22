@@ -23,6 +23,8 @@ function createFlow() {
   const alertRefresh = jest.fn().mockResolvedValue(undefined);
   const statusSync = { reconcileExternalEvent: jest.fn().mockResolvedValue(undefined) };
   const divergence = { record: jest.fn().mockResolvedValue(undefined) };
+  let lastAcknowledgement: unknown;
+  let lastResponseStatus: jest.Mock;
   const tx = {
     orderTimeline: { create: jest.fn(async ({ data }: { data: { status: string } }) => { timeline.push(data.status); return {}; }) },
     marketplaceOrder: { updateMany: jest.fn(async ({ data }: { data: { statusInternal?: string } }) => ({ count: data.statusInternal ? 1 : 0 })) },
@@ -107,13 +109,29 @@ function createFlow() {
     const rawBody = Buffer.from(`{"app_id":5764608647577512345,"app_shop_id":"store-99","type":"deliveryStatus","timestamp":${timestamp},"data":{"order_id":${externalOrderId},"delivery_status":${deliveryStatus}}}`);
     const signature = createHash('md5').update(rawBody).update('test-secret').digest('hex');
     const response = { status: jest.fn() };
-    await controller.receiveWebhook(
+    lastResponseStatus = response.status;
+    lastAcknowledgement = await controller.receiveWebhook(
       '99food', {}, { 'didi-header-sign': signatureValid ? signature : '0'.repeat(32) },
       { rawBody } as never, response as never,
     );
     return [...inboxRows.values()].at(-1);
   };
-  return { send, inboxRows, prisma, ordersService, gateway, alertRefresh, divergence, timeline, getStatus: () => status, getLogistics: () => logistics };
+  const sendOrderFinish = async (timestamp: number) => {
+    const rawBody = Buffer.from(`{"app_id":5764608647577512345,"app_shop_id":"store-99","type":"orderFinish","timestamp":${timestamp},"data":{"order_id":${externalOrderId}}}`);
+    const signature = createHash('md5').update(rawBody).update('test-secret').digest('hex');
+    const response = { status: jest.fn() };
+    lastResponseStatus = response.status;
+    lastAcknowledgement = await controller.receiveWebhook(
+      '99food', {}, { 'didi-header-sign': signature }, { rawBody } as never, response as never,
+    );
+    return [...inboxRows.values()].at(-1);
+  };
+  return {
+    send, sendOrderFinish, inboxRows, prisma, ordersService, gateway, alertRefresh, divergence, timeline,
+    getStatus: () => status, getLogistics: () => logistics,
+    getLastAcknowledgement: () => lastAcknowledgement,
+    getLastResponseStatus: () => lastResponseStatus,
+  };
 }
 
 describe('signed 99Food deliveryStatus webhook through inbox and canonical lifecycle', () => {
@@ -121,6 +139,8 @@ describe('signed 99Food deliveryStatus webhook through inbox and canonical lifec
     const flow = createFlow();
     const arrived = await flow.send(130, 1780000000);
     expect(arrived?.status).toBe(MarketplaceEventStatus.PROCESSED);
+    expect(flow.getLastAcknowledgement()).toEqual({ errno: 0, errmsg: 'ok' });
+    expect(flow.getLastResponseStatus()).toHaveBeenCalledWith(200);
     expect(flow.getLogistics().deliveryStatus).toBe('130');
     expect(flow.getStatus()).toBe(OrderStatus.preparing);
 
@@ -148,6 +168,16 @@ describe('signed 99Food deliveryStatus webhook through inbox and canonical lifec
     expect(flow.divergence.record).toHaveBeenCalledWith(expect.objectContaining({
       tenantId: 'tenant-1', remoteState: 'DELIVERY_STATUS_170',
     }));
+  });
+
+  it('acknowledges and completes a signed orderFinish callback without losing its 64-bit order ID', async () => {
+    const flow = createFlow();
+    const finished = await flow.sendOrderFinish(1780000001);
+    expect(finished?.externalOrderId).toBe(externalOrderId);
+    expect(finished?.status).toBe(MarketplaceEventStatus.PROCESSED);
+    expect(flow.getLastAcknowledgement()).toEqual({ errno: 0, errmsg: 'ok' });
+    expect(flow.getLastResponseStatus()).toHaveBeenCalledWith(200);
+    expect(flow.getStatus()).toBe(OrderStatus.completed);
   });
 
   it('rejects unsigned events and ignores stale or duplicate callbacks without a second transition', async () => {
