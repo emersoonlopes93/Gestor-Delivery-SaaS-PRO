@@ -15,6 +15,7 @@ describe('99Food financial reconciliation UI contract', () => {
 
   it('shows explicit account selection and requires a manual posting action', () => {
     expect(panel).toContain('Conta financeira de destino');
+    expect(panel.indexOf('Conta financeira de destino')).toBeLessThan(panel.indexOf('aria-expanded={showDetails}'));
     expect(panel).toContain('Não configurada');
     expect(panel).toContain('Registrar no financeiro');
     expect(panel).toContain("settlement.status === 'LIQUIDATED_UNPOSTED'");
@@ -23,7 +24,17 @@ describe('99Food financial reconciliation UI contract', () => {
 
   it('does not turn missing WhiteList access into a zero-valued settlement state', () => {
     expect(panel).toContain("caught.code === 'FINANCE_ACCESS_NOT_ENABLED'");
-    expect(panel).toContain('A 99Food requer liberação/WhiteList');
+    expect(panel).toContain("caught.code === 'FINANCE_PROVIDER_UNAUTHORIZED'");
+    expect(panel).toContain('autorização da loja e a habilitação do acesso financeiro');
+    expect(panel).not.toContain('Os repasses não foram alterados');
+    expect(panel).toContain('safeSupportDetails(caught)');
+    expect(panel).not.toContain('setSupportDetails(caught.message)');
+    expect(panel).toContain('return `HTTP ${caught.status} · ${code}`');
+    expect(panel).toContain('Ver informações para suporte');
+    expect(panel).toContain('caught.status === 404');
+    expect(panel).toContain("caught.code === 'FINANCE_RESPONSE_UNRECOGNIZED'");
+    expect(panel).toContain("caught.code === 'FINANCE_EMPTY_RESPONSE'");
+    expect(panel).toContain('A 99Food informou um erro ao consultar os dados financeiros desta loja.');
     expect(panel).not.toContain("accessNotEnabled ? 'R$ 0,00'");
   });
 
@@ -35,6 +46,15 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('weekPaymentId');
     expect(panel).toContain('dayPaymentId');
     expect(panel).toContain('Ver detalhes e suporte');
+    expect(panel).toContain('Criar conta financeira');
+    expect(panel).toContain("api.post<FinancialAccountDTO>('/finance/accounts'");
+    expect(panel).toContain("api.put(`/finance/marketplaces/99food/connections/${connectionId}/settlement-account`");
+    expect(panel).toContain('accountId: createdAccount.id');
+    expect(panel).toContain('Conta criada e definida como destino dos repasses. Nenhum repasse foi registrado.');
+    expect(panel).toContain('initialBalance: 0');
+    expect(panel).toContain('Criar ou escolher uma conta não registra o repasse');
+    expect(panel).toContain('Selecione a integração da 99Food antes de configurar a conta de destino.');
+    expect(panel).toContain('A conta foi criada, mas não foi possível defini-la como destino.');
   });
 
   it('preserves the shared legacy/V2 order payment contract', () => {
@@ -42,7 +62,12 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(legacyPayment).toContain('Total pago pelo cliente');
     expect(legacyPayment).toContain('Valor a cobrar');
     expect(legacyPayment).toContain('Ganho estimado da loja');
+    expect(legacyPayment).toContain('Valor de loja informado pela 99Food no pedido');
+    expect(legacyPayment).toContain('Repasse previsto');
+    expect(legacyPayment).toContain('O pedido não informa um valor previsto de repasse verificável');
+    expect(legacyPayment).toContain('não informou um ganho de loja confiável');
     expect(v2Details).toContain('OrderPaymentSection');
+    expect(v2Details).toContain('origin={origin}');
     expect(v2Details).not.toContain('merchantEstimatedReceivable =');
     expect(v2Details).not.toContain('withdrawAmount');
   });

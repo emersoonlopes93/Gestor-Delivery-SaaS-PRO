@@ -1,4 +1,5 @@
 import { MarketplaceProvider } from '@prisma/client';
+import { Logger } from '@nestjs/common';
 import { Food99ApiError } from '../providers/food99-api.error';
 import {
   Food99FinancialClientService,
@@ -16,7 +17,7 @@ describe('Food99FinancialClientService', () => {
   });
 
   function makeService() {
-    const tokens = { getAccessToken: jest.fn().mockResolvedValue('shop-token') };
+    const tokens = { getAccessToken: jest.fn().mockResolvedValue('finance-token'), invalidate: jest.fn() };
     const service = new Food99FinancialClientService({
       get: jest.fn((key: string) => ({
         MARKETPLACE_99FOOD_FINANCE_API_BASE_URL: 'https://food99-finance.test',
@@ -76,7 +77,7 @@ describe('Food99FinancialClientService', () => {
 
     const [url, request] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://food99-finance.test/v3/finance/finance/getShopBillDetail');
-    expect(request.headers).toMatchObject({ authorization: 'Bearer shop-token' });
+    expect(request.headers).toMatchObject({ authorization: 'Bearer finance-token' });
     expect(JSON.parse(String(request.body))).toEqual({
       acceptor_code: '5764608924570091908',
       start_date: '20260901',
@@ -131,7 +132,7 @@ describe('Food99FinancialClientService', () => {
       { startDate: '2026-09-01', endDate: '2026-09-12' },
       'correlation-1',
     )).resolves.toEqual([]);
-    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, connection, true);
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, true);
     expect((global.fetch as jest.Mock).mock.calls[1][1].headers).toMatchObject({
       authorization: 'Bearer fresh-token',
     });
@@ -151,6 +152,121 @@ describe('Food99FinancialClientService', () => {
     await expect(promise).rejects.toMatchObject<Partial<Food99ApiError>>({
       providerCode: 'FINANCE_ACCESS_NOT_ENABLED',
     });
+  });
+
+  it('accepts a successful financial envelope whose business code is a string', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"code":"0","data":{"records":[],"totalPage":"0"}}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchSettlements(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-string-code',
+    )).resolves.toEqual([]);
+  });
+
+  it('rejects an HTTP 200 business error without exposing provider text or persisting an inferred result', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"code":"100401","message":"merchant-specific diagnostic","data":null}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-business-error',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_PROVIDER_BUSINESS_100401',
+      httpStatus: 200,
+    });
+  });
+
+  it('classifies the observed HTTP 200 error_code envelope as a provider business error', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"error_code":"10050","error_description":"provider diagnostic","Details":"provider details","request_id":"provider-request"}',
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-error-code-envelope',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_PROVIDER_BUSINESS_10050',
+      httpStatus: 200,
+      message: 'A 99Food informou um erro ao consultar os dados financeiros desta loja. Confira a configuracao e a liberacao financeira com o suporte. Nenhum repasse foi registrado.',
+    });
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'food99_financial_provider_rejected',
+      errorCode: 10050,
+      hasErrorCode: true,
+      hasProviderMessage: true,
+      rootKeys: ['Details', 'error_code', 'error_description', 'request_id'],
+    }));
+    expect(warn.mock.calls.flat().join('')).not.toContain('provider diagnostic');
+    expect(warn.mock.calls.flat().join('')).not.toContain('provider details');
+  });
+
+  it('keeps an HTTP 200 empty body distinct from a legitimate empty dataset', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-empty-body',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_EMPTY_RESPONSE',
+      httpStatus: 502,
+    });
+  });
+
+  it('reports an HTTP 200 envelope without contract markers as unrecognized without logging its body', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    global.fetch = jest.fn().mockResolvedValue(new Response('{}', {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    }));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-unrecognized-envelope',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: 'FINANCE_RESPONSE_UNRECOGNIZED',
+      httpStatus: 200,
+    });
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'food99_financial_provider_rejected',
+      contentType: 'application/json',
+      bodyBytes: 2,
+      bodyPresent: true,
+      rootType: 'object',
+      rootKeys: [],
+      dataType: null,
+      dataKeys: null,
+    }));
+    expect(warn.mock.calls.flat().join('')).not.toContain('{}');
+  });
+
+  it('keeps a persistent 401 distinct from PedeHub RBAC and uncertain whitelist denial', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":401}', { status: 401 }));
+    const { service, connection, tokens } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-1',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      httpStatus: 401,
+      providerCode: 'FINANCE_PROVIDER_UNAUTHORIZED',
+    });
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, true);
+    expect(tokens.invalidate).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces provider failures instead of returning an empty dataset', async () => {

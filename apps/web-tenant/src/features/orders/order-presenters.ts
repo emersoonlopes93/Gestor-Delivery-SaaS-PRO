@@ -13,6 +13,11 @@ export const ORDER_TIME_THRESHOLDS_MINUTES = {
   delayed: 30,
 } as const;
 
+/** Stored order numbers can already contain a hash; render exactly one human-facing prefix. */
+export function formatOrderNumber(value: string): string {
+  return `#${value.trim().replace(/^#+\s*/, '')}`;
+}
+
 export const ORDER_STATUS_PRESENTATION: Record<OrderStatus, { label: string; tone: string }> = {
   pending: { label: 'Novo — precisa confirmar', tone: 'status-badge-pending' },
   confirmed: { label: 'Confirmado — aguardando cozinha', tone: 'status-badge-confirmed' },

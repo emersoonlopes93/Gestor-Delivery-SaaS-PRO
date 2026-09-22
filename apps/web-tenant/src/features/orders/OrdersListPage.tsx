@@ -5,7 +5,7 @@ import { api, ApiError } from '../../lib/api-client';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { OrderDrawer } from './components/OrderDrawer';
 import { OrderStatusBadge } from './components/OrderStatusBadge';
-import { deliveryStatement, providerLabel } from './order-presenters';
+import { deliveryStatement, formatOrderNumber, providerLabel } from './order-presenters';
 import { subscribeOrdersRealtimeEvents } from '../../notifications/ordersRealtimeEvents';
 import { OrdersFreshnessStatus } from './components/OrdersFreshnessStatus';
 import { useOrdersRealtimeState } from './hooks/useOrdersRealtimeState';
@@ -164,7 +164,7 @@ export function OrdersListPage() {
               const operational = order.operational;
               return (
               <button key={order.id} type="button" aria-label={`Abrir detalhes do pedido ${order.orderNumber}`} onClick={() => setSelectedOrderId(order.id)} className="group grid w-full gap-3 p-4 text-left transition hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary md:grid-cols-[1fr_1fr] xl:grid-cols-[130px_minmax(180px,1.2fr)_minmax(180px,1fr)_minmax(180px,1fr)_140px_44px] xl:items-center xl:gap-4">
-                <div><p className="text-base font-black text-foreground">#{order.orderNumber}</p><p className="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground"><Clock3 className="h-3.5 w-3.5" />{fmtDate(order.createdAt)}</p></div>
+                <div><p className="text-base font-black text-foreground">{formatOrderNumber(order.orderNumber)}</p><p className="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground"><Clock3 className="h-3.5 w-3.5" />{fmtDate(order.createdAt)}</p></div>
                 <div className="min-w-0"><p className="truncate text-sm font-black text-foreground">{order.customerName}</p><p className="mt-1 truncate text-xs text-muted-foreground">{order.customerPhone}</p><span className="mt-1 inline-flex rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-black text-foreground">{operational ? providerLabel(operational) : order.sourceChannel}</span></div>
                 <div className="space-y-1.5"><OrderStatusBadge status={order.status} />{operational && operational.syncState !== 'NONE' ? <p className={`text-xs font-bold ${operational.syncState === 'FAILED' ? 'text-destructive' : 'text-primary'}`}>{operational.marketplaceOperation.friendlyMessage}</p> : null}</div>
                 <div className="flex items-start gap-2 text-sm"><Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span className="font-semibold text-foreground">{operational ? deliveryStatement(operational, order.fulfillmentType) : order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}</span></div>

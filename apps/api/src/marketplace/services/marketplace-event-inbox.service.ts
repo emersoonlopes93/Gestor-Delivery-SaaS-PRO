@@ -54,7 +54,10 @@ export class MarketplaceEventInboxService {
       body: input.body,
     });
 
-    if (input.provider === MarketplaceProvider.FOOD_99
+    const isFood99ShopStatus = input.provider === MarketplaceProvider.FOOD_99
+      && parsed.topic?.toUpperCase() === 'SHOPSTATUS'
+      && !parsed.externalOrderId;
+    if (input.provider === MarketplaceProvider.FOOD_99 && !isFood99ShopStatus
       && (!parsed.eventId || !parsed.externalOrderId || !parsed.externalStoreId || !parsed.topic)) {
       this.logger.warn({
         message: 'food99_webhook_payload_unmapped',
@@ -85,7 +88,7 @@ export class MarketplaceEventInboxService {
       headers: input.headers,
       channel: MarketplaceEventChannel.WEBHOOK,
       connection,
-      process: true,
+      process: !isFood99ShopStatus,
     });
   }
 
@@ -108,15 +111,14 @@ export class MarketplaceEventInboxService {
     const dedupeKey = createHash('sha256')
       .update(`${input.parsed.provider}:${dedupeScope}:${legacyDedupeKey}`)
       .digest('hex');
-    const existing = await this.prisma.marketplaceEventInbox.findFirst({
-      where: {
-        provider: input.parsed.provider,
-        OR: [
-          { dedupeKey },
-          ...(input.connection ? [{ dedupeKey: legacyDedupeKey, connectionId: input.connection.id }] : []),
-        ],
-      },
-    });
+    const duplicateWhere: Prisma.MarketplaceEventInboxWhereInput = {
+      provider: input.parsed.provider,
+      OR: [
+        { dedupeKey },
+        ...(input.connection ? [{ dedupeKey: legacyDedupeKey, connectionId: input.connection.id }] : []),
+      ],
+    };
+    const existing = await this.prisma.marketplaceEventInbox.findFirst({ where: duplicateWhere });
     if (existing) {
       await this.prisma.marketplaceEventInbox.update({
         where: { id: existing.id },
@@ -172,9 +174,9 @@ export class MarketplaceEventInboxService {
       });
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      inbox = await this.prisma.marketplaceEventInbox.findFirstOrThrow({
-        where: { provider: input.parsed.provider, dedupeKey },
-      });
+      const raced = await this.prisma.marketplaceEventInbox.findFirst({ where: duplicateWhere });
+      if (!raced) throw error;
+      inbox = raced;
       await this.prisma.marketplaceEventInbox.update({
         where: { id: inbox.id },
         data: {

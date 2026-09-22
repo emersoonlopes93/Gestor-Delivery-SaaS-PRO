@@ -23,7 +23,7 @@ export function shouldAnnounceOperationalAlert(alert: OperationalAlertForAnnounc
 }
 
 export function getOperationalAlertRepeatIntervalMs(alert: OperationalAlertForAnnouncement): number {
-  return alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY || alert.ruleKey === MARKETPLACE_COURIER_ARRIVED_RULE_KEY || alert.severity === 'CRITICAL'
+  return alert.ruleKey === WAITING_ACCEPTANCE_RULE_KEY || alert.ruleKey === MARKETPLACE_COURIER_ARRIVED_RULE_KEY
     ? 30_000
     : 60_000;
 }

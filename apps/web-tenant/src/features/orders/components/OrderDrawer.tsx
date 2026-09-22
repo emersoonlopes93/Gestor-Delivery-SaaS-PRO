@@ -20,7 +20,7 @@ import { Capacitor } from '@capacitor/core';
 import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
 import { printThermalText } from '../../../lib/thermal-print';
 import toast from 'react-hot-toast';
-import { buildRoutingSummary, presentOrderTime, providerLabel, resolveOrderPriority } from '../order-presenters';
+import { buildRoutingSummary, formatOrderNumber, presentOrderTime, providerLabel, resolveOrderPriority } from '../order-presenters';
 import { subscribeOrdersRealtimeEvents } from '../../../notifications/ordersRealtimeEvents';
 
 export interface OrderDrawerProps {
@@ -209,7 +209,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
         fetchDetail(true);
         return;
       }
-      printThermalText(printRes.data.content, { title: `Pedido #${order.orderNumber}`, paperWidthMm: 58 });
+      printThermalText(printRes.data.content, { title: `Pedido ${formatOrderNumber(order.orderNumber)}`, paperWidthMm: 58 });
       setIsPrinting(false);
       toast.success('Imprimindo...');
       fetchDetail(true);
@@ -255,10 +255,10 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 <h2 id="order-drawer-title" className="text-xl font-black text-foreground tracking-tight">
                   {order?.operational?.origin === 'FOOD_99' && order.operational.providerOrderNumber
                     ? `Pedido 99Food #${order.operational.providerOrderNumber}`
-                    : `Pedido #${order?.orderNumber || '...'}`}
+                    : `Pedido ${formatOrderNumber(order?.orderNumber || '...')}`}
                 </h2>
                 {order?.operational?.origin === 'FOOD_99' && order.operational.providerOrderNumber ? (
-                  <p className="text-xs font-bold text-muted-foreground">PedeHub #{order.orderNumber}</p>
+                  <p className="text-xs font-bold text-muted-foreground">PedeHub {formatOrderNumber(order.orderNumber)}</p>
                 ) : null}
               </div>
               {order && <OrderStatusBadge status={order.status} />}

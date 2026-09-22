@@ -285,6 +285,17 @@ canonical CAS primitive to `out_for_delivery`; `150` persists the external arriv
 never cancels the commercial order; `180` refreshes courier metadata and clears the current
 arrival condition until a later `130`. Alerts recover on 140/170/180 and terminal orders.
 
+`deliveryStatus` must reach the logistics handler before the ordinary order-topic filter.
+The signed callback's derived inbox identity includes `delivery_status`, so 130 and 140
+for the same order and provider second remain distinct; other callback identities keep
+their previous format. Older timestamps and regressive progressive delivery states are
+ignored without advancing the order's last-event cursor. Only a provider-owned 140
+can advance the canonical order to `out_for_delivery` through tenant-scoped CAS and
+emit `order.changed` after commit. A prior stored callback is not silently replayed
+against production orders when this code is deployed.
+An authenticated callback without an imported internal order stays failed/retryable in
+the inbox instead of being marked successfully processed.
+
 Canonical stock remains local and recipe-driven: a tenant-scoped
 `MarketplaceCatalogMapping(connectionId, provider, externalItemId) -> Product` resolves the
 provider item before the existing idempotent `OrderItem.productId` depletion engine runs.
@@ -337,10 +348,13 @@ O token por loja usa `GET /v1/auth/authtoken/get` com `app_id`, `app_secret` e `
 
 O callback 99Food valida `didi-header-sign` como o digest MD5 hexadecimal de 32 caracteres dos bytes exatos do corpo bruto concatenados diretamente ao App Secret (`MD5(raw POST body + app_secret)`). Não há ordenação de JSON, timestamp, nonce, path ou query na mensagem assinada. A comparação usa buffers e `timingSafeEqual`; assinatura ausente, malformada ou incorreta falha fechada. O App Secret vem de `MARKETPLACE_99FOOD_CLIENT_SECRET`, sem valor registrado em logs.
 
-O protocolo 99Food recomendado envia um objeto por callback: `app_id`, `app_shop_id`, `type`, `timestamp` e `data`. Para pedidos, `data.order_id` identifica o pedido; `orderNew` também pode fornecer o ID interno da loja em `data.order_info.shop.shop_id`. `app_shop_id` é o identificador da loja no sistema do parceiro e resolve `MarketplaceConnection.externalStoreId`; o ID interno, quando presente, alimenta `externalMerchantId`. Como o contrato não fornece `eventId`, o adapter deriva uma chave determinística com SHA-256 somente desses identificadores técnicos, tipo e timestamp. IDs long oficiais são preservados como strings a partir do corpo bruto assinado, evitando perda de precisão do `JSON.parse` nativo. A resposta atual é `204` somente depois que a inbox aceita o evento. O callback é apenas um sinal: a importação busca o snapshot autoritativo pelo `order_id`.
+O protocolo 99Food recomendado envia um objeto por callback: `app_id`, `app_shop_id`, `type`, `timestamp` e `data`. Para pedidos, `data.order_id` identifica o pedido; `orderNew` também pode fornecer o ID interno da loja em `data.order_info.shop.shop_id`. `app_shop_id` é o identificador da loja no sistema do parceiro e resolve `MarketplaceConnection.externalStoreId`; o ID interno, quando presente, alimenta `externalMerchantId`. Como o contrato não fornece `eventId`, o adapter deriva uma chave determinística com SHA-256 somente desses identificadores técnicos, tipo e timestamp. IDs long oficiais são preservados como strings a partir do corpo bruto assinado, evitando perda de precisão do `JSON.parse` nativo. Após a inbox aceitar o evento, a resposta nativa é HTTP `200` com JSON `{ "errno": 0, "errmsg": "ok" }`: o portal 99Food exige o campo `errno=0` e reenvia o callback quando ele está ausente ou diferente. O callback é apenas um sinal: a importação busca o snapshot autoritativo pelo `order_id`.
 
 O polling é opt-in por ambiente e por conexão. Cada loja recebe job e token independentes. O worker persiste ou confirma a duplicata antes de enviar o ACK oficial completo (`id`, `orderId`, `eventType`), em lotes de até 2.000. `429` e `5xx` usam retry exponencial e `Retry-After`; erro permanente bloqueia a conexão sem contaminar outras lojas.
 
 Pedidos usam `marketplace_99food`, preservam itens, opções, taxas, descontos, total, pagamento, troco, endereço e timestamps do snapshot. Somente `MERCHANT` permite entregador, rota e auto-dispatch internos. O lifecycle outbound expõe confirmar e pronto; entregue é permitido somente para `MERCHANT`. Cancelamento permanece indisponível porque o Swagger lista `reason_id` numérico mas não fornece rótulos oficiais, e despacho/aceite/recusa de cancelamento não são enviados para endpoints Open Delivery legados.
 
 Variáveis: `MARKETPLACE_99FOOD_APP_ID`, `MARKETPLACE_99FOOD_CLIENT_SECRET`, `MARKETPLACE_99FOOD_API_BASE_URL`, `MARKETPLACE_99FOOD_FINANCE_API_BASE_URL`, `MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS`, `MARKETPLACE_99FOOD_ENABLED`, `MARKETPLACE_99FOOD_POLLING_ENABLED`, `MARKETPLACE_99FOOD_POLLING_INTERVAL_MS`, `MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS` e `MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN`. Habilitar polling exige Redis e BullMQ. Sem credenciais Sandbox, testes reais de OAuth, webhook, polling, pedido e lifecycle permanecem obrigatoriamente pendentes; a feature não pode ser declarada homologada. O contrato financeiro separado está em [Conciliação financeira 99Food](./99food-financial-reconciliation.md).
+### Tratamento de eventos não acionáveis e reparos históricos (2026-09-20)
+
+`shopStatus` assinado informa estado da loja, não de um pedido. A inbox o preserva como não acionável e não tenta importar um pedido sem `order_id`; registros legados desse tópico que falharam pelo mesmo motivo podem ser classificados como ignorados sem criar IDs. Um pedido histórico `unknown-order` com ID numérico já perdido por arredondamento não é reparável automaticamente: ele permanece armazenado, fora da busca periódica de detalhes, até existir evidência oficial do identificador exato. Uma confirmação outbound aceita só é marcada como reconciliada por `orderFinish` quando o evento processado corresponde ao mesmo tenant, conexão e ID externo, ocorreu após a operação e o pedido local já está concluído; a reconciliação não força uma transição terminal.

@@ -33,8 +33,11 @@ export class MarketplaceWebhookController {
       body,
     });
     if (provider === MarketplaceProvider.FOOD_99) {
-      response.status(HttpStatus.NO_CONTENT);
-      return undefined;
+      // The native 99Food callback retries when it does not receive this JSON ACK.
+      // A 204 empty response is a successful HTTP response, but not a successful
+      // provider acknowledgement.
+      response.status(HttpStatus.OK);
+      return { errno: 0, errmsg: 'ok' };
     }
     if ('heartbeat' in result) {
       return result.merchantIds === undefined ? undefined : { merchantIds: result.merchantIds };

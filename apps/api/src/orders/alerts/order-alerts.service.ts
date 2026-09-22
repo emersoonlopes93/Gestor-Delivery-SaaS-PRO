@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MarketplaceDivergenceStatus, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus, Prisma } from '@prisma/client';
+import { MarketplaceDivergenceStatus, MarketplaceDivergenceType, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { OrdersGateway } from '../orders.gateway';
 
@@ -8,6 +8,7 @@ export const ORDER_ALERT_RULES = {
   ORDER_DELAYED: 'ORDER_DELAYED',
   ORDER_SYNC_FAILED: 'ORDER_SYNC_FAILED',
   PROVIDER_RECONCILIATION_FAILED: 'PROVIDER_RECONCILIATION_FAILED',
+  MARKETPLACE_CATALOG_MAPPING_REQUIRED: 'MARKETPLACE_CATALOG_MAPPING_REQUIRED',
   MARKETPLACE_COURIER_ARRIVED: 'MARKETPLACE_COURIER_ARRIVED',
 } as const;
 
@@ -63,7 +64,7 @@ export class OrderAlertsService {
         id: true, orderNumber: true, status: true, createdAt: true,
         marketplaceOrders: { select: {
           operations: { where: { status: { in: [MarketplaceOperationStatus.FAILED, MarketplaceOperationStatus.INTERVENTION_REQUIRED] } }, select: { id: true, status: true } },
-          divergences: { where: { status: MarketplaceDivergenceStatus.OPEN }, select: { id: true } },
+          divergences: { where: { status: MarketplaceDivergenceStatus.OPEN }, select: { id: true, type: true, reason: true } },
           provider: true,
           deliveryOwnership: true,
           normalizedPayload: true,
@@ -72,32 +73,38 @@ export class OrderAlertsService {
     });
     const candidates: Candidate[] = [];
     for (const order of orders) {
+      const displayNumber = this.displayNumber(order.orderNumber);
       if (order.status === OrderStatus.pending) candidates.push({
         orderId: order.id, ruleKey: ORDER_ALERT_RULES.ORDER_WAITING_ACTION, severity: OrderAlertSeverity.ATTENTION,
-        title: `Pedido #${order.orderNumber} aguardando ação`, message: 'O pedido continua pendente de confirmação.', metadata: { orderNumber: order.orderNumber },
+        title: `Pedido ${displayNumber} aguardando ação`, message: 'O pedido continua pendente de confirmação.', metadata: { orderNumber: displayNumber },
       });
       if (order.createdAt < delayedBefore) candidates.push({
         orderId: order.id, ruleKey: ORDER_ALERT_RULES.ORDER_DELAYED, severity: OrderAlertSeverity.ATTENTION,
-        title: `Pedido #${order.orderNumber} atrasado`, message: 'O pedido ultrapassou o limiar operacional existente de 30 minutos.', metadata: { orderNumber: order.orderNumber, thresholdMinutes: 30 },
+        title: `Pedido ${displayNumber} atrasado`, message: 'O pedido ultrapassou o limiar operacional existente de 30 minutos.', metadata: { orderNumber: displayNumber, thresholdMinutes: 30 },
       });
       if (order.marketplaceOrders.some((marketplaceOrder) => marketplaceOrder.operations.length > 0)) candidates.push({
         orderId: order.id, ruleKey: ORDER_ALERT_RULES.ORDER_SYNC_FAILED, severity: OrderAlertSeverity.CRITICAL,
-        title: `Falha de sincronização no pedido #${order.orderNumber}`, message: 'Uma operação de marketplace falhou e exige verificação.', metadata: { orderNumber: order.orderNumber },
+        title: `Falha de sincronização no pedido ${displayNumber}`, message: 'Uma operação de marketplace falhou e exige verificação.', metadata: { orderNumber: displayNumber },
       });
-      if (order.marketplaceOrders.some((marketplaceOrder) => marketplaceOrder.divergences.length > 0)) candidates.push({
+      const openDivergences = order.marketplaceOrders.flatMap((marketplaceOrder) => marketplaceOrder.divergences);
+      if (openDivergences.some((divergence) => this.requiresCriticalReconciliationAlert(divergence))) candidates.push({
         orderId: order.id, ruleKey: ORDER_ALERT_RULES.PROVIDER_RECONCILIATION_FAILED, severity: OrderAlertSeverity.CRITICAL,
-        title: `Divergência de reconciliação no pedido #${order.orderNumber}`, message: 'A reconciliação do provider exige verificação operacional.', metadata: { orderNumber: order.orderNumber },
+        title: `Divergência de reconciliação no pedido ${displayNumber}`,
+        message: 'A integração exige verificação antes de uma nova tentativa.', metadata: { orderNumber: displayNumber },
       });
-    }
-    for (const order of orders) {
+      const unmapped = openDivergences.find((divergence) => this.isCatalogMappingDivergence(divergence));
+      if (unmapped) candidates.push({
+        orderId: order.id, ruleKey: ORDER_ALERT_RULES.MARKETPLACE_CATALOG_MAPPING_REQUIRED, severity: OrderAlertSeverity.INFO,
+        title: `Produto do marketplace precisa de associação no pedido ${displayNumber}`,
+        message: 'O pedido segue operável; a baixa de estoque deste item foi mantida em espera para evitar erro.',
+        metadata: { orderNumber: displayNumber, divergenceType: unmapped.type },
+      });
       if (order.marketplaceOrders.some((marketplaceOrder) => this.isFood99CourierAtRestaurant(marketplaceOrder))) {
         candidates.push({
-          orderId: order.id,
-          ruleKey: ORDER_ALERT_RULES.MARKETPLACE_COURIER_ARRIVED,
-          severity: OrderAlertSeverity.ATTENTION,
-          title: `Entregador da 99Food chegou para o pedido #${order.orderNumber}`,
+          orderId: order.id, ruleKey: ORDER_ALERT_RULES.MARKETPLACE_COURIER_ARRIVED, severity: OrderAlertSeverity.ATTENTION,
+          title: `Entregador da 99Food chegou para o pedido ${displayNumber}`,
           message: 'O entregador parceiro chegou ao estabelecimento e aguarda a retirada.',
-          metadata: { orderNumber: order.orderNumber, provider: '99food' },
+          metadata: { orderNumber: displayNumber, provider: '99food' },
         });
       }
     }
@@ -111,6 +118,24 @@ export class OrderAlertsService {
   }
 
   private fingerprint(candidate: Candidate) { return `${candidate.orderId}:${candidate.ruleKey}`; }
+
+  private displayNumber(orderNumber: string): string {
+    return `#${orderNumber.trim().replace(/^#+\s*/, '')}`;
+  }
+
+  private requiresCriticalReconciliationAlert(divergence: { type: MarketplaceDivergenceType; reason: string }): boolean {
+    return divergence.type === MarketplaceDivergenceType.AUTHENTICATION_FAILURE
+      || divergence.type === MarketplaceDivergenceType.INVALID_TRANSITION
+      || divergence.type === MarketplaceDivergenceType.OPERATION_TIMEOUT
+      || divergence.type === MarketplaceDivergenceType.EVENT_MISSING
+      || divergence.type === MarketplaceDivergenceType.PERMANENT_PROVIDER_REJECTION
+      || (divergence.type === MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE && !this.isCatalogMappingDivergence(divergence));
+  }
+
+  private isCatalogMappingDivergence(divergence: { type: MarketplaceDivergenceType; reason: string }): boolean {
+    return divergence.type === MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE
+      && /^Marketplace catalog items are unmapped:/i.test(divergence.reason);
+  }
 
   private isFood99CourierAtRestaurant(marketplaceOrder: {
     provider: string;

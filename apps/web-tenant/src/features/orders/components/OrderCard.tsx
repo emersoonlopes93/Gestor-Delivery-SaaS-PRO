@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, ArrowRight, Clock3, FileText, Info, Shoppin
 import type { OrderBoardItemDTO, OrderOperationalAction } from '@gestor/types';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { deliveryStatement, presentOrderTime, providerLabel, resolveOrderPriority } from '../order-presenters';
+import { deliveryStatement, formatOrderNumber, presentOrderTime, providerLabel, resolveOrderPriority } from '../order-presenters';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderActionMenu } from './OrderActionMenu';
 
@@ -68,7 +68,7 @@ export const OrderCard = memo(function OrderCard({
             </div>
           </div>
           <div className="text-right">
-            <p className="text-lg font-black leading-none text-foreground">#{order.orderNumber}</p>
+            <p className="text-lg font-black leading-none text-foreground">{formatOrderNumber(order.orderNumber)}</p>
             <span className="mt-1.5 inline-flex rounded-md border border-border bg-muted px-2 py-1 text-[10px] font-black text-foreground">{providerLabel(operational)}</span>
           </div>
         </div>

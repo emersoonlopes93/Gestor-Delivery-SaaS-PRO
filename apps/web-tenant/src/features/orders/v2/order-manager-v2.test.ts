@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OrderBoardItemDTO } from '@gestor/types';
 import { OrderAlertCoordinator } from './order-alert-coordinator';
-import { filterManagerOrders, formatElapsed, getOperationalIntelligence, groupOrdersForManager, isRunnableStatusAction, matchesOrderSearch, privacySafeOrderPhrase } from './order-manager-v2';
+import { filterManagerOrders, formatElapsed, formatOrderDisplayNumber, getOperationalIntelligence, getProviderOrderNumber, groupOrdersForManager, isRunnableStatusAction, matchesOrderSearch, privacySafeOrderPhrase } from './order-manager-v2';
 
 function order(status: OrderBoardItemDTO['status'], overrides: Partial<OrderBoardItemDTO> = {}): OrderBoardItemDTO {
   return {
@@ -22,6 +22,18 @@ describe('Order Manager V2 projections', () => {
   it('preserves board search and origin filtering', () => {
     expect(filterManagerOrders([order('pending')], '1042', 'PEDEHUB')).toHaveLength(1);
     expect(filterManagerOrders([order('pending')], '1042', 'IFOOD')).toHaveLength(0);
+  });
+  it('uses a trusted provider display number for external search without losing the PedeHub reference', () => {
+    const external = order('pending', { orderNumber: '#01042', operational: { ...order('pending').operational, origin: 'FOOD_99', providerOrderNumber: '#210004' } });
+    expect(getProviderOrderNumber(external)).toBe('210004');
+    expect(matchesOrderSearch(external, '210004')).toBe(true);
+    expect(matchesOrderSearch(external, '01042')).toBe(true);
+    expect(formatOrderDisplayNumber(external.orderNumber)).toBe('#01042');
+    expect(formatOrderDisplayNumber(getProviderOrderNumber(external)!)).toBe('#210004');
+    expect(formatOrderDisplayNumber('210004')).toBe('#210004');
+    expect(getProviderOrderNumber(order('pending', { operational: { ...external.operational, providerOrderNumber: '5764686607160511787' } }))).toBeNull();
+    expect(getProviderOrderNumber(order('pending', { operational: { ...external.operational, providerOrderNumber: '#5764686607160511787' } }))).toBeNull();
+    expect(getProviderOrderNumber(order('pending', { operational: { ...external.operational, origin: 'PEDEHUB' } }))).toBeNull();
   });
   it('derives compact cockpit counts from the reconciled operational board', () => {
     const ready = order('ready_for_delivery', { fulfillmentType: 'delivery' });
@@ -150,7 +162,21 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('Indicadores operacionais');
     expect(card).toContain('Logistica da loja');
     expect(card).toContain('Falha de sincronizacao');
+    expect(card).toContain('PedeHub {formatOrderDisplayNumber(order.orderNumber)}');
+    expect(card).toContain('Número da plataforma não informado');
+    expect(card).toContain("externalWithoutNumber ? 'PedeHub ' : ''");
+    expect(card).toContain("order.operational.syncState === 'FAILED'");
+    expect(card).not.toContain("syncState !== 'NONE'");
+    expect(card).not.toContain("'Sincronizado'");
     expect(details).toContain('Resumo operacional do pedido');
+    expect(details.indexOf('Resumo operacional do pedido')).toBeLessThan(details.indexOf('Diagnóstico do pedido'));
+    expect(details).toContain('onAction(order, primaryAction)');
+    expect(details).toContain('aria-pressed={tab ===');
+    expect(details).not.toContain('role="tablist"');
+    expect(details).toContain('Referência PedeHub ${formatOrderDisplayNumber(order.orderNumber)}');
+    expect(details).toContain('Pedido PedeHub ${formatOrderDisplayNumber(order.orderNumber)}');
+    expect(details).toContain('Número da plataforma não informado');
+    expect(details).toContain('Cliente e entrega');
     expect(details).toContain('Proxima acao');
     expect(details).toContain('formatElapsed');
     expect(card).toContain('onAction(order, action)');
@@ -161,6 +187,8 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('alertSeverity');
     expect(card).toContain('onOpenAlert');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('activeAlertSeverityByOrderId');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('{alert.message}');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Confira o estado do pedido antes de tentar novamente.');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('ORDER_ALERT_CENTER_TOGGLE_EVENT');
   });
 

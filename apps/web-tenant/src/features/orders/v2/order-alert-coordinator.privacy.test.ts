@@ -50,6 +50,12 @@ describe('Order Manager V2 voice privacy', () => {
     expect(phrases).toEqual(['Entregador da 99Food chegou para o pedido 101.']);
   });
 
+  it('does not repeat an acknowledged critical reconciliation alert', () => {
+    const acknowledgedCritical = { ruleKey: 'PROVIDER_RECONCILIATION_FAILED', acknowledgedAt: '2026-09-15T12:00:00.000Z', severity: 'CRITICAL' as const };
+    expect(shouldAnnounceOperationalAlert(acknowledgedCritical)).toBe(false);
+    expect(getOperationalAlertRepeatIntervalMs(acknowledgedCritical)).toBe(60_000);
+  });
+
   it('uses the operational waiting-acceptance voice without customer data', async () => {
     const phrases: string[] = [];
     const coordinator = new OrderAlertCoordinator();

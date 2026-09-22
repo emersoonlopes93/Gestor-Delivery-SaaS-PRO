@@ -1,4 +1,4 @@
-import { MarketplaceEventChannel, MarketplaceEventStatus, MarketplaceProvider } from '@prisma/client';
+import { MarketplaceEventChannel, MarketplaceEventStatus, MarketplaceProvider, Prisma } from '@prisma/client';
 import { MarketplaceEventInboxService } from './marketplace-event-inbox.service';
 
 describe('MarketplaceEventInboxService', () => {
@@ -247,6 +247,52 @@ describe('MarketplaceEventInboxService', () => {
       body: {},
     })).rejects.toThrow('Invalid marketplace webhook signature.');
     expect(prisma.marketplaceEventInbox.create).not.toHaveBeenCalled();
+  });
+
+  it('stores a signed 99Food shopStatus as a non-order event without dispatching ingestion', async () => {
+    provider.parseWebhookEvent.mockResolvedValueOnce({
+      provider: MarketplaceProvider.FOOD_99,
+      eventId: null,
+      topic: 'shopStatus',
+      externalMerchantId: 'merchant-99',
+      externalStoreId: 'store-99',
+      externalOrderId: null,
+      rawPayload: { type: 'shopStatus', data: { store_status: 1 } },
+    });
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce(null);
+    prisma.marketplaceEventInbox.create.mockResolvedValueOnce({ id: 'shop-status-1' });
+    const service = new MarketplaceEventInboxService(
+      prisma as never, registry as never, connectionService as never, ingestionService as never, undefined,
+    );
+    await expect(service.receiveWebhook({
+      provider: MarketplaceProvider.FOOD_99, headers: {}, rawBody: Buffer.from('{}'), body: {},
+    })).resolves.toEqual({ accepted: true, duplicate: false, inboxId: 'shop-status-1' });
+    expect(prisma.marketplaceEventInbox.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MarketplaceEventStatus.IGNORED, topic: 'shopStatus' }),
+    }));
+    expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
+  });
+
+  it('recovers a concurrent dedupe insert using the same scoped identity', async () => {
+    prisma.marketplaceEventInbox.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'raced-1', status: MarketplaceEventStatus.PROCESSED });
+    prisma.marketplaceEventInbox.create.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed on provider,dedupe_key', { code: 'P2002', clientVersion: '5.0.0' },
+    ));
+    const service = new MarketplaceEventInboxService(
+      prisma as never, registry as never, connectionService as never, ingestionService as never, undefined,
+    );
+    await expect(service.persistParsedEvent({
+      parsed: {
+        provider: MarketplaceProvider.FOOD_99, eventId: 'same-event', externalMerchantId: 'merchant-99',
+        externalOrderId: '5764686451388255673', rawPayload: { type: 'orderFinish' },
+      },
+      channel: MarketplaceEventChannel.WEBHOOK,
+      connection: { id: 'conn-1', tenantId: 'tenant-1' } as never,
+    })).resolves.toEqual({ accepted: true, duplicate: true, inboxId: 'raced-1' });
+    expect(prisma.marketplaceEventInbox.findFirst.mock.calls[0][0])
+      .toEqual(prisma.marketplaceEventInbox.findFirst.mock.calls[1][0]);
   });
 
   it('only reapplies a processed inbox row when it is a known lifecycle event', async () => {

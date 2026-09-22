@@ -1,14 +1,24 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketplaceConnection } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
-import { Food99TokenService } from './food99-token.service';
+import { Food99FinancialTokenService } from './food99-financial-token.service';
 
 export type Food99FinancialRecord = Record<string, unknown>;
 
 export type Food99FinancialWindow = {
   startDate: string;
   endDate: string;
+};
+
+type Food99FinancialResponseMetadata = {
+  contentType: string | null;
+  bodyBytes: number;
+  bodyPresent: boolean;
+  rootType: string;
+  rootKeys: string[] | null;
+  dataType: string | null;
+  dataKeys: string[] | null;
 };
 
 const FINANCIAL_IDENTIFIER_FIELDS = [
@@ -98,9 +108,11 @@ export function splitFood99FinancialBackfill(
 
 @Injectable()
 export class Food99FinancialClientService {
+  private readonly logger = new Logger(Food99FinancialClientService.name);
+
   constructor(
     private readonly config: ConfigService,
-    private readonly tokens: Food99TokenService,
+    private readonly tokens: Food99FinancialTokenService,
   ) {}
 
   fetchBillEntries(
@@ -154,7 +166,7 @@ export class Food99FinancialClientService {
       );
     }
 
-    let token = await this.tokens.getAccessToken(connection);
+    let token = await this.tokens.getAccessToken();
     const all: Food99FinancialRecord[] = [];
     let pageNo = 1;
     let totalPages = 1;
@@ -168,18 +180,51 @@ export class Food99FinancialClientService {
       };
       let response = await this.execute(connection, token, path, correlationId, body);
       if (response.status === 401) {
-        token = await this.tokens.getAccessToken(connection, true);
+        token = await this.tokens.getAccessToken(true);
         response = await this.execute(connection, token, path, correlationId, body);
-        if (response.status === 401) await this.tokens.markAuthenticationFailed(connection);
+        if (response.status === 401) this.tokens.invalidate();
       }
       const raw = await response.text();
-      const payload = this.asRecord(this.tryParse(raw));
+      const metadata = this.responseMetadata(raw, response.headers.get('content-type'));
+      if (!metadata.bodyPresent) {
+        this.logInvalidResponse(response.status, path, correlationId, { ...metadata, rootType: 'empty' });
+        throw new Food99ApiError(
+          '99Food financial API returned an empty response.',
+          false,
+          502,
+          'FINANCE_EMPTY_RESPONSE',
+        );
+      }
+      let parsed: unknown;
+      try {
+        parsed = this.tryParse(raw);
+      } catch {
+        this.logInvalidResponse(response.status, path, correlationId, {
+          ...metadata,
+          rootType: 'invalid_json',
+        });
+        throw new Food99ApiError(
+          '99Food financial API returned invalid JSON.',
+          false,
+          502,
+          'INVALID_RESPONSE',
+        );
+      }
+      const payload = this.asRecord(parsed);
+      const responseMetadata = this.responseMetadata(raw, response.headers.get('content-type'), parsed);
       if (!response.ok || !this.isProviderSuccess(payload)) {
+        this.logProviderOutcome(response.status, path, correlationId, payload, responseMetadata);
         throw this.toFinancialError(response.status, payload);
       }
       const data = this.asRecord(payload?.data);
-      const rows = this.readRows(data);
-      totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
+      let rows: Food99FinancialRecord[];
+      try {
+        rows = this.readRows(data);
+        totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
+      } catch (error) {
+        this.logInvalidResponse(response.status, path, correlationId, responseMetadata);
+        throw error;
+      }
       all.push(...rows);
       if (rows.length === 0) break;
       pageNo += 1;
@@ -215,23 +260,27 @@ export class Food99FinancialClientService {
   }
 
   private tryParse(raw: string): unknown {
-    try {
-      return parseFood99FinancialJson(raw);
-    } catch {
-      throw new Food99ApiError(
-        '99Food financial API returned invalid JSON.',
-        false,
-        502,
-        'INVALID_RESPONSE',
-      );
-    }
+    return parseFood99FinancialJson(raw);
   }
 
   private isProviderSuccess(payload: Record<string, unknown> | null): boolean {
     if (!payload) return false;
-    if (typeof payload.errno === 'number') return payload.errno === 0;
-    if (typeof payload.code === 'number') return payload.code === 0 || payload.code === 200;
+    const errno = this.readBusinessCode(payload.errno);
+    if (errno !== null) return errno === 0;
+    const code = this.readBusinessCode(payload.code);
+    if (code !== null) return code === 0 || code === 200;
+    const errorCode = this.readBusinessCode(payload.error_code);
+    if (errorCode !== null && errorCode !== 0) return false;
     return payload.data !== undefined;
+  }
+
+  private readBusinessCode(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isInteger(value)) return value;
+    if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+      const parsed = Number(value);
+      return Number.isSafeInteger(parsed) ? parsed : null;
+    }
+    return null;
   }
 
   private readRows(data: Record<string, unknown> | null): Food99FinancialRecord[] {
@@ -284,18 +333,98 @@ export class Food99FinancialClientService {
     httpStatus: number,
     payload: Record<string, unknown> | null,
   ): Food99ApiError {
-    const providerMessage = [payload?.errmsg, payload?.message]
+    const providerMessage = [payload?.errmsg, payload?.message, payload?.error_description, payload?.Details]
       .find((value): value is string => typeof value === 'string');
+    const providerBusinessCode = this.readBusinessCode(payload?.errno)
+      ?? this.readBusinessCode(payload?.code)
+      ?? this.readBusinessCode(payload?.error_code);
+    const providerReportedBusinessError = providerBusinessCode !== null || Boolean(providerMessage);
     const whitelistDenied = httpStatus === 403
       || Boolean(providerMessage?.toLowerCase().includes('whitelist'));
+    const authorizationRejected = httpStatus === 401 && !whitelistDenied;
     return new Food99ApiError(
       whitelistDenied
         ? 'A integracao financeira da 99Food requer liberacao/WhiteList.'
-        : `99Food financial request failed with HTTP ${httpStatus}.`,
+        : authorizationRejected
+          ? 'A 99Food nao autorizou a consulta financeira apos renovar o acesso. Verifique a autorizacao da loja e a liberacao financeira com o suporte.'
+        : providerReportedBusinessError
+          ? 'A 99Food informou um erro ao consultar os dados financeiros desta loja. Confira a configuracao e a liberacao financeira com o suporte. Nenhum repasse foi registrado.'
+        : httpStatus >= 200 && httpStatus < 300
+          ? 'A 99Food respondeu a consulta financeira, mas o formato do retorno nao foi reconhecido. Nenhum repasse foi registrado.'
+          : `99Food financial request failed with HTTP ${httpStatus}.`,
       httpStatus === 429 || httpStatus >= 500,
       httpStatus,
-      whitelistDenied ? 'FINANCE_ACCESS_NOT_ENABLED' : providerMessage,
+      whitelistDenied
+        ? 'FINANCE_ACCESS_NOT_ENABLED'
+        : authorizationRejected
+          ? 'FINANCE_PROVIDER_UNAUTHORIZED'
+          : providerBusinessCode !== null
+            ? `FINANCE_PROVIDER_BUSINESS_${providerBusinessCode}`
+            : providerMessage ? 'FINANCE_PROVIDER_REJECTED' : 'FINANCE_RESPONSE_UNRECOGNIZED',
     );
+  }
+
+  private logProviderOutcome(
+    httpStatus: number,
+    path: string,
+    correlationId: string,
+    payload: Record<string, unknown> | null,
+    metadata: Food99FinancialResponseMetadata,
+  ): void {
+    this.logger.warn({
+      message: 'food99_financial_provider_rejected',
+      correlationId,
+      httpStatus,
+      endpoint: path.endsWith('getShopBillDetail') ? 'bill_detail' : 'week_settlement',
+      errno: this.readBusinessCode(payload?.errno),
+      code: this.readBusinessCode(payload?.code),
+      errorCode: this.readBusinessCode(payload?.error_code),
+      hasErrorCode: Object.prototype.hasOwnProperty.call(payload ?? {}, 'error_code'),
+      ...metadata,
+      hasProviderMessage: typeof payload?.errmsg === 'string'
+        || typeof payload?.message === 'string'
+        || typeof payload?.error_description === 'string'
+        || typeof payload?.Details === 'string',
+    });
+  }
+
+  private logInvalidResponse(
+    httpStatus: number,
+    path: string,
+    correlationId: string,
+    metadata: Food99FinancialResponseMetadata,
+  ): void {
+    this.logger.warn({
+      message: 'food99_financial_response_invalid',
+      correlationId,
+      httpStatus,
+      endpoint: path.endsWith('getShopBillDetail') ? 'bill_detail' : 'week_settlement',
+      ...metadata,
+    });
+  }
+
+  private responseMetadata(
+    raw: string,
+    contentType: string | null,
+    parsed?: unknown,
+  ): Food99FinancialResponseMetadata {
+    const root = this.asRecord(parsed);
+    const data = this.asRecord(root?.data);
+    return {
+      contentType: contentType?.split(';', 1)[0]?.trim() || null,
+      bodyBytes: Buffer.byteLength(raw, 'utf8'),
+      bodyPresent: raw.trim().length > 0,
+      rootType: this.valueType(parsed),
+      rootKeys: root ? Object.keys(root).sort().slice(0, 12) : null,
+      dataType: root && Object.prototype.hasOwnProperty.call(root, 'data') ? this.valueType(root.data) : null,
+      dataKeys: data ? Object.keys(data).sort().slice(0, 12) : null,
+    };
+  }
+
+  private valueType(value: unknown): string {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    return typeof value;
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {

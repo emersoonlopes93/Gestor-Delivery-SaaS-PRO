@@ -107,6 +107,15 @@ describe('Food99Provider', () => {
     expect((parsed.rawPayload.data as Record<string, unknown>).delivery_status).toBe(130);
   });
 
+  it('gives different same-second delivery states distinct inbox identities', async () => {
+    const raw130 = Buffer.from('{"app_id":5764608647577512345,"app_shop_id":"store-99","type":"deliveryStatus","timestamp":1768815260,"data":{"order_id":5764607618872501234,"delivery_status":130}}');
+    const raw140 = Buffer.from('{"app_id":5764608647577512345,"app_shop_id":"store-99","type":"deliveryStatus","timestamp":1768815260,"data":{"order_id":5764607618872501234,"delivery_status":140}}');
+    const arrived = await provider.parseWebhookEvent({ headers: {}, rawBody: raw130, body: {} });
+    const pickedUp = await provider.parseWebhookEvent({ headers: {}, rawBody: raw140, body: {} });
+    expect(arrived.eventId).not.toBe(pickedUp.eventId);
+    expect((await provider.parseWebhookEvent({ headers: {}, rawBody: raw130, body: {} })).eventId).toBe(arrived.eventId);
+  });
+
   it('leaves mandatory identifiers null for an unsupported or incomplete payload', async () => {
     const parsed = await provider.parseWebhookEvent({
       headers: {}, rawBody: Buffer.from('{"type":"orderNew","data":{}}'), body: {},

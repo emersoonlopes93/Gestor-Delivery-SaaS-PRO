@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { ActionPerformed } from '@capacitor/local-notifications';
+import { formatOrderNumber } from '../features/orders/order-presenters';
 
 export const ORDERS_CHANNEL_ID = 'new-orders-v2';
 const NOTIFIED_ORDER_IDS_KEY = 'native_notified_order_ids_v1';
@@ -97,7 +98,7 @@ export async function showNewOrderNotification(order: NewOrderNotificationPayloa
   const total = typeof order.total === 'number'
     ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total)
     : '';
-  const body = `Pedido #${order.orderNumber}${total ? ` - ${total}` : ''}`;
+  const body = `Pedido ${formatOrderNumber(order.orderNumber)}${total ? ` - ${total}` : ''}`;
 
   await LocalNotifications.schedule({
     notifications: [{
