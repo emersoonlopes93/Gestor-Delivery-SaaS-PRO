@@ -2631,3 +2631,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A migration aditiva cria a chave única opcional tenant/operação. Registros pagos históricos sem data não foram modificados: o resumo os quantifica e a tela orienta revisão individual.
 - Repasses 99Food permanecem no fluxo já idempotente e com bloqueio de divergência. O painel mostra a síntese antes de detalhes técnicos colapsados. iFood não é apresentado como repasse financeiro confirmado.
 - Ainda necessário antes de promoção: executar os gates completos e CI da PR, aplicar/validar a migration em ambiente seguro e fazer aceitação autenticada desktop/mobile, inclusive finance.read sem reports.read e uma consulta provider 99Food com WhiteList.
+## PedeHub UI/UX Etapa 2B — Painel de Operações/Gestor V2 (2026-09-23)
+
+- Branch/PR: `feat/pedehub-ops-redesign-2b1`, empilhada sobre `feat/pedehub-today-orders-stage2a` (PR #101); atualização destinada à PR #103. Nenhum commit da PR #99 foi incorporado.
+- O Gestor V2 mantém o board, busca, filtros, lanes, modais, impressão e ação de status existentes, mas usa um card operacional próprio mais legível: canal, número, estado e tempo reais, cliente, itens, logística, valor com rótulo canônico, sync apenas condicional e uma ação primária já autorizada.
+- O cockpit não duplica KPI/sincronização. Tablets e telas menores usam seletor explícito de lane até `xl`, sem rolagem horizontal forçada; desktop preserva a grade de três lanes. O controle de resumo declara corretamente expandir/recolher o que ele efetivamente mostra.
+- Removido o artefato versionado `OrderManagerV2Page.tsx.bak`. Não houve mudança de API, DTO, schema, migration, lifecycle, RBAC, impressão, provider/99Food, rota, sidebar, deploy ou banco remoto.
+- Validação local: testes focados `order-manager-v2` 16/16 PASS; lint web-tenant, typecheck/build web-tenant, `check:no-any`, `check:boundaries`, `check:theme` e `git diff --check` PASS. Avaliação independente de design em duas rodadas: PASS. QA visual autenticado em desktop/mobile permanece pendente porque não há automação/navegador autenticado disponível.

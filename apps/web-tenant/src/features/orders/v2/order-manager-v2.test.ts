@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
 import type { OrderBoardItemDTO } from '@gestor/types';
 import { OrderAlertCoordinator } from './order-alert-coordinator';
 import { filterManagerOrders, formatElapsed, getOperationalIntelligence, groupOrdersForManager, isRunnableStatusAction, matchesOrderSearch, privacySafeOrderPhrase } from './order-manager-v2';
+import ManagerOrderCard from './ManagerOrderCard';
 
 function order(status: OrderBoardItemDTO['status'], overrides: Partial<OrderBoardItemDTO> = {}): OrderBoardItemDTO {
   return {
@@ -72,6 +75,30 @@ describe('Order alert coordinator', () => {
 });
 
 describe('Order Manager V2 visual contracts', () => {
+  it('renders the manager card with canonical print, action, and conditional sync affordances', () => {
+    const printCalls: string[] = [];
+    const actionCalls: string[] = [];
+    const pending = order('pending', {
+      operational: {
+        ...order('pending').operational,
+        syncState: 'PENDING',
+        primaryAction: { type: 'CONFIRM', label: 'Confirmar', mode: 'LOCAL', enabled: true, targetStatus: 'confirmed' },
+      },
+    });
+    const pendingMarkup = renderToStaticMarkup(createElement(ManagerOrderCard, { order: pending, now: Date.parse('2026-09-10T12:10:00.000Z'), onOpen: () => undefined, onAction: (item) => actionCalls.push(item.id), onPrint: (item) => printCalls.push(item.id), isActionPending: false, isPrinting: false }));
+    expect(pendingMarkup).toContain('Imprimir pedido 1042');
+    expect(pendingMarkup).toContain('Confirmar');
+    expect(pendingMarkup).toContain('Sincronizando');
+    expect(pendingMarkup).not.toContain('Verificar sincronização');
+    expect(actionCalls).toEqual([]);
+    expect(printCalls).toEqual([]);
+
+    const failed = order('pending', { operational: { ...pending.operational, syncState: 'FAILED' } });
+    const failedMarkup = renderToStaticMarkup(createElement(ManagerOrderCard, { order: failed, now: Date.parse('2026-09-10T12:10:00.000Z'), onOpen: () => undefined, onAction: () => undefined, onPrint: () => undefined, isActionPending: false, isPrinting: false }));
+    expect(failedMarkup).toContain('Verificar sincronização');
+    expect(failedMarkup).not.toContain('Sincronizando');
+  });
+
   it('keeps operational actions and channel selection inside the V2 cockpit', () => {
     const controlCenter = readFileSync(resolve(__dirname, 'OperationalControlCenter.tsx'), 'utf8');
     const overlay = readFileSync(resolve(__dirname, 'OperationalOverlay.tsx'), 'utf8');
@@ -94,17 +121,15 @@ describe('Order Manager V2 visual contracts', () => {
     expect(sidebar).toContain('/tenant/store-pause');
   });
 
-  it('uses explicit mobile stage tabs instead of a horizontally scrolling mobile kanban', () => {
+  it('uses explicit lane selection through tablet widths and a real desktop grid', () => {
     const source = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     expect(source).toContain('Etapas do kanban');
     expect(source).toContain('activeMobileLane');
     expect(source).toContain('setActiveMobileLane');
-    expect(source).toContain('sm:overflow-x-auto');
+    expect(source).toContain('xl:hidden');
+    expect(source).not.toContain('overflow-x-auto');
     expect(source).not.toContain('min-w-[calc(100vw-2.5rem)]');
-    expect(source).toContain('sm:min-w-[22rem]');
-    expect(source).toContain('sm:snap-mandatory');
-    expect(source).toContain('sm:overscroll-x-contain');
-    expect(source).toContain('sm:scroll-px-3');
+    expect(source).not.toContain('min-w-[22rem]');
     expect(source).toContain('grid-cols-4');
     expect(source).toContain('xl:grid-cols-3');
   });
@@ -139,13 +164,15 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('aria-controls="order-manager-v2-cockpit-expanded"');
     expect(page).toContain('hidden={cockpitCollapsed}');
     expect(page.indexOf('Buscar pedido, cliente ou item')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
-    expect(page).toContain('Metric label="Ativos"');
+    expect(page).not.toContain('Metric label="Ativos"');
+    expect(page).toContain('Recolher resumo da operação');
     expect(page).toContain('2xl:justify-end');
     expect(page).toContain('sm:w-[260px]');
   });
 
   it('labels card scan indicators and repeats operational context in details', () => {
     const card = readFileSync(resolve(__dirname, 'OrderCardV2.tsx'), 'utf8');
+    const managerCard = readFileSync(resolve(__dirname, 'ManagerOrderCard.tsx'), 'utf8');
     const details = readFileSync(resolve(__dirname, 'OrderDetailsModalV2.tsx'), 'utf8');
     expect(card).toContain('Indicadores operacionais');
     expect(card).not.toContain('Logistica da loja');
@@ -167,6 +194,13 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('alertSeverity');
     expect(card).toContain('onOpenAlert');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('activeAlertSeverityByOrderId');
+    expect(managerCard).toContain('customerName');
+    expect(managerCard).toContain('itemsSummary');
+    expect(managerCard).toContain('deliverySummary');
+    expect(managerCard).toContain('financialSummary');
+    expect(managerCard).toContain('operationalValueLabel');
+    expect(managerCard).toContain("syncState === 'PENDING'");
+    expect(managerCard).toContain("syncState === 'FAILED'");
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('ORDER_ALERT_CENTER_TOGGLE_EVENT');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Resumo da operação');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Pedidos exibidos');
@@ -179,11 +213,15 @@ describe('Order Manager V2 visual contracts', () => {
 
   it('wires accessible print actions to the canonical receipt flow', () => {
     const card = readFileSync(resolve(__dirname, 'OrderCardV2.tsx'), 'utf8');
+    const managerCard = readFileSync(resolve(__dirname, 'ManagerOrderCard.tsx'), 'utf8');
     const details = readFileSync(resolve(__dirname, 'OrderDetailsModalV2.tsx'), 'utf8');
     const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     const printFlow = readFileSync(resolve(__dirname, '../order-print.ts'), 'utf8');
     expect(card).toContain('title="Imprimir pedido"');
     expect(card).toContain('onPrint(order)');
+    expect(managerCard).toContain('title="Imprimir pedido"');
+    expect(managerCard).toContain('onPrint(order)');
+    expect(managerCard).toContain('onAction(order, action)');
     expect(details).toContain('title="Imprimir pedido"');
     expect(details).toContain('onPrint(order)');
     expect(page).toContain('printOrderCustomerReceipt');

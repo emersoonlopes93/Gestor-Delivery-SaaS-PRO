@@ -14,7 +14,6 @@ import {
   Volume2,
   VolumeX,
   Wifi,
-  WifiOff,
 } from "lucide-react";
 import type {
   OrderBoardItemDTO,
@@ -310,18 +309,6 @@ export function OrderManagerV2Page() {
     setActiveMobileLane((lane) => OPERATIONAL_TAB_LANES[tab].includes(lane) ? lane : OPERATIONAL_TAB_LANES[tab][0]);
   }, []);
   const intelligence = useMemo(() => getOperationalIntelligence(orders, now), [orders, now]);
-  const kpis = useMemo(
-    () => ({
-      active: filtered.length,
-      attention: filtered.filter(
-        (order) =>
-          order.status === "pending" ||
-          order.operational.syncState === "FAILED",
-      ).length,
-      route: grouped.route.length,
-    }),
-    [filtered, grouped.route.length],
-  );
   const hasActiveFilters = query.trim().length > 0 || origin !== 'all';
   const operationalContextLabel = OPERATIONAL_TAB_LABELS[operationalTab];
   const clearFilters = () => {
@@ -333,16 +320,11 @@ export function OrderManagerV2Page() {
     <main className="mx-auto max-w-[1800px] space-y-2 p-2 sm:space-y-3 sm:p-4">
       <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-1.5 shadow-sm sm:p-3">
         <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2 sm:p-3">
-          <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
-            <div className="min-w-0 flex-1 sm:mr-auto sm:flex-none"><h1 className="text-base font-black tracking-tight text-foreground sm:text-xl">Painel de pedidos</h1><p className="truncate text-[9px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
-            <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[9px] font-black sm:px-2.5 sm:py-2 sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
-            <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-9 sm:w-9"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}</button>
-          </div>
-          <div className="mt-2"><OperationalQuickActions orders={orders} onOpenOrder={setSelected} /></div>
-          <div className="mt-2 hidden grid-cols-3 gap-1.5 sm:grid sm:flex-wrap">
-            <Metric label="Ativos" value={kpis.active} />
-            <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
-            <Metric label="Em rota" value={kpis.route} />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-0 flex-1"><h1 className="text-lg font-black tracking-tight text-foreground sm:text-xl">Painel de pedidos</h1><p className="truncate text-xs font-semibold text-muted-foreground">Acompanhe e gerencie seus pedidos em tempo real</p></div>
+            <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
+            <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-black ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3.5 w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
+            <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir resumo da operação" : "Recolher resumo da operação"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir resumo da operação" : "Recolher resumo da operação"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
           </div>
         </div>
         {alertsOpen ? (
@@ -373,23 +355,6 @@ export function OrderManagerV2Page() {
           </div>
         </section>
         <div className="mt-2 hidden flex-col gap-2 sm:flex 2xl:flex-row 2xl:items-center 2xl:justify-end">
-          <div className="hidden">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-              Sala de controle · operação ao vivo
-            </p>
-            <h1 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">
-              Painel de pedidos
-            </h1>
-          </div>
-          <div className="hidden">
-            <Metric label="Ativos" value={kpis.active} />
-            <Metric
-              label="Atenção"
-              value={kpis.attention}
-              tone="text-amber-700 dark:text-amber-300"
-            />
-            <Metric label="Em rota" value={kpis.route} />
-          </div>
           <div className="flex flex-wrap items-stretch gap-1.5">
             <div className="flex flex-wrap items-center gap-1 border border-border bg-background p-1">
               <button
@@ -498,28 +463,14 @@ export function OrderManagerV2Page() {
             ))}
           </div>
           <p className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground" aria-live="polite"><span className="font-black uppercase tracking-wide text-foreground">Pedidos exibidos</span><span className="tabular-nums">{filtered.length}</span>{hasActiveFilters ? <button type="button" onClick={clearFilters} className="font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Limpar filtros</button> : null}</p>
-          <span
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-bold ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}
-          >
-            {realtime.connectionState === "connected" ? (
-              <Wifi className="h-3.5 w-3.5" />
-            ) : (
-              <WifiOff className="h-3.5 w-3.5" />
-            )}
-            {realtime.isStale
-              ? "Dados aguardando atualização"
-              : realtime.connectionState === "connected"
-                ? "Sincronizado"
-                : "Reconectando"}
-          </span>
         </div>
       </header>
       <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={handleOperationalTabChange} />
-      <div className="grid grid-cols-3 gap-1 sm:hidden" role="tablist" aria-label="Etapas do kanban">
+      <div className="grid grid-cols-3 gap-1 xl:hidden" role="tablist" aria-label="Etapas do kanban">
         {ORDER_MANAGER_LANES.filter((lane) => operationalLanes.includes(lane.id)).map((lane) => {
           const style = LANE_STYLE[lane.id];
           const selected = activeMobileLane === lane.id;
-          return <button key={lane.id} type="button" role="tab" aria-selected={selected} onClick={() => setActiveMobileLane(lane.id)} className={`min-h-9 rounded-lg border px-1.5 py-1 text-left text-[9px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected ? `${style.badge} border-current/40` : 'border-border bg-card text-muted-foreground'}`}><span className="flex items-center justify-between gap-1"><span className="truncate">{lane.label}</span><span className="grid h-4 min-w-4 place-items-center rounded-full border border-current/20 text-[8px]">{grouped[lane.id].length}</span></span></button>;
+          return <button key={lane.id} type="button" role="tab" aria-selected={selected} onClick={() => setActiveMobileLane(lane.id)} className={`min-h-10 rounded-lg border px-2 py-1.5 text-left text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected ? `${style.badge} border-current/40` : 'border-border bg-card text-muted-foreground'}`}><span className="flex items-center justify-between gap-1"><span className="truncate">{lane.label}</span><span className="grid h-5 min-w-5 place-items-center rounded-full border border-current/20 text-[11px]">{grouped[lane.id].length}</span></span></button>;
         })}
       </div>
       {error ? (
@@ -538,7 +489,7 @@ export function OrderManagerV2Page() {
         </div>
       ) : (
         <section
-          className="space-y-2 pb-5 sm:-mx-3 sm:flex sm:snap-x sm:snap-mandatory sm:gap-3 sm:overflow-x-auto sm:overscroll-x-contain sm:scroll-px-3 sm:px-3 sm:pb-5 xl:mx-0 xl:grid xl:grid-cols-3 xl:overflow-visible xl:px-0"
+          className="space-y-2 pb-5 xl:grid xl:grid-cols-3 xl:gap-3 xl:space-y-0"
           aria-label="Kanban operacional"
         >
           {ORDER_MANAGER_LANES.filter((lane) => OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)).map((lane) => {
@@ -547,7 +498,7 @@ export function OrderManagerV2Page() {
             return (
               <section
                 key={lane.id}
-                className={`${activeMobileLane === lane.id ? 'block' : 'hidden'} min-h-[300px] w-full rounded-2xl border border-border bg-muted/15 sm:block sm:min-w-[22rem] sm:snap-start xl:min-w-0 ${style.rule}`}
+                className={`${activeMobileLane === lane.id ? 'block' : 'hidden'} min-h-[300px] w-full rounded-2xl border border-border bg-muted/15 xl:block ${style.rule}`}
               >
                 <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-3 py-2">
                   <div className="flex items-start gap-2">
@@ -619,7 +570,7 @@ function Metric({
   return (
     <div className="min-w-14 rounded-lg border border-border bg-background px-2 py-1 text-center">
       <p className={`text-sm font-black tabular-nums ${tone}`}>{value}</p>
-      <p className="text-[8px] font-black uppercase tracking-wider text-muted-foreground">
+      <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
     </div>
