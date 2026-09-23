@@ -1,3 +1,11 @@
+## PedeHub UI/UX Etapa 2B.1 — PDV (2026-09-23)
+
+- Branch: `feat/pedehub-pos-stage2b1`, isolada de `origin/main-copy` / `33bdb479dd5923b24576c44986ec46683e11aeb6`. Nenhum commit das PRs #99, #100 ou #101 foi incorporado.
+- O PDV preserva catálogo, modalidades, cliente, carrinho, comanda, frete, pagamento e criação de venda; a apresentação agora evidencia o fluxo produtos -> revisão -> finalizar. Em mobile há acesso ao dado de atendimento antes dos itens e retorno ao catálogo sem limpar o carrinho.
+- O carrinho vazio orienta para o catálogo. Junto a Fechar conta, uma explicação acessível reutiliza exclusivamente as condições já existentes: caixa, carrinho, cliente, endereço/frete delivery ou fallback genérico. A mutação, payload, cálculo, idempotência, permissões, rotas e regras de obrigatoriedade não mudaram.
+- O estado pendente comunica `Finalizando venda…`; a confirmação visual ocorre apenas no `onSuccess` real da API e não afirma pagamento ou impressão concluídos. Foram adicionados foco visível e nomes acessíveis a controles alterados.
+- Arquivos: `PosPage.tsx`, helper/teste de estado de finalização e teste de contrato visual estático do PDV. Testes focados: 2 arquivos/6 testes PASS. Lint, typecheck web-tenant, no-any, boundaries, theme, features, build web-tenant e diff check PASS; avaliação de design PASS. QA autenticado/visual em 320/768/1024/wide e CI remoto permanecem pendentes antes de merge/deploy.
+
 ## Operational Control Center (2026-09-13)
 
 - O Gestor V2 passou a reutilizar o board canônico para um cockpit compacto: estado operacional da loja, atalhos permissionados para taxas, Radar, caixa e mesas, e contadores de Delivery, Retirada e Comandas sem pedidos terminais ou dupla contagem.
