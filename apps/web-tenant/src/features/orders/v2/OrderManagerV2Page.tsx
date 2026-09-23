@@ -32,7 +32,6 @@ import {
   reconcileBoardOrder,
 } from "../order-reconciliation";
 import { useOrdersRealtimeState } from "../hooks/useOrdersRealtimeState";
-import { OrderCardV2 } from "./OrderCardV2";
 import ManagerOrderCard from './ManagerOrderCard';
 import { OrderDetailsModalV2 } from "./OrderDetailsModalV2";
 import { OperationalControlCenter, OperationalQuickActions } from './OperationalControlCenter';
