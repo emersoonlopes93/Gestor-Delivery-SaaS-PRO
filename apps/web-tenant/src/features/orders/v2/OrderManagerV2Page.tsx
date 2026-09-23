@@ -32,7 +32,8 @@ import {
   reconcileBoardOrder,
 } from "../order-reconciliation";
 import { useOrdersRealtimeState } from "../hooks/useOrdersRealtimeState";
-import { OrderCardV2 } from "./OrderCardV2";`r`nimport ManagerOrderCard from \"./ManagerOrderCard\";
+import { OrderCardV2 } from "./OrderCardV2";
+import ManagerOrderCard from './ManagerOrderCard';
 import { OrderDetailsModalV2 } from "./OrderDetailsModalV2";
 import { OperationalControlCenter, OperationalQuickActions } from './OperationalControlCenter';
 import { filterOrdersForOperationalTab, OPERATIONAL_TAB_LANES, type OperationalTab } from './operational-control-center';
