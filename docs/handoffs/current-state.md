@@ -1,3 +1,12 @@
+## PedeHub UI/UX Etapa 2A — Hoje e Painel de pedidos (2026-09-23)
+
+- Branch: `feat/pedehub-today-orders-stage2a`, isolada de `origin/main-copy` / `33bdb479dd5923b24576c44986ec46683e11aeb6`. Nenhum commit da PR #99 ou #100 foi incorporado.
+- Hoje reorganiza a leitura para Agora, resumo de período, fluxo e análises complementares: remove o KPI redundante `Em andamento`, mantém uma única apresentação primária de Receita concluída e restringe a área a `Pedidos aguardando ação`, que representa somente pedidos pendentes existentes.
+- O Gestor V2 passa a se apresentar como `Painel de pedidos`, separa `Resumo da operação` de `Pedidos exibidos`, explica vazio no canal/filtro ativo e mantém busca, origens, canais, etapas desktop/mobile, alertas/ACK, áudio, impressão, detalhe e ações retornadas pela API.
+- Cards priorizam canal, número, etapa, tempo, itens, alerta e próxima ação; dados de cliente, entrega, logística e valor continuam no detalhe. Alertas usam linguagem operacional sem eliminar gravidade/ACK. Sincronização somente aparece quando PENDING/FAILED e não afirma confirmação externa prematura; pedidos não terminais usam `Aberto há X` sem nova regra de atraso/lifecycle.
+- Contratos preservados: gates `reports.read`/módulo reports e `order_manager_v2`/`orders.use_kanban`; status, endpoints, DTOs, ações autorizadas, alertas e API não foram alterados. Arquivos: OperationsDashboard e testes; OrderManagerV2Page, OrderCardV2, OrderDetailsModalV2 e testes V2.
+- Validação local: 4 arquivos/28 testes PASS; lint web-tenant PASS; typecheck web-tenant PASS; check:no-any, boundaries e theme PASS; build web-tenant PASS; diff check PASS. Avaliação de design em três rodadas: PASS. QA visual/autenticado em 320/768/1024/wide e CI remoto permanecem pendentes antes de merge/deploy.
+
 ## Operational Control Center (2026-09-13)
 
 - O Gestor V2 passou a reutilizar o board canônico para um cockpit compacto: estado operacional da loja, atalhos permissionados para taxas, Radar, caixa e mesas, e contadores de Delivery, Retirada e Comandas sem pedidos terminais ou dupla contagem.

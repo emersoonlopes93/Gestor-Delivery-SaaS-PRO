@@ -35,13 +35,16 @@ describe('OperationsDashboard', () => {
       </MemoryRouter>,
     );
     expect(html).toContain('Loja aberta');
+    expect(html).toContain('Agora');
     expect(html).toContain('Receita concluída');
     expect(html).toContain('Pizza Margherita');
-    expect(html).toContain('Detalhamento por hora indisponível');
-    expect(html).toContain('operação');
-    expect(html).toContain('Atenção');
+    expect(html).toContain('Pedidos aguardando ação');
+    expect(html).toContain('Fluxo operacional');
+    expect(html).toContain('aguardando ação');
     expect(html).toContain('Cardápio');
-    expect(html).toContain('Fluxo nos últimos 7 dias');
+    expect(html).not.toContain('Fluxo nos últimos 7 dias');
+    expect(html).not.toContain('Em andamento');
+    expect((html.match(/Receita concluída/g) ?? [])).toHaveLength(1);
     expect(html).not.toContain('Ãƒ');
     expect(html).not.toContain('Tenant ID');
     expect(html).not.toContain('Permissões');

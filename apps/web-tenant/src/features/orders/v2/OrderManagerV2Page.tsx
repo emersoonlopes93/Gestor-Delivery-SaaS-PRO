@@ -57,7 +57,18 @@ import {
 } from "./order-alert-coordinator";
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
+const OPERATIONAL_TAB_LABELS: Record<OperationalTab, string> = {
+  delivery: 'Delivery',
+  pickup: 'Balcão',
+  dine_in: 'Comandas',
+};
 type OrderAlert = { id: string; orderId: string | null; ruleKey: string; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
+
+const alertSeverityLabel = (severity: OrderAlert['severity']) => {
+  if (severity === 'CRITICAL') return 'Ação imediata';
+  if (severity === 'ATTENTION') return 'Requer atenção';
+  return 'Informação';
+};
 type BoardLane = 'kitchen' | 'ready' | 'route';
 const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
 const LANE_STYLE = {
@@ -311,13 +322,19 @@ export function OrderManagerV2Page() {
     }),
     [filtered, grouped.route.length],
   );
+  const hasActiveFilters = query.trim().length > 0 || origin !== 'all';
+  const operationalContextLabel = OPERATIONAL_TAB_LABELS[operationalTab];
+  const clearFilters = () => {
+    setQuery('');
+    setOrigin('all');
+  };
 
   return (
     <main className="mx-auto max-w-[1800px] space-y-2 p-2 sm:space-y-3 sm:p-4">
       <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-1.5 shadow-sm sm:p-3">
         <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2 sm:p-3">
           <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
-            <div className="min-w-0 flex-1 sm:mr-auto sm:flex-none"><h1 className="text-base font-black tracking-tight text-foreground sm:text-xl">Painel de Operações</h1><p className="truncate text-[9px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
+            <div className="min-w-0 flex-1 sm:mr-auto sm:flex-none"><h1 className="text-base font-black tracking-tight text-foreground sm:text-xl">Painel de pedidos</h1><p className="truncate text-[9px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[9px] font-black sm:px-2.5 sm:py-2 sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
             <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-9 sm:w-9"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}</button>
           </div>
@@ -333,7 +350,7 @@ export function OrderManagerV2Page() {
             <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
             {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
               <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
-                <span className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alert.severity}</span>
+                <span data-severity={alert.severity} className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alertSeverityLabel(alert.severity)}<span className="sr-only">Severidade técnica: {alert.severity}</span></span>
                 <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
                 {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
                 {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
@@ -342,7 +359,9 @@ export function OrderManagerV2Page() {
           </section>
         ) : null}
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
-        <div className="grid grid-cols-4 gap-1 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
+        <section aria-labelledby="operation-summary-heading">
+          <p id="operation-summary-heading" className="mb-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Resumo da operação</p>
+          <div className="grid grid-cols-4 gap-1 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
           <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
           <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
@@ -351,14 +370,15 @@ export function OrderManagerV2Page() {
           <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} />
           <Metric label="iFood" value={intelligence.channels.IFOOD} />
           <Metric label="99Food" value={intelligence.channels.FOOD_99} />
-        </div>
+          </div>
+        </section>
         <div className="mt-2 hidden flex-col gap-2 sm:flex 2xl:flex-row 2xl:items-center 2xl:justify-end">
           <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
             </p>
             <h1 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">
-              Painel de Operações
+              Painel de pedidos
             </h1>
           </div>
           <div className="hidden">
@@ -477,6 +497,7 @@ export function OrderManagerV2Page() {
               </button>
             ))}
           </div>
+          <p className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground" aria-live="polite"><span className="font-black uppercase tracking-wide text-foreground">Pedidos exibidos</span><span className="tabular-nums">{filtered.length}</span>{hasActiveFilters ? <button type="button" onClick={clearFilters} className="font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Limpar filtros</button> : null}</p>
           <span
             className={`ml-auto inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-bold ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}
           >
@@ -563,7 +584,7 @@ export function OrderManagerV2Page() {
                   ))}
                   {grouped[lane.id].length === 0 ? (
                     <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border p-4 text-center text-xs font-bold text-muted-foreground">
-                      Sem pedidos nesta etapa
+                      <p>Sem pedidos em {lane.label.toLocaleLowerCase('pt-BR')} para {operationalContextLabel}{hasActiveFilters ? ' com os filtros atuais.' : '.'}</p>
                     </div>
                   ) : null}
                 </div>
