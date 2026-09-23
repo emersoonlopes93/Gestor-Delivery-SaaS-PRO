@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ChevronRight,
   CircleDollarSign,
   Printer,
   Radio,
@@ -9,7 +8,6 @@ import {
 } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderOperationalAction } from '@gestor/types';
 import {
-  ORDER_STATUS_PRESENTATION,
   presentOrderTime,
   providerLabel,
 } from '../order-presenters';
@@ -62,7 +60,6 @@ export default function ManagerOrderCard({
 }: Props) {
   const action = order.operational.primaryAction;
   const syncState = order.operational.syncState;
-  const status = ORDER_STATUS_PRESENTATION[order.status];
   const isTerminal = order.status === 'completed' || order.status === 'cancelled';
   const timing = presentOrderTime(order.createdAt, now);
   const elapsedLabel = isTerminal
@@ -83,12 +80,19 @@ export default function ManagerOrderCard({
       <div className="pointer-events-none relative p-3 pl-4">
         <header className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate font-mono text-[11px] font-black uppercase tracking-[0.14em] text-primary">
-              {providerLabel(order.operational)}
-            </p>
-            <h3 className="mt-1 text-lg font-black leading-none text-foreground">#{order.orderNumber}</h3>
+            <div className="flex items-center gap-1.5">
+              {order.operational.provider === 'PEDEHUB' && <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-black tracking-wide text-sky-500">PedeHub</span>}
+              {order.operational.provider === 'IFOOD' && <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-black italic tracking-wide text-red-500">iFood</span>}
+              {order.operational.provider === 'FOOD_99' && <span className="rounded bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-black italic tracking-wide text-yellow-500">99Food</span>}
+              {order.operational.provider !== 'PEDEHUB' && order.operational.provider !== 'IFOOD' && order.operational.provider !== 'FOOD_99' && (
+                <p className="truncate font-mono text-[11px] font-black uppercase tracking-[0.14em] text-primary">
+                  {providerLabel(order.operational)}
+                </p>
+              )}
+            </div>
+            <h3 className="mt-1 text-lg font-black leading-none text-foreground">{order.orderNumber.startsWith("#") ? order.orderNumber : "#" + order.orderNumber}</h3>
           </div>
-          <div className="flex max-w-[13rem] flex-wrap items-center justify-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {alertSeverity && onOpenAlert ? (
               <button
                 type="button"
@@ -118,9 +122,7 @@ export default function ManagerOrderCard({
           </div>
         </header>
 
-        <p className="mt-2 truncate text-[11px] font-bold uppercase tracking-wide text-muted-foreground" title={status.label}>
-          {status.label}
-        </p>
+        
         <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
           <p className="flex min-w-0 items-center gap-1.5 font-semibold text-foreground">
             <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -160,15 +162,22 @@ export default function ManagerOrderCard({
               type="button"
               disabled={isActionPending}
               onClick={(event) => { event.stopPropagation(); onAction(order, action); }}
-              className="pointer-events-auto relative z-10 inline-flex min-h-9 items-center gap-1 border border-primary bg-primary px-2.5 py-1.5 text-xs font-black uppercase tracking-wide text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+              className={`pointer-events-auto relative z-10 inline-flex min-h-8 items-center gap-1 rounded-md px-3 py-1.5 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-wait disabled:opacity-60 ${
+                action.targetStatus === 'preparing' ? 'bg-amber-500 text-amber-950 hover:bg-amber-400 focus-visible:ring-amber-500' :
+                action.targetStatus === 'ready_for_pickup' || action.targetStatus === 'ready_for_delivery' || action.targetStatus === 'out_for_delivery' ? 'bg-emerald-500 text-emerald-950 hover:bg-emerald-400 focus-visible:ring-emerald-500' :
+                'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary'
+              }`}
             >
               {isActionPending ? 'Atualizando…' : action.label}
-              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wide text-primary">
-              {action?.label ?? 'Detalhes'}<ChevronRight className="h-3.5 w-3.5" />
-            </span>
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); onOpen(order); }}
+              className="pointer-events-auto relative z-10 inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-700 bg-transparent px-3 py-1.5 text-xs font-bold text-slate-300 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            >
+              {action?.label ?? 'Acompanhar'}
+            </button>
           )}
         </footer>
       </div>
