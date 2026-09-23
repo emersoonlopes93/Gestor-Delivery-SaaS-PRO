@@ -1,3 +1,10 @@
+## PedeHub UI/UX — navegação clara e consistente (2026-09-23)
+
+- Branch isolada `feat/pedehub-uiux-navigation-stage1`, baseada em `origin/main-copy` no SHA `33bdb479dd5923b24576c44986ec46683e11aeb6`; nenhum commit da PR #99 foi incorporado.
+- A navegação agora prioriza o Painel de pedidos na sidebar desktop e na barra mobile, preservando Lista de pedidos, Kanban, Cozinha, rotas e gates existentes. O painel Mais remove somente destinos que já estão disponíveis para o mesmo perfil na barra inferior.
+- Metadados de navegação resolvem a seção pai de rotas contextuais, aplicam módulo junto de permissão e feature, e deixam Gestão/Canais visíveis quando ao menos um destino-filho é autorizado. QR Code é condicionado a `settings.manage`; o controle de Perfil deixa de aparentar ação sem destino.
+- Sem alteração de dados, permissões de negócio, rotas existentes, pedidos, marketplace, finanças, estoque, migrations ou deploy. Validação visual autenticada desktop/mobile permanece pendente; executar os gates locais e CI no SHA final antes de merge.
+
 ## Operational Control Center (2026-09-13)
 
 - O Gestor V2 passou a reutilizar o board canônico para um cockpit compacto: estado operacional da loja, atalhos permissionados para taxas, Radar, caixa e mesas, e contadores de Delivery, Retirada e Comandas sem pedidos terminais ou dupla contagem.

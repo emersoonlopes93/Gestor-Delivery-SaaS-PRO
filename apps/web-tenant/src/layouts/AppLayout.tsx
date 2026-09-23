@@ -20,7 +20,7 @@ import { addNativeNotificationClickListener } from '../lib/native-notifications'
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { OrderAlertTopbarButton } from '../features/orders/v2/OrderAlertTopbarButton';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
-import { filterSidebarNavigation, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
+import { filterSidebarNavigation, getActiveSidebarGroupId, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
 import type { SidebarNavigationGroup, SidebarNavigationItem } from '../navigation/navigation.types';
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
@@ -58,15 +58,6 @@ function isItemActive(item: SidebarNavigationItem, pathname: string): boolean {
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
-function firstActiveGroupId(groups: readonly SidebarNavigationGroup[], pathname: string): string | null {
-  for (const g of groups) {
-    for (const it of g.items) {
-      if (isItemActive(it, pathname)) return g.id;
-    }
-  }
-  return null;
-}
-
 function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperations, canReadOrders, canReadFinance, canReadCustomers }: {
   pathname: string;
   navigate: (to: string) => void;
@@ -77,7 +68,7 @@ function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperatio
   canReadCustomers: boolean;
 }) {
   const items = [
-    canUseOperations ? { label: 'Operações', to: '/orders/manager', icon: LayoutGrid, active: pathname === '/orders/manager' } : null,
+    canUseOperations ? { label: 'Painel de pedidos', to: '/orders/manager', icon: LayoutGrid, active: pathname === '/orders/manager' } : null,
     canReadOrders ? { label: 'Pedidos', to: '/orders', icon: ClipboardList, active: pathname === '/orders' || pathname === '/orders/board' } : null,
     canReadFinance ? { label: 'Financeiro', to: '/management/finance', icon: Wallet, active: pathname.startsWith('/management/finance') } : null,
     canReadCustomers ? { label: 'Clientes', to: '/customers', icon: Users, active: pathname.startsWith('/customers') } : null,
@@ -96,8 +87,8 @@ function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperatio
   );
 }
 
-function MobileMoreSheet({ groups, onNavigate, onClose }: { groups: readonly SidebarNavigationGroup[]; onNavigate: (to: string) => void; onClose: () => void }) {
-  const items = groups.flatMap((group) => group.items).filter((item) => !item.isExternal);
+function MobileMoreSheet({ groups, excludedDestinations, onNavigate, onClose }: { groups: readonly SidebarNavigationGroup[]; excludedDestinations: readonly string[]; onNavigate: (to: string) => void; onClose: () => void }) {
+  const items = groups.flatMap((group) => group.items).filter((item) => !item.isExternal && !excludedDestinations.includes(item.to));
   return <section className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-border bg-card p-4 pb-[max(1rem,var(--safe-area-bottom))] shadow-2xl md:hidden" aria-label="Mais opções de navegação" aria-modal="true" role="dialog">
     <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/35" />
     <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-black text-foreground">Mais opções</h2><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">Fechar</button></div>
@@ -111,10 +102,11 @@ function SidebarGroupView(props: {
   group: SidebarNavigationGroup;
   collapsed: boolean;
   isOpen: boolean;
-  isAnyItemActive: boolean;
+  isCurrentGroup: boolean;
+  pathname: string;
   onToggle: (groupId: string) => void;
 }) {
-  const { group, collapsed, isOpen, isAnyItemActive, onToggle } = props;
+  const { group, collapsed, isOpen, isCurrentGroup, pathname, onToggle } = props;
 
   return (
     <div className="select-none">
@@ -122,7 +114,9 @@ function SidebarGroupView(props: {
         <button
           type="button"
           onClick={() => onToggle(group.id)}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 group ${isAnyItemActive
+          aria-expanded={isOpen}
+          aria-controls={`sidebar-group-${group.id}`}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 group ${isCurrentGroup
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -142,11 +136,13 @@ function SidebarGroupView(props: {
       )}
 
       <div
+        id={`sidebar-group-${group.id}`}
         className={`overflow-hidden transition-[max-height,opacity] duration-200 ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
           }`}
       >
         <div className="mt-1 space-y-1">
           {group.items.map((item) => {
+            const itemActive = isItemActive(item, pathname);
             if (item.isExternal) {
               return (
                 <a
@@ -170,21 +166,22 @@ function SidebarGroupView(props: {
               <NavLink
                 key={item.id}
                 to={item.to}
+                aria-current={itemActive ? 'page' : undefined}
                 title={collapsed ? item.label : undefined}
-                className={({ isActive }) => {
-                  return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
+                className={() => {
+                  return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${itemActive
                     ? 'bg-muted/80 text-foreground'
                     : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
-                {({ isActive }) => (
+                {() => (
                   <>
-                    {isActive && !collapsed && (
+                    {itemActive && !collapsed && (
                       <span className="absolute -left-3 top-[18%] bottom-[18%] w-[3px] bg-primary rounded-r-full" aria-hidden />
                     )}
                     <span
-                      className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
+                      className={`flex items-center justify-center transition-colors duration-300 ${itemActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
                       aria-hidden
                     >
                       <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
@@ -331,10 +328,18 @@ export function AppLayout() {
   }, [collapsed, openGroups]);
 
   const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
+  const hasEnabledModule = useCallback((module?: string) => !module || user?.enabledModules?.includes(module) === true, [user?.enabledModules]);
   const canUseOperations = Boolean(isFeatureVisible?.(undefined, 'order_manager_v2')) && hasPermission(userPermissions, 'orders.use_kanban');
   const canReadOrders = hasPermission(userPermissions, 'orders.read');
-  const canReadFinance = hasPermission(userPermissions, 'finance.read');
-  const canReadCustomers = hasPermission(userPermissions, 'crm.read');
+  const canReadFinance = hasPermission(userPermissions, 'finance.read') && hasEnabledModule('finance');
+  const canReadCustomers = hasPermission(userPermissions, 'crm.read') && hasEnabledModule('crm');
+  const canManageSettings = hasPermission(userPermissions, 'settings.manage');
+  const mobileDestinations = [
+    canUseOperations ? '/orders/manager' : null,
+    canReadOrders ? '/orders' : null,
+    canReadFinance ? '/management/finance' : null,
+    canReadCustomers ? '/customers' : null,
+  ].filter((destination): destination is string => destination !== null);
   const tenantSlug = user?.tenant?.slug;
   const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
 
@@ -378,11 +383,12 @@ export function AppLayout() {
       SIDEBAR_GROUPS,
       (featureFlag, featureKey) => isFeatureVisible ? isFeatureVisible(featureFlag, featureKey) : !featureFlag || String(import.meta.env[featureFlag]).toLowerCase() === 'true',
       (permission) => !permission || hasPermission(userPermissions, permission),
+      hasEnabledModule,
     );
-  }, [isFeatureVisible, userPermissions]);
+  }, [hasEnabledModule, isFeatureVisible, userPermissions]);
 
   const activeGroupId = useMemo(() => {
-    return firstActiveGroupId(groups, location.pathname);
+    return getActiveSidebarGroupId(location.pathname, groups);
   }, [groups, location.pathname]);
 
   const setAccordionOpenGroup = useCallback((groupId: string) => {
@@ -397,8 +403,7 @@ export function AppLayout() {
 
   useEffect(() => {
     if (!activeGroupId) return;
-    setOpenGroups((prev) => {
-      if (prev[activeGroupId]) return prev;
+    setOpenGroups(() => {
       const next: Record<string, boolean> = {};
       for (const g of SIDEBAR_GROUPS) next[g.id] = false;
       next[activeGroupId] = true;
@@ -525,7 +530,7 @@ export function AppLayout() {
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
       ) : null}
 
-      {isMobileOpen ? <MobileMoreSheet groups={groups} onClose={closeMobile} onNavigate={(to) => { closeMobile(); navigate(to); }} /> : null}
+      {isMobileOpen ? <MobileMoreSheet groups={groups} excludedDestinations={mobileDestinations} onClose={closeMobile} onNavigate={(to) => { closeMobile(); navigate(to); }} /> : null}
 
       <aside
         className={`tenant-sidebar safe-top safe-bottom hidden flex-col transition-[width,background-color] duration-200 ease-out md:static md:flex ${collapsed ? 'w-[72px]' : 'w-64'}`}
@@ -626,7 +631,7 @@ export function AppLayout() {
               />
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-1.5 w-full">
+              <div className={`grid w-full gap-1.5 ${canManageSettings ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <a
                   href={publicMenuUrl}
                   target="_blank"
@@ -636,14 +641,14 @@ export function AppLayout() {
                   <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">CardÃ¡pio</span>
                 </a>
-                <button
+                {canManageSettings ? <button
                   type="button"
                   onClick={() => navigate('/settings/qr-codes')}
                   className="flex flex-row items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all group shadow-sm h-[34px]"
                 >
                   <QrCode className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">QR Code</span>
-                </button>
+                </button> : null}
               </div>
             </>
           )}
@@ -652,14 +657,14 @@ export function AppLayout() {
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
           {groups.map((group) => {
             const isOpen = openGroups[group.id] ?? false;
-            const isAnyItemActive = group.items.some((it) => isItemActive(it, location.pathname));
             return (
               <SidebarGroupView
                 key={group.id}
                 group={group}
                 collapsed={collapsed}
                 isOpen={collapsed ? true : isOpen}
-                isAnyItemActive={isAnyItemActive}
+                isCurrentGroup={group.id === activeGroupId}
+                pathname={location.pathname}
                 onToggle={toggleGroup}
               />
             );
@@ -709,17 +714,12 @@ export function AppLayout() {
                 {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
               </button>
 
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-card p-1 sm:pr-3 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm select-none"
-                title="Perfil"
-              >
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card p-1 sm:pr-3 text-xs font-bold text-foreground shadow-sm select-none">
                 <div className="w-6 h-6 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
                   <UserCircle className="h-4 w-4" aria-hidden />
                 </div>
                 <span className="hidden min-[1150px]:inline truncate max-w-[120px]">{user?.name || 'Conta'}</span>
-                <ChevronRight className="hidden min-[1150px]:inline h-3 w-3 text-muted-foreground rotate-90" aria-hidden />
-              </button>
+              </div>
             </div>
           </div>
         </header>

@@ -22,6 +22,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   item({ id: 'catalog.upsells', label: 'Upsells', path: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS', featureKey: 'upsells' }),
   item({ id: 'inventory.home', label: 'Estoque', path: '/inventory', icon: ClipboardList, permission: 'inventory.read', module: 'inventory', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' }),
   item({ id: 'orders.list', label: 'Pedidos', path: '/orders', icon: ClipboardList, permission: 'orders.read', match: (p) => p === '/orders' }),
+  item({ id: 'orders.manager', label: 'Painel de pedidos', path: '/orders/manager', icon: LayoutGrid, permission: 'orders.use_kanban', featureKey: 'order_manager_v2', match: (p) => p === '/orders/manager' }),
   item({ id: 'orders.board', label: 'Kanban', path: '/orders/board', icon: BarChart3, permission: 'orders.use_kanban' }),
   item({ id: 'orders.kds', label: 'Cozinha (KDS)', path: '/orders/kds', icon: ChefHat, permission: 'kds.use', featureKey: 'kds' }),
   item({ id: 'orders.automation', label: 'Automação de Pedidos', path: '/orders/settings/automation', icon: Bot, permission: 'orders.settings.manage' }),
@@ -33,12 +34,12 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   item({ id: 'pos.tables', label: 'Mesas', path: '/pos/tables', icon: QrCode, permission: 'pos.read', featureKey: 'dine_in' }),
   item({ id: 'pos.printers', label: 'Impressão', path: '/pos/printers', icon: Printer, permission: 'settings.manage', featureKey: 'printing' }),
   item({ id: 'cash.home', label: 'Caixa e Fechamento', path: '/cash', icon: Wallet, permission: 'cash.read', parentId: 'management.finance' }),
-  item({ id: 'management.hub', label: 'Gestão', hubDescription: 'Acompanhe indicadores, metas, desempenho, análises e equipe.', path: '/management', icon: ChartLine }),
+  item({ id: 'management.hub', label: 'Gestão', hubDescription: 'Acompanhe indicadores, metas, desempenho, análises e equipe.', path: '/management', icon: ChartLine, childAccessItemIds: ['analytics.goals', 'analytics.performance', 'analytics.bi', 'management.employees'], match: (p) => p === '/management' }),
   item({ id: 'management.employees', label: 'Equipe', hubDescription: 'Gerencie funcionários e acessos da loja.', path: '/management/employees', icon: Users, permission: 'users.read', parentId: 'management.hub' }),
   item({ id: 'management.suppliers', label: 'Fornecedores', hubDescription: 'Organize fornecedores e dados de compra.', path: '/management/suppliers', icon: Truck, permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' }),
   item({ id: 'management.purchases', label: 'Compras', hubDescription: 'Registre entradas e reposições de insumos.', path: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read', module: 'purchasing', parentId: 'inventory.home' }),
   item({ id: 'management.finance', label: 'Financeiro', hubLabel: 'Visão', hubDescription: 'Acompanhe lançamentos e o resultado do negócio.', path: '/management/finance', icon: Wallet, permission: 'finance.read', module: 'finance', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' }),
-  item({ id: 'channels.hub', label: 'Canais e Relacionamento', path: '/channels', icon: Link2, permission: 'orders.read' }),
+  item({ id: 'channels.hub', label: 'Canais e Relacionamento', path: '/channels', icon: Link2, childAccessItemIds: ['settings.storefront', 'settings.integrations', 'whatsapp.inbox', 'whatsapp.config', 'crm.customers', 'crm.dashboard', 'crm.promotions', 'campaigns.home', 'marketing.automations'], match: (p) => p === '/channels' }),
   item({ id: 'crm.customers', label: 'Clientes', hubDescription: 'Acompanhe clientes e seu histórico de pedidos.', path: '/customers', icon: Users, permission: 'crm.read', module: 'crm', parentId: 'channels.hub' }),
   item({ id: 'crm.dashboard', label: 'CRM Avançado', hubDescription: 'Analise a base de clientes e oportunidades.', path: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED', featureKey: 'crm_enterprise', parentId: 'channels.hub' }),
   item({ id: 'marketing.automations', label: 'Automações', hubDescription: 'Defina jornadas automáticas de relacionamento.', path: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns', parentId: 'channels.hub' }),
@@ -68,7 +69,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
 ];
 
 export const NAVIGATION_GROUPS: readonly NavigationGroup[] = [
-  { id: 'operations', label: 'Operação', itemIds: ['dashboard.overview', 'orders.list', 'orders.board', 'orders.kds', 'pos.home', 'pos.tables', 'cash.home', 'delivery.dispatch', 'delivery.map', 'delivery.drivers', 'delivery.zones'] },
+  { id: 'operations', label: 'Operação', itemIds: ['dashboard.overview', 'orders.manager', 'orders.list', 'orders.board', 'orders.kds', 'pos.home', 'pos.tables', 'cash.home', 'delivery.dispatch', 'delivery.map', 'delivery.drivers', 'delivery.zones'] },
   { id: 'catalog-production', label: 'Cardápio e Produção', itemIds: ['catalog.products', 'catalog.categories', 'catalog.option-groups', 'catalog.combos', 'catalog.upsells', 'inventory.home'] },
   { id: 'finance', label: 'Financeiro', itemIds: ['management.finance'] },
   { id: 'management', label: 'Gestão', itemIds: ['management.hub'] },
@@ -93,17 +94,31 @@ export function getNavigationItems(itemIds: readonly string[]): readonly Navigat
   });
 }
 
+export function isNavigationItemVisible(
+  entry: NavigationItem,
+  isFeatureVisible: (featureFlag?: string, featureKey?: string) => boolean,
+  hasPermission: (permission?: string) => boolean,
+  hasModule: (module?: string) => boolean,
+): boolean {
+  if (entry.childAccessItemIds) {
+    return entry.childAccessItemIds.some((itemId) => {
+      const child = itemsById.get(itemId);
+      return child ? isNavigationItemVisible(child, isFeatureVisible, hasPermission, hasModule) : false;
+    });
+  }
+
+  return isFeatureVisible(entry.featureFlag, entry.featureKey)
+    && hasPermission(entry.permission)
+    && hasModule(entry.module);
+}
+
 export function filterNavigationItems(
   items: readonly NavigationItem[],
   isFeatureVisible: (featureFlag?: string, featureKey?: string) => boolean,
   hasPermission: (permission?: string) => boolean,
   hasModule: (module?: string) => boolean,
 ): readonly NavigationItem[] {
-  return items.filter((entry) => (
-    isFeatureVisible(entry.featureFlag, entry.featureKey)
-    && hasPermission(entry.permission)
-    && hasModule(entry.module)
-  ));
+  return items.filter((entry) => isNavigationItemVisible(entry, isFeatureVisible, hasPermission, hasModule));
 }
 
 export function matchNavigationItem(entry: NavigationItem, pathname: string): boolean {
@@ -123,6 +138,22 @@ export function getBreadcrumbMetadata(pathname: string): BreadcrumbMetadata {
     : { label: entry.label };
 }
 
+function sidebarGroupIdForEntry(entry: NavigationItem): string | null {
+  const directGroup = NAVIGATION_GROUPS.find((group) => group.itemIds.includes(entry.id));
+  if (directGroup) return directGroup.id;
+  const parent = entry.parentId ? itemsById.get(entry.parentId) : undefined;
+  return parent ? sidebarGroupIdForEntry(parent) : null;
+}
+
+export function getActiveSidebarGroupId(
+  pathname: string,
+  groups: readonly SidebarNavigationGroup[],
+): string | null {
+  const entry = getNavigationItem(pathname);
+  const groupId = entry ? sidebarGroupIdForEntry(entry) : null;
+  return groupId && groups.some((group) => group.id === groupId) ? groupId : null;
+}
+
 export function getSidebarNavigation(): readonly SidebarNavigationGroup[] {
   return NAVIGATION_GROUPS.map((group) => ({
     id: group.id,
@@ -130,7 +161,7 @@ export function getSidebarNavigation(): readonly SidebarNavigationGroup[] {
     items: group.itemIds.map((id) => {
       const entry = itemsById.get(id);
       if (!entry?.icon) throw new Error(`Sidebar navigation item ${id} is missing`);
-      return { id: entry.id, label: entry.label, to: entry.path, icon: entry.icon, permission: entry.permission, featureFlag: entry.featureFlag, featureKey: entry.featureKey, match: entry.match };
+      return { id: entry.id, label: entry.label, to: entry.path, icon: entry.icon, permission: entry.permission, module: entry.module, featureFlag: entry.featureFlag, featureKey: entry.featureKey, childAccessItemIds: entry.childAccessItemIds, match: entry.match };
     }),
   }));
 }
@@ -139,9 +170,13 @@ export function filterSidebarNavigation(
   groups: readonly SidebarNavigationGroup[],
   isFeatureVisible: (featureFlag?: string, featureKey?: string) => boolean,
   hasPermission: (permission?: string) => boolean,
+  hasModule: (module?: string) => boolean,
 ): readonly SidebarNavigationGroup[] {
   return groups.flatMap((group) => {
-    const items = group.items.filter((entry) => isFeatureVisible(entry.featureFlag, entry.featureKey) && hasPermission(entry.permission));
+    const items = group.items.filter((entry) => {
+      const definition = itemsById.get(entry.id);
+      return definition ? isNavigationItemVisible(definition, isFeatureVisible, hasPermission, hasModule) : false;
+    });
     return items.length ? [{ ...group, items }] : [];
   });
 }

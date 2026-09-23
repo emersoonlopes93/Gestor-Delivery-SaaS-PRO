@@ -1,5 +1,6 @@
 import {
   filterSidebarNavigation,
+  getActiveSidebarGroupId,
   getBreadcrumbMetadata,
   getNavigationItem,
   getNavigationItems,
@@ -13,7 +14,7 @@ describe('navigation registry', () => {
   it('projects the six manager-workflow groups through the navigation hubs', () => {
     const sidebar = getSidebarNavigation();
     expect(sidebar).toHaveLength(6);
-    expect(sidebar.flatMap((group) => group.items)).toHaveLength(28);
+    expect(sidebar.flatMap((group) => group.items)).toHaveLength(29);
     expect(NAVIGATION_ITEMS.map((entry) => entry.id)).toEqual(expect.arrayContaining([
       'dashboard.overview', 'orders.kds', 'inventory.home', 'management.purchases', 'analytics.reports', 'settings.integrations', 'channels.hub', 'management.hub',
     ]));
@@ -27,7 +28,7 @@ describe('navigation registry', () => {
   });
 
   it('keeps the current guards and filters sidebar entries without changing their order', () => {
-    const filtered = filterSidebarNavigation(getSidebarNavigation(), (_flag, key) => key !== 'kds', (permission) => permission !== 'billing.read');
+    const filtered = filterSidebarNavigation(getSidebarNavigation(), (_flag, key) => key !== 'kds', (permission) => permission !== 'billing.read', () => true);
     expect(filtered.find((group) => group.id === 'settings')?.items.map((entry) => entry.id)).not.toContain('billing.plan');
     expect(filtered.find((group) => group.id === 'operations')?.items.map((entry) => entry.id)).not.toContain('orders.kds');
   });
@@ -35,6 +36,7 @@ describe('navigation registry', () => {
   it('preserves representative permission and feature contracts used by desktop and mobile sidebar projection', () => {
     const byId = new Map(NAVIGATION_ITEMS.map((entry) => [entry.id, entry]));
     expect(byId.get('orders.kds')).toMatchObject({ permission: 'kds.use', featureKey: 'kds' });
+    expect(byId.get('orders.manager')).toMatchObject({ permission: 'orders.use_kanban', featureKey: 'order_manager_v2' });
     expect(byId.get('analytics.bi')).toMatchObject({ permission: 'reports.read', featureKey: 'bi_advanced' });
     expect(byId.get('analytics.goals')).toMatchObject({ permission: 'goals.read', featureKey: 'goals' });
     expect(byId.get('campaigns.home')).toMatchObject({ permission: 'crm.manage_coupons', featureKey: 'campaigns' });
@@ -65,7 +67,7 @@ describe('navigation registry', () => {
 
   it('keeps hub card entries subject to their original permission and feature metadata', () => {
     const byId = new Map(NAVIGATION_ITEMS.map((entry) => [entry.id, entry]));
-    expect(byId.get('channels.hub')).toMatchObject({ permission: 'orders.read', path: '/channels' });
+    expect(byId.get('channels.hub')).toMatchObject({ path: '/channels', childAccessItemIds: expect.arrayContaining(['crm.customers', 'whatsapp.inbox']) });
     expect(byId.get('management.hub')).toMatchObject({ path: '/management' });
     expect(byId.get('analytics.reports')).toMatchObject({
       path: '/analytics/reports',
@@ -94,6 +96,36 @@ describe('navigation registry', () => {
     );
 
     expect(visible.map((entry) => entry.id)).toEqual(['settings.integrations', 'whatsapp.inbox']);
+  });
+
+  it('keeps route context ahead of saved sidebar state and respects module access', () => {
+    const sidebar = getSidebarNavigation();
+    expect(getActiveSidebarGroupId('/management/finance', sidebar)).toBe('finance');
+    expect(getActiveSidebarGroupId('/analytics/reports', sidebar)).toBe('finance');
+    expect(getActiveSidebarGroupId('/analytics/goals', sidebar)).toBe('management');
+    expect(getActiveSidebarGroupId('/analytics/performance', sidebar)).toBe('management');
+    expect(getActiveSidebarGroupId('/customers', sidebar)).toBe('channels');
+    expect(getActiveSidebarGroupId('/campaigns', sidebar)).toBe('channels');
+    expect(getActiveSidebarGroupId('/promotions', sidebar)).toBe('channels');
+
+    const visible = filterSidebarNavigation(
+      sidebar,
+      () => true,
+      () => true,
+      (module) => module !== 'inventory' && module !== 'finance',
+    );
+    expect(visible.find((group) => group.id === 'catalog-production')?.items.map((item) => item.id)).not.toContain('inventory.home');
+    expect(visible.map((group) => group.id)).not.toContain('finance');
+  });
+
+  it('exposes Channels when a child destination is authorized without orders.read', () => {
+    const visible = filterSidebarNavigation(
+      getSidebarNavigation(),
+      () => true,
+      (permission) => permission === 'crm.read',
+      () => true,
+    );
+    expect(visible.find((group) => group.id === 'channels')?.items.map((item) => item.id)).toEqual(['channels.hub']);
   });
 
   it('keeps the management landing functional for partial access and preserves old route metadata', () => {
