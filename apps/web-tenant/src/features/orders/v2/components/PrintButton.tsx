@@ -1,3 +1,4 @@
+import React from 'react';
 import { Printer } from 'lucide-react';
 
 export default function PrintButton({ className, ariaLabel = 'Imprimir' }: { className?: string; ariaLabel?: string }) {
