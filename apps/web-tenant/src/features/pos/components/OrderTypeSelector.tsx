@@ -35,7 +35,7 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
   onTypeChange,
 }) => {
   return (
-    <div className="grid grid-cols-4 gap-2 w-full sm:w-auto">
+    <div className="grid grid-cols-4 gap-2 w-full sm:w-auto shrink-0">
       {ORDER_TYPES.map((type) => {
         const Icon = type.icon;
         const isActive = currentType === type.id;
@@ -46,10 +46,10 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
             type="button"
             onClick={() => onTypeChange(type.id)}
             className={`
-              flex min-w-[76px] sm:min-w-[88px] flex-col items-center justify-center rounded-xl border px-3 py-2.5 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary
+              flex min-w-[72px] sm:min-w-[84px] flex-col items-center justify-center rounded-xl border px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary
               ${isActive
-                ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/10 font-bold'
-                : 'border-border/60 bg-card/60 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground'}
+                ? 'border-primary bg-primary/15 text-primary shadow-md shadow-primary/15 font-extrabold ring-1 ring-primary/40'
+                : 'border-border/70 bg-card/70 text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground'}
             `}
           >
             <Icon size={18} className="shrink-0" />

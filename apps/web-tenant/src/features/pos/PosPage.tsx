@@ -24,7 +24,10 @@ import {
   Receipt,
   UserPlus,
   Package,
-  CircleAlert
+  CircleAlert,
+  Trash2,
+  Clock,
+  CreditCard
 } from 'lucide-react';
 
 // New Components
@@ -720,7 +723,7 @@ export default function PosPage() {
                </div>
 
                {/* Search & Modalities Row */}
-               <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                  <div className="relative flex-1 group w-full">
                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={16} />
                    <input
@@ -938,7 +941,7 @@ export default function PosPage() {
                         </button>
                       </div>
                       <button onClick={() => removeFromCart(item.cartLineId)} aria-label={`Remover ${item.name}`} className="text-muted-foreground hover:text-destructive p-1 transition-colors">
-                        <X size={14} />
+                        <Trash2 size={14} className="text-destructive/80 hover:text-destructive" />
                       </button>
                     </div>
                   </div>
@@ -1002,11 +1005,22 @@ export default function PosPage() {
             </div>
           )}
 
-          {!canFinalizeSale && !createSale.isPending && (
+          {!canFinalizeSale && !createSale.isPending ? (
             <p id="pos-finish-requirement" className="flex items-start gap-2 rounded-xl border border-border bg-muted/40 p-2.5 text-xs font-medium leading-snug text-muted-foreground">
               <CircleAlert size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
               {finishBlocker}
             </p>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/10 p-2.5 text-xs font-medium text-primary">
+              <div className="flex items-center gap-2 min-w-0">
+                <Clock size={15} className="shrink-0 text-primary" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-primary/80">Próximo passo</p>
+                  <p className="text-xs font-bold text-primary truncate">Confirme o pedido e finalize a conta para prosseguir.</p>
+                </div>
+              </div>
+              <ChevronRight size={15} className="shrink-0 text-primary" />
+            </div>
           )}
 
           <button
@@ -1015,7 +1029,8 @@ export default function PosPage() {
             aria-describedby={!canFinalizeSale ? 'pos-finish-requirement' : undefined}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-3.5 rounded-2xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 text-sm sm:text-base transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
           >
-             {createSale.isPending ? 'Finalizando venda…' : 'FECHAR CONTA (F4)'}
+             <CreditCard size={18} />
+             {createSale.isPending ? 'Finalizando venda…' : 'Fechar conta (F4)'}
              <ChevronRight size={18} strokeWidth={3} />
           </button>
         </div>
