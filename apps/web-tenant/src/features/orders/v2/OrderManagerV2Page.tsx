@@ -102,6 +102,7 @@ export function OrderManagerV2Page() {
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<OrderAlert[]>([]);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsRef = useRef<HTMLDivElement>(null);
   const [cockpitCollapsed, setCockpitCollapsed] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem(COCKPIT_COLLAPSED_STORAGE_KEY) === "true");
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -143,10 +144,36 @@ export function OrderManagerV2Page() {
   }, []);
 
   useEffect(() => {
-    const openAlertCenter = () => { setAlertsOpen(true); void fetchAlerts(); };
-    window.addEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
-    return () => window.removeEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
+    const toggleAlertCenter = () => {
+      setAlertsOpen((current) => {
+        if (!current) void fetchAlerts();
+        return !current;
+      });
+    };
+    window.addEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, toggleAlertCenter);
+    return () => window.removeEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, toggleAlertCenter);
   }, [fetchAlerts]);
+
+  useEffect(() => {
+    if (!alertsOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAlertsOpen(false);
+    };
+    const handleClickOutside = (event: MouseEvent) => {
+      if (alertsRef.current && !alertsRef.current.contains(event.target as Node)) {
+        setAlertsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    const timer = setTimeout(() => {
+      window.addEventListener("click", handleClickOutside);
+    }, 50);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("click", handleClickOutside);
+      clearTimeout(timer);
+    };
+  }, [alertsOpen]);
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     const response = await api.patch<OrderAlert>(`/order-alerts/${alertId}/acknowledge`, {});
@@ -328,16 +355,97 @@ export function OrderManagerV2Page() {
           </div>
         </div>
         {alertsOpen ? (
-          <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
-            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
-            {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
-              <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
-                <span data-severity={alert.severity} className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alertSeverityLabel(alert.severity)}<span className="sr-only">Severidade técnica: {alert.severity}</span></span>
-                <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
-                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
-                {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
+          <section
+            ref={alertsRef}
+            role="dialog"
+            aria-label="Central de alertas"
+            className="fixed top-14 right-3 sm:right-6 z-50 flex w-[380px] sm:w-[420px] max-w-[calc(100vw-24px)] flex-col rounded-2xl border border-border bg-card shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between border-b border-border p-3 sm:px-4 bg-card/80 rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <BellRing className="h-4 w-4 text-primary" />
+                <p className="text-xs font-black uppercase tracking-wider text-foreground">Central de alertas</p>
               </div>
-            ))}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="text-xs font-bold text-primary hover:underline focus-visible:outline-none"
+                  onClick={() => void fetchAlerts()}
+                >
+                  Atualizar
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none"
+                  onClick={() => setAlertsOpen(false)}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[min(480px,65vh)] overflow-y-auto p-3 space-y-2 divide-y divide-border/40">
+              {alerts.length === 0 ? (
+                <p className="py-4 text-center text-xs font-medium text-muted-foreground">
+                  Nenhum alerta operacional no histórico recente.
+                </p>
+              ) : (
+                alerts.map((alert) => (
+                  <div key={alert.id} className="pt-2.5 first:pt-0 pb-1 flex items-start gap-2.5">
+                    <span
+                      data-severity={alert.severity}
+                      className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                        alert.severity === "CRITICAL"
+                          ? "bg-destructive/10 text-destructive border border-destructive/20"
+                          : alert.severity === "ATTENTION"
+                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                          : "bg-primary/10 text-primary border border-primary/20"
+                      }`}
+                    >
+                      {alertSeverityLabel(alert.severity)}
+                      <span className="sr-only">Severidade técnica: {alert.severity}</span>
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold leading-snug text-foreground break-words">{alert.title}</p>
+                      <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
+                        {alert.state === "RECOVERED"
+                          ? "Recuperado"
+                          : alert.acknowledgedAt
+                          ? "Reconhecido"
+                          : "Pendente"}{" "}
+                        · {new Date(alert.lastSeenAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                      {alert.orderId ? (
+                        <button
+                          type="button"
+                          className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary hover:text-primary-foreground transition"
+                          onClick={() => {
+                            const found = ordersRef.current.find((order) => order.id === alert.orderId);
+                            if (found) setSelected(found);
+                            setAlertsOpen(false);
+                          }}
+                        >
+                          Abrir
+                        </button>
+                      ) : null}
+                      {alert.state === "ACTIVE" && !alert.acknowledgedAt ? (
+                        <button
+                          type="button"
+                          className="rounded-md border border-border px-2 py-1 text-[11px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                          onClick={() => void acknowledgeAlert(alert.id)}
+                        >
+                          ACK
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </section>
         ) : null}
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
