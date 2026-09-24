@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Bike, Users, Store } from 'lucide-react';
+import { ShoppingBag, Truck, Users, Store } from 'lucide-react';
 import { PosFulfillmentType } from '@gestor/types';
 
 interface OrderTypeSelectorProps {
@@ -12,25 +12,21 @@ const ORDER_TYPES = [
     id: PosFulfillmentType.DINE_IN,
     label: 'Balcão',
     icon: Store,
-    color: 'emerald',
   },
   {
     id: PosFulfillmentType.TABLE,
     label: 'Mesa',
     icon: Users,
-    color: 'emerald',
   },
   {
     id: PosFulfillmentType.PICKUP,
     label: 'Retirada',
     icon: ShoppingBag,
-    color: 'indigo',
   },
   {
     id: PosFulfillmentType.DELIVERY,
     label: 'Delivery',
-    icon: Bike,
-    color: 'amber',
+    icon: Truck,
   },
 ];
 
@@ -39,29 +35,25 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
   onTypeChange,
 }) => {
   return (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div className="grid grid-cols-4 gap-2 w-full sm:w-auto">
       {ORDER_TYPES.map((type) => {
         const Icon = type.icon;
         const isActive = currentType === type.id;
-        const colors = {
-          emerald: 'bg-status-success/10 border-status-success text-status-success shadow-status-success/10',
-          indigo: 'bg-primary/10 border-primary text-primary shadow-primary/10',
-          amber: 'bg-status-warning/10 border-status-warning text-status-warning shadow-status-warning/10',
-        };
 
         return (
           <button
             key={type.id}
+            type="button"
             onClick={() => onTypeChange(type.id)}
             className={`
-              flex flex-col items-center justify-center p-1.5 rounded-xl border-2 transition-all duration-200
-              ${isActive 
-                ? `${colors[type.color as keyof typeof colors]} shadow-lg` 
-                : 'bg-card border-border text-muted-foreground hover:border-primary hover:bg-muted'}
+              flex min-w-[76px] sm:min-w-[88px] flex-col items-center justify-center rounded-xl border px-3 py-2.5 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary
+              ${isActive
+                ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/10 font-bold'
+                : 'border-border/60 bg-card/60 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground'}
             `}
           >
-            <Icon size={20} className={isActive ? 'animate-bounce' : ''} />
-            <span className="text-xs font-bold mt-1 uppercase tracking-tight">{type.label}</span>
+            <Icon size={18} className="shrink-0" />
+            <span className="mt-1 text-[11px] font-bold tracking-tight">{type.label}</span>
           </button>
         );
       })}

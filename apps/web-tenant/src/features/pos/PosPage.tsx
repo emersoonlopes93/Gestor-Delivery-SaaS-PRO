@@ -23,7 +23,7 @@ import {
   Printer,
   Receipt,
   UserPlus,
-  MapPin,
+  Package,
   CircleAlert
 } from 'lucide-react';
 
@@ -140,7 +140,7 @@ export default function PosPage() {
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<PosFulfillmentType>(PosFulfillmentType.DINE_IN);
-  const [selectedCategoryId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   
   // Mesa Fields
   const [tableNumber, setTableNumber] = useState('');
@@ -217,6 +217,22 @@ export default function PosPage() {
     },
     refetchOnWindowFocus: false,
   });
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    (products || []).forEach(p => {
+      if (p.categoryName) set.add(p.categoryName);
+    });
+    return ['Todos', ...Array.from(set)];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return (products || []).filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'Todos' || p.categoryName === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, selectedCategory]);
 
   const { data: salonTables, isLoading: salonLoading } = useQuery<SalonTable[]>({
     queryKey: ['posSalon'],
@@ -433,18 +449,6 @@ export default function PosPage() {
     }
   };
 
-  useMemo(() => {
-    if (!products) return [];
-    const catsMap = new Map<string, { id: string; name: string }>();
-    products.forEach(p => { if (!catsMap.has(p.categoryId)) catsMap.set(p.categoryId, { id: p.categoryId, name: p.categoryName }); });
-    return Array.from(catsMap.values());
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    if (!products) return [];
-    if (!selectedCategoryId) return products;
-    return products.filter(p => p.categoryId === selectedCategoryId);
-  }, [products, selectedCategoryId]);
 
   const addToCart = useCallback((product: CatalogProduct) => {
     // Produtos configuráveis/combos devem passar pelo fluxo de configuração.
@@ -698,35 +702,72 @@ export default function PosPage() {
       </div>
 
       {/* ========== CENTER: CONTENT ========== */}
-      <section aria-label="Catálogo e atendimento" className="order-1 flex min-w-0 flex-1 flex-col bg-background dark:bg-muted950 md:min-h-0">
+      <section aria-label="Catálogo e atendimento" className="order-1 flex min-w-0 flex-1 flex-col bg-background md:min-h-0">
         {viewMode === 'catalog' ? (
            <>
-             <div className="border-b border-border200 bg-card p-3 dark:border-border800 dark:bg-muted900">
-               <div className="mb-3 flex items-center justify-between gap-3 xl:hidden">
+             {/* Header Bar: Title, Search, Modalities & Categories */}
+             <div className="border-b border-border bg-card p-3.5 sm:p-4 space-y-3">
+               <div className="flex items-center justify-between gap-3">
                  <div>
-                   <h2 id="pos-catalog-title" className="text-sm font-black text-foreground">Produtos e atendimento</h2>
-                   <p className="text-xs text-muted-foreground">Escolha o atendimento e adicione os itens.</p>
+                   <h2 id="pos-catalog-title" className="text-lg font-black text-foreground">PDV</h2>
+                   <p className="text-xs font-medium text-muted-foreground">Venda presencial e gerencie pedidos rapidamente</p>
                  </div>
                  {cart.length > 0 && (
-                   <a href="#pos-cart" className="shrink-0 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-bold text-primary outline-none transition-colors hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring">
+                   <a href="#pos-cart" className="shrink-0 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20 xl:hidden">
                      Ver venda ({cart.length})
                    </a>
                  )}
                </div>
-               <div className="flex flex-col items-center gap-3 xl:flex-row">
-               <div className="relative flex-1 group w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400 group-focus-within:text-status-success" size={16} />
-                <input
-                  ref={searchInputRef}
-                  type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                   aria-label="Buscar produtos"
-                   className="w-full rounded-xl border border-border200 bg-card py-2.5 pl-12 pr-4 text-sm outline-none transition-all focus:border-status-success focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800"
-                  placeholder="F2 para buscar..."
-                />
+
+               {/* Search & Modalities Row */}
+               <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                 <div className="relative flex-1 group w-full">
+                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={16} />
+                   <input
+                     ref={searchInputRef}
+                     type="text"
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     aria-label="Buscar produtos"
+                     className="w-full rounded-xl border border-border/80 bg-background py-2.5 pl-10 pr-12 text-sm outline-none transition-all focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
+                     placeholder="Buscar produtos (F2)..."
+                   />
+                   <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                     F2
+                   </kbd>
+                 </div>
+                 <OrderTypeSelector currentType={fulfillmentType} onTypeChange={setFulfillmentType} />
                </div>
-               <OrderTypeSelector currentType={fulfillmentType} onTypeChange={setFulfillmentType} />
+
+               {/* Categories Filter Bar */}
+               <div className="flex items-center justify-between gap-2 overflow-x-auto pt-1 pb-0.5 no-scrollbar">
+                 <div className="flex items-center gap-1.5">
+                   {categories.map((cat) => (
+                     <button
+                       key={cat}
+                       type="button"
+                       onClick={() => setSelectedCategory(cat)}
+                       className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all whitespace-nowrap ${
+                         selectedCategory === cat
+                           ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                           : 'border border-border/60 bg-card/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                       }`}
+                     >
+                       {cat}
+                     </button>
+                   ))}
+                 </div>
+                 <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 pl-2">
+                   <span className="font-semibold">Ordenar por:</span>
+                   <select aria-label="Ordenar produtos" className="rounded-lg border border-border/60 bg-card px-2 py-1 text-xs font-bold text-foreground outline-none">
+                     <option value="popular">Mais vendidos</option>
+                     <option value="name">Nome (A-Z)</option>
+                     <option value="price">Menor preço</option>
+                   </select>
+                 </div>
                </div>
-               <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 md:hidden dark:bg-muted900/60">
+
+               <div className="rounded-xl border border-border bg-muted/40 p-3 md:hidden">
                  <div className="flex items-start justify-between gap-3">
                    <div>
                      <p className="text-xs font-black text-foreground">Dados do atendimento</p>
@@ -749,8 +790,10 @@ export default function PosPage() {
                  )}
                </div>
              </div>
-             <div className="min-h-[18rem] flex-1 overflow-y-auto p-3 custom-scrollbar md:min-h-0">
-               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+
+             {/* Grid of Product Cards */}
+             <div className="min-h-[18rem] flex-1 overflow-y-auto p-3.5 sm:p-4 custom-scrollbar md:min-h-0">
+               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3.5">
                  {filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
                </div>
             </div>
@@ -761,22 +804,25 @@ export default function PosPage() {
       </section>
 
       {/* ========== RIGHT: CART ========== */}
-      <aside id="pos-cart" aria-labelledby="pos-cart-title" className={`order-2 flex min-h-[30rem] w-full flex-col border-t border-border200 bg-card shadow-2xl transition-transform dark:border-border800 dark:bg-muted900 md:min-h-0 md:w-[380px] md:border-l md:border-t-0 lg:w-[420px] ${viewMode === 'salon' ? 'translate-x-full md:translate-x-0' : ''}`}>
-        <div className="shrink-0 px-4 py-3 bg-card flex items-center justify-between border-b border-border200 dark:border-border800">
+      <aside id="pos-cart" aria-labelledby="pos-cart-title" className={`order-2 flex min-h-[30rem] w-full flex-col border-t border-border/80 bg-card shadow-2xl transition-transform md:min-h-0 md:w-[380px] md:border-l md:border-t-0 lg:w-[420px] ${viewMode === 'salon' ? 'translate-x-full md:translate-x-0' : ''}`}>
+        {/* Operator & Order # Bar */}
+        <div className="shrink-0 px-4 py-3 bg-card/90 flex items-center justify-between border-b border-border">
            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <div>
-                <h2 id="pos-cart-title" className="text-sm font-black text-foreground">Venda atual</h2>
-                <span className="text-[10px] font-black uppercase text-status-success">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
+                <h2 id="pos-cart-title" className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  OPERADOR: {activeSession?.operatorName || 'DONO DA PIZZARIA'}
+                </h2>
               </div>
            </div>
-           <div className="flex gap-2">
+           <div className="flex items-center gap-2">
+             <span className="text-xs font-extrabold text-foreground">PDV #0042</span>
              {currentOrderId && (
                <>
                  <button
                    onClick={() => handlePrint(currentOrderId!, 'customer')}
                    aria-label="Imprimir cupom do cliente"
-                   className="rounded-lg border border-border/70 bg-background p-1.5 text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800"
+                   className="rounded-lg border border-border bg-background p-1.5 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                    title="Imprimir Cupom"
                 >
                   <Receipt size={14} />
@@ -784,174 +830,194 @@ export default function PosPage() {
                  <button
                    onClick={() => handlePrint(currentOrderId!, 'kitchen')}
                    aria-label="Imprimir ticket da cozinha"
-                   className="rounded-lg border border-border/70 bg-background p-1.5 text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800"
+                   className="rounded-lg border border-border bg-background p-1.5 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   title="Imprimir Cozinha"
                 >
                   <Printer size={14} />
                 </button>
                </>
              )}
-             {currentOrderId && (
-                <span className="bg-status-warning/10 text-status-warning text-[9px] font-black uppercase px-2 py-0.5 rounded border border-status-warning/20 shadow-sm">Comanda Aberta</span>
-              )}
-            </div>
+           </div>
         </div>
-        
-        {/* Compact Customer & Address Selection */}
-        <div className="shrink-0 px-4 py-3 bg-muted50 dark:bg-muted950 border-b border-border200 dark:border-border800">
+
+        {/* Customer Block */}
+        <div className="shrink-0 px-4 py-3 bg-muted/20 border-b border-border/60">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Cliente</span>
+            {isDelivery && (
+              <span className="text-[9px] font-bold text-destructive uppercase animate-pulse">
+                Requer Identificação
+              </span>
+            )}
+          </div>
           {(!selectedCustomer && !customerName.trim()) ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-muted-foreground500 tracking-wider">Cliente</span>
-                {isDelivery && (
-                  <span className="text-[9px] font-bold text-destructive uppercase animate-pulse">
-                    Requer Identificação
-                  </span>
-                )}
-              </div>
-               <button
-                 onClick={() => setIsCustomerDrawerOpen(true)}
-                 className="w-full rounded-xl border border-dashed border-border300 bg-background py-3 text-xs font-black uppercase tracking-wider text-foreground/85 outline-none transition-all hover:bg-muted100 focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800 dark:text-foreground dark:hover:bg-muted750"
-              >
-                <UserPlus size={14} className="text-primary" />
-                Identificar Cliente
-              </button>
-            </div>
+            <button
+              onClick={() => setIsCustomerDrawerOpen(true)}
+              className="w-full flex items-center justify-between rounded-xl border border-dashed border-border/80 bg-background px-3 py-2.5 text-xs font-bold text-foreground transition-all hover:border-primary/50 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span className="flex items-center gap-2">
+                <UserPlus size={16} className="text-primary" />
+                Identificar cliente
+              </span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </button>
           ) : (
-            <div className="flex flex-col gap-1 bg-card dark:bg-muted900 rounded-xl border border-border200 dark:border-border800 p-3 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-black text-foreground truncate">{selectedCustomer?.name || customerName}</p>
-                  <p className="text-[10px] font-bold text-muted-foreground">{selectedCustomer?.phone || customerPhone}</p>
-                </div>
-                 <button
-                   onClick={() => setIsCustomerDrawerOpen(true)}
-                   className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1 text-[9px] font-black uppercase text-primary outline-none transition-all hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Editar
-                </button>
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background p-3 shadow-sm">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-foreground truncate">{selectedCustomer?.name || customerName}</p>
+                <p className="text-[10px] text-muted-foreground">{selectedCustomer?.phone || customerPhone}</p>
               </div>
-              {isDelivery && (
-                <div className="border-t border-border100 dark:border-border800 mt-2 pt-2 text-[10px] font-bold text-muted-foreground flex items-start gap-1.5 min-w-0">
-                  <MapPin size={12} className="text-primary shrink-0 mt-0.5" />
-                  <span className="truncate">
-                    {deliveryAddress.street ? `${deliveryAddress.street}, ${deliveryAddress.number}` : 'Endereço não selecionado'}
-                    {deliveryAddress.neighborhood && ` · ${deliveryAddress.neighborhood}`}
-                  </span>
-                </div>
-              )}
+              <button
+                onClick={() => setIsCustomerDrawerOpen(true)}
+                className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary hover:bg-primary/20"
+              >
+                Editar
+              </button>
             </div>
           )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
-             {cart.length === 0 ? (
-               <div className="h-full min-h-52 flex flex-col items-center justify-center text-center text-muted-foreground">
-                 <ShoppingCart size={48} strokeWidth={1} />
-                 <p className="mt-3 text-sm font-bold text-foreground">Adicione itens para iniciar a venda.</p>
-                 <button onClick={() => { setViewMode('catalog'); searchInputRef.current?.focus(); }} className="mt-3 rounded-lg px-3 py-2 text-xs font-bold text-primary outline-none transition-colors hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring">
-                   Ir para o catálogo
-                 </button>
-              </div>
-             ) : (
-               cart.map((item) => (
-               <div key={item.cartLineId} className="bg-card border border-border rounded-2xl p-4 group transition-all hover:bg-muted">
-                 <div className="flex justify-between items-start gap-4 mb-3">
-                   <p className="font-bold text-foreground text-[13px] leading-tight">{item.name}</p>
-                    <button onClick={() => removeFromCart(item.cartLineId)} aria-label={`Remover ${item.name}`} className="rounded-md p-1 text-muted-foreground outline-none transition-colors hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"><X size={16} /></button>
-                 </div>
-                   {item.compositionLabel ? (
-                     <div className="text-[10px] text-muted-foreground500 dark:text-muted-foreground400 font-bold mb-2 line-clamp-2">
-                       {item.compositionLabel}
-                     </div>
-                   ) : null}
-                   <div className="flex items-center justify-between">
-                     <div className="flex items-center bg-card rounded-xl p-1 border border-border">
-                        <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} aria-label={`Diminuir ${item.name}`} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Minus size={14} strokeWidth={3} /></button>
-                       <span className="w-8 text-center font-black text-sm text-foreground">{item.quantity}</span>
-                        <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} aria-label={`Aumentar ${item.name}`} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Plus size={14} strokeWidth={3} /></button>
-                     </div>
-                     <p className="text-status-success font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
-                   </div>
-                </div>
-              ))
-            )}
-        </div>
-
-        <div className="shrink-0 p-4 bg-muted50 dark:bg-muted950 space-y-4 shadow-[0_-10px_20px_rgba(0,0,0,0.2)]">
-            {fulfillmentType === PosFulfillmentType.TABLE && (
-               <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400"><Hash size={14} /></span>
-                  <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-status-success" placeholder="Selecione uma mesa no salão" value={tableNumber} readOnly aria-label="Mesa selecionada" />
-                  </div>
-                  <button 
-                    onClick={handleSaveDraft}
-                    disabled={!selectedTableId || cart.length === 0 || upsertDraft.isPending}
-                  className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                     <Save size={14} />
-                     {upsertDraft.isPending ? 'Salvando...' : 'Lançar Comanda'}
-                  </button>
-               </div>
-            )}
-
-            {currentOrderId && fulfillmentType === PosFulfillmentType.TABLE && (
-              <button 
-                onClick={() => setIsSplitModalOpen(true)}
-                className="w-full bg-background dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-foreground/85 dark:text-foreground border border-border200 dark:border-border700 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-2"
+        {/* Cart Items List */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2.5 bg-card/40">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Itens do pedido</span>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCart([])}
+                className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-destructive transition-colors"
               >
-                  <Users size={14} />
-                  Dividir Conta / Fechamento Parcial
+                <X size={12} /> Limpar
               </button>
             )}
+          </div>
 
-            <div className="space-y-1.5 border-t border-border200 dark:border-border800/50 pt-3">
-               <div className="flex justify-between text-[11px] font-bold text-muted-foreground500 dark:text-muted-foreground400 uppercase tracking-tighter">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-               </div>
-               {isDelivery && (
-                 <div className="space-y-1">
-                   <div className="flex justify-between text-[11px] font-bold text-muted-foreground500 dark:text-muted-foreground400 uppercase tracking-tighter">
-                     <span>Frete</span>
-                     <span>{deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Pendente'}</span>
-                   </div>
-                   {deliveryFeeRule && (
-                     <p className="text-[10px] font-bold text-muted-foreground500 dark:text-muted-foreground400 truncate">{deliveryFeeRule}</p>
-                   )}
-                 </div>
-               )}
-               <div className="flex justify-between items-end">
-                  <span className="text-sm font-black text-muted-foreground900 dark:text-white uppercase italic">Total Líquido</span>
-                  <span className="text-4xl font-black text-foreground tracking-tighter italic leading-none">{formatCurrency(total)}</span>
-               </div>
+          {cart.length === 0 ? (
+            <div className="h-full min-h-48 flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+              <ShoppingCart size={40} strokeWidth={1} className="text-muted-foreground/50" />
+              <p className="mt-3 text-sm font-bold text-foreground">Adicione itens para iniciar a venda.</p>
+              <button onClick={() => { setViewMode('catalog'); searchInputRef.current?.focus(); }} className="mt-3 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/20">
+                Ir para o catálogo
+              </button>
             </div>
+          ) : (
+            cart.map((item) => {
+              const itemImage = products?.find(p => p.id === item.productId || p.name === item.name)?.image;
+              return (
+                <div key={item.cartLineId} className="flex gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm hover:border-border transition-all">
+                  <div className="w-12 h-12 rounded-xl bg-muted/30 shrink-0 overflow-hidden relative border border-border/40">
+                    {itemImage ? (
+                      <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/60">
+                        <Package size={20} strokeWidth={1.5} />
+                      </div>
+                    )}
+                  </div>
 
-            {saleError && (
-              <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 flex items-start gap-2">
-                <CircleAlert size={15} className="text-destructive shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-[11px] font-bold text-destructive leading-tight">{saleError}</p>
-                <button type="button" onClick={() => setSaleError(null)} aria-label="Fechar mensagem de erro" className="ml-auto rounded p-0.5 text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"><X size={14} /></button>
-              </div>
-            )}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="font-bold text-foreground text-xs leading-snug truncate">{item.name}</p>
+                      <span className="font-extrabold text-foreground text-xs tabular-nums shrink-0">{formatCurrency(item.basePrice * item.quantity)}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium">
+                      {item.quantity}x {formatCurrency(item.basePrice)}
+                    </p>
+                    {item.compositionLabel ? (
+                      <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 mt-0.5">{item.compositionLabel}</p>
+                    ) : null}
 
-            {!canFinalizeSale && !createSale.isPending && (
-              <p id="pos-finish-requirement" className="flex items-start gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-medium leading-snug text-muted-foreground dark:bg-muted900">
-                <CircleAlert size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-                {finishBlocker}
-              </p>
-            )}
+                    <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/40">
+                      <div className="flex items-center rounded-lg border border-border/80 bg-background p-0.5">
+                        <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} aria-label={`Diminuir ${item.name}`} className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground">
+                          <Minus size={12} strokeWidth={2.5} />
+                        </button>
+                        <span className="w-6 text-center font-black text-xs text-foreground tabular-nums">{item.quantity}</span>
+                        <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} aria-label={`Aumentar ${item.name}`} className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground">
+                          <Plus size={12} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                      <button onClick={() => removeFromCart(item.cartLineId)} aria-label={`Remover ${item.name}`} className="text-muted-foreground hover:text-destructive p-1 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
 
-            <button 
-              onClick={() => setIsPaymentModalOpen(true)}
-              disabled={!canFinalizeSale}
-              aria-describedby={!canFinalizeSale ? 'pos-finish-requirement' : undefined}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
+        {/* Totals & CTA */}
+        <div className="shrink-0 p-4 bg-card/90 space-y-3 border-t border-border">
+          {fulfillmentType === PosFulfillmentType.TABLE && (
+             <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"><Hash size={14} /></span>
+                  <input className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary" placeholder="Selecione uma mesa no salão" value={tableNumber} readOnly aria-label="Mesa selecionada" />
+                </div>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={!selectedTableId || cart.length === 0 || upsertDraft.isPending}
+                  className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                   <Save size={14} />
+                   {upsertDraft.isPending ? 'Salvando...' : 'Lançar Comanda'}
+                </button>
+             </div>
+          )}
+
+          {currentOrderId && fulfillmentType === PosFulfillmentType.TABLE && (
+            <button
+              onClick={() => setIsSplitModalOpen(true)}
+              className="w-full bg-background hover:bg-muted text-foreground border border-border rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
             >
-               {createSale.isPending ? 'Finalizando venda…' : 'FECHAR CONTA (F4)'}
-               <ChevronRight size={20} strokeWidth={3} />
+                <Users size={14} />
+                Dividir Conta / Fechamento Parcial
             </button>
+          )}
+
+          <div className="space-y-1.5 border-t border-border/60 pt-3">
+             <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                <span>Subtotal ({cart.length} itens)</span>
+                <span className="font-bold tabular-nums text-foreground">{formatCurrency(subtotal)}</span>
+             </div>
+             {isDelivery && (
+               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                 <span>Frete / Taxa de serviço</span>
+                 <span className="font-bold tabular-nums text-foreground">{deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Pendente'}</span>
+               </div>
+             )}
+             <div className="flex justify-between items-baseline pt-2 border-t border-border/60">
+                <span className="text-base font-extrabold text-foreground">Total</span>
+                <span className="text-3xl font-black text-primary tabular-nums">{formatCurrency(total)}</span>
+             </div>
+          </div>
+
+          {saleError && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-2.5 flex items-start gap-2">
+              <CircleAlert size={15} className="text-destructive shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-[11px] font-bold text-destructive leading-tight">{saleError}</p>
+              <button type="button" onClick={() => setSaleError(null)} aria-label="Fechar mensagem de erro" className="ml-auto rounded p-0.5 text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"><X size={14} /></button>
+            </div>
+          )}
+
+          {!canFinalizeSale && !createSale.isPending && (
+            <p id="pos-finish-requirement" className="flex items-start gap-2 rounded-xl border border-border bg-muted/40 p-2.5 text-xs font-medium leading-snug text-muted-foreground">
+              <CircleAlert size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+              {finishBlocker}
+            </p>
+          )}
+
+          <button
+            onClick={() => setIsPaymentModalOpen(true)}
+            disabled={!canFinalizeSale}
+            aria-describedby={!canFinalizeSale ? 'pos-finish-requirement' : undefined}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-3.5 rounded-2xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 text-sm sm:text-base transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
+          >
+             {createSale.isPending ? 'Finalizando venda…' : 'FECHAR CONTA (F4)'}
+             <ChevronRight size={18} strokeWidth={3} />
+          </button>
         </div>
       </aside>
 
