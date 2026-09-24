@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  BellRing,
   ChevronDown,
   ChevronUp,
   ChefHat,
@@ -9,15 +10,10 @@ import {
   RefreshCw,
   Route,
   Search,
+  Volume1,
+  Volume2,
+  VolumeX,
   Wifi,
-  Hourglass,
-  Clock,
-  CheckCircle2,
-  Truck,
-  ShoppingBag,
-  Store,
-  Filter,
-  Settings2,
 } from "lucide-react";
 import type {
   OrderBoardItemDTO,
@@ -315,210 +311,159 @@ export function OrderManagerV2Page() {
   const intelligence = useMemo(() => getOperationalIntelligence(orders, now), [orders, now]);
   const hasActiveFilters = query.trim().length > 0 || origin !== 'all';
   const operationalContextLabel = OPERATIONAL_TAB_LABELS[operationalTab];
+  const clearFilters = () => {
+    setQuery('');
+    setOrigin('all');
+  };
 
   return (
     <main className="mx-auto max-w-[1800px] space-y-2 p-2 sm:space-y-3 sm:p-4">
-      <header className="rounded-2xl border border-slate-800 border-b-4 border-b-primary bg-[#0b1120] p-1.5 shadow-sm sm:p-3">
-      <header className="rounded-2xl border border-slate-800 border-b-4 border-b-primary bg-[#0b1120] p-1.5 shadow-sm sm:p-3">
-
-        <div id="order-manager-v2-cockpit" className="rounded-xl p-2 sm:p-3">
-
+      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-1.5 shadow-sm sm:p-3">
+        <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2 sm:p-3">
           <div className="flex flex-wrap items-center gap-2">
-
-            <div className="min-w-0 flex-1"><h1 className="text-lg font-black tracking-tight text-slate-100 sm:text-xl">Painel de Operações</h1><p className="truncate text-xs font-semibold text-slate-400">Acompanhe e gerencie seus pedidos em tempo real</p></div>
-
+            <div className="min-w-0 flex-1"><h1 className="text-lg font-black tracking-tight text-foreground sm:text-xl">Painel de pedidos</h1><p className="truncate text-xs font-semibold text-muted-foreground">Acompanhe e gerencie seus pedidos em tempo real</p></div>
             <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
-
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-black ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3.5 w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
-
             <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir resumo da operação" : "Recolher resumo da operação"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="sr-only">{cockpitCollapsed ? "Expandir resumo da operação" : "Recolher resumo da operação"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
-
           </div>
-
-          {alertsOpen ? (
-
-            <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
-
-              <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
-
-              {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
-
-                <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
-
-                  <span data-severity={alert.severity} className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alertSeverityLabel(alert.severity)}<span className="sr-only">Severidade técnica: {alert.severity}</span></span>
-
-                  <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
-
-                  {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
-
-                  {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
-
-                </div>
-
-              ))}
-
-            </section>
-
-          ) : null}
-
-          <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
-
-            <section aria-labelledby="operation-summary-heading">
-
-              <h2 id="operation-summary-heading" className="sr-only">Resumo da operação</h2>
-
-              <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:gap-3" aria-label="Indicadores operacionais">
-
-                <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-400" prefix={<Hourglass className="h-5 w-5 text-amber-400" />} />
-
-                <Metric label="Atrasados" value={intelligence.delayed} tone="text-red-500" prefix={<div className="grid h-6 w-6 place-items-center rounded-full bg-red-500/20"><Clock className="h-4 w-4 text-red-500" /></div>} />
-
-                <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-400" prefix={<div className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500/20"><CheckCircle2 className="h-4 w-4 text-emerald-400" /></div>} />
-
-                <Metric label="Delivery" value={intelligence.delivery} tone="text-slate-200" prefix={<Truck className="h-5 w-5 text-sky-400" />} />
-
-                <Metric label="Retirada" value={intelligence.pickup} tone="text-slate-200" prefix={<ShoppingBag className="h-5 w-5 text-fuchsia-400" />} />
-
-                <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} tone="text-slate-200" prefix={<Store className="h-5 w-5 text-sky-400" />} />
-
-                <Metric label="iFood" value={intelligence.channels.IFOOD} tone="text-slate-200" prefix={<span className="text-sm font-black italic text-red-500">iFood</span>} />
-
-                <Metric label="99Food" value={intelligence.channels.FOOD_99} tone="text-slate-200" prefix={<span className="text-sm font-black italic text-yellow-500">99</span>} />
-
-              </div>
-
-            </section>
-
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-
-            <label className="relative w-full sm:w-[320px]">
-
-              <span className="sr-only">Buscar pedido, cliente ou item</span>
-
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-
-              <input
-
-                aria-label="Buscar pedido, cliente ou item"
-
-                value={query}
-
-                onChange={(event) => setQuery(event.target.value)}
-
-                placeholder="Buscar pedido, cliente ou item..."
-
-                className="h-9 w-full rounded-full border border-slate-700 bg-slate-900/50 pl-9 pr-3 text-xs text-slate-200 outline-none focus:border-primary"
-
-              />
-
-            </label>
-
-            <div className="flex flex-wrap gap-1.5" aria-label="Filtrar origem">
-
-              {ORIGINS.map((candidate) => (
-
-                <button
-
-                  key={candidate}
-
-                  type="button"
-
-                  onClick={() => setOrigin(candidate)}
-
-                  className={`rounded-full px-4 py-1.5 text-[11px] font-bold transition-colors ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-slate-700 text-slate-300 hover:bg-slate-800"}`}
-
-                >
-
-                  {candidate === "all" ? "Todos" : candidate === "FOOD_99" ? "99Food" : candidate === "PEDEHUB" ? "PedeHub" : "iFood"}
-
-                </button>
-
-              ))}
-
-            </div>
-
-            <div className="ml-auto flex items-center gap-2">
-
-              <details className="group relative">
-
-                <summary className="list-none inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-slate-700 bg-transparent px-3 text-[11px] font-bold text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
-
-                  <Settings2 className="h-4 w-4" /> Alertas
-
-                </summary>
-
-                <div className="absolute right-0 top-full z-50 mt-1 w-[260px] rounded-xl border border-border bg-card p-3 shadow-lg">
-
-                  <div className="space-y-3">
-
-                    <p className="text-xs font-bold text-foreground">Configurações de Alerta</p>
-
-                    <label className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-
-                      Som
-
-                      <button type="button" onClick={() => soundManager.setSoundPreferenceEnabled(!soundManager.soundPreferenceEnabled)} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${soundManager.soundPreferenceEnabled ? 'bg-primary' : 'bg-muted'}`} role="switch" aria-checked={soundManager.soundPreferenceEnabled}><span aria-hidden="true" className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${soundManager.soundPreferenceEnabled ? 'translate-x-4' : 'translate-x-0'}`} /></button>
-
-                    </label>
-
-                    <label className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-
-                      Voz (Leitura)
-
-                      <button type="button" onClick={() => setVoiceAlertsEnabled(!voiceEnabled, voiceScope)} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${voiceEnabled ? 'bg-primary' : 'bg-muted'}`} role="switch" aria-checked={voiceEnabled}><span aria-hidden="true" className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${voiceEnabled ? 'translate-x-4' : 'translate-x-0'}`} /></button>
-
-                    </label>
-
-                    <label className="space-y-1.5 text-[11px] font-semibold text-muted-foreground block">
-
-                      <span>Volume</span>
-
-                      <input aria-label="Volume dos alertas" className="w-full accent-primary" type="range" min="0" max="1" step="0.05" value={soundManager.volume} onChange={(event) => soundManager.setVolume(Number(event.target.value))} />
-
-                    </label>
-
-                    <div className="flex gap-2">
-
-                      <button type="button" onClick={() => void soundManager.testSound()} className="flex-1 rounded-md border border-border py-1 text-[10px] font-bold text-foreground hover:bg-muted">Testar Som</button>
-
-                      <button type="button" onClick={() => void testVoice()} className="flex-1 rounded-md border border-border py-1 text-[10px] font-bold text-foreground hover:bg-muted">Testar Voz</button>
-
-                    </div>
-
-                    {soundManager.needsAudioUnlock && (
-
-                      <button type="button" onClick={() => void soundManager.unlockAudio()} className="w-full rounded-md bg-amber-500/10 py-1.5 text-[11px] font-bold text-amber-600 border border-amber-500/20 mt-1">Desbloquear Áudio Automático</button>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-              </details>
-
-              <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-700 bg-transparent px-3 text-[11px] font-bold text-slate-300 hover:bg-slate-800">
-
-                <Filter className="h-4 w-4" /> Filtros
-
-              </button>
-
-              <button type="button" onClick={() => void fetchBoard()} className="grid h-9 w-9 place-items-center rounded-full border border-slate-700 text-slate-300 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-primary" aria-label="Atualizar pedidos">
-
-                <RefreshCw className="h-4 w-4" />
-
-              </button>
-
-            </div>
-
-          </div>
-
         </div>
-
-      </header>
-
+        {alertsOpen ? (
+          <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
+            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
+            {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
+              <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
+                <span data-severity={alert.severity} className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alertSeverityLabel(alert.severity)}<span className="sr-only">Severidade técnica: {alert.severity}</span></span>
+                <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
+                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
+                {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
+              </div>
+            ))}
+          </section>
+        ) : null}
+        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
+        <section aria-labelledby="operation-summary-heading">
+          <p id="operation-summary-heading" className="mb-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Resumo da operação</p>
+          <div className="grid grid-cols-4 gap-1 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
+          <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
+          <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
+          <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
+          <Metric label="Delivery" value={intelligence.delivery} />
+          <Metric label="Retirada" value={intelligence.pickup} />
+          <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} />
+          <Metric label="iFood" value={intelligence.channels.IFOOD} />
+          <Metric label="99Food" value={intelligence.channels.FOOD_99} />
+          </div>
+        </section>
+        <div className="mt-2 hidden flex-col gap-2 sm:flex 2xl:flex-row 2xl:items-center 2xl:justify-end">
+          <div className="flex flex-wrap items-stretch gap-1.5">
+            <div className="flex flex-wrap items-center gap-1 border border-border bg-background p-1">
+              <button
+                type="button"
+                onClick={() =>
+                  soundManager.setSoundPreferenceEnabled(
+                    !soundManager.soundPreferenceEnabled,
+                  )
+                }
+                className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${soundManager.soundPreferenceEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground hover:bg-muted"}`}
+                aria-pressed={soundManager.soundPreferenceEnabled}
+              >
+                {soundManager.soundPreferenceEnabled ? (
+                  <Volume1 className="h-3.5 w-3.5" />
+                ) : (
+                  <VolumeX className="h-3.5 w-3.5" />
+                )}
+                Som {soundManager.soundPreferenceEnabled ? "on" : "off"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoiceAlertsEnabled(!voiceEnabled, voiceScope)}
+                className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${voiceEnabled ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}
+                aria-pressed={voiceEnabled}
+              >
+                {voiceEnabled ? (
+                  <Volume2 className="h-3.5 w-3.5" />
+                ) : (
+                  <VolumeX className="h-3.5 w-3.5" />
+                )}
+                Voz {voiceEnabled ? "on" : "off"}
+              </button>
+              <label className="flex min-h-9 items-center gap-2 px-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+                Volume
+                <input
+                  aria-label="Volume dos alertas"
+                  className="w-20 accent-primary"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={soundManager.volume}
+                  onChange={(event) => soundManager.setVolume(Number(event.target.value))}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void soundManager.testSound()}
+                className="inline-flex min-h-9 items-center gap-1.5 border border-border px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Testar som
+              </button>
+              <button
+                type="button"
+                onClick={() => void testVoice()}
+                className="inline-flex min-h-9 items-center gap-1.5 border border-border px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Testar voz
+              </button>
+              {soundManager.needsAudioUnlock ? (
+                <button
+                  type="button"
+                  onClick={() => void soundManager.unlockAudio()}
+                  className="inline-flex min-h-9 items-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-2 text-[10px] font-black uppercase tracking-wide text-amber-800 dark:text-amber-200"
+                >
+                  <BellRing className="h-3.5 w-3.5" />
+                  Liberar
+                </button>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => void fetchBoard()}
+              className="grid min-h-11 min-w-11 place-items-center border border-border text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label="Atualizar pedidos"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
+          <label className="relative w-full sm:w-[260px]">
+            <span className="sr-only">
+              Buscar pedido, cliente ou item
+            </span>
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              aria-label="Buscar pedido, cliente ou item"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar pedido, cliente ou item..."
+              className="h-8 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-[11px] outline-none focus:border-primary sm:h-9 sm:text-xs"
+            />
+          </label>
+          <div className="flex flex-wrap gap-1" aria-label="Filtrar origem">
+            {ORIGINS.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                onClick={() => setOrigin(candidate)}
+                className={`rounded-lg px-2 py-1.5 text-[9px] font-black sm:text-[10px] ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
+              >
+                {candidate === "all" ? "Todos" : candidate}
+              </button>
+            ))}
+          </div>
+          <p className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground" aria-live="polite"><span className="font-black uppercase tracking-wide text-foreground">Pedidos exibidos</span><span className="tabular-nums">{filtered.length}</span>{hasActiveFilters ? <button type="button" onClick={clearFilters} className="font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Limpar filtros</button> : null}</p>
+        </div>
       </header>
       <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={handleOperationalTabChange} />
       <div className="grid grid-cols-3 gap-1 xl:hidden" role="tablist" aria-label="Etapas do kanban">
@@ -616,21 +561,18 @@ export function OrderManagerV2Page() {
 function Metric({
   label,
   value,
-  prefix,
   tone = "text-foreground",
 }: {
   label: string;
   value: number;
-  prefix?: React.ReactNode;
   tone?: string;
 }) {
   return (
-    <div className="flex min-w-[120px] flex-1 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 sm:flex-initial sm:min-w-0">
-      {prefix && <div className="shrink-0">{prefix}</div>}
-      <div className="min-w-0 flex-1">
-        <p className={`text-lg font-black leading-none tabular-nums ${tone}`}>{value}</p>
-        <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">{label}</p>
-      </div>
+    <div className="min-w-14 rounded-lg border border-border bg-background px-2 py-1 text-center">
+      <p className={`text-sm font-black tabular-nums ${tone}`}>{value}</p>
+      <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
     </div>
   );
 }
