@@ -13,6 +13,7 @@ interface ProductLinkOverrideDialogProps {
   link: LinkWithGroup | null;
   onSaveOverrides: (payload: UpdateProductOptionGroupLinkDto) => Promise<void>;
   isSaving: boolean;
+  onToggleItemOverride?: (optionItemId: string, currentEffectiveIsActive: boolean) => Promise<void>;
 }
 
 export const ProductLinkOverrideDialog: React.FC<ProductLinkOverrideDialogProps> = ({
@@ -21,6 +22,7 @@ export const ProductLinkOverrideDialog: React.FC<ProductLinkOverrideDialogProps>
   link,
   onSaveOverrides,
   isSaving,
+  onToggleItemOverride,
 }) => {
   const [form, setForm] = useState<{
     overrideName: string;
@@ -241,6 +243,73 @@ export const ProductLinkOverrideDialog: React.FC<ProductLinkOverrideDialogProps>
             />
           </div>
         </div>
+
+        {/* Item Availability Section */}
+        {link?.optionGroup?.items && link.optionGroup.items.length > 0 && (
+          <div className="space-y-3 pt-3 border-t border-border">
+            <div className="flex flex-col">
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider">
+                Disponibilidade dos Itens neste Produto
+              </label>
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Desative itens individualmente para este produto sem alterar o grupo global da biblioteca.
+              </span>
+            </div>
+
+            <div className="divide-y divide-border border border-border rounded-xl bg-card overflow-hidden">
+              {link.optionGroup.items.map((item) => {
+                const isGlobalInactive = !item.isActive;
+                const effectiveIsActive = item.effectiveIsActive ?? (item.isActive && (item.override?.isActive ?? true));
+                const isLocallyPaused = item.isActive && effectiveIsActive === false;
+
+                return (
+                  <div key={item.id} className="p-3 flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-foreground flex items-center gap-2 flex-wrap">
+                        <span>{item.name}</span>
+                        {isGlobalInactive && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground rounded-full border border-border">
+                            Inativo na Biblioteca
+                          </span>
+                        )}
+                        {isLocallyPaused && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full border border-amber-500/20">
+                            Pausado neste produto
+                          </span>
+                        )}
+                      </div>
+                      {item.description && (
+                        <div className="text-xs text-muted-foreground truncate">{item.description}</div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isGlobalInactive || !onToggleItemOverride}
+                      onClick={() => onToggleItemOverride?.(item.id, effectiveIsActive)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                        effectiveIsActive ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                      }`}
+                      title={
+                        isGlobalInactive
+                          ? 'Item inativo globalmente na Biblioteca'
+                          : effectiveIsActive
+                          ? 'Clique para pausar neste produto'
+                          : 'Clique para reativar neste produto'
+                      }
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          effectiveIsActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );

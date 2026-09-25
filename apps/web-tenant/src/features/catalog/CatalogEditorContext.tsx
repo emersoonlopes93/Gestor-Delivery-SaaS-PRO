@@ -46,6 +46,7 @@ export type CatalogEditorContextValue = {
   openGlobalGroupEditor: (group: OptionGroup) => void;
   openEditLinkModal: (link: LinkWithGroup) => void;
   removeGroupLink: (id: string) => void;
+  toggleItemOverride: (optionItemId: string, currentEffectiveIsActive: boolean) => Promise<void>;
 
   // Combo
   bundleItems: BundleItemWithProduct[];

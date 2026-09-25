@@ -6,6 +6,7 @@ import { ProductOptionGroupsService } from './product-option-groups.service';
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';
 import { UpdateProductOptionGroupLinkDto } from './dto/update-product-option-group-link.dto';
 import { ReorderProductOptionGroupLinksDto } from './dto/reorder-product-option-group-links.dto';
+import { UpdateProductOptionItemOverrideDto } from './dto/update-product-option-item-override.dto';
 
 @Controller('catalog/products/:productId/option-groups')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -22,6 +23,16 @@ export class ProductOptionGroupsController {
   @RequirePermissions('catalog.manage_products')
   link(@Param('productId') productId: string, @Body() dto: Omit<CreateProductOptionGroupLinkDto, 'productId'>) {
     return this.service.link({ ...dto, productId });
+  }
+
+  @Patch('items/:optionItemId/override')
+  @RequirePermissions('catalog.manage_products')
+  upsertItemOverride(
+    @Param('productId') productId: string,
+    @Param('optionItemId') optionItemId: string,
+    @Body() dto: UpdateProductOptionItemOverrideDto,
+  ) {
+    return this.service.upsertItemOverride(productId, optionItemId, dto);
   }
 
   @Patch(':linkId')

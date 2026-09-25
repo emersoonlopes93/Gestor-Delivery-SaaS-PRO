@@ -50,74 +50,87 @@ export const ProductPersonalization: React.FC = () => {
       </div>
 
       <div className="space-y-3 md:hidden">
-        {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
-          <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
-            <div>
-              <div className="font-black text-foreground">{l.overrideName || l.optionGroup?.name || 'Opções'}</div>
-              <div className="text-xs text-muted-foreground font-medium mt-1">
-                {l.optionGroup && (
-                  <>
-                    {formatSelectionType(l.optionGroup.selectionType)} • {l.optionGroup.isRequired ? 'Obrigatório' : 'Opcional'} • {formatSelectionRules({
-                      isRequired: l.optionGroup.isRequired,
-                      minSelect: l.optionGroup.minSelect,
-                      maxSelect: l.optionGroup.maxSelect,
-                      selectionType: l.optionGroup.selectionType,
-                    })}
-                  </>
+        {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => {
+          const pausedCount = (l.optionGroup?.items || []).filter(
+            (i) => i.isActive && (i.effectiveIsActive === false || i.override?.isActive === false),
+          ).length;
+
+          return (
+            <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+              <div>
+                <div className="font-black text-foreground">{l.overrideName || l.optionGroup?.name || 'Opções'}</div>
+                <div className="text-xs text-muted-foreground font-medium mt-1">
+                  {l.optionGroup && (
+                    <>
+                      {formatSelectionType(l.optionGroup.selectionType)} • {l.optionGroup.isRequired ? 'Obrigatório' : 'Opcional'} • {formatSelectionRules({
+                        isRequired: l.optionGroup.isRequired,
+                        minSelect: l.optionGroup.minSelect,
+                        maxSelect: l.optionGroup.maxSelect,
+                        selectionType: l.optionGroup.selectionType,
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {(l.overrideName || l.overrideIsRequired !== null || l.overrideMinSelect !== null || l.overrideMaxSelect !== null) && (
+                  <span className="text-xs font-medium text-primary bg-primary/10 p-2 rounded-lg border border-primary/20">
+                    Regras customizadas
+                  </span>
+                )}
+                {pausedCount > 0 && (
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                    {pausedCount} {pausedCount === 1 ? 'item pausado neste produto' : 'itens pausados neste produto'}
+                  </span>
                 )}
               </div>
-            </div>
 
-            {(l.overrideName || l.overrideIsRequired !== null || l.overrideMinSelect !== null || l.overrideMaxSelect !== null) && (
-              <div className="text-xs font-medium text-primary bg-primary/10 p-2 rounded-lg border border-primary/20">
-                Regras customizadas neste produto
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-              <button
-                type="button"
-                onClick={() => moveLink(l.id, -1)}
-                disabled={savingStates.reorderLinks}
-                className="px-3 py-2 text-xs font-black text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-              >
-                Subir
-              </button>
-              <button
-                type="button"
-                onClick={() => moveLink(l.id, 1)}
-                disabled={savingStates.reorderLinks}
-                className="px-3 py-2 text-xs font-black text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-              >
-                Descer
-              </button>
-              <button
-                type="button"
-                onClick={() => openEditLinkModal(l)}
-                className="px-3 py-2 text-xs font-bold bg-muted text-foreground hover:bg-muted/80 rounded-xl transition-all col-span-2"
-              >
-                Configurar neste produto
-              </button>
-              {l.optionGroup && (
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => openGlobalGroupEditor(l.optionGroup)}
-                  className="px-3 py-2 text-xs font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all col-span-2"
+                  onClick={() => moveLink(l.id, -1)}
+                  disabled={savingStates.reorderLinks}
+                  className="px-3 py-2 text-xs font-black text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                 >
-                  Editar grupo compartilhado
+                  Subir
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => removeGroupLink(l.id)}
-                disabled={savingStates[`remove-${l.id}`]}
-                className="px-3 py-2 text-xs font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all col-span-2"
-              >
-                Desvincular do produto
-              </button>
+                <button
+                  type="button"
+                  onClick={() => moveLink(l.id, 1)}
+                  disabled={savingStates.reorderLinks}
+                  className="px-3 py-2 text-xs font-black text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                >
+                  Descer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEditLinkModal(l)}
+                  className="px-3 py-2 text-xs font-bold bg-muted text-foreground hover:bg-muted/80 rounded-xl transition-all col-span-2"
+                >
+                  Configurar neste produto
+                </button>
+                {l.optionGroup && (
+                  <button
+                    type="button"
+                    onClick={() => openGlobalGroupEditor(l.optionGroup)}
+                    className="px-3 py-2 text-xs font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all col-span-2"
+                  >
+                    Editar grupo compartilhado
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeGroupLink(l.id)}
+                  disabled={savingStates[`remove-${l.id}`]}
+                  className="px-3 py-2 text-xs font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all col-span-2"
+                >
+                  Desvincular do produto
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {links.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm italic shadow-sm">
             Nenhum grupo de opções vinculado a este produto.
@@ -144,6 +157,9 @@ export const ProductPersonalization: React.FC = () => {
                 l.overrideMinSelect !== null ||
                 l.overrideMaxSelect !== null
               );
+              const pausedCount = (l.optionGroup?.items || []).filter(
+                (i) => i.isActive && (i.effectiveIsActive === false || i.override?.isActive === false),
+              ).length;
 
               return (
                 <tr key={l.id} className="hover:bg-muted/50 dark:hover:bg-muted/80 dark:bg-card/40 transition-colors group">
@@ -175,13 +191,20 @@ export const ProductPersonalization: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 text-xs font-medium">
-                    {hasOverride ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
-                        Regras customizadas
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Padrão do grupo</span>
-                    )}
+                    <div className="flex flex-col gap-1 items-start">
+                      {hasOverride ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                          Regras customizadas
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Padrão do grupo</span>
+                      )}
+                      {pausedCount > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          {pausedCount} {pausedCount === 1 ? 'item pausado' : 'itens pausados'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">

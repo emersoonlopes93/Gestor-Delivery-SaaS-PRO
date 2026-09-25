@@ -112,6 +112,7 @@ export class StorefrontService {
           orderBy: { order: 'asc' },
           include: {
 
+            optionItemPrices: true,
             optionGroupLinks: {
               include: {
                 optionGroup: {
@@ -151,7 +152,7 @@ export class StorefrontService {
       include: {
         products: {
           include: {
-
+            optionItemPrices: true;
             optionGroupLinks: {
               include: { optionGroup: { include: { items: true } } };
             };
@@ -259,36 +260,49 @@ export class StorefrontService {
               isAvailable,
               badges: [], // Populated below
 
-              optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
-                id: ol.id,
-                optionGroupId: ol.optionGroupId,
-                order: ol.order,
-                pricingAxis: ol.pricingAxis,
-                overrideName: ol.overrideName,
-                overrideDescription: ol.overrideDescription,
-                overrideIsRequired: ol.overrideIsRequired,
-                overrideMinSelect: ol.overrideMinSelect,
-                overrideMaxSelect: ol.overrideMaxSelect,
-                optionGroup: {
-                  id: ol.optionGroup.id,
-                  name: ol.optionGroup.name,
-                  description: ol.optionGroup.description,
-                  selectionType: ol.optionGroup.selectionType as 'single' | 'multiple' | 'quantity',
-                  isRequired: ol.optionGroup.isRequired,
-                  minSelect: ol.optionGroup.minSelect,
-                  maxSelect: ol.optionGroup.maxSelect,
-                  isActive: ol.optionGroup.isActive,
-                  items: ol.optionGroup.items.map((oi) => ({
-                    id: oi.id,
-                    name: oi.name,
-                    description: oi.description,
-                    isActive: oi.isActive,
-                    allowQuantity: oi.allowQuantity,
-                    priceImpactType: oi.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage',
-                    priceImpactValue: Number(oi.priceImpactValue),
-                  })),
-                },
-              })),
+              optionGroupLinks: (p.optionGroupLinks || []).map((ol) => {
+                const itemOverrideMap = new Map((p.optionItemPrices || []).map((o) => [o.optionItemId, o]));
+                const activeItems = ol.optionGroup.items
+                  .map((oi) => {
+                    const override = itemOverrideMap.get(oi.id);
+                    const effectiveIsActive = oi.isActive && (override?.isActive ?? true);
+                    const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
+                    return {
+                      id: oi.id,
+                      name: oi.name,
+                      description: oi.description,
+                      isActive: oi.isActive,
+                      effectiveIsActive,
+                      allowQuantity: oi.allowQuantity,
+                      priceImpactType: oi.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage',
+                      priceImpactValue: overridePrice ?? Number(oi.priceImpactValue),
+                    };
+                  })
+                  .filter((oi) => oi.effectiveIsActive !== false);
+
+                return {
+                  id: ol.id,
+                  optionGroupId: ol.optionGroupId,
+                  order: ol.order,
+                  pricingAxis: ol.pricingAxis,
+                  overrideName: ol.overrideName,
+                  overrideDescription: ol.overrideDescription,
+                  overrideIsRequired: ol.overrideIsRequired,
+                  overrideMinSelect: ol.overrideMinSelect,
+                  overrideMaxSelect: ol.overrideMaxSelect,
+                  optionGroup: {
+                    id: ol.optionGroup.id,
+                    name: ol.optionGroup.name,
+                    description: ol.optionGroup.description,
+                    selectionType: ol.optionGroup.selectionType as 'single' | 'multiple' | 'quantity',
+                    isRequired: ol.optionGroup.isRequired,
+                    minSelect: ol.optionGroup.minSelect,
+                    maxSelect: ol.optionGroup.maxSelect,
+                    isActive: ol.optionGroup.isActive,
+                    items: activeItems,
+                  },
+                };
+              }),
               upsellLinks: (p.upsellLinks || []).map((l) => ({
                 id: l.id,
                 upsell: {

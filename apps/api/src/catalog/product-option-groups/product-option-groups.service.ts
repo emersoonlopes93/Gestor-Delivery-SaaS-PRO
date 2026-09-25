@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';
 import { UpdateProductOptionGroupLinkDto } from './dto/update-product-option-group-link.dto';
+import { UpdateProductOptionItemOverrideDto } from './dto/update-product-option-item-override.dto';
 
 @Injectable()
 export class ProductOptionGroupsService {
@@ -135,12 +136,93 @@ export class ProductOptionGroupsService {
     }
   }
 
+  async upsertItemOverride(
+    productId: string,
+    optionItemId: string,
+    dto: UpdateProductOptionItemOverrideDto,
+  ) {
+    const tenantId = this.getRequiredTenantId();
+    await this.ensureProduct(tenantId, productId);
+
+    const item = await this.prisma.tenantClient.optionItem.findFirst({
+      where: { id: optionItemId, tenantId },
+      select: { id: true, optionGroupId: true, isActive: true },
+    });
+    if (!item) throw new NotFoundException('Item de opção não encontrado.');
+
+    const link = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
+      where: { productId, optionGroupId: item.optionGroupId, tenantId },
+      select: { id: true },
+    });
+    if (!link) {
+      throw new BadRequestException('Este item de opção não pertence a um grupo vinculado a este produto.');
+    }
+
+    const existing = await this.prisma.tenantClient.productOptionItemPrice.findUnique({
+      where: { productId_optionItemId: { productId, optionItemId } },
+    });
+
+    const nextIsActive = dto.isActive !== undefined ? dto.isActive : (existing?.isActive ?? null);
+    const nextPrice = dto.price !== undefined ? (dto.price !== null ? new Prisma.Decimal(dto.price) : null) : (existing?.price ?? null);
+
+    // Se nenhum override for mantido (isActive é true/null e preço é null), deletar o registro para herdar padrão
+    if ((nextIsActive === null || nextIsActive === true) && nextPrice === null) {
+      if (existing) {
+        await this.prisma.tenantClient.productOptionItemPrice.delete({
+          where: { productId_optionItemId: { productId, optionItemId } },
+        });
+      }
+      return { success: true, effectiveIsActive: item.isActive, override: null };
+    }
+
+    const updated = await this.prisma.tenantClient.productOptionItemPrice.upsert({
+      where: { productId_optionItemId: { productId, optionItemId } },
+      create: {
+        tenantId,
+        productId,
+        optionItemId,
+        isActive: nextIsActive,
+        price: nextPrice,
+      },
+      update: {
+        isActive: nextIsActive,
+        price: nextPrice,
+      },
+    });
+
+    const effectiveIsActive = item.isActive && (updated.isActive ?? true);
+    return {
+      success: true,
+      effectiveIsActive,
+      override: {
+        id: updated.id,
+        isActive: updated.isActive,
+        price: updated.price ? Number(updated.price) : null,
+      },
+    };
+  }
+
   async unlink(linkId: string) {
     const link = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
       where: { id: linkId },
-      select: { id: true, productId: true },
+      select: { id: true, productId: true, optionGroupId: true },
     });
     if (!link) throw new NotFoundException('Vínculo não encontrado.');
+
+    const items = await this.prisma.tenantClient.optionItem.findMany({
+      where: { optionGroupId: link.optionGroupId },
+      select: { id: true },
+    });
+    const itemIds = items.map((i) => i.id);
+
+    if (itemIds.length > 0) {
+      await this.prisma.tenantClient.productOptionItemPrice.deleteMany({
+        where: {
+          productId: link.productId,
+          optionItemId: { in: itemIds },
+        },
+      });
+    }
 
     await this.prisma.tenantClient.productOptionGroupLink.delete({ where: { id: linkId } });
 
@@ -190,7 +272,7 @@ export class ProductOptionGroupsService {
     const tenantId = this.getRequiredTenantId();
     await this.ensureProduct(tenantId, productId);
 
-    return this.prisma.tenantClient.productOptionGroupLink.findMany({
+    const links = await this.prisma.tenantClient.productOptionGroupLink.findMany({
       where: { productId, tenantId },
       orderBy: { order: 'asc' },
       include: {
@@ -199,6 +281,34 @@ export class ProductOptionGroupsService {
         },
       },
     });
+
+    const overrides = await this.prisma.tenantClient.productOptionItemPrice.findMany({
+      where: { productId, tenantId },
+    });
+
+    const overrideMap = new Map(overrides.map((o) => [o.optionItemId, o]));
+
+    return links.map((link) => ({
+      ...link,
+      optionGroup: {
+        ...link.optionGroup,
+        items: link.optionGroup.items.map((item) => {
+          const override = overrideMap.get(item.id);
+          const effectiveIsActive = item.isActive && (override?.isActive ?? true);
+          return {
+            ...item,
+            effectiveIsActive,
+            override: override
+              ? {
+                  id: override.id,
+                  isActive: override.isActive,
+                  price: override.price ? Number(override.price) : null,
+                }
+              : null,
+          };
+        }),
+      },
+    }));
   }
 
   async reorderLinks(productId: string, orderedLinkIds: string[]) {

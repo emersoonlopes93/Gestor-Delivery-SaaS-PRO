@@ -690,12 +690,28 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     );
   }
 
+  const toggleItemOverride = async (optionItemId: string, currentEffectiveIsActive: boolean) => {
+    if (!productId) return;
+    const nextIsActive = !currentEffectiveIsActive;
+    setSavingStates((p) => ({ ...p, [`override-item-${optionItemId}`]: true }));
+    try {
+      await api.patch(`/catalog/products/${productId}/option-groups/items/${optionItemId}/override`, {
+        isActive: nextIsActive,
+      });
+      await loadAll();
+    } catch (err) {
+      console.error('Erro ao alternar disponibilidade do item:', err);
+    } finally {
+      setSavingStates((p) => ({ ...p, [`override-item-${optionItemId}`]: false }));
+    }
+  };
+
   return (
     <FormProvider {...methods}>
     <CatalogEditorProvider value={{ 
       productId, isNew, isComboMode, product, savingStates, setSavingStates, loadAll, handleSaveProduct, 
       goNextWizardStep, goPrevWizardStep, isComboWizard, isProductWizard, onOpenRecipe: () => setIsRecipeModalOpen(true),
-      links, moveLink, openAddGroupModal, setIsCreateComplementModalOpen, openGlobalGroupEditor, openEditLinkModal, removeGroupLink,
+      links, moveLink, openAddGroupModal, setIsCreateComplementModalOpen, openGlobalGroupEditor, openEditLinkModal, removeGroupLink, toggleItemOverride,
       bundleItems, bundleSummary, comboPricingType, setComboPricingType, comboPricingValue, setComboPricingValue, updateComboPricing, openBundleItemModal, deleteBundleItem,
       publication, patchPublication, rules, openRuleModal, deleteRule, formatChannelLabel, formatDaysLabel
     }}>
@@ -937,6 +953,16 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
           }
         }}
         isSaving={Boolean(savingStates.saveLinkOverrides)}
+        onToggleItemOverride={async (optionItemId, currentEffectiveIsActive) => {
+          await toggleItemOverride(optionItemId, currentEffectiveIsActive);
+          if (productId && editingLink) {
+            const freshLinks = await api.get<LinkWithGroup[]>(`/catalog/products/${productId}/option-groups`);
+            if (freshLinks.success) {
+              const updatedLink = freshLinks.data.find((l) => l.id === editingLink.id);
+              if (updatedLink) setEditingLink(updatedLink);
+            }
+          }
+        }}
       />
 
       <Modal

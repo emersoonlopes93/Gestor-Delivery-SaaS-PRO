@@ -143,8 +143,22 @@ export interface OptionItem {
   allowQuantity: boolean;
   minQty?: number | null;
   maxQty?: number | null;
+  effectiveIsActive?: boolean;
+  override?: ProductOptionItemOverride | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+}
+
+export interface ProductOptionItemOverride {
+  id: string;
+  tenantId: string;
+  productId: string;
+  optionItemId: string;
+  price?: number | string | null;
+  costPrice?: number | string | null;
+  isActive?: boolean | null;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export interface ProductOptionGroupLink {
