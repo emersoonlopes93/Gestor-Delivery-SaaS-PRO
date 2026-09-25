@@ -124,6 +124,9 @@ export interface OptionGroup {
   items?: OptionItem[];
   createdAt: Date | string;
   updatedAt: Date | string;
+  _count?: {
+    optionGroupLinks: number;
+  };
 }
 
 export interface OptionItem {

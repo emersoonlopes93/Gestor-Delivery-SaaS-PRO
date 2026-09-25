@@ -1,6 +1,6 @@
 import React from 'react';
-
 import { useCatalogEditor } from '../CatalogEditorContext';
+import { formatSelectionRules, formatSelectionType } from '../utils/optionGroupHelpers';
 
 export const ProductPersonalization: React.FC = () => {
   const {
@@ -35,14 +35,14 @@ export const ProductPersonalization: React.FC = () => {
               onClick={openAddGroupModal}
               className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
             >
-              Vincular opções
+              Vincular grupo existente
             </button>
             <button
               type="button"
               onClick={() => setIsCreateComplementModalOpen(true)}
               className="px-4 py-2 text-sm font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all"
             >
-              Criar novas opções
+              Criar novo grupo
             </button>
           </div>
         </div>
@@ -50,18 +50,30 @@ export const ProductPersonalization: React.FC = () => {
 
       <div className="space-y-3 md:hidden">
         {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
-          <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-            <div className="font-black text-foreground">{l.optionGroup?.name ?? 'Opções'}</div>
-            <div className="text-xs text-muted-foreground font-medium mt-1">
-              Base: req={String(l.optionGroup?.isRequired)} min={l.optionGroup?.minSelect} max={l.optionGroup?.maxSelect}
+          <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+            <div>
+              <div className="font-black text-foreground">{l.optionGroup?.name ?? 'Opções'}</div>
+              <div className="text-xs text-muted-foreground font-medium mt-1">
+                {l.optionGroup && (
+                  <>
+                    {formatSelectionType(l.optionGroup.selectionType)} • {l.optionGroup.isRequired ? 'Obrigatório' : 'Opcional'} • {formatSelectionRules({
+                      isRequired: l.optionGroup.isRequired,
+                      minSelect: l.optionGroup.minSelect,
+                      maxSelect: l.optionGroup.maxSelect,
+                      selectionType: l.optionGroup.selectionType,
+                    })}
+                  </>
+                )}
+              </div>
             </div>
-            <div className="mt-3 text-xs font-bold text-foreground/80">
-              Overrides: req={String(l.overrideIsRequired ?? '-')}
-              {' | '}min={l.overrideMinSelect ?? '-'}
-              {' | '}max={l.overrideMaxSelect ?? '-'}
-            </div>
-            <div className="mt-1 text-xs font-black text-foreground/90">Axis: {l.pricingAxis}</div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+
+            {(l.overrideName || l.overrideIsRequired !== null || l.overrideMinSelect !== null || l.overrideMaxSelect !== null) && (
+              <div className="text-xs font-medium text-primary bg-primary/10 p-2 rounded-lg border border-primary/20">
+                Regras customizadas neste produto
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => moveLink(l.id, -1)}
@@ -81,24 +93,24 @@ export const ProductPersonalization: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openEditLinkModal(l)}
-                className="px-3 py-2 text-xs font-black bg-muted text-foreground hover:bg-muted/80 rounded-xl transition-all"
+                className="px-3 py-2 text-xs font-bold bg-muted text-foreground hover:bg-muted/80 rounded-xl transition-all col-span-2"
               >
-                Overrides
+                Configurar neste produto
               </button>
               <button
                 type="button"
                 onClick={() => removeGroupLink(l.id)}
                 disabled={savingStates[`remove-${l.id}`]}
-                className="px-3 py-2 text-xs font-black bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                className="px-3 py-2 text-xs font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all col-span-2"
               >
-                Remover
+                Desvincular do produto
               </button>
             </div>
           </div>
         ))}
         {links.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm italic shadow-sm">
-            Nenhuma opção vinculada.
+            Nenhum grupo de opções vinculado a este produto.
           </div>
         ) : null}
       </div>
@@ -108,66 +120,100 @@ export const ProductPersonalization: React.FC = () => {
           <thead className="bg-muted/30 dark:bg-muted/80 border-b border-border">
             <tr>
               <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Grupo de Opções</th>
-              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Overrides</th>
-              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Axis</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Regras do Grupo</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Configuração Local</th>
               <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border dark:divide-border/60">
-            {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
-              <tr key={l.id} className="hover:bg-muted/50 dark:hover:bg-muted/80 dark:bg-card/40 transition-colors group">
-                <td className="px-6 py-4">
-                  <div className="font-bold text-foreground">{l.optionGroup?.name ?? 'Grupo de Opções'}</div>
-                  <div className="text-xs text-muted-foreground font-medium mt-1">
-                    Base: req={String(l.optionGroup?.isRequired)} min={l.optionGroup?.minSelect} max={l.optionGroup?.maxSelect}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm font-bold text-foreground/80">
-                  req={String(l.overrideIsRequired ?? '-')}
-                  {' | '}min={l.overrideMinSelect ?? '-'}
-                  {' | '}max={l.overrideMaxSelect ?? '-'}
-                </td>
-                <td className="px-6 py-4 text-sm font-black text-foreground/90">{l.pricingAxis}</td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => moveLink(l.id, -1)}
-                      disabled={savingStates.reorderLinks}
-                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-                      title="Subir"
-                    >
-                      {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↑'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveLink(l.id, 1)}
-                      disabled={savingStates.reorderLinks}
-                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-                      title="Descer"
-                    >
-                      {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↓'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openEditLinkModal(l)}
-                      className="px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded transition-all"
-                    >
-                      Overrides
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeGroupLink(l.id)}
-                      disabled={savingStates[`remove-${l.id}`]}
-                      className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                    >
-                      {savingStates[`remove-${l.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
-                      Remover
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => {
+              const hasOverride = Boolean(
+                l.overrideName ||
+                l.overrideDescription ||
+                l.overrideIsRequired !== null ||
+                l.overrideMinSelect !== null ||
+                l.overrideMaxSelect !== null
+              );
+
+              return (
+                <tr key={l.id} className="hover:bg-muted/50 dark:hover:bg-muted/80 dark:bg-card/40 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-foreground">{l.overrideName || l.optionGroup?.name || 'Grupo de Opções'}</div>
+                    {l.overrideName && l.optionGroup?.name && (
+                      <div className="text-[11px] text-muted-foreground italic">
+                        (Nome original: {l.optionGroup.name})
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-xs font-medium text-muted-foreground">
+                    {l.optionGroup ? (
+                      <div className="space-y-0.5">
+                        <div className="font-bold text-foreground">
+                          {formatSelectionType(l.optionGroup.selectionType)}
+                        </div>
+                        <div>
+                          {l.optionGroup.isRequired ? 'Obrigatório' : 'Opcional'} • {formatSelectionRules({
+                            isRequired: l.optionGroup.isRequired,
+                            minSelect: l.optionGroup.minSelect,
+                            maxSelect: l.optionGroup.maxSelect,
+                            selectionType: l.optionGroup.selectionType,
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-xs font-medium">
+                    {hasOverride ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                        Regras customizadas
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Padrão do grupo</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => moveLink(l.id, -1)}
+                        disabled={savingStates.reorderLinks}
+                        className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                        title="Subir"
+                      >
+                        {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↑'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveLink(l.id, 1)}
+                        disabled={savingStates.reorderLinks}
+                        className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                        title="Descer"
+                      >
+                        {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↓'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEditLinkModal(l)}
+                        className="px-3 py-1 text-xs font-bold text-foreground bg-muted hover:bg-muted/80 rounded transition-all"
+                      >
+                        Configurar neste produto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeGroupLink(l.id)}
+                        disabled={savingStates[`remove-${l.id}`]}
+                        className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                      >
+                        {savingStates[`remove-${l.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
+                        Desvincular
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {links.length === 0 && (
