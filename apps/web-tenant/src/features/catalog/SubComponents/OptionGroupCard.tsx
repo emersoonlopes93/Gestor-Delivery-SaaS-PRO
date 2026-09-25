@@ -14,12 +14,14 @@ interface OptionGroupCardProps {
   group: GroupWithItems;
   onEdit: (group: GroupWithItems) => void;
   onDelete: (group: GroupWithItems) => void;
+  onViewProducts: (group: GroupWithItems) => void;
 }
 
 export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
   group,
   onEdit,
   onDelete,
+  onViewProducts,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -46,17 +48,20 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
             )}
           </div>
 
-          {/* Usage Badge (MANDATORY) */}
-          <div
-            className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+          {/* Usage Badge (MANDATORY & CLICKABLE) */}
+          <button
+            type="button"
+            onClick={() => onViewProducts(group)}
+            title="Ver produtos que utilizam este grupo"
+            className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95 ${
               usageCount > 0
-                ? 'bg-primary/10 text-primary border border-primary/20'
-                : 'bg-muted text-muted-foreground border border-border'
+                ? 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20'
+                : 'bg-muted text-muted-foreground border border-border hover:bg-muted/80'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
             <span>{formatUsageCount(usageCount)}</span>
-          </div>
+          </button>
         </div>
 
         {/* Rule Badges */}
@@ -150,15 +155,25 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
       </div>
 
       {/* Card Footer / Actions */}
-      <div className="flex items-center justify-between pt-2 border-t border-border">
-        <button
-          type="button"
-          onClick={() => onEdit(group)}
-          className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5"
-        >
-          <Edit3 className="w-3.5 h-3.5" />
-          Editar grupo
-        </button>
+      <div className="flex items-center justify-between pt-2 border-t border-border gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onViewProducts(group)}
+            className="px-3 py-2 text-xs font-bold text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-all flex items-center gap-1.5"
+          >
+            <Layers className="w-3.5 h-3.5 text-primary" />
+            Ver produtos
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(group)}
+            className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            Editar grupo
+          </button>
+        </div>
 
         <div className="relative">
           <button
@@ -176,7 +191,18 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
                 className="fixed inset-0 z-10"
                 onClick={() => setIsMenuOpen(false)}
               />
-              <div className="absolute right-0 bottom-full mb-1 w-44 bg-card border border-border rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 bottom-full mb-1 w-48 bg-card border border-border rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onViewProducts(group);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs font-bold text-foreground hover:bg-muted flex items-center gap-2"
+                >
+                  <Layers className="w-3.5 h-3.5 text-primary" />
+                  Ver produtos vinculados
+                </button>
                 <button
                   type="button"
                   onClick={() => {

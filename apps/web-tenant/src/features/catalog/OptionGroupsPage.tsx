@@ -5,6 +5,7 @@ import { OptionGroupEditorModal } from './SubComponents/OptionGroupEditorModal';
 import { OptionGroupCard } from './SubComponents/OptionGroupCard';
 import { ConfirmSharedEditModal } from './SubComponents/ConfirmSharedEditModal';
 import { ConfirmDeleteGroupModal } from './SubComponents/ConfirmDeleteGroupModal';
+import { LinkedProductsModal } from './SubComponents/LinkedProductsModal';
 import { Search, Plus, Layers, Filter, RefreshCw, XCircle } from 'lucide-react';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[]; _count?: { optionGroupLinks: number } };
@@ -22,6 +23,7 @@ export function OptionGroupsPage() {
   // Modal States
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupWithItems | null>(null);
+  const [viewProductsGroup, setViewProductsGroup] = useState<GroupWithItems | null>(null);
 
   // Guardrail Modals
   const [sharedGroupToEdit, setSharedGroupToEdit] = useState<GroupWithItems | null>(null);
@@ -123,6 +125,10 @@ export function OptionGroupsPage() {
   const handleSaved = async () => {
     setIsEditorOpen(false);
     await loadGroups();
+  };
+
+  const handleOpenViewProducts = (group: GroupWithItems) => {
+    setViewProductsGroup(group);
   };
 
   return (
@@ -246,6 +252,7 @@ export function OptionGroupsPage() {
               group={g}
               onEdit={handleRequestEdit}
               onDelete={handleRequestDelete}
+              onViewProducts={handleOpenViewProducts}
             />
           ))}
         </div>
@@ -301,6 +308,16 @@ export function OptionGroupsPage() {
         groupId={editingGroup?.id || null}
         onSaved={handleSaved}
       />
+
+      {/* Linked Products Inverse Management Modal */}
+      {viewProductsGroup && (
+        <LinkedProductsModal
+          isOpen={Boolean(viewProductsGroup)}
+          onClose={() => setViewProductsGroup(null)}
+          group={viewProductsGroup}
+          onUpdated={loadGroups}
+        />
+      )}
 
       {/* Guardrail: Shared Group Edit Confirmation */}
       {sharedGroupToEdit && (
