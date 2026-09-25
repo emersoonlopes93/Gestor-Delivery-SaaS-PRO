@@ -43,6 +43,7 @@ export type CatalogEditorContextValue = {
   moveLink: (id: string, direction: -1 | 1) => void;
   openAddGroupModal: () => void;
   setIsCreateComplementModalOpen: (open: boolean) => void;
+  openGlobalGroupEditor: (group: OptionGroup) => void;
   openEditLinkModal: (link: LinkWithGroup) => void;
   removeGroupLink: (id: string) => void;
 

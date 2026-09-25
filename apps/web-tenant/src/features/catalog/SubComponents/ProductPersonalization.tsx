@@ -9,6 +9,7 @@ export const ProductPersonalization: React.FC = () => {
     moveLink,
     openAddGroupModal,
     setIsCreateComplementModalOpen,
+    openGlobalGroupEditor,
     openEditLinkModal,
     removeGroupLink,
     savingStates,
@@ -26,23 +27,23 @@ export const ProductPersonalization: React.FC = () => {
           <div>
             <div className="font-black text-foreground">Grupos de Opções vinculados</div>
             <div className="text-sm text-muted-foreground font-medium mt-1">
-              Vincule grupos de opções reutilizáveis para personalização deste produto.
+              Vincule grupos de opções reutilizáveis da Biblioteca para personalização deste produto.
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={openAddGroupModal}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all shadow-sm"
             >
-              Vincular grupo existente
+              + Vincular grupo existente
             </button>
             <button
               type="button"
               onClick={() => setIsCreateComplementModalOpen(true)}
               className="px-4 py-2 text-sm font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all"
             >
-              Criar novo grupo
+              + Criar novo grupo
             </button>
           </div>
         </div>
@@ -52,7 +53,7 @@ export const ProductPersonalization: React.FC = () => {
         {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
           <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
             <div>
-              <div className="font-black text-foreground">{l.optionGroup?.name ?? 'Opções'}</div>
+              <div className="font-black text-foreground">{l.overrideName || l.optionGroup?.name || 'Opções'}</div>
               <div className="text-xs text-muted-foreground font-medium mt-1">
                 {l.optionGroup && (
                   <>
@@ -97,6 +98,15 @@ export const ProductPersonalization: React.FC = () => {
               >
                 Configurar neste produto
               </button>
+              {l.optionGroup && (
+                <button
+                  type="button"
+                  onClick={() => openGlobalGroupEditor(l.optionGroup)}
+                  className="px-3 py-2 text-xs font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all col-span-2"
+                >
+                  Editar grupo compartilhado
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => removeGroupLink(l.id)}
@@ -200,6 +210,15 @@ export const ProductPersonalization: React.FC = () => {
                       >
                         Configurar neste produto
                       </button>
+                      {l.optionGroup && (
+                        <button
+                          type="button"
+                          onClick={() => openGlobalGroupEditor(l.optionGroup)}
+                          className="px-3 py-1 text-xs font-bold text-foreground bg-muted border border-border hover:bg-muted/80 rounded transition-all"
+                        >
+                          Editar grupo
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeGroupLink(l.id)}
