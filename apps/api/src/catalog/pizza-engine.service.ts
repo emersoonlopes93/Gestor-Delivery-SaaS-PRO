@@ -27,7 +27,7 @@ export class PizzaEngineService {
   async calculatePrice(categoryId: string, sizeId: string, flavorSelections: { productId: string, fraction: number }[]) {
     const category = await this.prisma.tenantClient.productCategory.findUnique({
       where: { id: categoryId },
-      select: { templateConfig: true, templateType: true }
+      select: { id: true, tenantId: true, templateConfig: true, templateType: true }
     });
 
     if (!category || category.templateType !== 'pizza') {
@@ -51,7 +51,7 @@ export class PizzaEngineService {
       throw new BadRequestException('Selecione no máximo 2 sabores para a pizza.');
     }
     if (!sizeId) {
-      throw new BadRequestException('Tamanho inválido.');
+      throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
     }
     for (const flavor of flavorSelections) {
       if (!flavor.productId) {
@@ -65,14 +65,75 @@ export class PizzaEngineService {
       throw new BadRequestException('A soma das frações dos sabores deve ser igual a 1 (100%).');
     }
 
-    // Get Size details
+    const flavorIds = Array.from(new Set(flavorSelections.map((flavor) => flavor.productId)));
+
+    // A size must be active and from the same tenant. Its structural
+    // authorization is checked against every selected pizza flavor below.
     const size = await this.prisma.tenantClient.optionItem.findUnique({
       where: { id: sizeId },
-      select: { name: true }
+      select: {
+        id: true,
+        tenantId: true,
+        optionGroupId: true,
+        name: true,
+        isActive: true,
+        deletedAt: true,
+        optionGroup: {
+          select: { isActive: true, deletedAt: true },
+        },
+      }
     });
 
-    if (!size) {
-      throw new BadRequestException('Tamanho inválido.');
+    if (
+      !size ||
+      size.tenantId !== category.tenantId ||
+      !size.isActive ||
+      size.deletedAt !== null ||
+      !size.optionGroup.isActive ||
+      size.optionGroup.deletedAt !== null
+    ) {
+      throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
+    }
+
+    const flavors = await this.prisma.tenantClient.product.findMany({
+      where: {
+        tenantId: category.tenantId,
+        id: { in: flavorIds },
+        categoryId,
+        deletedAt: null,
+        isActive: true,
+        isAvailable: true,
+      },
+      select: { id: true },
+    });
+    if (flavors.length !== flavorIds.length) {
+      throw new BadRequestException('Um ou mais sabores não estão disponíveis para esta pizza.');
+    }
+
+    const sizeLinks = await this.prisma.tenantClient.productOptionGroupLink.findMany({
+      where: {
+        tenantId: category.tenantId,
+        productId: { in: flavorIds },
+        optionGroupId: size.optionGroupId,
+        pricingAxis: 'primary',
+      },
+      select: { productId: true },
+    });
+    const authorizedFlavorIds = new Set(sizeLinks.map((link) => link.productId));
+    if (flavorIds.some((flavorId) => !authorizedFlavorIds.has(flavorId))) {
+      throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
+    }
+
+    const priceRecords = await this.prisma.tenantClient.productOptionItemPrice.findMany({
+      where: {
+        tenantId: category.tenantId,
+        productId: { in: flavorIds },
+        optionItemId: sizeId,
+      },
+      select: { productId: true, isActive: true },
+    });
+    if (priceRecords.some((record) => record.isActive === false)) {
+      throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
     }
 
     // Get prices for each flavor at the selected size

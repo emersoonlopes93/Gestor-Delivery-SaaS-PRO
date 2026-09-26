@@ -18,6 +18,7 @@ import {
 import { api } from '../lib/api-client';
 import { useCartStore } from '../store/use-cart-store';
 import { useAnalytics } from '../features/analytics';
+import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -61,23 +62,24 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
 
   const optionGroupLinks = product.optionGroupLinks ?? [];
   const isProductAvailable = product.isAvailable && !isStoreClosed;
+  const isPizzaTemplate = shouldUsePizzaFlow(category, optionGroupLinks);
 
   const sizeGroup = useMemo(() => {
+    if (!isPizzaTemplate) return undefined;
     return optionGroupLinks.find((link) =>
       link.optionGroup?.isActive && (
         link.pricingAxis === 'primary' ||
         /tamanh/i.test(link.optionGroup.name)
       )
     );
-  }, [optionGroupLinks]);
+  }, [isPizzaTemplate, optionGroupLinks]);
 
   const mountingGroup = useMemo(() => {
+    if (!isPizzaTemplate) return undefined;
     return optionGroupLinks.find((link) =>
       link.optionGroup?.isActive && /montagem|montage/i.test(link.optionGroup.name)
     );
-  }, [optionGroupLinks]);
-
-  const isPizzaTemplate = isPizzaCategory(category) || Boolean(sizeGroup || mountingGroup);
+  }, [isPizzaTemplate, optionGroupLinks]);
 
   const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
   const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
