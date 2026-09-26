@@ -36,6 +36,7 @@ export interface Product {
   image?: string | null;
   mediaAssetId?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   isFeatured: boolean;
   isAvailable: boolean;
   sellableOnline: boolean;
