@@ -13,6 +13,7 @@ export interface ProductCategory {
   templateType: CategoryTemplateType;
   templateConfig?: Record<string, unknown> | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   activeDays?: CategoryActiveDay[];
   isFeatured: boolean;
   order: number;
@@ -37,6 +38,7 @@ export interface Product {
   image?: string | null;
   mediaAssetId?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   isFeatured: boolean;
   isAvailable: boolean;
   sellableOnline: boolean;

@@ -6,7 +6,7 @@ import {
   formatSelectionRules,
   formatPriceImpact,
 } from '../utils/optionGroupHelpers';
-import { Layers, ChevronDown, ChevronUp, MoreVertical, Edit3, Trash2 } from 'lucide-react';
+import { Archive, Layers, ChevronDown, ChevronUp, MoreVertical, Edit3, RotateCcw } from 'lucide-react';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[]; _count?: { optionGroupLinks: number } };
 
@@ -14,6 +14,7 @@ interface OptionGroupCardProps {
   group: GroupWithItems;
   onEdit: (group: GroupWithItems) => void;
   onDelete: (group: GroupWithItems) => void;
+  onRestore?: (group: GroupWithItems) => void;
   onViewProducts: (group: GroupWithItems) => void;
 }
 
@@ -21,12 +22,14 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
   group,
   onEdit,
   onDelete,
+  onRestore,
   onViewProducts,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const usageCount = group._count?.optionGroupLinks ?? 0;
+  const isArchived = Boolean(group.deletedAt);
   const items = [...(group.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const maxVisibleItems = 4;
   const hasMoreItems = items.length > maxVisibleItems;
@@ -168,6 +171,7 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
           <button
             type="button"
             onClick={() => onEdit(group)}
+            disabled={isArchived}
             className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5"
           >
             <Edit3 className="w-3.5 h-3.5" />
@@ -192,6 +196,20 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
                 onClick={() => setIsMenuOpen(false)}
               />
               <div className="absolute right-0 bottom-full mb-1 w-48 bg-card border border-border rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                {isArchived ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onRestore?.(group);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-bold text-foreground hover:bg-muted flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-primary" />
+                    Restaurar grupo
+                  </button>
+                ) : (
+                  <>
                 <button
                   type="button"
                   onClick={() => {
@@ -222,9 +240,11 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
                   }}
                   className="w-full px-3 py-2 text-left text-xs font-bold text-destructive hover:bg-destructive/10 flex items-center gap-2"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Excluir grupo
+                  <Archive className="w-3.5 h-3.5" />
+                  Arquivar grupo
                 </button>
+                  </>
+                )}
               </div>
             </>
           )}

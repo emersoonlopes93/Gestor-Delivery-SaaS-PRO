@@ -114,11 +114,12 @@ export class StorefrontService {
 
             optionItemPrices: true,
             optionGroupLinks: {
+              where: { optionGroup: { isActive: true, deletedAt: null } },
               include: {
                 optionGroup: {
                   include: {
                     items: {
-                      where: { isActive: true },
+                      where: { isActive: true, deletedAt: null },
                       orderBy: { order: 'asc' },
                     },
                   },
@@ -265,7 +266,7 @@ export class StorefrontService {
                 const activeItems = ol.optionGroup.items
                   .map((oi) => {
                     const override = itemOverrideMap.get(oi.id);
-                    const effectiveIsActive = oi.isActive && (override?.isActive ?? true);
+                    const effectiveIsActive = oi.deletedAt === null && oi.isActive && (override?.isActive ?? true);
                     const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
                     return {
                       id: oi.id,

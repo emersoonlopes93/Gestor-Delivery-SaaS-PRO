@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal } from '../../../components/Modal';
-import { AlertOctagon } from 'lucide-react';
+import { Archive } from 'lucide-react';
 
 interface ConfirmDeleteGroupModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ export const ConfirmDeleteGroupModal: React.FC<ConfirmDeleteGroupModalProps> = (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Excluir grupo?"
+      title="Arquivar grupo?"
       maxWidth="max-w-md"
       footer={
         <>
@@ -42,14 +42,14 @@ export const ConfirmDeleteGroupModal: React.FC<ConfirmDeleteGroupModalProps> = (
             className="px-5 py-2 text-sm font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg transition-colors flex items-center gap-2"
           >
             {isDeleting && <div className="w-4 h-4 border-2 border-destructive-foreground border-t-transparent rounded-full animate-spin" />}
-            Excluir grupo
+            Arquivar grupo
           </button>
         </>
       }
     >
       <div className="space-y-4 text-left">
         <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-          <AlertOctagon className="w-6 h-6 shrink-0 mt-0.5" />
+          <Archive className="w-6 h-6 shrink-0 mt-0.5" />
           <div className="text-sm font-medium text-foreground">
             {usageCount > 0 ? (
               <>

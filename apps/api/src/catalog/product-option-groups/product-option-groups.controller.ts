@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
-import { RequirePermissions } from '../../common/decorators';
+import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { ProductOptionGroupsService } from './product-option-groups.service';
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';
@@ -21,8 +21,8 @@ export class ProductOptionGroupsController {
 
   @Post()
   @RequirePermissions('catalog.manage_products')
-  link(@Param('productId') productId: string, @Body() dto: Omit<CreateProductOptionGroupLinkDto, 'productId'>) {
-    return this.service.link({ ...dto, productId });
+  link(@Param('productId') productId: string, @Body() dto: Omit<CreateProductOptionGroupLinkDto, 'productId'>, @CurrentUser('sub') actorId: string) {
+    return this.service.link({ ...dto, productId }, actorId);
   }
 
   @Patch('items/:optionItemId/override')
@@ -31,25 +31,26 @@ export class ProductOptionGroupsController {
     @Param('productId') productId: string,
     @Param('optionItemId') optionItemId: string,
     @Body() dto: UpdateProductOptionItemOverrideDto,
+    @CurrentUser('sub') actorId: string,
   ) {
-    return this.service.upsertItemOverride(productId, optionItemId, dto);
+    return this.service.upsertItemOverride(productId, optionItemId, dto, actorId);
   }
 
   @Patch(':linkId')
   @RequirePermissions('catalog.manage_products')
-  update(@Param('linkId') linkId: string, @Body() dto: UpdateProductOptionGroupLinkDto) {
-    return this.service.update(linkId, dto);
+  update(@Param('linkId') linkId: string, @Body() dto: UpdateProductOptionGroupLinkDto, @CurrentUser('sub') actorId: string) {
+    return this.service.update(linkId, dto, actorId);
   }
 
   @Delete(':linkId')
   @RequirePermissions('catalog.manage_products')
-  unlink(@Param('linkId') linkId: string) {
-    return this.service.unlink(linkId);
+  unlink(@Param('linkId') linkId: string, @CurrentUser('sub') actorId: string) {
+    return this.service.unlink(linkId, actorId);
   }
 
   @Post('reorder')
   @RequirePermissions('catalog.manage_products')
-  reorder(@Param('productId') productId: string, @Body() dto: ReorderProductOptionGroupLinksDto) {
-    return this.service.reorderLinks(productId, dto.orderedLinkIds);
+  reorder(@Param('productId') productId: string, @Body() dto: ReorderProductOptionGroupLinksDto, @CurrentUser('sub') actorId: string) {
+    return this.service.reorderLinks(productId, dto.orderedLinkIds, actorId);
   }
 }

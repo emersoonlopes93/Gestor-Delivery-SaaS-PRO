@@ -19,6 +19,18 @@ export class ProductOptionGroupsService {
     return tenantId;
   }
 
+  private async audit(
+    tenantId: string,
+    actorId: string | undefined,
+    action: string,
+    resource: string,
+    details: Record<string, string | boolean | number | null>,
+  ) {
+    await this.prisma.auditLog.create({
+      data: { tenantId, userId: actorId ?? null, userType: 'tenant_user', action, resource, details },
+    });
+  }
+
   private async ensureProduct(tenantId: string, productId: string) {
     const product = await this.prisma.tenantClient.product.findFirst({
       where: { id: productId, tenantId, deletedAt: null },
@@ -30,7 +42,7 @@ export class ProductOptionGroupsService {
 
   private async ensureOptionGroup(tenantId: string, optionGroupId: string) {
     const group = await this.prisma.tenantClient.optionGroup.findFirst({
-      where: { id: optionGroupId, tenantId },
+      where: { id: optionGroupId, tenantId, deletedAt: null },
       select: { id: true, selectionType: true, isRequired: true, minSelect: true, maxSelect: true, isActive: true },
     });
     if (!group) throw new NotFoundException('Grupo não encontrado.');
@@ -76,6 +88,7 @@ export class ProductOptionGroupsService {
         tenantId,
         optionGroupId: { in: groupIds },
         isActive: true,
+        deletedAt: null,
         priceImpactType: 'replace',
       },
       select: { id: true },
@@ -89,7 +102,7 @@ export class ProductOptionGroupsService {
     }
   }
 
-  async link(dto: CreateProductOptionGroupLinkDto) {
+  async link(dto: CreateProductOptionGroupLinkDto, actorId?: string) {
     const tenantId = this.getRequiredTenantId();
     await this.ensureProduct(tenantId, dto.productId);
     const group = await this.ensureOptionGroup(tenantId, dto.optionGroupId);
@@ -125,6 +138,7 @@ export class ProductOptionGroupsService {
 
       await this.assertNoPrimaryReplaceConflict(tenantId, dto.productId);
 
+      await this.audit(tenantId, actorId, 'catalog.product_option_group.linked', 'product_option_group_link', { productId: dto.productId, optionGroupId: dto.optionGroupId, linkId: created.id });
       return created;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -140,12 +154,13 @@ export class ProductOptionGroupsService {
     productId: string,
     optionItemId: string,
     dto: UpdateProductOptionItemOverrideDto,
+    actorId?: string,
   ) {
     const tenantId = this.getRequiredTenantId();
     await this.ensureProduct(tenantId, productId);
 
     const item = await this.prisma.tenantClient.optionItem.findFirst({
-      where: { id: optionItemId, tenantId },
+      where: { id: optionItemId, tenantId, deletedAt: null, optionGroup: { deletedAt: null } },
       select: { id: true, optionGroupId: true, isActive: true },
     });
     if (!item) throw new NotFoundException('Item de opção não encontrado.');
@@ -172,6 +187,7 @@ export class ProductOptionGroupsService {
           where: { productId_optionItemId: { productId, optionItemId } },
         });
       }
+      await this.audit(tenantId, actorId, 'catalog.product_option_item.override_cleared', 'product_option_item_price', { productId, optionItemId });
       return { success: true, effectiveIsActive: item.isActive, override: null };
     }
 
@@ -191,6 +207,7 @@ export class ProductOptionGroupsService {
     });
 
     const effectiveIsActive = item.isActive && (updated.isActive ?? true);
+    await this.audit(tenantId, actorId, 'catalog.product_option_item.override_updated', 'product_option_item_price', { productId, optionItemId });
     return {
       success: true,
       effectiveIsActive,
@@ -202,7 +219,7 @@ export class ProductOptionGroupsService {
     };
   }
 
-  async unlink(linkId: string) {
+  async unlink(linkId: string, actorId?: string) {
     const link = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
       where: { id: linkId },
       select: { id: true, productId: true, optionGroupId: true },
@@ -210,7 +227,7 @@ export class ProductOptionGroupsService {
     if (!link) throw new NotFoundException('Vínculo não encontrado.');
 
     const items = await this.prisma.tenantClient.optionItem.findMany({
-      where: { optionGroupId: link.optionGroupId },
+      where: { optionGroupId: link.optionGroupId, deletedAt: null },
       select: { id: true },
     });
     const itemIds = items.map((i) => i.id);
@@ -226,10 +243,12 @@ export class ProductOptionGroupsService {
 
     await this.prisma.tenantClient.productOptionGroupLink.delete({ where: { id: linkId } });
 
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.product_option_group.unlinked', 'product_option_group_link', { productId: link.productId, optionGroupId: link.optionGroupId, linkId });
+
     return { success: true };
   }
 
-  async update(linkId: string, dto: UpdateProductOptionGroupLinkDto) {
+  async update(linkId: string, dto: UpdateProductOptionGroupLinkDto, actorId?: string) {
     const existing = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
       where: { id: linkId },
       select: { id: true, productId: true, optionGroupId: true, pricingAxis: true, overrideIsRequired: true, overrideMinSelect: true, overrideMaxSelect: true },
@@ -265,6 +284,8 @@ export class ProductOptionGroupsService {
 
     await this.assertNoPrimaryReplaceConflict(tenantId, existing.productId);
 
+    await this.audit(tenantId, actorId, 'catalog.product_option_group.updated', 'product_option_group_link', { productId: existing.productId, optionGroupId: existing.optionGroupId, linkId });
+
     return updated;
   }
 
@@ -273,11 +294,11 @@ export class ProductOptionGroupsService {
     await this.ensureProduct(tenantId, productId);
 
     const links = await this.prisma.tenantClient.productOptionGroupLink.findMany({
-      where: { productId, tenantId },
+      where: { productId, tenantId, optionGroup: { deletedAt: null } },
       orderBy: { order: 'asc' },
       include: {
         optionGroup: {
-          include: { items: { orderBy: { order: 'asc' } } },
+          include: { items: { where: { deletedAt: null }, orderBy: { order: 'asc' } } },
         },
       },
     });
@@ -294,7 +315,7 @@ export class ProductOptionGroupsService {
         ...link.optionGroup,
         items: link.optionGroup.items.map((item) => {
           const override = overrideMap.get(item.id);
-          const effectiveIsActive = item.isActive && (override?.isActive ?? true);
+          const effectiveIsActive = item.deletedAt === null && item.isActive && (override?.isActive ?? true);
           return {
             ...item,
             effectiveIsActive,
@@ -311,7 +332,7 @@ export class ProductOptionGroupsService {
     }));
   }
 
-  async reorderLinks(productId: string, orderedLinkIds: string[]) {
+  async reorderLinks(productId: string, orderedLinkIds: string[], actorId?: string) {
     const tenantId = this.getRequiredTenantId();
     await this.ensureProduct(tenantId, productId);
 
@@ -340,6 +361,8 @@ export class ProductOptionGroupsService {
         }),
       ),
     );
+
+    await this.audit(tenantId, actorId, 'catalog.product_option_group.reordered', 'product_option_group_link', { productId, count: orderedLinkIds.length });
 
     return this.listByProduct(productId);
   }

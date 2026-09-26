@@ -685,7 +685,7 @@ export class CheckoutValidatorService {
     const groupLinkMap = new Map<string, OptionGroupLinkWithData>();
     for (const link of optionGroupLinks) {
       const group = link.optionGroup;
-      if (group && group.isActive) {
+      if (group && group.isActive && group.deletedAt === null) {
         groupLinkMap.set(group.id, link);
       }
     }
@@ -780,7 +780,7 @@ export class CheckoutValidatorService {
         }
 
         const override = (optionItemPrices || []).find((o) => o.optionItemId === chosen.optionItemId);
-        const effectiveIsActive = itemRecord.isActive && (override?.isActive ?? true);
+        const effectiveIsActive = itemRecord.deletedAt === null && itemRecord.isActive && (override?.isActive ?? true);
         if (!effectiveIsActive) {
           throw new BadRequestException(`A opção "${itemRecord.name}" não está disponível para o produto "${productName}".`);
         }

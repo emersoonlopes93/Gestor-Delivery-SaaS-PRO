@@ -9,7 +9,7 @@ import { LinkedProductsModal } from './SubComponents/LinkedProductsModal';
 import { Search, Plus, Layers, Filter, RefreshCw, XCircle } from 'lucide-react';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[]; _count?: { optionGroupLinks: number } };
-type FilterType = 'all' | 'required' | 'optional' | 'most_used';
+type FilterType = 'all' | 'required' | 'optional' | 'most_used' | 'archived';
 
 export function OptionGroupsPage() {
   const [groups, setGroups] = useState<GroupWithItems[]>([]);
@@ -38,7 +38,7 @@ export function OptionGroupsPage() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const res = await api.get<GroupWithItems[]>('/catalog/option-groups');
+      const res = await api.get<GroupWithItems[]>('/catalog/option-groups?includeArchived=true');
       if (res.success) {
         setGroups(res.data);
       } else {
@@ -53,7 +53,7 @@ export function OptionGroupsPage() {
   };
 
   const filteredGroups = useMemo(() => {
-    let result = [...groups];
+    let result = groups.filter((group) => activeFilter === 'archived' ? Boolean(group.deletedAt) : !group.deletedAt);
 
     // Search filter
     if (searchQuery.trim()) {
@@ -111,7 +111,7 @@ export function OptionGroupsPage() {
     if (!groupToDelete) return;
     setIsDeleting(true);
     try {
-      await api.delete(`/catalog/option-groups/${groupToDelete.id}`);
+      await api.patch(`/catalog/option-groups/${groupToDelete.id}/archive`, {});
       setGroupToDelete(null);
       await loadGroups();
     } catch (err) {
@@ -119,6 +119,16 @@ export function OptionGroupsPage() {
       alert('Não foi possível excluir o grupo de opções.');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleRestore = async (group: GroupWithItems) => {
+    try {
+      await api.patch(`/catalog/option-groups/${group.id}/restore`, {});
+      await loadGroups();
+    } catch (err) {
+      console.error('Erro ao restaurar grupo:', err);
+      alert('Não foi possível restaurar o grupo de opções.');
     }
   };
 
@@ -224,6 +234,16 @@ export function OptionGroupsPage() {
           >
             Mais usados
           </button>
+          <button
+            onClick={() => setActiveFilter('archived')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              activeFilter === 'archived'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            Arquivados ({groups.filter((group) => Boolean(group.deletedAt)).length})
+          </button>
         </div>
       </div>
 
@@ -252,6 +272,7 @@ export function OptionGroupsPage() {
               group={g}
               onEdit={handleRequestEdit}
               onDelete={handleRequestDelete}
+              onRestore={handleRestore}
               onViewProducts={handleOpenViewProducts}
             />
           ))}
@@ -263,7 +284,7 @@ export function OptionGroupsPage() {
             <Layers className="w-6 h-6" />
           </div>
 
-          {groups.length === 0 ? (
+          {groups.filter((group) => !group.deletedAt).length === 0 && activeFilter !== 'archived' ? (
             <div className="space-y-2 max-w-md mx-auto">
               <h3 className="font-black text-foreground text-lg">Nenhum grupo de opções criado</h3>
               <p className="text-xs text-muted-foreground font-medium leading-relaxed">
