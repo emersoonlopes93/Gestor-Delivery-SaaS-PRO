@@ -13,13 +13,11 @@ export interface ProductCategory {
   templateType: CategoryTemplateType;
   templateConfig?: Record<string, unknown> | null;
   isActive: boolean;
-  deletedAt?: Date | string | null;
   activeDays?: CategoryActiveDay[];
   isFeatured: boolean;
   order: number;
   createdAt: Date | string;
   updatedAt: Date | string;
-  deletedAt?: Date | string | null;
 }
 
 export interface Product {
@@ -38,7 +36,6 @@ export interface Product {
   image?: string | null;
   mediaAssetId?: string | null;
   isActive: boolean;
-  deletedAt?: Date | string | null;
   isFeatured: boolean;
   isAvailable: boolean;
   sellableOnline: boolean;
@@ -47,7 +44,6 @@ export interface Product {
   order: number;
   createdAt: Date | string;
   updatedAt: Date | string;
-  deletedAt?: Date | string | null;
   _count?: {
     optionGroupLinks: number;
   };
@@ -122,6 +118,7 @@ export interface OptionGroup {
   minSelect: number;
   maxSelect: number;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   order: number;
   items?: OptionItem[];
   createdAt: Date | string;
@@ -139,6 +136,7 @@ export interface OptionItem {
   description?: string | null;
   sku?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   order: number;
   priceImpactType: PriceImpactType;
   priceImpactValue: number | string;
