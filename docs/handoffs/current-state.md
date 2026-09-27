@@ -2644,3 +2644,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Storefront, detalhe de produto/POS, linkagem por produto e Checkout filtram/rejeitam grupos ou itens arquivados no servidor. Pedidos históricos usam `snapshotCatalogV2Json`/snapshots de OrderItem, sem FK viva para apresentar opções em KDS/impressão.
 - `AuditLog` existente é tenant-scoped e agora registra criação, edição, arquivo/restauração de grupo/item e alterações de vínculo/override, com userId autenticado quando a chamada vem dos controllers. Não há PII de cliente nos detalhes.
 - Validação: Prisma generate e teste focado `option-groups.service.spec.ts` 2/2 PASS; `git diff --check` PASS. Gates restantes para promoção: build/lint completos, migration em banco efêmero, testes de storefront/checkout e CI/Preview autenticado. Nenhum banco remoto, provider, deploy ou merge foi executado.
+
+## Teste de integração — Complementos + Pizza Engine (2026-09-26)
+
+- Branch temporária `test/catalog-pizza-option-groups-integration`, criada de `fix/pizza-engine-isolation-main-copy` / PR #109 e mesclada normalmente com `origin/feat/catalog-soft-delete-audit-log` / PR #107. As branches de origem permaneceram intactas.
+- Único conflito: `docs/handoffs/current-state.md`, porque ambas as linhas de trabalho adicionavam seu registro final. Ambos os registros foram preservados; não houve conflito de código, schema ou migration.
+- Correção mínima exclusiva desta integração: `option-groups.service.spec.ts` usava dois casts duplos que bloqueavam `check:no-any`. O teste passou a construir o serviço via reflexão, sem alterar comportamento de produção.
+- Validações: `pnpm db:generate`; API focada 3 suítes/9 testes; storefront focado 1 arquivo/2 testes; `check:no-any`, typecheck, lint e build completos passaram. O lint registrou 17 warnings preexistentes, sem erros.
+- Pendente: Preview Vercel e homologação autenticada de Açaí/Pizza, carrinho, checkout e inspeção de rede. Esta branch não deve ser promovida ou mesclada em `main-copy`.
