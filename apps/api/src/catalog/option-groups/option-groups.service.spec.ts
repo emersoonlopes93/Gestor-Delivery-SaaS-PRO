@@ -1,6 +1,4 @@
 import { OptionGroupsService } from './option-groups.service';
-import { PrismaService } from '../../database/prisma.service';
-import { TenantContextService } from '../../common/context/tenant-context.service';
 
 describe('OptionGroupsService archive lifecycle', () => {
   const tenantId = 'tenant-a';
@@ -18,8 +16,9 @@ describe('OptionGroupsService archive lifecycle', () => {
       },
       auditLog: { create: jest.fn() },
     };
-    const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) } as unknown as TenantContextService;
-    return { prisma, service: new OptionGroupsService(prisma as unknown as PrismaService, tenantContext) };
+    const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) };
+    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext]) as OptionGroupsService;
+    return { prisma, service };
   }
 
   it('archives a group without removing its links and writes a tenant audit record', async () => {
