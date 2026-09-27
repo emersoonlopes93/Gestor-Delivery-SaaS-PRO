@@ -18,7 +18,6 @@ export interface ProductCategory {
   order: number;
   createdAt: Date | string;
   updatedAt: Date | string;
-  deletedAt?: Date | string | null;
 }
 
 export interface Product {
@@ -37,6 +36,7 @@ export interface Product {
   image?: string | null;
   mediaAssetId?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   isFeatured: boolean;
   isAvailable: boolean;
   sellableOnline: boolean;
@@ -45,7 +45,6 @@ export interface Product {
   order: number;
   createdAt: Date | string;
   updatedAt: Date | string;
-  deletedAt?: Date | string | null;
   _count?: {
     optionGroupLinks: number;
   };
@@ -120,10 +119,14 @@ export interface OptionGroup {
   minSelect: number;
   maxSelect: number;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   order: number;
   items?: OptionItem[];
   createdAt: Date | string;
   updatedAt: Date | string;
+  _count?: {
+    optionGroupLinks: number;
+  };
 }
 
 export interface OptionItem {
@@ -134,14 +137,29 @@ export interface OptionItem {
   description?: string | null;
   sku?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   order: number;
   priceImpactType: PriceImpactType;
   priceImpactValue: number | string;
   allowQuantity: boolean;
   minQty?: number | null;
   maxQty?: number | null;
+  effectiveIsActive?: boolean;
+  override?: ProductOptionItemOverride | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+}
+
+export interface ProductOptionItemOverride {
+  id: string;
+  tenantId: string;
+  productId: string;
+  optionItemId: string;
+  price?: number | string | null;
+  costPrice?: number | string | null;
+  isActive?: boolean | null;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export interface ProductOptionGroupLink {
