@@ -77,9 +77,8 @@ export class PizzaEngineService {
         optionGroupId: true,
         name: true,
         isActive: true,
-        deletedAt: true,
         optionGroup: {
-          select: { isActive: true, deletedAt: true },
+          select: { isActive: true },
         },
       }
     });
@@ -88,9 +87,7 @@ export class PizzaEngineService {
       !size ||
       size.tenantId !== category.tenantId ||
       !size.isActive ||
-      size.deletedAt !== null ||
-      !size.optionGroup.isActive ||
-      size.optionGroup.deletedAt !== null
+      !size.optionGroup.isActive
     ) {
       throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
     }
@@ -121,18 +118,6 @@ export class PizzaEngineService {
     });
     const authorizedFlavorIds = new Set(sizeLinks.map((link) => link.productId));
     if (flavorIds.some((flavorId) => !authorizedFlavorIds.has(flavorId))) {
-      throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
-    }
-
-    const priceRecords = await this.prisma.tenantClient.productOptionItemPrice.findMany({
-      where: {
-        tenantId: category.tenantId,
-        productId: { in: flavorIds },
-        optionItemId: sizeId,
-      },
-      select: { productId: true, isActive: true },
-    });
-    if (priceRecords.some((record) => record.isActive === false)) {
       throw new BadRequestException('O tamanho selecionado não está disponível para esta pizza.');
     }
 

@@ -18,8 +18,7 @@ function createEngine(overrides: Record<string, Record<string, jest.Mock>> = {})
         optionGroupId: 'pizza-size-group',
         name: 'Grande',
         isActive: true,
-        deletedAt: null,
-        optionGroup: { isActive: true, deletedAt: null },
+        optionGroup: { isActive: true },
       }),
     },
     product: {
@@ -35,8 +34,7 @@ function createEngine(overrides: Record<string, Record<string, jest.Mock>> = {})
       findMany: jest.fn().mockResolvedValue([{ productId: 'flavor-a' }]),
     },
     productOptionItemPrice: {
-      findMany: jest.fn().mockResolvedValue([{ productId: 'flavor-a', isActive: true }]),
-      findUnique: jest.fn().mockResolvedValue({ price: 35, isActive: true }),
+      findUnique: jest.fn().mockResolvedValue({ price: 35 }),
     },
   };
 
@@ -90,8 +88,7 @@ describe('PizzaEngineService', () => {
           optionGroupId: 'foreign-group',
           name: '500 ml',
           isActive: true,
-          deletedAt: null,
-          optionGroup: { isActive: true, deletedAt: null },
+          optionGroup: { isActive: true },
         }),
       },
     });
