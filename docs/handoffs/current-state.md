@@ -2650,3 +2650,11 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Causa confirmada: o commit `9bda6ca9` introduziu os campos no schema sem migration; a migration inicial mantinha `price NOT NULL` e nao criava `is_active`. O erro do Dokploy em `GET /api/v1/public/storefront/:slug` confirma a ausencia de `is_active` no banco que servia a API.
 - Validacao local: `prisma validate`, `pnpm db:generate`, `pnpm check:no-any`, typecheck, lint (17 warnings preexistentes no storefront), build completo, teste API de parser de opcoes (4/4) e storefront CategoryNavigation (2/2) passaram. A execucao da migration em PostgreSQL efemero ficou pendente porque o Docker Desktop local nao estava disponivel; nenhum banco remoto foi consultado ou alterado.
 - Operacao posterior obrigatoria: apos merge, seguir o runbook Dokploy com backup verificavel, auditoria de destino e `api-migrate`; somente apos exit code zero reiniciar a API e validar o endpoint publico. Nao usar `prisma db push`.
+
+## C2.5A-D - estabilidade do configurador e Option Groups (2026-09-27)
+
+- Branch: `fix/product-configurator-option-groups-stability`, derivada de `fix/pizza-engine-isolation-main-copy` em `b326f68d`.
+- O modal publico passa a resetar selecoes somente quando o produto muda e reconcilia grupos genericos sem perder itens validos durante render/refetch. A regra efetiva e compartilhada: `single` usa maximo 1, required usa minimo 1 e overrides do vinculo prevalecem.
+- Checkout reaplica as mesmas invariantes antes de validar e gravar o snapshot. O middleware Prisma invalida cache do Storefront para `ProductOptionGroupLink`, `OptionItem` e `ProductOptionItemPrice`, alem dos modelos ja relevantes; nenhum TTL ou migration foi alterado.
+- A biblioteca autenticada recebe `_count.optionGroupLinks` compativel com a UI e distingue itens ativos de arquivados. O endpoint de detalhe aceita `includeArchived=true` para contexto administrativo.
+- Validacao local: `pnpm db:generate`, testes focados Storefront 5/5, API 10/10 e Web Tenant 1/1, `check:no-any` e lint dos pacotes alterados. Build Storefront concluiu; gates longos globais/API/tenant exigem conclusao confirmada antes de PR. Nenhum deploy, banco remoto, migration ou Preview foi executado.

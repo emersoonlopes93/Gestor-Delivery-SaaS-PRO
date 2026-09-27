@@ -7,6 +7,7 @@ import {
   formatPriceImpact,
 } from '../utils/optionGroupHelpers';
 import { Archive, Layers, ChevronDown, ChevronUp, MoreVertical, Edit3, RotateCcw } from 'lucide-react';
+import { splitOptionGroupItems } from './option-group-card-items';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[]; _count?: { optionGroupLinks: number } };
 
@@ -30,10 +31,10 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
 
   const usageCount = group._count?.optionGroupLinks ?? 0;
   const isArchived = Boolean(group.deletedAt);
-  const items = [...(group.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const { activeItems, archivedItems } = splitOptionGroupItems(group.items);
   const maxVisibleItems = 4;
-  const hasMoreItems = items.length > maxVisibleItems;
-  const visibleItems = isExpanded ? items : items.slice(0, maxVisibleItems);
+  const hasMoreItems = activeItems.length > maxVisibleItems;
+  const visibleItems = isExpanded ? activeItems : activeItems.slice(0, maxVisibleItems);
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
@@ -97,7 +98,7 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
       {/* Items List Preview */}
       <div className="border border-border/60 rounded-xl overflow-hidden bg-muted/20">
         <div className="px-3.5 py-2 bg-muted/50 border-b border-border/60 flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          <span>Opções ({items.length})</span>
+          <span>Opções ativas ({activeItems.length})</span>
           {hasMoreItems && (
             <button
               type="button"
@@ -110,7 +111,7 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
                 </>
               ) : (
                 <>
-                  + {items.length - maxVisibleItems} opções <ChevronDown className="w-3 h-3" />
+                  + {activeItems.length - maxVisibleItems} opções <ChevronDown className="w-3 h-3" />
                 </>
               )}
             </button>
@@ -149,9 +150,14 @@ export const OptionGroupCard: React.FC<OptionGroupCardProps> = ({
             </div>
           ))}
 
-          {items.length === 0 && (
+          {activeItems.length === 0 && archivedItems.length === 0 && (
             <div className="px-3.5 py-6 text-center text-xs text-muted-foreground italic font-medium">
               Nenhuma opção cadastrada neste grupo.
+            </div>
+          )}
+          {archivedItems.length > 0 && (
+            <div className="px-3.5 py-2.5 text-xs text-muted-foreground bg-muted/30 border-t border-border/40">
+              {archivedItems.length} {archivedItems.length === 1 ? 'opção arquivada' : 'opções arquivadas'}
             </div>
           )}
         </div>

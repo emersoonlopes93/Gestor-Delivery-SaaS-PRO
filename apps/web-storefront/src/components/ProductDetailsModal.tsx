@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Minus, Plus, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
 import type {
   StorefrontProductPayload,
@@ -7,6 +7,7 @@ import type {
   StorefrontOptionItemPayload,
   PizzaCompositionDTO,
 } from '@gestor/types';
+import { resolveEffectiveSelectionRules } from '@gestor/types';
 import {
   dedupeById,
   getPizzaFlavorSelectionLimit,
@@ -21,6 +22,7 @@ import { useAnalytics } from '../features/analytics';
 import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { reconcileGenericSelections } from './product-details-selection';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -47,6 +49,8 @@ type PizzaPreview = {
   calculatedPrice: number;
 };
 
+const EMPTY_OPTION_ITEMS: StorefrontOptionItemPayload[] = [];
+
 export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, isStoreClosed, onClose }: ProductDetailsModalProps) {
   const analytics = useAnalytics();
   const addItem = useCartStore((s) => s.addItem);
@@ -60,7 +64,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
   const [pizzaPreviewError, setPizzaPreviewError] = useState<string | null>(null);
 
-  const optionGroupLinks = product.optionGroupLinks ?? [];
+  const optionGroupLinks = useMemo(() => product.optionGroupLinks ?? [], [product.optionGroupLinks]);
   const isProductAvailable = product.isAvailable && !isStoreClosed;
   const isPizzaTemplate = shouldUsePizzaFlow(category, optionGroupLinks);
 
@@ -81,8 +85,8 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     );
   }, [isPizzaTemplate, optionGroupLinks]);
 
-  const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
-  const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
+  const pizzaSizeItems = sizeGroup?.optionGroup.items ?? EMPTY_OPTION_ITEMS;
+  const pizzaMountingItems = mountingGroup?.optionGroup.items ?? EMPTY_OPTION_ITEMS;
   const isHalfAndHalf = isHalfAndHalfMounting(selectedMountingItemId, pizzaMountingItems);
   const flavorSelectionLimit = getPizzaFlavorSelectionLimit(selectedMountingItemId, pizzaMountingItems);
   const pizzaFlavorOptions = useMemo(() => {
@@ -102,25 +106,34 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   }, [isPizzaTemplate, mountingGroup?.optionGroup.id, optionGroupLinks, sizeGroup?.optionGroup.id]);
 
   const hasV2Options = genericOptionLinks.length > 0;
+  const genericOptionLinksRef = useRef(genericOptionLinks);
+
+  useEffect(() => {
+    genericOptionLinksRef.current = genericOptionLinks;
+  }, [genericOptionLinks]);
 
   useEffect(() => {
     setSelections(
-      genericOptionLinks.map((link) => ({
+      genericOptionLinksRef.current.map((link) => ({
         optionGroupId: link.optionGroup.id,
         name: link.overrideName || link.optionGroup.name,
         items: [],
       }))
     );
 
-    if (!isPizzaTemplate) {
-      setSelectedSizeId('');
-      setSelectedMountingItemId('');
-      setSelectedPizzaFlavorIds([]);
-      setPizzaPreview(null);
-      setPizzaPreviewError(null);
-      return;
-    }
+    setSelectedSizeId('');
+    setSelectedMountingItemId('');
+    setSelectedPizzaFlavorIds([]);
+    setPizzaPreview(null);
+    setPizzaPreviewError(null);
+  }, [product.id]);
 
+  useEffect(() => {
+    setSelections((current) => reconcileGenericSelections(genericOptionLinks, current));
+  }, [genericOptionLinks]);
+
+  useEffect(() => {
+    if (!isPizzaTemplate) return;
     const firstSize = pizzaSizeItems[0]?.id ?? '';
     setSelectedSizeId((current) => (pizzaSizeItems.some((size) => size.id === current) ? current : firstSize));
     const preferredMounting =
@@ -137,7 +150,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       if (validIds.length > 0) return validIds.slice(0, 2);
       return product.id ? [product.id] : [];
     });
-  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
+  }, [isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
 
   useEffect(() => {
     if (!isPizzaTemplate) return;
@@ -303,8 +316,15 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       const group = link.optionGroup;
       const state = selections.find((s) => s.optionGroupId === group.id);
       const count = state?.items.length || 0;
-      const min = link.overrideMinSelect ?? group.minSelect;
-      const max = link.overrideMaxSelect ?? group.maxSelect;
+      const { effectiveMinSelect: min, effectiveMaxSelect: max } = resolveEffectiveSelectionRules({
+        selectionType: group.selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        overrideIsRequired: link.overrideIsRequired,
+        overrideMinSelect: link.overrideMinSelect,
+        overrideMaxSelect: link.overrideMaxSelect,
+      });
       const name = link.overrideName || group.name;
 
       if (count < min) return `Selecione pelo menos ${min} em "${name}"`;
@@ -586,8 +606,17 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
               <div className="space-y-5">
                 {genericOptionLinks.map((link) => {
                   const group = link.optionGroup;
-                  const min = link.overrideMinSelect ?? group.minSelect;
-                  const max = link.overrideMaxSelect ?? group.maxSelect;
+                  const rules = resolveEffectiveSelectionRules({
+                    selectionType: group.selectionType,
+                    isRequired: group.isRequired,
+                    minSelect: group.minSelect,
+                    maxSelect: group.maxSelect,
+                    overrideIsRequired: link.overrideIsRequired,
+                    overrideMinSelect: link.overrideMinSelect,
+                    overrideMaxSelect: link.overrideMaxSelect,
+                  });
+                  const min = rules.effectiveMinSelect;
+                  const max = rules.effectiveMaxSelect;
                   const state = selections.find((s) => s.optionGroupId === group.id);
                   const selectedIds = new Set((state?.items ?? []).map((item) => item.optionItemId));
 
@@ -599,7 +628,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                             {link.overrideName || group.name}
                           </div>
                           <div className="text-[10px] text-gray-400 font-bold">
-                            {min > 0 ? `Obrigatório • ` : ''}
+                            {rules.effectiveIsRequired ? `Obrigatório • ` : ''}
                             {max === 1 ? 'Escolha 1' : `Escolha até ${max}`}
                           </div>
                         </div>

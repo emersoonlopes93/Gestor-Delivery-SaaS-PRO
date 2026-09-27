@@ -134,14 +134,20 @@ export class OptionGroupsService {
   }
 
   async listGroups(includeArchived = false) {
-    return this.prisma.tenantClient.optionGroup.findMany({
+    const groups = await this.prisma.tenantClient.optionGroup.findMany({
       where: includeArchived ? undefined : { deletedAt: null },
       orderBy: { order: 'asc' },
       include: {
         items: { where: includeArchived ? undefined : { deletedAt: null }, orderBy: { order: 'asc' } },
         productLinks: { select: { id: true, productId: true, order: true } },
+        _count: { select: { productLinks: true } },
       },
     });
+
+    return groups.map(({ _count, ...group }) => ({
+      ...group,
+      _count: { optionGroupLinks: _count.productLinks },
+    }));
   }
 
   async getGroup(id: string, includeArchived = false) {
@@ -153,11 +159,13 @@ export class OptionGroupsService {
           orderBy: { order: 'asc' },
           include: { product: { select: { id: true, name: true, type: true, isActive: true } } },
         },
+        _count: { select: { productLinks: true } },
       },
     });
 
     if (!group) throw new NotFoundException('Grupo não encontrado.');
-    return group;
+    const { _count, ...groupData } = group;
+    return { ...groupData, _count: { optionGroupLinks: _count.productLinks } };
   }
 
   async updateGroup(id: string, dto: UpdateOptionGroupDto, actorId?: string) {

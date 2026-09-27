@@ -3,7 +3,7 @@ import { OptionGroupsService } from './option-groups.service';
 describe('OptionGroupsService archive lifecycle', () => {
   const tenantId = 'tenant-a';
   const actorId = 'user-a';
-  const activeGroup = { id: 'group-a', deletedAt: null, items: [], productLinks: [] };
+  const activeGroup = { id: 'group-a', deletedAt: null, items: [], productLinks: [], _count: { productLinks: 0 } };
 
   function makeService() {
     const prisma = {
@@ -42,5 +42,21 @@ describe('OptionGroupsService archive lifecycle', () => {
 
     expect(prisma.tenantClient.optionGroup.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: { deletedAt: null } }));
     expect(prisma.tenantClient.optionGroup.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: undefined }));
+  });
+
+  it('returns the optionGroupLinks usage count consumed by the tenant library', async () => {
+    const { prisma, service } = makeService();
+    prisma.tenantClient.optionGroup.findMany.mockResolvedValue([{
+      ...activeGroup,
+      _count: { productLinks: 2 },
+      items: [{ id: 'active-item', deletedAt: null }, { id: 'archived-item', deletedAt: new Date() }],
+    }]);
+
+    const groups = await service.listGroups(true);
+
+    expect(groups[0]).toMatchObject({
+      _count: { optionGroupLinks: 2 },
+      items: [{ id: 'active-item' }, { id: 'archived-item' }],
+    });
   });
 });
