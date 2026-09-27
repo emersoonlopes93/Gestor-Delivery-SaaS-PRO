@@ -2629,3 +2629,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Pizza Engine continua usando o modelo existente, sem migration, e valida tenant, estado ativo/arquivado do tamanho e grupo, sabores ativos/disponíveis da categoria pizza e o vínculo estrutural `PRIMARY` do grupo selecionado para todos os sabores. Item de tamanho de outro grupo ou tenant é rejeitado.
 - Cobertura nova: regressão Açaí configurável com tamanho/primary/replace/montagem; checkout rejeita `pizzaComposition` em categoria normal; engine cobre pizza válida, categoria não-pizza, tamanho cross-tenant ou sem vínculo, sabor indisponível e frações inválidas.
 - Fora de escopo preservado: `allowHalfHalf`, redesign de `ProductOptionItemPrice`, união discriminada completa do DTO, automação transacional de categoria/template, snapshots históricos, OrdersService e redesign de cadastro.
+
+## Dokploy — correção da imagem da API (2026-09-26)
+
+- O `docker-compose.prod.yml` usa `apps/api/Dockerfile`. O estágio final recebia `apps/api/node_modules`, cujos pacotes `@gestor/*` são links de workspace para `/app/packages`, mas não recebia essa árvore; o container poderia falhar ao resolver os módulos internos no startup.
+- O builder agora usa `pnpm --filter @gestor/api... build` e o runner copia `/app/packages`. Isso mantém os artefatos das dependências internas e os alvos dos links presentes na imagem final.
+- Validações locais: build das dependências da API concluído sem erro; `docker compose -f docker-compose.prod.yml config --no-interpolate --quiet` passou. O build da imagem e o startup do container permanecem pendentes pois o daemon Docker local estava indisponível; nenhum deploy, migration ou alteração remota foi executado.
