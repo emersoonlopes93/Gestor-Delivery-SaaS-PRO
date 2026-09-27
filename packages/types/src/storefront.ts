@@ -60,6 +60,7 @@ export interface StorefrontOptionItemPayload {
   description?: string | null;
   isActive: boolean;
   isAvailable?: boolean;
+  effectiveIsActive?: boolean;
   allowQuantity: boolean;
   priceImpactType: PriceImpactType;
   priceImpactValue: number;

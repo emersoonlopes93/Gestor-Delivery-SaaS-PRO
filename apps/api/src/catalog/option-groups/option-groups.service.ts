@@ -22,6 +22,18 @@ export class OptionGroupsService {
     return tenantId;
   }
 
+  private async audit(
+    tenantId: string,
+    actorId: string | undefined,
+    action: string,
+    resource: string,
+    details: Record<string, string | boolean | number | null>,
+  ) {
+    await this.prisma.auditLog.create({
+      data: { tenantId, userId: actorId ?? null, userType: 'tenant_user', action, resource, details },
+    });
+  }
+
   private validateGroupRules(input: {
     selectionType: 'single' | 'multiple' | 'quantity';
     isRequired: boolean;
@@ -88,7 +100,7 @@ export class OptionGroupsService {
     }
   }
 
-  async createGroup(dto: CreateOptionGroupDto) {
+  async createGroup(dto: CreateOptionGroupDto, actorId?: string) {
     const tenantId = this.getRequiredTenantId();
 
     const isRequired = dto.isRequired ?? false;
@@ -102,7 +114,7 @@ export class OptionGroupsService {
       maxSelect,
     });
 
-    return this.prisma.tenantClient.optionGroup.create({
+    const group = await this.prisma.tenantClient.optionGroup.create({
       data: {
         tenantId,
         name: dto.name,
@@ -117,23 +129,26 @@ export class OptionGroupsService {
       } satisfies Prisma.OptionGroupUncheckedCreateInput,
       include: { items: { orderBy: { order: 'asc' } } },
     });
+    await this.audit(tenantId, actorId, 'catalog.option_group.created', 'option_group', { optionGroupId: group.id });
+    return group;
   }
 
-  async listGroups() {
+  async listGroups(includeArchived = false) {
     return this.prisma.tenantClient.optionGroup.findMany({
+      where: includeArchived ? undefined : { deletedAt: null },
       orderBy: { order: 'asc' },
       include: {
-        items: { orderBy: { order: 'asc' } },
+        items: { where: includeArchived ? undefined : { deletedAt: null }, orderBy: { order: 'asc' } },
         productLinks: { select: { id: true, productId: true, order: true } },
       },
     });
   }
 
-  async getGroup(id: string) {
+  async getGroup(id: string, includeArchived = false) {
     const group = await this.prisma.tenantClient.optionGroup.findFirst({
-      where: { id },
+      where: includeArchived ? { id } : { id, deletedAt: null },
       include: {
-        items: { orderBy: { order: 'asc' } },
+        items: { where: includeArchived ? undefined : { deletedAt: null }, orderBy: { order: 'asc' } },
         productLinks: {
           orderBy: { order: 'asc' },
           include: { product: { select: { id: true, name: true, type: true, isActive: true } } },
@@ -145,7 +160,7 @@ export class OptionGroupsService {
     return group;
   }
 
-  async updateGroup(id: string, dto: UpdateOptionGroupDto) {
+  async updateGroup(id: string, dto: UpdateOptionGroupDto, actorId?: string) {
     const existing = await this.getGroup(id);
 
     const next = {
@@ -162,7 +177,7 @@ export class OptionGroupsService {
       maxSelect: next.maxSelect,
     });
 
-    return this.prisma.tenantClient.optionGroup.update({
+    const group = await this.prisma.tenantClient.optionGroup.update({
       where: { id },
       data: {
         name: dto.name,
@@ -177,16 +192,31 @@ export class OptionGroupsService {
       },
       include: { items: { orderBy: { order: 'asc' } } },
     });
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_group.updated', 'option_group', { optionGroupId: id });
+    return group;
   }
 
-  async deleteGroup(id: string) {
+  async archiveGroup(id: string, actorId?: string) {
     await this.getGroup(id);
-    return this.prisma.tenantClient.optionGroup.delete({
-      where: { id },
-    });
+    const group = await this.prisma.tenantClient.optionGroup.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_group.archived', 'option_group', { optionGroupId: id });
+    return group;
   }
 
-  async createItem(dto: CreateOptionItemDto) {
+  async restoreGroup(id: string, actorId?: string) {
+    const group = await this.getGroup(id, true);
+    if (!group.deletedAt) throw new BadRequestException('Grupo não está arquivado.');
+    const restored = await this.prisma.tenantClient.optionGroup.update({ where: { id }, data: { deletedAt: null } });
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_group.restored', 'option_group', { optionGroupId: id });
+    return restored;
+  }
+
+  // Compatibility endpoint: existing clients expected the group to leave the active library.
+  async deleteGroup(id: string, actorId?: string) {
+    return this.archiveGroup(id, actorId);
+  }
+
+  async createItem(dto: CreateOptionItemDto, actorId?: string) {
     if (!dto.optionGroupId) {
       throw new BadRequestException('optionGroupId é obrigatório.');
     }
@@ -203,7 +233,7 @@ export class OptionGroupsService {
       maxQty: dto.maxQty ?? null,
     });
 
-    return this.prisma.tenantClient.optionItem.create({
+    const item = await this.prisma.tenantClient.optionItem.create({
       data: {
         tenantId,
         optionGroupId: dto.optionGroupId,
@@ -219,11 +249,13 @@ export class OptionGroupsService {
         maxQty: dto.maxQty ?? null,
       } satisfies Prisma.OptionItemUncheckedCreateInput,
     });
+    await this.audit(tenantId, actorId, 'catalog.option_item.created', 'option_item', { optionItemId: item.id, optionGroupId: dto.optionGroupId });
+    return item;
   }
 
-  async updateItem(id: string, dto: UpdateOptionItemDto) {
+  async updateItem(id: string, dto: UpdateOptionItemDto, actorId?: string) {
     const item = await this.prisma.tenantClient.optionItem.findFirst({
-      where: { id },
+      where: { id, deletedAt: null, optionGroup: { deletedAt: null } },
       include: { optionGroup: true },
     });
     if (!item) throw new NotFoundException('Item não encontrado.');
@@ -238,7 +270,7 @@ export class OptionGroupsService {
       maxQty: dto.maxQty ?? item.maxQty,
     });
 
-    return this.prisma.tenantClient.optionItem.update({
+    const updated = await this.prisma.tenantClient.optionItem.update({
       where: { id },
       data: {
         name: dto.name,
@@ -253,18 +285,33 @@ export class OptionGroupsService {
         maxQty: dto.maxQty ?? undefined,
       },
     });
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_item.updated', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    return updated;
   }
 
-  async deleteItem(id: string) {
+  async archiveItem(id: string, actorId?: string) {
     const item = await this.prisma.tenantClient.optionItem.findFirst({
-      where: { id },
-      select: { id: true },
+      where: { id, deletedAt: null },
+      select: { id: true, optionGroupId: true },
     });
     if (!item) throw new NotFoundException('Item não encontrado.');
 
-    return this.prisma.tenantClient.optionItem.delete({
-      where: { id },
-    });
+    const archived = await this.prisma.tenantClient.optionItem.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_item.archived', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    return archived;
+  }
+
+  async restoreItem(id: string, actorId?: string) {
+    const item = await this.prisma.tenantClient.optionItem.findFirst({ where: { id }, select: { id: true, optionGroupId: true, deletedAt: true } });
+    if (!item) throw new NotFoundException('Item não encontrado.');
+    if (!item.deletedAt) throw new BadRequestException('Item não está arquivado.');
+    const restored = await this.prisma.tenantClient.optionItem.update({ where: { id }, data: { deletedAt: null } });
+    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_item.restored', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    return restored;
+  }
+
+  async deleteItem(id: string, actorId?: string) {
+    return this.archiveItem(id, actorId);
   }
 
   async reorderItems(optionGroupId: string, orderedItemIds: string[]) {

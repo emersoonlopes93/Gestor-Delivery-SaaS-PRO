@@ -13,13 +13,15 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { CatalogEditorProvider } from './CatalogEditorContext';
 import { CatalogProductFormState } from './CatalogEditorTypes';
 import { OptionGroupEditorModal } from './SubComponents/OptionGroupEditorModal';
+import { LinkExistingGroupDialog } from './SubComponents/LinkExistingGroupDialog';
+import { ProductLinkOverrideDialog } from './SubComponents/ProductLinkOverrideDialog';
+import { ConfirmSharedEditModal } from './SubComponents/ConfirmSharedEditModal';
 
 import {
   CatalogAvailabilityRule,
   CatalogPublication,
   CreateAvailabilityRuleDto,
   CreateComboBundleItemDto,
-  CreateProductOptionGroupLinkDto,
   OptionGroup,
   Product,
   ProductOptionGroupLink,
@@ -169,17 +171,24 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   const [links, setLinks] = useState<LinkWithGroup[]>([]);
   const [allGroups, setAllGroups] = useState<OptionGroup[]>([]);
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
-  const [selectedGroupIdToAdd, setSelectedGroupIdToAdd] = useState<string>('');
   const [isCreateComplementModalOpen, setIsCreateComplementModalOpen] = useState(false);
+
+  const [globalGroupToEdit, setGlobalGroupToEdit] = useState<OptionGroup | null>(null);
+  const [isGlobalGroupModalOpen, setIsGlobalGroupModalOpen] = useState(false);
+  const [isSharedEditWarningOpen, setIsSharedEditWarningOpen] = useState(false);
+
+  const openGlobalGroupEditor = (group: OptionGroup) => {
+    setGlobalGroupToEdit(group);
+    const count = group._count?.optionGroupLinks ?? 1;
+    if (count > 1) {
+      setIsSharedEditWarningOpen(true);
+    } else {
+      setIsGlobalGroupModalOpen(true);
+    }
+  };
 
   const [isEditLinkModalOpen, setIsEditLinkModalOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<LinkWithGroup | null>(null);
-  const [linkForm, setLinkForm] = useState<UpdateProductOptionGroupLinkDto>({
-    overrideIsRequired: undefined,
-    overrideMinSelect: undefined,
-    overrideMaxSelect: undefined,
-    pricingAxis: undefined,
-  });
 
   // Combo
   const [bundleItems, setBundleItems] = useState<BundleItemWithProduct[]>([]);
@@ -231,10 +240,16 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   const loadAll = async () => {
     setIsLoading(true);
     try {
-      // Carregar categorias sempre
-      const catRes = await api.get<ProductCategory[]>('/catalog/categories');
+      const [catRes, groupsRes] = await Promise.all([
+        api.get<ProductCategory[]>('/catalog/categories'),
+        api.get<Array<OptionGroup & { items?: Array<{ id: string; name: string }> }>>('/catalog/option-groups'),
+      ]);
+
       if (catRes.success) {
         setValue('categories', catRes.data);
+      }
+      if (groupsRes.success) {
+        setAllGroups(groupsRes.data);
       }
 
       if (isNew) {
@@ -242,10 +257,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         return;
       }
 
-      const [prodRes, linksRes, groupsRes, pubRes, rulesRes] = await Promise.all([
+      const [prodRes, linksRes, pubRes, rulesRes] = await Promise.all([
         api.get<ProductDetails>(`/catalog/products/${productId}`),
         api.get<LinkWithGroup[]>(`/catalog/products/${productId}/option-groups`),
-        api.get<Array<OptionGroup & { items?: Array<{ id: string; name: string }> }>>('/catalog/option-groups'),
         api.get<CatalogPublication>(`/catalog/products/${productId}/publication`),
         api.get<CatalogAvailabilityRule[]>(`/catalog/products/${productId}/publication/rules`),
       ]);
@@ -282,12 +296,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         });
       }
       if (linksRes.success) setLinks(linksRes.data);
-      if (groupsRes.success) {
-        setAllGroups(groupsRes.data);
-        if (!selectedGroupIdToAdd) {
-          setSelectedGroupIdToAdd(groupsRes.data[0]?.id ?? '');
-        }
-      }
 
       if (prodRes.success && (isComboMode || prodRes.data.type === 'combo')) {
         const isBundleCombo = (prodRes.data.comboMode ?? 'bundle') === 'bundle';
@@ -428,28 +436,8 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const openAddGroupModal = async () => {
     setIsAddGroupModalOpen(true);
-    if (!selectedGroupIdToAdd) {
-      setSelectedGroupIdToAdd(availableGroupsToAdd[0]?.id ?? '');
-    }
   };
 
-  const addGroupLink = async () => {
-    if (!selectedGroupIdToAdd) return;
-    if (!productId) return;
-    setSavingStates((p) => ({ ...p, addGroupLink: true }));
-    try {
-      const payload: Omit<CreateProductOptionGroupLinkDto, 'productId'> = {
-        optionGroupId: selectedGroupIdToAdd,
-        order: links.length,
-        pricingAxis: 'secondary',
-      };
-      await api.post(`/catalog/products/${productId}/option-groups`, payload);
-      setIsAddGroupModalOpen(false);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, addGroupLink: false }));
-    }
-  };
   const handleComplementCreated = async (created: OptionGroup) => {
     if (!productId) {
       setIsCreateComplementModalOpen(false);
@@ -490,33 +478,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const openEditLinkModal = (link: LinkWithGroup) => {
     setEditingLink(link);
-    setLinkForm({
-      overrideIsRequired: link.overrideIsRequired ?? undefined,
-      overrideMinSelect: link.overrideMinSelect ?? undefined,
-      overrideMaxSelect: link.overrideMaxSelect ?? undefined,
-      pricingAxis: link.pricingAxis,
-    });
     setIsEditLinkModalOpen(true);
-  };
-
-  const saveLinkOverrides = async () => {
-    if (!editingLink) return;
-    if (!productId) return;
-    setSavingStates((p) => ({ ...p, saveLinkOverrides: true }));
-    try {
-      // Enviar apenas campos definidos para evitar sobrescrever com undefined
-      const payload: UpdateProductOptionGroupLinkDto = {
-        ...(linkForm.overrideIsRequired !== undefined && { overrideIsRequired: linkForm.overrideIsRequired }),
-        ...(linkForm.overrideMinSelect !== undefined && { overrideMinSelect: linkForm.overrideMinSelect }),
-        ...(linkForm.overrideMaxSelect !== undefined && { overrideMaxSelect: linkForm.overrideMaxSelect }),
-        ...(linkForm.pricingAxis && { pricingAxis: linkForm.pricingAxis }),
-      };
-      await api.patch(`/catalog/products/${productId}/option-groups/${editingLink.id}`, payload);
-      setIsEditLinkModalOpen(false);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, saveLinkOverrides: false }));
-    }
   };
 
   const reorderLinks = async (orderedIds: string[]) => {
@@ -728,12 +690,28 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     );
   }
 
+  const toggleItemOverride = async (optionItemId: string, currentEffectiveIsActive: boolean) => {
+    if (!productId) return;
+    const nextIsActive = !currentEffectiveIsActive;
+    setSavingStates((p) => ({ ...p, [`override-item-${optionItemId}`]: true }));
+    try {
+      await api.patch(`/catalog/products/${productId}/option-groups/items/${optionItemId}/override`, {
+        isActive: nextIsActive,
+      });
+      await loadAll();
+    } catch (err) {
+      console.error('Erro ao alternar disponibilidade do item:', err);
+    } finally {
+      setSavingStates((p) => ({ ...p, [`override-item-${optionItemId}`]: false }));
+    }
+  };
+
   return (
     <FormProvider {...methods}>
     <CatalogEditorProvider value={{ 
       productId, isNew, isComboMode, product, savingStates, setSavingStates, loadAll, handleSaveProduct, 
       goNextWizardStep, goPrevWizardStep, isComboWizard, isProductWizard, onOpenRecipe: () => setIsRecipeModalOpen(true),
-      links, moveLink, openAddGroupModal, setIsCreateComplementModalOpen, openEditLinkModal, removeGroupLink,
+      links, moveLink, openAddGroupModal, setIsCreateComplementModalOpen, openGlobalGroupEditor, openEditLinkModal, removeGroupLink, toggleItemOverride,
       bundleItems, bundleSummary, comboPricingType, setComboPricingType, comboPricingValue, setComboPricingValue, updateComboPricing, openBundleItemModal, deleteBundleItem,
       publication, patchPublication, rules, openRuleModal, deleteRule, formatChannelLabel, formatDaysLabel
     }}>
@@ -893,60 +871,98 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
       )}
 
       {/* Personalização Modals */}
-      <Modal
+      <LinkExistingGroupDialog
         isOpen={isAddGroupModalOpen}
         onClose={() => setIsAddGroupModalOpen(false)}
-        title="Vincular complemento ao produto"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsAddGroupModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={addGroupLink}
-              disabled={savingStates.addGroupLink || availableGroupsToAdd.length === 0 || !productId}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {savingStates.addGroupLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              Vincular
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          {availableGroupsToAdd.length > 0 ? (
-            <>
-              <div className="text-sm text-muted-foreground font-bold">Selecione um complemento</div>
-              <select
-                value={selectedGroupIdToAdd}
-                onChange={(e) => setSelectedGroupIdToAdd(e.target.value)}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              >
-                {availableGroupsToAdd.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          ) : (
-            <div className="text-sm text-muted-foreground font-bold italic p-4 text-center">
-              Nenhum complemento disponível para vínculo. Todos já estão vinculados.
-            </div>
-          )}
-        </div>
-      </Modal>
+        availableGroups={availableGroupsToAdd}
+        onLinkGroup={async (groupId: string) => {
+          if (!productId) return;
+          setSavingStates((p) => ({ ...p, addGroupLink: true }));
+          try {
+            await api.post(`/catalog/products/${productId}/option-groups`, {
+              optionGroupId: groupId,
+              order: links.length,
+              pricingAxis: 'secondary',
+            });
+            setIsAddGroupModalOpen(false);
+            await loadAll();
+          } finally {
+            setSavingStates((p) => ({ ...p, addGroupLink: false }));
+          }
+        }}
+        isLinking={Boolean(savingStates.addGroupLink)}
+        onOpenCreateGroup={() => {
+          setIsAddGroupModalOpen(false);
+          setIsCreateComplementModalOpen(true);
+        }}
+      />
 
       <OptionGroupEditorModal
         isOpen={isCreateComplementModalOpen}
         onClose={() => setIsCreateComplementModalOpen(false)}
         groupId={null}
         onSaved={handleComplementCreated}
+      />
+
+      {isGlobalGroupModalOpen && globalGroupToEdit && (
+        <OptionGroupEditorModal
+          isOpen={isGlobalGroupModalOpen}
+          onClose={() => {
+            setIsGlobalGroupModalOpen(false);
+            setGlobalGroupToEdit(null);
+          }}
+          groupId={globalGroupToEdit.id}
+          onSaved={async () => {
+            setIsGlobalGroupModalOpen(false);
+            setGlobalGroupToEdit(null);
+            await loadAll();
+          }}
+        />
+      )}
+
+      {isSharedEditWarningOpen && globalGroupToEdit && (
+        <ConfirmSharedEditModal
+          isOpen={isSharedEditWarningOpen}
+          onClose={() => setIsSharedEditWarningOpen(false)}
+          groupName={globalGroupToEdit.name}
+          usageCount={globalGroupToEdit._count?.optionGroupLinks ?? 1}
+          onConfirm={() => {
+            setIsSharedEditWarningOpen(false);
+            setIsGlobalGroupModalOpen(true);
+          }}
+        />
+      )}
+
+      <ProductLinkOverrideDialog
+        isOpen={isEditLinkModalOpen}
+        onClose={() => {
+          setIsEditLinkModalOpen(false);
+          setEditingLink(null);
+        }}
+        link={editingLink}
+        onSaveOverrides={async (payload: UpdateProductOptionGroupLinkDto) => {
+          if (!productId || !editingLink) return;
+          setSavingStates((p) => ({ ...p, saveLinkOverrides: true }));
+          try {
+            await api.patch(`/catalog/products/${productId}/option-groups/${editingLink.id}`, payload);
+            setIsEditLinkModalOpen(false);
+            setEditingLink(null);
+            await loadAll();
+          } finally {
+            setSavingStates((p) => ({ ...p, saveLinkOverrides: false }));
+          }
+        }}
+        isSaving={Boolean(savingStates.saveLinkOverrides)}
+        onToggleItemOverride={async (optionItemId, currentEffectiveIsActive) => {
+          await toggleItemOverride(optionItemId, currentEffectiveIsActive);
+          if (productId && editingLink) {
+            const freshLinks = await api.get<LinkWithGroup[]>(`/catalog/products/${productId}/option-groups`);
+            if (freshLinks.success) {
+              const updatedLink = freshLinks.data.find((l) => l.id === editingLink.id);
+              if (updatedLink) setEditingLink(updatedLink);
+            }
+          }
+        }}
       />
 
       <Modal
@@ -999,84 +1015,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
               onChange={(e) => setBundleItemForm({ ...bundleItemForm, qty: Number(e.target.value || 1) })}
               className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
             />
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isEditLinkModalOpen}
-        onClose={() => setIsEditLinkModalOpen(false)}
-        title="Overrides do link"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsEditLinkModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={saveLinkOverrides}
-              disabled={savingStates.saveLinkOverrides}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {savingStates.saveLinkOverrides && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              Salvar
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Pricing Axis</label>
-            <select
-              value={(linkForm.pricingAxis as string) ?? 'secondary'}
-              onChange={(e) => setLinkForm((p) => ({ ...p, pricingAxis: e.target.value as 'primary' | 'secondary' }))}
-              className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="secondary">secondary</option>
-              <option value="primary">primary</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={Boolean(linkForm.overrideIsRequired)}
-              onChange={(e) => setLinkForm((p) => ({ ...p, overrideIsRequired: e.target.checked }))}
-              className="w-4 h-4 rounded text-primary border-input focus:ring-primary"
-            />
-            <span className="text-sm font-bold text-foreground">Override required</span>
-            <button
-              type="button"
-              onClick={() => setLinkForm((p) => ({ ...p, overrideIsRequired: undefined }))}
-              className="ml-auto text-xs font-black text-muted-foreground hover:text-foreground transition-colors"
-            >
-              limpar
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Override min</label>
-              <input
-                type="number"
-                value={linkForm.overrideMinSelect ?? ''}
-                onChange={(e) => setLinkForm((p) => ({ ...p, overrideMinSelect: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Override max</label>
-              <input
-                type="number"
-                value={linkForm.overrideMaxSelect ?? ''}
-                onChange={(e) => setLinkForm((p) => ({ ...p, overrideMaxSelect: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
           </div>
         </div>
       </Modal>
