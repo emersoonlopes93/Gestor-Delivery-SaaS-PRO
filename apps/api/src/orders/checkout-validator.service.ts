@@ -25,6 +25,7 @@ import { FeatureControlService } from '../feature-control/feature-control.servic
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
+    optionItemPrices: true;
     optionGroupLinks: { include: { optionGroup: { include: { items: true } } } };
     category: { select: { id: true, templateType: true, templateConfig: true } };
   };
@@ -474,6 +475,7 @@ export class CheckoutValidatorService {
     const product = await this.prisma.product.findFirst({
       where: { id: item.productId, tenantId, deletedAt: null },
       include: {
+        optionItemPrices: true,
         optionGroupLinks: {
           include: {
             optionGroup: {
@@ -565,6 +567,7 @@ export class CheckoutValidatorService {
         typedProduct.optionGroupLinks,
         typedProduct.name,
         basePrice,
+        typedProduct.optionItemPrices,
       );
 
       effectiveBasePrice = pricing.effectiveBasePrice;
@@ -653,6 +656,7 @@ export class CheckoutValidatorService {
     optionGroupLinks: OptionGroupLinkWithData[],
     productName: string,
     basePrice: number,
+    optionItemPrices?: Prisma.ProductOptionItemPriceGetPayload<Record<string, never>>[],
   ): {
     effectiveBasePrice: number;
     unitPrice: number;
@@ -681,7 +685,7 @@ export class CheckoutValidatorService {
     const groupLinkMap = new Map<string, OptionGroupLinkWithData>();
     for (const link of optionGroupLinks) {
       const group = link.optionGroup;
-      if (group && group.isActive) {
+      if (group && group.isActive && group.deletedAt === null) {
         groupLinkMap.set(group.id, link);
       }
     }
@@ -774,8 +778,11 @@ export class CheckoutValidatorService {
         if (!itemRecord) {
           throw new BadRequestException(`Opção não encontrada no grupo "${groupName}".`);
         }
-        if (!itemRecord.isActive) {
-          throw new BadRequestException(`A opção "${itemRecord.name}" não está disponível.`);
+
+        const override = (optionItemPrices || []).find((o) => o.optionItemId === chosen.optionItemId);
+        const effectiveIsActive = itemRecord.deletedAt === null && itemRecord.isActive && (override?.isActive ?? true);
+        if (!effectiveIsActive) {
+          throw new BadRequestException(`A opção "${itemRecord.name}" não está disponível para o produto "${productName}".`);
         }
 
         const allowQuantity = itemRecord.allowQuantity || false;
@@ -785,7 +792,8 @@ export class CheckoutValidatorService {
         const qty = allowQuantity ? Math.max(1, Number(chosen.qty ?? 1)) : 1;
 
         const impactType = itemRecord.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage';
-        const impactValue = Number(itemRecord.priceImpactValue);
+        const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
+        const impactValue = overridePrice ?? Number(itemRecord.priceImpactValue);
 
         let appliedAmount = 0;
 

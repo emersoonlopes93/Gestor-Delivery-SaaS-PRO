@@ -27,12 +27,15 @@ FROM dependencies AS builder
 WORKDIR /app
 COPY . .
 RUN pnpm --filter @gestor/api prisma:generate
-RUN pnpm --filter @gestor/api build
+# A API resolve pacotes internos por links de workspace; construa tambem as
+# dependencias transitivas para que os artefatos delas existam no runner.
+RUN pnpm --filter @gestor/api... build
 
 # Stage 4: Runner
 FROM base AS runner
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json

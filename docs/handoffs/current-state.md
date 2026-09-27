@@ -2517,7 +2517,6 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - The normalized marketplace JSON and shared operational DTO gained additive explicit fields. Legacy generic `customerPaid` and `merchantReceivable` fields retain their compatibility meaning; order details, Gestor legacy, Gestor 2.0 (via the shared detail section), and customer printing consume the explicit facts. Printing prefers the explicit customer-paid field while retaining legacy fallback for non-99Food callers.
 - `FinancialProjection.merchantReceivable` is documented and tested as an estimated receivable, never settlement. No schema/migration, backfill, provider call, account mutation, financial transaction, KDS, lifecycle, BAPP/OpenAPI, Marketplace Gate, remote database, Dokploy, or deploy change was made. Get Bill Data remains deferred because its complete official API contract was not found.
 - Validation: focused API contract/projection/order-view-model/printing suites: 4 suites / 71 tests PASS; focused financial-balance and financial-transaction suites: 2 suites / 10 tests PASS; focused web legacy-order and Gestor 2.0 suites: 2 files / 19 tests PASS. API/web lint and builds, repository typecheck, `check:no-any`, `check:boundaries`, `check:features`, and `git diff --check`: PASS.
-
 ## Alert Engine 2.0 (2026-09-13)
 
 - Branch: `feat/order-alert-engine-v2`, based on `origin/main-copy` / `cde5a0b69a06e3dc5d30b72e2096c1a49d5d112c`.
@@ -2622,3 +2621,34 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A migration aditiva cria a chave única opcional tenant/operação. Registros pagos históricos sem data não foram modificados: o resumo os quantifica e a tela orienta revisão individual.
 - Repasses 99Food permanecem no fluxo já idempotente e com bloqueio de divergência. O painel mostra a síntese antes de detalhes técnicos colapsados. iFood não é apresentado como repasse financeiro confirmado.
 - Ainda necessário antes de promoção: executar os gates completos e CI da PR, aplicar/validar a migration em ambiente seguro e fazer aceitação autenticada desktop/mobile, inclusive finance.read sem reports.read e uma consulta provider 99Food com WhiteList.
+
+## C1 + C2 — Isolamento e hardening do Pizza Engine (2026-09-26)
+
+- Branch isolada: `fix/pizza-engine-isolation`, criada de `main-copy` em `cde5a0b69a06e3dc5d30b72e2096c1a49d5d112c`; a PR #107 de soft-delete/audit log permaneceu separada e aberta.
+- Storefront agora decide o fluxo de pizza exclusivamente por `category.templateType === 'pizza'`. Grupos genéricos de tamanho, `pricingAxis: primary`, `replace` e nomes como montagem não ativam mais a UI, simulação ou `pizzaComposition`.
+- Pizza Engine continua usando o modelo existente, sem migration, e valida tenant, estado ativo do tamanho e grupo, sabores ativos/disponíveis da categoria pizza e o vínculo estrutural `PRIMARY` do grupo selecionado para todos os sabores. Item de tamanho de outro grupo ou tenant é rejeitado. O schema atual não modela arquivamento para opções/grupos nem ativação por registro de preço.
+- Cobertura nova: regressão Açaí configurável com tamanho/primary/replace/montagem; checkout rejeita `pizzaComposition` em categoria normal; engine cobre pizza válida, categoria não-pizza, tamanho cross-tenant ou sem vínculo, sabor indisponível e frações inválidas.
+- Fora de escopo preservado: `allowHalfHalf`, redesign de `ProductOptionItemPrice`, união discriminada completa do DTO, automação transacional de categoria/template, snapshots históricos, OrdersService e redesign de cadastro.
+
+## Dokploy — correção da imagem da API (2026-09-26)
+
+- O `docker-compose.prod.yml` usa `apps/api/Dockerfile`. O estágio final recebia `apps/api/node_modules`, cujos pacotes `@gestor/*` são links de workspace para `/app/packages`, mas não recebia essa árvore; o container poderia falhar ao resolver os módulos internos no startup.
+- O builder agora usa `pnpm --filter @gestor/api... build` e o runner copia `/app/packages`. Isso mantém os artefatos das dependências internas e os alvos dos links presentes na imagem final.
+- Validações locais: build das dependências da API concluído sem erro; `docker compose -f docker-compose.prod.yml config --no-interpolate --quiet` passou. O build da imagem e o startup do container permanecem pendentes pois o daemon Docker local estava indisponível; nenhum deploy, migration ou alteração remota foi executado.
+- O log posterior do Dokploy expôs seis erros TypeScript em `PizzaEngineService`: o código tentava selecionar `deletedAt` em `OptionItem`/`OptionGroup` e `isActive` em `ProductOptionItemPrice`, campos ausentes no schema. As referências foram removidas, preservando as validações de tenant, item/grupo ativos, vínculo `primary` e sabores ativos/disponíveis. A suíte focal passou (6/6) e `pnpm --filter @gestor/api... build` voltou a concluir sem erro.
+## Catálogo — Fase 3A/3B: arquivamento seguro e AuditLog (2026-09-26)
+
+- Branch: `feat/catalog-soft-delete-audit-log`, derivada após a Fase 2 de overrides. A auditoria confirmou que OptionGroup/OptionItem usavam hard-delete; OptionItem → OptionGroup, ProductOptionGroupLink → OptionGroup e ProductOptionItemPrice → OptionItem têm `onDelete: Cascade`, portanto a remoção física apagava vínculos e overrides.
+- A fase adota o padrão existente `deletedAt`, não cria `archivedAt`: `isActive` continua sendo indisponibilidade temporária e `deletedAt` remove o cadastro de novos usos e das leituras operacionais. Grupos/itens não possuem unique por nome, então manter um nome arquivado não bloqueia um novo cadastro.
+- `DELETE` legado passou a arquivar por compatibilidade. Endpoints explícitos de archive/restore preservam links e overrides; restore limpa somente `deletedAt`. Nenhum hard-delete é exposto na UI comum.
+- Storefront, detalhe de produto/POS, linkagem por produto e Checkout filtram/rejeitam grupos ou itens arquivados no servidor. Pedidos históricos usam `snapshotCatalogV2Json`/snapshots de OrderItem, sem FK viva para apresentar opções em KDS/impressão.
+- `AuditLog` existente é tenant-scoped e agora registra criação, edição, arquivo/restauração de grupo/item e alterações de vínculo/override, com userId autenticado quando a chamada vem dos controllers. Não há PII de cliente nos detalhes.
+- Validação: Prisma generate e teste focado `option-groups.service.spec.ts` 2/2 PASS; `git diff --check` PASS. Gates restantes para promoção: build/lint completos, migration em banco efêmero, testes de storefront/checkout e CI/Preview autenticado. Nenhum banco remoto, provider, deploy ou merge foi executado.
+
+## Teste de integração — Complementos + Pizza Engine (2026-09-26)
+
+- Branch temporária `test/catalog-pizza-option-groups-integration`, criada de `fix/pizza-engine-isolation-main-copy` / PR #109 e mesclada normalmente com `origin/feat/catalog-soft-delete-audit-log` / PR #107. As branches de origem permaneceram intactas.
+- Único conflito: `docs/handoffs/current-state.md`, porque ambas as linhas de trabalho adicionavam seu registro final. Ambos os registros foram preservados; não houve conflito de código, schema ou migration.
+- Correção mínima exclusiva desta integração: `option-groups.service.spec.ts` usava dois casts duplos que bloqueavam `check:no-any`. O teste passou a construir o serviço via reflexão, sem alterar comportamento de produção.
+- Validações: `pnpm db:generate`; API focada 3 suítes/9 testes; storefront focado 1 arquivo/2 testes; `check:no-any`, typecheck, lint e build completos passaram. O lint registrou 17 warnings preexistentes, sem erros.
+- Pendente: Preview Vercel e homologação autenticada de Açaí/Pizza, carrinho, checkout e inspeção de rede. Esta branch não deve ser promovida ou mesclada em `main-copy`.

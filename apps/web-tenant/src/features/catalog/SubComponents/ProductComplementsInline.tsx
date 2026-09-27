@@ -3,6 +3,7 @@ import { api } from '../../../lib/api-client';
 import { Switch } from '../../../components/ui/Switch';
 import { Loader2 } from 'lucide-react';
 import { ProductOptionGroupLink, OptionGroup, OptionItem } from '@gestor/types';
+import { ConfirmGlobalItemToggleModal } from './ConfirmGlobalItemToggleModal';
 
 type LinkWithGroup = ProductOptionGroupLink & { 
   optionGroup?: OptionGroup & { items?: OptionItem[] } 
@@ -13,9 +14,17 @@ interface ProductComplementsInlineProps {
   isParentActive: boolean;
 }
 
+interface PendingToggle {
+  linkId: string;
+  itemId: string;
+  itemName: string;
+  nextActiveState: boolean;
+}
+
 export function ProductComplementsInline({ productId, isParentActive }: ProductComplementsInlineProps) {
   const [links, setLinks] = useState<LinkWithGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingToggle, setPendingToggle] = useState<PendingToggle | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -38,7 +47,20 @@ export function ProductComplementsInline({ productId, isParentActive }: ProductC
     };
   }, [productId]);
 
-  const handleToggleItem = async (linkId: string, itemId: string, isActive: boolean) => {
+  const requestToggleItem = (linkId: string, item: OptionItem, nextActiveState: boolean) => {
+    setPendingToggle({
+      linkId,
+      itemId: item.id,
+      itemName: item.name,
+      nextActiveState,
+    });
+  };
+
+  const executeToggleItem = async () => {
+    if (!pendingToggle) return;
+    const { linkId, itemId, nextActiveState: isActive } = pendingToggle;
+    setPendingToggle(null);
+
     // Optimistic update
     setLinks(prev => prev.map(link => {
       if (link.id !== linkId) return link;
@@ -58,7 +80,6 @@ export function ProductComplementsInline({ productId, isParentActive }: ProductC
       await api.patch(`/catalog/option-groups/items/${itemId}`, { isActive });
     } catch (error) {
       console.error('Erro ao atualizar complemento:', error);
-      // Revert on error (could store prev state to be precise, but re-fetching works too)
       const res = await api.get<LinkWithGroup[]>(`/catalog/products/${productId}/option-groups`);
       if (res.success) setLinks(res.data);
     }
@@ -73,7 +94,7 @@ export function ProductComplementsInline({ productId, isParentActive }: ProductC
   }
 
   if (links.length === 0) {
-    return null; // Should not happen since we check count before rendering
+    return null;
   }
 
   return (
@@ -81,8 +102,11 @@ export function ProductComplementsInline({ productId, isParentActive }: ProductC
       <div className="flex flex-col gap-4">
         {links.map((link) => (
           <div key={link.id} className="bg-card border border-border rounded-xl p-3 shadow-sm">
-            <div className="text-xs font-black text-foreground uppercase tracking-wider mb-2">
-              {link.optionGroup?.name}
+            <div className="text-xs font-black text-foreground uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>{link.optionGroup?.name}</span>
+              <span className="text-[10px] text-muted-foreground font-normal normal-case">
+                Status global do item
+              </span>
             </div>
             <div className="flex gap-2 flex-wrap">
               {link.optionGroup?.items?.map((item) => (
@@ -97,7 +121,7 @@ export function ProductComplementsInline({ productId, isParentActive }: ProductC
                   </div>
                   <Switch
                     checked={item.isActive ?? true}
-                    onCheckedChange={(isActive: boolean) => handleToggleItem(link.id, item.id, isActive)}
+                    onCheckedChange={(isActive: boolean) => requestToggleItem(link.id, item, isActive)}
                     aria-label={`Status do complemento ${item.name}`}
                   />
                 </div>
@@ -109,6 +133,16 @@ export function ProductComplementsInline({ productId, isParentActive }: ProductC
           </div>
         ))}
       </div>
+
+      {pendingToggle && (
+        <ConfirmGlobalItemToggleModal
+          isOpen={Boolean(pendingToggle)}
+          onClose={() => setPendingToggle(null)}
+          onConfirm={executeToggleItem}
+          itemName={pendingToggle.itemName}
+          nextState={pendingToggle.nextActiveState}
+        />
+      )}
     </div>
   );
 }
