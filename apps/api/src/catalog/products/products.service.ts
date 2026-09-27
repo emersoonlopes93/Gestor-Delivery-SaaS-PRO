@@ -286,7 +286,7 @@ export class ProductsService {
         category: true,
         mediaAsset: true,
 
-        optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
+        optionGroupLinks: { where: { optionGroup: { deletedAt: null } }, include: { optionGroup: { include: { items: { where: { deletedAt: null }, orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
 
         comboBundleItems: {
           include: { product: true },
