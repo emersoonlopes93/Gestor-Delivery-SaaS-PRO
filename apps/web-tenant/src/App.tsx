@@ -398,14 +398,7 @@ export function App() {
           }
         />
 
-        <Route
-          path="/channels"
-          element={
-            <PermissionGate permission="orders.read">
-              <ChannelsPage />
-            </PermissionGate>
-          }
-        />
+        <Route path="/channels" element={<ChannelsPage />} />
 
         {/* Inventory & Recipes (Phase 9) */}
         <Route
