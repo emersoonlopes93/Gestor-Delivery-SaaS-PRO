@@ -81,7 +81,7 @@ describe('Order Manager V2 visual contracts', () => {
     expect(controlCenter).not.toContain("navigate('");
     expect(controlCenter).toContain('<OperationalOverlay title="Tempos e taxas"');
     expect(controlCenter).toContain('<OperationalOverlay title="Radar da frota"');
-    expect(page).toContain('Painel de Operações');
+    expect(page).toContain('Painel de pedidos');
     expect(page).toContain('<OperationalQuickActions orders={orders} onOpenOrder={setSelected} />');
     expect(page.indexOf('<header')).toBeLessThan(page.indexOf('<OperationalControlCenter'));
     expect(controlCenter).toContain('<OperationalOverlay title="Lançamentos de caixa"');
@@ -148,8 +148,14 @@ describe('Order Manager V2 visual contracts', () => {
     const card = readFileSync(resolve(__dirname, 'OrderCardV2.tsx'), 'utf8');
     const details = readFileSync(resolve(__dirname, 'OrderDetailsModalV2.tsx'), 'utf8');
     expect(card).toContain('Indicadores operacionais');
-    expect(card).toContain('Logistica da loja');
-    expect(card).toContain('Falha de sincronizacao');
+    expect(card).not.toContain('Logistica da loja');
+    expect(details).toContain('Logística');
+    expect(card).toContain('Não foi possível atualizar a plataforma. Confira o estado antes de tentar novamente.');
+    expect(card).toContain('Atualização com a plataforma em andamento');
+    expect(card).toContain('Aberto há');
+    expect(card).not.toContain('deliveryStatement');
+    expect(card).not.toContain('financialSummary.operationalValue');
+    expect(details).toContain('Não foi possível atualizar a plataforma. Confira o estado antes de tentar novamente.');
     expect(details).toContain('Resumo operacional do pedido');
     expect(details).toContain('Proxima acao');
     expect(details).toContain('formatElapsed');
@@ -162,6 +168,13 @@ describe('Order Manager V2 visual contracts', () => {
     expect(card).toContain('onOpenAlert');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('activeAlertSeverityByOrderId');
     expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('ORDER_ALERT_CENTER_TOGGLE_EVENT');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Resumo da operação');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Pedidos exibidos');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Limpar filtros');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('OPERATIONAL_TAB_LABELS');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('para {operationalContextLabel}');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Ação imediata');
+    expect(readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8')).toContain('Requer atenção');
   });
 
   it('wires accessible print actions to the canonical receipt flow', () => {

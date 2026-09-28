@@ -1,13 +1,13 @@
 import type { ComponentType, SVGProps } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, Banknote, CalendarDays,
-  CheckCircle2, ChefHat, Clock3, Copy, ExternalLink, PackageCheck, ReceiptText,
+  AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, Banknote,
+  CheckCircle2, ChefHat, Copy, ExternalLink, PackageCheck, ReceiptText,
   RefreshCw, ShoppingBag, Store, Truck, UtensilsCrossed, XCircle,
 } from 'lucide-react';
 import type { DashboardStatsDTO } from '@gestor/types';
 import {
-  calculateComparison, channelLabel, formatHour, getOperationalSteps, getOrdersInProgress,
+  calculateComparison, channelLabel, formatHour, getOperationalSteps,
   type MetricComparison, type StoreOperationalStatus,
 } from '../dashboard.utils';
 
@@ -96,7 +96,6 @@ export function OperationsDashboard({
   const averageTicket = current?.commercial.averageTicket ?? 0;
   const cancellationRate = current?.operational.cancellationRate ?? 0;
   const preparation = current?.operational.averagePreparationTimeMinutes ?? 0;
-  const inProgress = getOrdersInProgress(current);
   const pending = current?.operational.ordersByStatus.pending ?? 0;
   const flow = getOperationalSteps(current);
   const channels = Object.entries(current?.operational.ordersByChannel ?? {}).filter(([, count]) => count > 0).sort((a, b) => b[1] - a[1]);
@@ -113,7 +112,6 @@ export function OperationsDashboard({
     { label: 'Ticket concluído', value: money(averageTicket), icon: ReceiptText, comparison: calculateComparison(averageTicket, previous?.commercial.averageTicket), accent: 'via-indigo-500' },
     { label: 'Cancelamentos', value: `${cancellationRate.toFixed(1)}%`, icon: XCircle, comparison: calculateComparison(cancellationRate, previous?.operational.cancellationRate), inverse: true, accent: 'via-rose-500' },
     { label: 'Preparo médio', value: `${Math.round(preparation)} min`, icon: ChefHat, comparison: calculateComparison(preparation, previous?.operational.averagePreparationTimeMinutes), inverse: true, accent: 'via-amber-500' },
-    { label: 'Em andamento', value: number(inProgress), icon: Clock3, comparison: calculateComparison(inProgress, getOrdersInProgress(previous)), accent: 'via-violet-500' },
   ];
 
   return (
@@ -126,8 +124,9 @@ export function OperationsDashboard({
         </div>
       ) : null}
 
-      <section aria-label="Pulso da operação" className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:px-5">
+      <section aria-label="Agora" className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:px-5">
         <div className="pointer-events-none absolute -right-20 -top-24 h-60 w-60 rounded-full bg-indigo-500/10 blur-3xl dark:bg-indigo-500/15" />
+        <p className="relative mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Agora</p>
         <div className="relative grid items-center gap-4 lg:grid-cols-[1.2fr_auto_1fr]">
           <div className="flex min-w-0 items-center gap-3">
             <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
@@ -140,13 +139,9 @@ export function OperationsDashboard({
             </div>
           </div>
           <div className="hidden h-9 w-px bg-slate-200 dark:bg-slate-700 lg:block" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Fluxo {periodLabel}</p>
-              <p className="mt-1 text-base font-bold tabular-nums text-slate-900 dark:text-slate-100">{total} <span className="text-xs font-medium text-slate-600 dark:text-slate-400">pedidos</span></p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Atenção</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Pedidos aguardando ação</p>
               <p className={`mt-1 text-base font-bold tabular-nums ${pending > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{pending} <span className="text-xs font-medium text-slate-600 dark:text-slate-400">aguardando</span></p>
             </div>
             <Link to={pending > 0 ? '/orders' : storeStatus === 'open' ? '/orders' : '/settings'} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:border-indigo-400 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/15 dark:focus:ring-indigo-400 dark:focus:ring-offset-slate-900 sm:col-span-1">
@@ -194,7 +189,7 @@ export function OperationsDashboard({
           </div>
         </Panel>
 
-        <Panel title="Pontos de atenção" subtitle="Somente condições que pedem ação">
+        <Panel title="Pedidos aguardando ação" subtitle="Pedidos pendentes que exigem aceite">
           <div className="divide-y divide-border px-4">
             {pending > 0 ? (
               <Link to="/orders" className="flex items-center gap-3 py-3.5">
@@ -203,35 +198,17 @@ export function OperationsDashboard({
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </Link>
             ) : null}
-            {storeStatus !== 'open' ? (
-              <Link to="/settings" className="flex items-center gap-3 py-3.5">
-                <span className="rounded-lg bg-rose-500/10 p-2 text-rose-600"><Store className="h-4 w-4" /></span>
-                <div className="min-w-0 flex-1"><p className="text-xs font-bold text-foreground">{status.label}</p><p className="text-[11px] text-muted-foreground">{status.detail}.</p></div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </Link>
-            ) : null}
-            {pending === 0 && storeStatus === 'open' ? (
+            {pending === 0 ? (
               <div className="flex items-center gap-3 py-5">
                 <span className="rounded-lg bg-emerald-500/10 p-2 text-emerald-600"><CheckCircle2 className="h-4 w-4" /></span>
-                <div><p className="text-xs font-bold text-foreground">Operação em dia</p><p className="text-[11px] text-muted-foreground">Nenhuma ação imediata identificada.</p></div>
+                <div><p className="text-xs font-bold text-foreground">Nenhum pedido aguardando ação</p><p className="text-[11px] text-muted-foreground">Este painel acompanha apenas pedidos pendentes.</p></div>
               </div>
             ) : null}
           </div>
         </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        <Panel title="Receita concluída" subtitle="Somente pedidos concluídos" className="xl:col-span-1">
-          <div className="p-4">
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{money(completedRevenue)}</p>
-            <div className="mt-1"><Comparison value={calculateComparison(completedRevenue, previous?.commercial.totalRevenue)} /></div>
-            <div className="mt-4 rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-4">
-              <div className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /><p className="text-xs font-semibold">Detalhamento por hora indisponível</p></div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">A API atual não fornece receita horária. O total acima permanece preciso.</p>
-            </div>
-          </div>
-        </Panel>
-
+      <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Pedidos por canal" subtitle={`Origem dos pedidos ${periodLabel}`}>
           <div className="space-y-3 p-4">
             {channels.length > 0 ? channels.map(([channel, count]) => (
