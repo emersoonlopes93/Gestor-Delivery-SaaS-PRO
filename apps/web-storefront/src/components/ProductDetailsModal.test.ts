@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveEffectiveSelectionRules, type CartSelectedOptionGroup, type StorefrontProductPayload } from '@gestor/types';
 import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { reconcileGenericSelections } from './product-details-selection';
-import { getGenericOptionGroupError, getPizzaValidation } from './product-details-validation';
+import { getGenericOptionGroupError, getPizzaValidation, shouldShowQuantityStepper } from './product-details-validation';
 
 const genericSizeAndAssemblyOptions = [
   {
@@ -107,6 +107,14 @@ describe('ProductDetailsModal generic option state', () => {
       overrideIsRequired: true,
       overrideMinSelect: 1,
       })).toMatchObject({ effectiveIsRequired: true, effectiveMinSelect: 1, effectiveMaxSelect: 3 });
+  });
+
+  it('shows steppers only for selected quantity items allowed by the contract', () => {
+    expect(shouldShowQuantityStepper('single', true, true)).toBe(false);
+    expect(shouldShowQuantityStepper('multiple', true, true)).toBe(false);
+    expect(shouldShowQuantityStepper('quantity', false, true)).toBe(false);
+    expect(shouldShowQuantityStepper('quantity', true, false)).toBe(false);
+    expect(shouldShowQuantityStepper('quantity', true, true)).toBe(true);
   });
 
   it('reports the exact generic group that needs attention before adding to cart', () => {

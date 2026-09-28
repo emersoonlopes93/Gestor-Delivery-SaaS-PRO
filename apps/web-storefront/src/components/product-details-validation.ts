@@ -1,8 +1,18 @@
 import { resolveEffectiveSelectionRules, type CartSelectedOptionGroup, type StorefrontProductPayload } from '@gestor/types';
 
 type GenericOptionLink = NonNullable<StorefrontProductPayload['optionGroupLinks']>[number];
+type OptionSelectionType = GenericOptionLink['optionGroup']['selectionType'];
 
 export type PizzaValidationTarget = 'pizza-size' | 'pizza-mounting' | 'pizza-flavors' | 'pizza-price';
+
+/** Quantity controls are entirely contract-driven; labels such as "Tamanho" are irrelevant. */
+export function shouldShowQuantityStepper(
+  selectionType: OptionSelectionType,
+  isSelected: boolean,
+  allowQuantity: boolean,
+): boolean {
+  return selectionType === 'quantity' && isSelected && allowQuantity;
+}
 
 export function getPizzaValidation(
   input: {

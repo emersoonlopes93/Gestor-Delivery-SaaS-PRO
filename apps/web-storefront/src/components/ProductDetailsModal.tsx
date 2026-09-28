@@ -23,7 +23,7 @@ import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { reconcileGenericSelections } from './product-details-selection';
-import { getGenericOptionGroupError, getPizzaValidation } from './product-details-validation';
+import { getGenericOptionGroupError, getPizzaValidation, shouldShowQuantityStepper } from './product-details-validation';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -514,9 +514,9 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       >
         <div className="relative">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="h-36 w-full object-cover sm:h-52 sm:rounded-t-[2rem]" />
+            <img src={product.image} alt={product.name} className="h-28 w-full object-cover sm:h-40 sm:rounded-t-[2rem]" />
           ) : (
-            <div className="h-20 w-full bg-primary-50 sm:rounded-t-[2rem]" />
+            <div className="h-16 w-full bg-primary-50 sm:rounded-t-[2rem]" />
           )}
           <button
             type="button"
@@ -717,7 +717,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
             ) : null}
 
             {hasV2Options ? (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {genericOptionLinks.map((link) => {
                   const group = link.optionGroup;
                   const rules = resolveEffectiveSelectionRules({
@@ -745,11 +745,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                       aria-label={link.overrideName || group.name}
                       aria-describedby={hasAttemptedSubmit && getGenericOptionGroupError(link, selections) ? `option-group-error-${group.id}` : undefined}
                       className={cn(
-                        'rounded-2xl border bg-slate-50/80 p-4 transition-colors sm:p-5',
+                        'rounded-xl border bg-slate-50/80 p-3 transition-colors sm:p-4',
                         hasAttemptedSubmit && getGenericOptionGroupError(link, selections) ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-100',
                       )}
                     >
-                      <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="mb-2 flex items-start justify-between gap-4">
                         <div>
                           <div className="text-gray-900 font-black text-sm uppercase tracking-wider">
                             {link.overrideName || group.name}
@@ -759,22 +759,20 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                             {max === 1 ? 'Escolha 1' : `Escolha até ${max}`}
                           </div>
                         </div>
-                        <div className="text-[10px] font-black uppercase text-gray-400">
-                          {(state?.items ?? []).length}/{max}
-                        </div>
+                        {max > 1 ? <div className="text-[10px] font-black uppercase text-gray-400">{(state?.items ?? []).length}/{max}</div> : null}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
                         {group.items.filter((item) => item.isActive).map((item) => {
                           const isSelected = selectedIds.has(item.id);
                           const priceImpactValue = Number(item.priceImpactValue ?? 0);
 
                           return (
                             <div key={item.id} className={cn(
-                              'overflow-hidden rounded-xl border transition-colors',
-                              isSelected ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-gray-200 bg-white hover:border-primary-300',
+                              'transition-colors',
+                              isSelected ? 'bg-primary-50' : 'hover:bg-slate-50',
                             )}>
-                              <label className="flex min-h-[44px] w-full cursor-pointer items-center gap-3 p-3 text-left focus-within:outline focus-within:outline-2 focus-within:outline-primary-500">
+                              <label className="flex min-h-[44px] w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left focus-within:outline focus-within:outline-2 focus-within:outline-primary-500">
                                 <input
                                   type={group.selectionType === 'single' || max === 1 ? 'radio' : 'checkbox'}
                                   name={`option-group-${group.id}`}
@@ -782,9 +780,9 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                                   onChange={() => toggleV2Option(group.id, item, min, max, group.selectionType)}
                                   className="sr-only"
                                 />
-                                <div className="flex items-center justify-between gap-3">
+                                <div className="flex flex-1 items-center justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-gray-900 font-bold text-xs truncate">{item.name}</div>
+                                    <div className="text-sm font-semibold text-gray-900">{item.name}</div>
                                     <div className="text-[10px] text-gray-400 font-bold">
                                       {item.priceImpactType === 'fixed'
                                         ? `+ ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(priceImpactValue)}`
@@ -805,8 +803,10 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                                 </div>
                               </label>
 
-                              {group.selectionType === 'quantity' && isSelected && item.allowQuantity ? (
-                                <div className="mt-3 flex items-center gap-3">
+                              {shouldShowQuantityStepper(group.selectionType, isSelected, item.allowQuantity) ? (
+                                <div className="flex min-h-10 items-center justify-between border-t border-slate-100 px-3 py-2">
+                                  <span className="text-xs font-bold text-slate-500">Qtd.</span>
+                                  <div className="flex items-center gap-2">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -814,20 +814,23 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                                       updateV2Qty(group.id, item.id, -1);
                                       if (current <= 1) return;
                                     }}
-                                    className="w-8 h-8 rounded-xl bg-white border border-gray-100 text-gray-500 flex items-center justify-center"
+                                    aria-label={`Diminuir quantidade de ${item.name}`}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
                                   >
                                     <Minus className="w-4 h-4" />
                                   </button>
-                                  <div className="text-gray-900 font-black">
+                                  <div aria-live="polite" className="min-w-5 text-center text-sm font-black text-slate-900">
                                     {state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1}
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => updateV2Qty(group.id, item.id, 1)}
-                                    className="w-8 h-8 rounded-xl bg-white border border-gray-100 text-gray-500 flex items-center justify-center"
+                                    aria-label={`Aumentar quantidade de ${item.name}`}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
                                   >
                                     <Plus className="w-4 h-4" />
                                   </button>
+                                  </div>
                                 </div>
                               ) : null}
                             </div>
