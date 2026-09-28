@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveEffectiveSelectionRules, type CartSelectedOptionGroup, type StorefrontProductPayload } from '@gestor/types';
 import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { reconcileGenericSelections } from './product-details-selection';
+import { getGenericOptionGroupError, getPizzaValidation } from './product-details-validation';
 
 const genericSizeAndAssemblyOptions = [
   {
@@ -105,6 +106,37 @@ describe('ProductDetailsModal generic option state', () => {
       maxSelect: 3,
       overrideIsRequired: true,
       overrideMinSelect: 1,
-    })).toMatchObject({ effectiveIsRequired: true, effectiveMinSelect: 1, effectiveMaxSelect: 3 });
+      })).toMatchObject({ effectiveIsRequired: true, effectiveMinSelect: 1, effectiveMaxSelect: 3 });
+  });
+
+  it('reports the exact generic group that needs attention before adding to cart', () => {
+    expect(getGenericOptionGroupError(genericSizeAndAssemblyOptions[0], [])).toContain('Escolha o tamanho');
+    expect(getGenericOptionGroupError(genericSizeAndAssemblyOptions[0], [{
+      optionGroupId: 'size-group',
+      name: 'Escolha o tamanho',
+      items: [{ optionItemId: 'size-500', name: '500 ml', priceImpactType: 'replace', priceImpactValue: 20, qty: 1 }],
+    }])).toBeNull();
+  });
+
+  it('targets the first invalid pizza control for inline feedback and focus', () => {
+    expect(getPizzaValidation({
+      hasMountingGroup: true,
+      selectedSizeId: '',
+      selectedMountingItemId: '',
+      selectedFlavorCount: 0,
+      flavorSelectionLimit: 2,
+      isPreviewLoading: false,
+      previewError: null,
+    })).toMatchObject({ target: 'pizza-size' });
+
+    expect(getPizzaValidation({
+      hasMountingGroup: true,
+      selectedSizeId: 'large',
+      selectedMountingItemId: 'whole',
+      selectedFlavorCount: 0,
+      flavorSelectionLimit: 2,
+      isPreviewLoading: false,
+      previewError: null,
+    })).toMatchObject({ target: 'pizza-flavors' });
   });
 });
