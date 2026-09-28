@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { api, ApiError } from '@/lib/api-client';
 import { printThermalText } from '@/lib/thermal-print';
 import { useActiveSession } from '../cash/hooks/useCashSession';
@@ -22,7 +23,8 @@ import {
   Printer,
   Receipt,
   UserPlus,
-  MapPin
+  MapPin,
+  CircleAlert
 } from 'lucide-react';
 
 // New Components
@@ -34,6 +36,7 @@ import { TransferTableModal } from './components/TransferTableModal';
 import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
 import { SplitPaymentModal } from './components/SplitPaymentModal';
 import { PosCustomerDrawer } from './components/PosCustomerDrawer';
+import { getPosFinishBlocker } from './pos-finish-state';
 import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
 
 interface CatalogProduct {
@@ -179,20 +182,6 @@ export default function PosPage() {
     setSourceTableForTransfer(table);
     setIsTransferModalOpen(true);
   }, []);
-
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F2') { e.preventDefault(); searchInputRef.current?.focus(); }
-      if (e.key === 'F4' && cart.length > 0 && !isPaymentModalOpen) { e.preventDefault(); setIsPaymentModalOpen(true); }
-      if (e.key === 'Escape') {
-        if (isPaymentModalOpen) setIsPaymentModalOpen(false);
-        if (showCustomerSearch) setShowCustomerSearch(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart.length, isPaymentModalOpen, showCustomerSearch]);
 
   // Printing Utility
   const handlePrint = async (orderId: string, type: 'customer' | 'kitchen') => {
@@ -539,6 +528,29 @@ export default function PosPage() {
     !customerMissingRequiredData &&
     (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated)) &&
     (fulfillmentType !== PosFulfillmentType.TABLE || !!selectedTableId);
+  const finishBlocker = useMemo(() => getPosFinishBlocker({
+    hasActiveSession: !!activeSession,
+    hasItems: cart.length > 0,
+    customerMissingRequiredData,
+    isDelivery,
+    deliveryMissingRequiredData,
+    deliveryFeeCalculated,
+  }), [activeSession, cart.length, customerMissingRequiredData, deliveryFeeCalculated, deliveryMissingRequiredData, isDelivery]);
+
+  // Keyboard shortcuts mirror the enabled controls; F4 cannot bypass the visible finish gate.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') { e.preventDefault(); searchInputRef.current?.focus(); }
+      if (e.key === 'F4' && canFinalizeSale && !isPaymentModalOpen) { e.preventDefault(); setIsPaymentModalOpen(true); }
+      if (e.key === 'Escape') {
+        if (isPaymentModalOpen) setIsPaymentModalOpen(false);
+        if (showCustomerSearch) setShowCustomerSearch(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canFinalizeSale, isPaymentModalOpen, showCustomerSearch]);
+
   const isSavingCustomerAddress =
     createCustomerMutation.isPending ||
     createAddressMutation.isPending ||
@@ -642,6 +654,7 @@ export default function PosPage() {
         clearSelectedCustomer();
         setDeliveryFee(0); setDeliveryFeeCalculated(false); setDeliveryFeeError(null);
         setSaleError(null);
+        toast.success('Venda registrada. Verifique a impressão do comprovante.');
         queryClient.invalidateQueries({ queryKey: ['posSalon'] });
       },
       onError: (error) => {
@@ -659,7 +672,8 @@ export default function PosPage() {
   if (sessionLoading) return <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-muted-foreground italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100dvh-64px)] bg-background text-foreground overflow-hidden font-sans">
+    <main className="flex min-h-[calc(100dvh-64px)] flex-col bg-background font-sans text-foreground md:h-[calc(100dvh-64px)] md:flex-row md:overflow-hidden">
+      <h1 className="sr-only">Ponto de venda</h1>
       
       {/* ========== LEFT: NAVIGATION ========== */}
       <div className="hidden lg:flex w-16 flex-col bg-card dark:bg-muted900 border-r border-border200 dark:border-border800 py-4 gap-4 items-center">
@@ -684,22 +698,58 @@ export default function PosPage() {
       </div>
 
       {/* ========== CENTER: CONTENT ========== */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background dark:bg-muted950">
+      <section aria-label="Catálogo e atendimento" className="order-1 flex min-w-0 flex-1 flex-col bg-background dark:bg-muted950 md:min-h-0">
         {viewMode === 'catalog' ? (
            <>
-            <div className="p-3 bg-card dark:bg-muted900 border-b border-border200 dark:border-border800 flex flex-col xl:flex-row gap-3 items-center">
-              <div className="relative flex-1 group w-full">
+             <div className="border-b border-border200 bg-card p-3 dark:border-border800 dark:bg-muted900">
+               <div className="mb-3 flex items-center justify-between gap-3 xl:hidden">
+                 <div>
+                   <h2 id="pos-catalog-title" className="text-sm font-black text-foreground">Produtos e atendimento</h2>
+                   <p className="text-xs text-muted-foreground">Escolha o atendimento e adicione os itens.</p>
+                 </div>
+                 {cart.length > 0 && (
+                   <a href="#pos-cart" className="shrink-0 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-bold text-primary outline-none transition-colors hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring">
+                     Ver venda ({cart.length})
+                   </a>
+                 )}
+               </div>
+               <div className="flex flex-col items-center gap-3 xl:flex-row">
+               <div className="relative flex-1 group w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400 group-focus-within:text-status-success" size={16} />
                 <input
                   ref={searchInputRef}
                   type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl pl-12 pr-4 py-2.5 text-sm outline-none focus:border-status-success transition-all"
+                   aria-label="Buscar produtos"
+                   className="w-full rounded-xl border border-border200 bg-card py-2.5 pl-12 pr-4 text-sm outline-none transition-all focus:border-status-success focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800"
                   placeholder="F2 para buscar..."
                 />
-              </div>
-              <OrderTypeSelector currentType={fulfillmentType} onTypeChange={setFulfillmentType} />
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+               </div>
+               <OrderTypeSelector currentType={fulfillmentType} onTypeChange={setFulfillmentType} />
+               </div>
+               <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 md:hidden dark:bg-muted900/60">
+                 <div className="flex items-start justify-between gap-3">
+                   <div>
+                     <p className="text-xs font-black text-foreground">Dados do atendimento</p>
+                     <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                       {isDelivery
+                         ? 'Informe cliente e endereço antes de calcular o frete.'
+                         : 'Informe o cliente antes de fechar a conta.'}
+                     </p>
+                   </div>
+                   <button
+                     type="button"
+                     onClick={() => setIsCustomerDrawerOpen(true)}
+                     className="shrink-0 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-bold text-primary outline-none transition-colors hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring"
+                   >
+                     {selectedCustomer || customerName.trim() ? 'Conferir' : 'Informar'}
+                   </button>
+                 </div>
+                 {isDelivery && !deliveryFeeCalculated && !deliveryMissingRequiredData && (
+                   <p className="mt-2 border-t border-border pt-2 text-xs font-medium text-muted-foreground">Frete pendente: abra os dados do atendimento para calcular.</p>
+                 )}
+               </div>
+             </div>
+             <div className="min-h-[18rem] flex-1 overflow-y-auto p-3 custom-scrollbar md:min-h-0">
                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                  {filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
                </div>
@@ -708,28 +758,33 @@ export default function PosPage() {
         ) : (
            <PosSalonView tables={salonTables || []} isLoading={salonLoading} onSelectTable={handleSelectTable} onTransferTable={handleTransferTable} />
         )}
-      </div>
+      </section>
 
       {/* ========== RIGHT: CART ========== */}
-      <div className={`w-full md:w-[380px] lg:w-[420px] flex flex-col bg-card dark:bg-muted900 border-l border-border200 dark:border-border800 shadow-2xl z-10 transition-transform ${viewMode === 'salon' ? 'translate-x-full md:translate-x-0' : ''}`}>
+      <aside id="pos-cart" aria-labelledby="pos-cart-title" className={`order-2 flex min-h-[30rem] w-full flex-col border-t border-border200 bg-card shadow-2xl transition-transform dark:border-border800 dark:bg-muted900 md:min-h-0 md:w-[380px] md:border-l md:border-t-0 lg:w-[420px] ${viewMode === 'salon' ? 'translate-x-full md:translate-x-0' : ''}`}>
         <div className="shrink-0 px-4 py-3 bg-card flex items-center justify-between border-b border-border200 dark:border-border800">
            <div className="flex items-center gap-2">
-             <div className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
-             <span className="text-[10px] font-black uppercase text-status-success">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
+              <div className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
+              <div>
+                <h2 id="pos-cart-title" className="text-sm font-black text-foreground">Venda atual</h2>
+                <span className="text-[10px] font-black uppercase text-status-success">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
+              </div>
            </div>
            <div className="flex gap-2">
              {currentOrderId && (
                <>
-                <button 
-                  onClick={() => handlePrint(currentOrderId!, 'customer')}
-                  className="bg-background dark:bg-muted800 text-foreground/70 p-1.5 rounded-lg hover:text-foreground transition-colors border border-border/70 dark:border-border700"
-                  title="Imprimir Cupom"
+                 <button
+                   onClick={() => handlePrint(currentOrderId!, 'customer')}
+                   aria-label="Imprimir cupom do cliente"
+                   className="rounded-lg border border-border/70 bg-background p-1.5 text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800"
+                   title="Imprimir Cupom"
                 >
                   <Receipt size={14} />
                 </button>
-                <button 
-                  onClick={() => handlePrint(currentOrderId!, 'kitchen')}
-                  className="bg-background dark:bg-muted800 text-foreground/70 p-1.5 rounded-lg hover:text-foreground transition-colors border border-border/70 dark:border-border700"
+                 <button
+                   onClick={() => handlePrint(currentOrderId!, 'kitchen')}
+                   aria-label="Imprimir ticket da cozinha"
+                   className="rounded-lg border border-border/70 bg-background p-1.5 text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800"
                   title="Imprimir Cozinha"
                 >
                   <Printer size={14} />
@@ -754,9 +809,9 @@ export default function PosPage() {
                   </span>
                 )}
               </div>
-              <button 
-                onClick={() => setIsCustomerDrawerOpen(true)}
-                className="w-full bg-background dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-foreground/85 dark:text-foreground border border-dashed border-border300 dark:border-border700 rounded-xl py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+               <button
+                 onClick={() => setIsCustomerDrawerOpen(true)}
+                 className="w-full rounded-xl border border-dashed border-border300 bg-background py-3 text-xs font-black uppercase tracking-wider text-foreground/85 outline-none transition-all hover:bg-muted100 focus-visible:ring-2 focus-visible:ring-ring dark:border-border700 dark:bg-muted800 dark:text-foreground dark:hover:bg-muted750"
               >
                 <UserPlus size={14} className="text-primary" />
                 Identificar Cliente
@@ -769,9 +824,9 @@ export default function PosPage() {
                   <p className="text-xs font-black text-foreground truncate">{selectedCustomer?.name || customerName}</p>
                   <p className="text-[10px] font-bold text-muted-foreground">{selectedCustomer?.phone || customerPhone}</p>
                 </div>
-                <button 
-                  onClick={() => setIsCustomerDrawerOpen(true)}
-                  className="text-[9px] font-black uppercase text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg hover:bg-primary/20 transition-all shrink-0"
+                 <button
+                   onClick={() => setIsCustomerDrawerOpen(true)}
+                   className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1 text-[9px] font-black uppercase text-primary outline-none transition-all hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Editar
                 </button>
@@ -791,16 +846,19 @@ export default function PosPage() {
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
              {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                <ShoppingCart size={48} strokeWidth={1} />
-                <p className="font-black mt-2 text-[10px] uppercase">Aguardando Itens</p>
+               <div className="h-full min-h-52 flex flex-col items-center justify-center text-center text-muted-foreground">
+                 <ShoppingCart size={48} strokeWidth={1} />
+                 <p className="mt-3 text-sm font-bold text-foreground">Adicione itens para iniciar a venda.</p>
+                 <button onClick={() => { setViewMode('catalog'); searchInputRef.current?.focus(); }} className="mt-3 rounded-lg px-3 py-2 text-xs font-bold text-primary outline-none transition-colors hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring">
+                   Ir para o catálogo
+                 </button>
               </div>
              ) : (
                cart.map((item) => (
                <div key={item.cartLineId} className="bg-card border border-border rounded-2xl p-4 group transition-all hover:bg-muted">
                  <div className="flex justify-between items-start gap-4 mb-3">
                    <p className="font-bold text-foreground text-[13px] leading-tight">{item.name}</p>
-                   <button onClick={() => removeFromCart(item.cartLineId)} className="text-muted-foreground hover:text-destructive transition-colors"><X size={16} /></button>
+                    <button onClick={() => removeFromCart(item.cartLineId)} aria-label={`Remover ${item.name}`} className="rounded-md p-1 text-muted-foreground outline-none transition-colors hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"><X size={16} /></button>
                  </div>
                    {item.compositionLabel ? (
                      <div className="text-[10px] text-muted-foreground500 dark:text-muted-foreground400 font-bold mb-2 line-clamp-2">
@@ -809,9 +867,9 @@ export default function PosPage() {
                    ) : null}
                    <div className="flex items-center justify-between">
                      <div className="flex items-center bg-card rounded-xl p-1 border border-border">
-                       <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground"><Minus size={14} strokeWidth={3} /></button>
+                        <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} aria-label={`Diminuir ${item.name}`} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Minus size={14} strokeWidth={3} /></button>
                        <span className="w-8 text-center font-black text-sm text-foreground">{item.quantity}</span>
-                       <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground"><Plus size={14} strokeWidth={3} /></button>
+                        <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} aria-label={`Aumentar ${item.name}`} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Plus size={14} strokeWidth={3} /></button>
                      </div>
                      <p className="text-status-success font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
                    </div>
@@ -872,21 +930,30 @@ export default function PosPage() {
 
             {saleError && (
               <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 flex items-start gap-2">
-                <X size={14} className="text-destructive shrink-0 mt-0.5 cursor-pointer" onClick={() => setSaleError(null)} />
+                <CircleAlert size={15} className="text-destructive shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-[11px] font-bold text-destructive leading-tight">{saleError}</p>
+                <button type="button" onClick={() => setSaleError(null)} aria-label="Fechar mensagem de erro" className="ml-auto rounded p-0.5 text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"><X size={14} /></button>
               </div>
+            )}
+
+            {!canFinalizeSale && !createSale.isPending && (
+              <p id="pos-finish-requirement" className="flex items-start gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-medium leading-snug text-muted-foreground dark:bg-muted900">
+                <CircleAlert size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+                {finishBlocker}
+              </p>
             )}
 
             <button 
               onClick={() => setIsPaymentModalOpen(true)}
               disabled={!canFinalizeSale}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
+              aria-describedby={!canFinalizeSale ? 'pos-finish-requirement' : undefined}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
             >
-               {createSale.isPending ? 'PROCESSANDO...' : 'FECHAR CONTA (F4)'}
+               {createSale.isPending ? 'Finalizando venda…' : 'FECHAR CONTA (F4)'}
                <ChevronRight size={20} strokeWidth={3} />
             </button>
         </div>
-      </div>
+      </aside>
 
       <PaymentModal 
         isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)}
@@ -1014,6 +1081,6 @@ export default function PosPage() {
           }}
         />
       )}
-    </div>
+    </main>
   );
 }
