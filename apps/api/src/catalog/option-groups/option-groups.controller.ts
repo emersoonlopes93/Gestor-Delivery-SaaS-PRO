@@ -28,8 +28,8 @@ export class OptionGroupsController {
 
   @Get(':id')
   @RequirePermissions('catalog.read')
-  getGroup(@Param('id') id: string) {
-    return this.service.getGroup(id);
+  getGroup(@Param('id') id: string, @Query('includeArchived') includeArchived?: string) {
+    return this.service.getGroup(id, includeArchived === 'true');
   }
 
   @Patch(':id')

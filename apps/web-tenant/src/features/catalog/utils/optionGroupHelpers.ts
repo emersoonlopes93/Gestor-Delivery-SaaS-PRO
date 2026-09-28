@@ -1,4 +1,4 @@
-import { OptionSelectionType, PriceImpactType } from '@gestor/types';
+import { OptionSelectionType, PriceImpactType, resolveEffectiveSelectionRules } from '@gestor/types';
 
 export function formatCurrency(value?: number | string | null): string {
   const num = Number(value ?? 0);
@@ -35,8 +35,12 @@ export function formatSelectionRules(params: {
   maxSelect?: number | null;
   selectionType?: OptionSelectionType | string | null;
 }): string {
-  const min = params.minSelect ?? 0;
-  const max = params.maxSelect ?? 1;
+  const { effectiveMinSelect: min, effectiveMaxSelect: max } = resolveEffectiveSelectionRules({
+    selectionType: params.selectionType ?? 'multiple',
+    isRequired: params.isRequired,
+    minSelect: params.minSelect,
+    maxSelect: params.maxSelect,
+  });
 
   if (min === 1 && max === 1) {
     return 'Escolha 1';

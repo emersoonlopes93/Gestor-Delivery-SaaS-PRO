@@ -13,6 +13,7 @@ import type {
   ValidatedComboLine,
   CheckoutValidationResult,
 } from '@gestor/types';
+import { resolveEffectiveSelectionRules } from '@gestor/types';
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
@@ -703,21 +704,25 @@ export class CheckoutValidatorService {
       const selectedGroup = selections.find((s) => s.optionGroupId === groupId);
       const selectedCount = selectedGroup ? selectedGroup.items.length : 0;
 
-      const minSelect = link.overrideMinSelect ?? group.minSelect;
-      const maxSelect = link.overrideMaxSelect ?? group.maxSelect;
-      const isRequired = link.overrideIsRequired ?? group.isRequired;
+      const rules = resolveEffectiveSelectionRules({
+        selectionType: group.selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        overrideIsRequired: link.overrideIsRequired,
+        overrideMinSelect: link.overrideMinSelect,
+        overrideMaxSelect: link.overrideMaxSelect,
+      });
       const groupName = link.overrideName ?? group.name;
 
-      const effectiveMin = isRequired ? Math.max(1, minSelect) : minSelect;
-
-      if (selectedCount < effectiveMin) {
+      if (selectedCount < rules.effectiveMinSelect) {
         throw new BadRequestException(
-          `Selecione pelo menos ${effectiveMin} opções em "${groupName}" para "${productName}".`,
+          `Selecione pelo menos ${rules.effectiveMinSelect} opções em "${groupName}" para "${productName}".`,
         );
       }
-      if (selectedCount > maxSelect) {
+      if (selectedCount > rules.effectiveMaxSelect) {
         throw new BadRequestException(
-          `Máximo de ${maxSelect} opções em "${groupName}" para "${productName}".`,
+          `Máximo de ${rules.effectiveMaxSelect} opções em "${groupName}" para "${productName}".`,
         );
       }
     }
@@ -757,9 +762,15 @@ export class CheckoutValidatorService {
       const pricingAxis = link.pricingAxis || 'secondary';
 
       const selectionType = group.selectionType;
-      const isRequired = (link.overrideIsRequired ?? group.isRequired) || false;
-      const minSelect = Number((link.overrideMinSelect ?? group.minSelect) ?? 0);
-      const maxSelect = Number((link.overrideMaxSelect ?? group.maxSelect) ?? 0);
+      const rules = resolveEffectiveSelectionRules({
+        selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        overrideIsRequired: link.overrideIsRequired,
+        overrideMinSelect: link.overrideMinSelect,
+        overrideMaxSelect: link.overrideMaxSelect,
+      });
 
       const groupItems = group.items;
       const chosenNames: string[] = [];
@@ -841,9 +852,9 @@ export class CheckoutValidatorService {
           groupName,
           selectionType,
           pricingAxis,
-          isRequired,
-          minSelect,
-          maxSelect,
+          isRequired: rules.effectiveIsRequired,
+          minSelect: rules.effectiveMinSelect,
+          maxSelect: rules.effectiveMaxSelect,
           allowQuantity: groupAllowQuantity,
           items: groupSnapshotItems,
         });

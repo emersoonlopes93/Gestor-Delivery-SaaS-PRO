@@ -99,6 +99,55 @@ export type ComboPricingType = 'fixed_price' | 'discount_percent' | 'discount_am
 
 export type OptionSelectionType = 'single' | 'multiple' | 'quantity';
 
+export interface EffectiveSelectionRules {
+  effectiveIsRequired: boolean;
+  effectiveMinSelect: number;
+  effectiveMaxSelect: number;
+}
+
+/**
+ * Resolves the selection contract used by catalog links at runtime.
+ *
+ * Link overrides take precedence over the shared group. The normalisation is
+ * deliberately defensive because historical records predate the validation
+ * currently enforced by the catalog APIs.
+ */
+export function resolveEffectiveSelectionRules(input: {
+  selectionType: OptionSelectionType | string;
+  isRequired?: boolean | null;
+  minSelect?: number | null;
+  maxSelect?: number | null;
+  overrideIsRequired?: boolean | null;
+  overrideMinSelect?: number | null;
+  overrideMaxSelect?: number | null;
+}): EffectiveSelectionRules {
+  const toNonNegativeInteger = (value: number | null | undefined, fallback: number) => {
+    const numeric = Number(value ?? fallback);
+    return Number.isFinite(numeric) ? Math.max(0, Math.floor(numeric)) : fallback;
+  };
+
+  const effectiveIsRequired = input.overrideIsRequired ?? input.isRequired ?? false;
+  const configuredMin = toNonNegativeInteger(input.overrideMinSelect ?? input.minSelect, 0);
+  const configuredMax = toNonNegativeInteger(input.overrideMaxSelect ?? input.maxSelect, 1);
+
+  if (input.selectionType === 'single') {
+    return {
+      effectiveIsRequired,
+      effectiveMinSelect: effectiveIsRequired ? 1 : 0,
+      effectiveMaxSelect: 1,
+    };
+  }
+
+  const effectiveMinSelect = effectiveIsRequired ? Math.max(1, configuredMin) : configuredMin;
+  return {
+    effectiveIsRequired,
+    effectiveMinSelect,
+    // A legacy required record may incorrectly contain max=0. Keep the
+    // runtime contract satisfiable instead of exposing an impossible choice.
+    effectiveMaxSelect: Math.max(effectiveMinSelect, configuredMax),
+  };
+}
+
 export type PriceImpactType = 'none' | 'fixed' | 'replace' | 'percentage';
 
 export type PricingAxis = 'primary' | 'secondary';
