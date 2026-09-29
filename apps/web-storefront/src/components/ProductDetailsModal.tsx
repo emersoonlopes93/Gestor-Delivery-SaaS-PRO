@@ -24,7 +24,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { reconcileGenericSelections } from './product-details-selection';
 import { getGenericOptionGroupError, getMaximumOptionQuantity, getPizzaValidation } from './product-details-validation';
-import { getStorefrontStartingPrice } from '../lib/product-pricing';
+import { calculateStorefrontGenericUnitPrice, getStorefrontStartingPrice } from '../lib/product-pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -320,30 +320,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
 
   const computed = useMemo(() => {
-    let effectiveBasePrice = product.basePrice;
-    const selectedPrimaryReplace = selections
-      .flatMap((selection) => {
-        const link = genericOptionLinks.find((candidate) => candidate.optionGroup.id === selection.optionGroupId);
-        return link?.pricingAxis === 'primary'
-          ? selection.items.filter((item) => item.priceImpactType === 'replace')
-          : [];
-      })
-      .at(0);
-
-    if (selectedPrimaryReplace) {
-      effectiveBasePrice = selectedPrimaryReplace.priceImpactValue;
-    }
-
-    let extras = 0;
     const parts: string[] = [];
+    const genericExtras = calculateStorefrontGenericUnitPrice(product, selections) - product.basePrice;
 
     selections.forEach((group) => {
       group.items.forEach((item) => {
-        if (item.priceImpactType === 'fixed') {
-          extras += item.priceImpactValue * (item.qty || 1);
-        } else if (item.priceImpactType === 'percentage') {
-          extras += (effectiveBasePrice * (item.priceImpactValue / 100)) * (item.qty || 1);
-        }
         parts.push(item.qty && item.qty > 1 ? `${item.name} x${item.qty}` : item.name);
       });
     });
@@ -355,8 +336,8 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       const basePrice = pizzaPreview?.calculatedPrice ?? product.basePrice;
 
       return {
-        unitPrice: basePrice + extras,
-        totalPrice: (basePrice + extras) * quantity,
+        unitPrice: basePrice + genericExtras,
+        totalPrice: (basePrice + genericExtras) * quantity,
         compositionLabel: [
           pizzaPreview ? `Pizza ${pizzaPreview.sizeName}` : 'Pizza',
           flavorNames.join(' / '),
@@ -366,11 +347,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     return {
-      unitPrice: effectiveBasePrice + extras,
-      totalPrice: (effectiveBasePrice + extras) * quantity,
+      unitPrice: calculateStorefrontGenericUnitPrice(product, selections),
+      totalPrice: calculateStorefrontGenericUnitPrice(product, selections) * quantity,
       compositionLabel: parts.join(', '),
     };
-  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product.basePrice, quantity, selectedPizzaFlavorIds, selections]);
+  }, [isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product, quantity, selectedPizzaFlavorIds, selections]);
 
   const pizzaValidation = useMemo(() => isPizzaTemplate ? getPizzaValidation({
     hasMountingGroup: Boolean(mountingGroup),
@@ -796,11 +777,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
 
                           return (
                             <div key={item.id} className={cn(
-                              'transition-colors',
+                              'flex min-h-[44px] items-center justify-between gap-3 px-3 py-2.5 transition-colors',
                               isSelected ? 'bg-primary-50' : 'hover:bg-slate-50',
                             )}>
                               <div className={cn(
-                                'flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left',
+                                'flex min-h-[44px] min-w-0 flex-1 items-center gap-3 text-left',
                                 !isQuantity && 'cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-primary-500',
                               )} onClick={!isQuantity ? () => toggleV2Option(group.id, item, min, max, group.selectionType) : undefined}>
                                 {!isQuantity ? <input
@@ -835,9 +816,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                               </div>
 
                               {isQuantity ? (
-                                <div className="flex min-h-10 items-center justify-between border-t border-slate-100 px-3 py-2">
-                                  <span className="text-xs font-bold text-slate-500">Qtd. {selectedQuantity === 0 ? '(nenhuma)' : ''}</span>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex shrink-0 items-center gap-2" aria-label={`Quantidade de ${item.name}`}>
                                   <button
                                     type="button"
                                     onClick={() => updateV2Qty(group.id, item, -1, max)}
