@@ -45,6 +45,7 @@ export function ProductListItem({
 
         <div className="mt-2 flex items-center gap-3">
           <div className="flex items-baseline gap-2">
+            {product.pricePrefix ? <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--storefront-muted-foreground)]">{product.pricePrefix}</span> : null}
             <span className="font-black text-[var(--storefront-foreground)]">
               {currencyFormatter(product.price)}
             </span>

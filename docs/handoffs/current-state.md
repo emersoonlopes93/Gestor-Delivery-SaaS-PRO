@@ -1,3 +1,10 @@
+## Storefront C2.5E.3 - preco e semantica de selecao (2026-09-28)
+
+- O Storefront agora deriva o preco exibido "A partir de" somente de itens `replace` ativos, efetivamente disponiveis e ligados ao eixo `primary`; o payload publico ja filtra grupos/itens arquivados e resolve o override de preco por produto antes dessa exibicao. Sem candidato elegivel, o preco-base continua sendo mostrado.
+- No modal generico, uma opcao `replace` selecionada no eixo `primary` passa a substituir o preco-base na previa local; adicionais fixos e percentuais sao calculados sobre essa base efetiva. O Checkout continua como autoridade e reaplica a mesma regra no servidor.
+- `single` usa radio, `multiple` usa checkbox e `quantity` usa somente stepper, com quantidade inicial zero e remocao explicita ao voltar para zero. Pizza Engine, schema, migrations, C2.6, checkout payload e comportamento de loja fechada nao foram alterados.
+- O Web Tenant explica `replace` como "Define o preco final" e esclarece que `primary` identifica o grupo que define o preco principal. Validacoes focadas: Storefront 10/10, Checkout 3/3 e builds Storefront/API passaram; gates globais permanecem em execucao nesta sessao.
+
 ## Operational Control Center (2026-09-13)
 
 - O Gestor V2 passou a reutilizar o board canônico para um cockpit compacto: estado operacional da loja, atalhos permissionados para taxas, Radar, caixa e mesas, e contadores de Delivery, Retirada e Comandas sem pedidos terminais ou dupla contagem.

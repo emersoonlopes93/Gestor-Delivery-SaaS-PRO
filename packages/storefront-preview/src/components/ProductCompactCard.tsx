@@ -43,6 +43,7 @@ export function ProductCompactCard({
         <h3 className="font-bold text-sm text-[var(--storefront-foreground)] truncate group-hover:text-[var(--storefront-primary)] transition-colors leading-tight">
           {product.name}
         </h3>
+        {product.pricePrefix ? <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-[var(--storefront-muted-foreground)]">{product.pricePrefix}</span> : null}
         <span className="font-black text-sm text-[var(--storefront-foreground)]">
           {currencyFormatter(product.price)}
         </span>

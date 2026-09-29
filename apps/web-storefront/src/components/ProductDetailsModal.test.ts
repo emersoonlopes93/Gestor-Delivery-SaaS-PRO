@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveEffectiveSelectionRules, type CartSelectedOptionGroup, type StorefrontProductPayload } from '@gestor/types';
 import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { reconcileGenericSelections } from './product-details-selection';
-import { getGenericOptionGroupError, getPizzaValidation, shouldShowQuantityStepper } from './product-details-validation';
+import { getGenericOptionGroupError, getMaximumOptionQuantity, getPizzaValidation, shouldShowQuantityStepper } from './product-details-validation';
 
 const genericSizeAndAssemblyOptions = [
   {
@@ -109,12 +109,18 @@ describe('ProductDetailsModal generic option state', () => {
       })).toMatchObject({ effectiveIsRequired: true, effectiveMinSelect: 1, effectiveMaxSelect: 3 });
   });
 
-  it('shows steppers only for selected quantity items allowed by the contract', () => {
+  it('shows steppers only for quantity groups, including their zero state', () => {
     expect(shouldShowQuantityStepper('single', true, true)).toBe(false);
     expect(shouldShowQuantityStepper('multiple', true, true)).toBe(false);
-    expect(shouldShowQuantityStepper('quantity', false, true)).toBe(false);
-    expect(shouldShowQuantityStepper('quantity', true, false)).toBe(false);
+    expect(shouldShowQuantityStepper('quantity', false, true)).toBe(true);
+    expect(shouldShowQuantityStepper('quantity', true, false)).toBe(true);
     expect(shouldShowQuantityStepper('quantity', true, true)).toBe(true);
+  });
+
+  it('keeps quantity items without allowQuantity in the stepper language at 0 or 1', () => {
+    expect(getMaximumOptionQuantity(false)).toBe(1);
+    expect(getMaximumOptionQuantity(true)).toBe(Number.POSITIVE_INFINITY);
+    expect(shouldShowQuantityStepper('quantity', false, false)).toBe(true);
   });
 
   it('reports the exact generic group that needs attention before adding to cart', () => {

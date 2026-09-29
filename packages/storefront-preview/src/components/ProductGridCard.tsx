@@ -77,6 +77,7 @@ export function ProductGridCard({
 
         <div className="mt-auto flex items-center justify-between gap-2">
           <div className="flex flex-col">
+            {product.pricePrefix ? <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--storefront-muted-foreground)]">{product.pricePrefix}</span> : null}
             {product.compareAtPrice && product.compareAtPrice > product.price && (
               <span className="text-xs text-[var(--storefront-muted-foreground)] line-through">
                 {currencyFormatter(product.compareAtPrice)}

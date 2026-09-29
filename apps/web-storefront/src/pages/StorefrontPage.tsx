@@ -43,6 +43,7 @@ import { useAnalytics } from '../features/analytics';
 import { useStorefrontConsent } from '../features/consent';
 import { SmartShowcase } from '../components/SmartShowcase';
 import { useCategoryScrollSpy } from '../hooks/useCategoryScrollSpy';
+import { getStorefrontStartingPrice, hasStorefrontStartingPrice } from '../lib/product-pricing';
 
 type CustomerHomePayload = {
   profile: { name: string; totalOrders: number };
@@ -553,7 +554,10 @@ export function StorefrontPage() {
                 {category.products.map((product) => (
                   <ProductRenderer
                     key={product.id}
-                    product={toStorefrontProduct(product)}
+                    product={toStorefrontProduct({
+                      ...product,
+                      startingPrice: hasStorefrontStartingPrice(product) ? getStorefrontStartingPrice(product) : null,
+                    })}
                     layout={effectiveProductLayout}
                     imageMode={layoutSettings.productImageMode}
                     showDescription={layoutSettings.showProductDescription}

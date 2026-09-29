@@ -336,6 +336,9 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
             </div>
 
             <div className="border border-border rounded-xl overflow-hidden bg-card">
+              <div className="border-b border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+                “Define o preço final” substitui o preço-base quando este grupo estiver vinculado ao eixo principal do produto.
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="bg-muted/50 border-b border-border">
@@ -368,7 +371,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                           >
                             <option value="none">Nenhum</option>
                             <option value="fixed">Adicional Fixo</option>
-                            <option value="replace">Substituir</option>
+                            <option value="replace">Define o preço final</option>
                             <option value="percentage">% Adicional</option>
                           </select>
                         </td>

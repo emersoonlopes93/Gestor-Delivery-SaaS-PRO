@@ -8,10 +8,15 @@ export type PizzaValidationTarget = 'pizza-size' | 'pizza-mounting' | 'pizza-fla
 /** Quantity controls are entirely contract-driven; labels such as "Tamanho" are irrelevant. */
 export function shouldShowQuantityStepper(
   selectionType: OptionSelectionType,
-  isSelected: boolean,
-  allowQuantity: boolean,
+  _isSelected: boolean,
+  _allowQuantity: boolean,
 ): boolean {
-  return selectionType === 'quantity' && isSelected && allowQuantity;
+  return selectionType === 'quantity';
+}
+
+/** Quantity groups always use a stepper. Items without quantity support are 0/1. */
+export function getMaximumOptionQuantity(allowQuantity: boolean): number {
+  return allowQuantity ? Number.POSITIVE_INFINITY : 1;
 }
 
 export function getPizzaValidation(

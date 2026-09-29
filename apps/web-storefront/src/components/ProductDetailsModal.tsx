@@ -23,7 +23,8 @@ import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { reconcileGenericSelections } from './product-details-selection';
-import { getGenericOptionGroupError, getPizzaValidation, shouldShowQuantityStepper } from './product-details-validation';
+import { getGenericOptionGroupError, getMaximumOptionQuantity, getPizzaValidation } from './product-details-validation';
+import { getStorefrontStartingPrice } from '../lib/product-pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -114,6 +115,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   }, [isPizzaTemplate, mountingGroup?.optionGroup.id, optionGroupLinks, sizeGroup?.optionGroup.id]);
 
   const hasV2Options = genericOptionLinks.length > 0;
+  const startingPrice = useMemo(() => getStorefrontStartingPrice(product), [product]);
   const genericOptionLinksRef = useRef(genericOptionLinks);
 
   useEffect(() => {
@@ -318,6 +320,20 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
 
   const computed = useMemo(() => {
+    let effectiveBasePrice = product.basePrice;
+    const selectedPrimaryReplace = selections
+      .flatMap((selection) => {
+        const link = genericOptionLinks.find((candidate) => candidate.optionGroup.id === selection.optionGroupId);
+        return link?.pricingAxis === 'primary'
+          ? selection.items.filter((item) => item.priceImpactType === 'replace')
+          : [];
+      })
+      .at(0);
+
+    if (selectedPrimaryReplace) {
+      effectiveBasePrice = selectedPrimaryReplace.priceImpactValue;
+    }
+
     let extras = 0;
     const parts: string[] = [];
 
@@ -326,7 +342,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
         if (item.priceImpactType === 'fixed') {
           extras += item.priceImpactValue * (item.qty || 1);
         } else if (item.priceImpactType === 'percentage') {
-          extras += (product.basePrice * (item.priceImpactValue / 100)) * (item.qty || 1);
+          extras += (effectiveBasePrice * (item.priceImpactValue / 100)) * (item.qty || 1);
         }
         parts.push(item.qty && item.qty > 1 ? `${item.name} x${item.qty}` : item.name);
       });
@@ -350,11 +366,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     return {
-      unitPrice: product.basePrice + extras,
-      totalPrice: (product.basePrice + extras) * quantity,
+      unitPrice: effectiveBasePrice + extras,
+      totalPrice: (effectiveBasePrice + extras) * quantity,
       compositionLabel: parts.join(', '),
     };
-  }, [isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product.basePrice, quantity, selectedPizzaFlavorIds, selections]);
+  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product.basePrice, quantity, selectedPizzaFlavorIds, selections]);
 
   const pizzaValidation = useMemo(() => isPizzaTemplate ? getPizzaValidation({
     hasMountingGroup: Boolean(mountingGroup),
@@ -436,18 +452,27 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     });
   };
 
-  const updateV2Qty = (groupId: string, itemId: string, delta: number) => {
+  const updateV2Qty = (groupId: string, item: StorefrontOptionItemPayload, delta: number, maxSelect: number) => {
     setSelections((prev) => {
       const group = prev.find((g) => g.optionGroupId === groupId);
       if (!group) return prev;
 
-      const newItems = group.items.map((i) => {
-        if (i.optionItemId === itemId) {
-          const newQty = Math.max(1, (i.qty || 1) + delta);
-          return { ...i, qty: newQty };
-        }
-        return i;
-      });
+      const currentItem = group.items.find((selected) => selected.optionItemId === item.id);
+      const nextQty = Math.min(getMaximumOptionQuantity(item.allowQuantity), Math.max(0, (currentItem?.qty ?? 0) + delta));
+      if (!currentItem && nextQty === 0) return prev;
+      if (!currentItem && group.items.length >= maxSelect) return prev;
+
+      const newItems = currentItem
+        ? nextQty === 0
+          ? group.items.filter((selected) => selected.optionItemId !== item.id)
+          : group.items.map((selected) => selected.optionItemId === item.id ? { ...selected, qty: nextQty } : selected)
+        : [...group.items, {
+          optionItemId: item.id,
+          name: item.name,
+          priceImpactType: item.priceImpactType,
+          priceImpactValue: item.priceImpactValue,
+          qty: nextQty,
+        }];
 
       return prev.map((g) => (g.optionGroupId === groupId ? { ...g, items: newItems } : g));
     });
@@ -537,7 +562,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
             </p>
             {!isPizzaTemplate ? (
               <p className="mt-3 text-sm font-black text-primary-700">
-                A partir de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.basePrice)}
+                A partir de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(startingPrice)}
               </p>
             ) : null}
           </header>
@@ -766,20 +791,26 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                         {group.items.filter((item) => item.isActive).map((item) => {
                           const isSelected = selectedIds.has(item.id);
                           const priceImpactValue = Number(item.priceImpactValue ?? 0);
+                          const isQuantity = group.selectionType === 'quantity';
+                          const selectedQuantity = state?.items.find((selected) => selected.optionItemId === item.id)?.qty ?? 0;
 
                           return (
                             <div key={item.id} className={cn(
                               'transition-colors',
                               isSelected ? 'bg-primary-50' : 'hover:bg-slate-50',
                             )}>
-                              <label className="flex min-h-[44px] w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left focus-within:outline focus-within:outline-2 focus-within:outline-primary-500">
-                                <input
-                                  type={group.selectionType === 'single' || max === 1 ? 'radio' : 'checkbox'}
+                              <div className={cn(
+                                'flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left',
+                                !isQuantity && 'cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-primary-500',
+                              )} onClick={!isQuantity ? () => toggleV2Option(group.id, item, min, max, group.selectionType) : undefined}>
+                                {!isQuantity ? <input
+                                  type={group.selectionType === 'single' ? 'radio' : 'checkbox'}
                                   name={`option-group-${group.id}`}
                                   checked={isSelected}
+                                  onClick={(event) => event.stopPropagation()}
                                   onChange={() => toggleV2Option(group.id, item, min, max, group.selectionType)}
                                   className="sr-only"
-                                />
+                                /> : null}
                                 <div className="flex flex-1 items-center justify-between gap-3">
                                   <div className="min-w-0">
                                     <div className="text-sm font-semibold text-gray-900">{item.name}</div>
@@ -793,39 +824,37 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                                             : ''}
                                     </div>
                                   </div>
-                                  <div className={cn(
-                                    'w-5 h-5 border flex items-center justify-center',
-                                    group.selectionType === 'single' || max === 1 ? 'rounded-full' : 'rounded-md',
-                                    isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-200 text-gray-400'
-                                  )}>
-                                    {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
-                                  </div>
+                                  {!isQuantity ? <div className={cn(
+                                      'w-5 h-5 border flex items-center justify-center',
+                                      group.selectionType === 'single' ? 'rounded-full' : 'rounded-md',
+                                      isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-200 text-gray-400'
+                                    )}>
+                                      {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                                    </div> : null}
                                 </div>
-                              </label>
+                              </div>
 
-                              {shouldShowQuantityStepper(group.selectionType, isSelected, item.allowQuantity) ? (
+                              {isQuantity ? (
                                 <div className="flex min-h-10 items-center justify-between border-t border-slate-100 px-3 py-2">
-                                  <span className="text-xs font-bold text-slate-500">Qtd.</span>
+                                  <span className="text-xs font-bold text-slate-500">Qtd. {selectedQuantity === 0 ? '(nenhuma)' : ''}</span>
                                   <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      const current = state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1;
-                                      updateV2Qty(group.id, item.id, -1);
-                                      if (current <= 1) return;
-                                    }}
+                                    onClick={() => updateV2Qty(group.id, item, -1, max)}
                                     aria-label={`Diminuir quantidade de ${item.name}`}
+                                    disabled={selectedQuantity === 0}
                                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
                                   >
                                     <Minus className="w-4 h-4" />
                                   </button>
                                   <div aria-live="polite" className="min-w-5 text-center text-sm font-black text-slate-900">
-                                    {state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1}
+                                    {selectedQuantity}
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => updateV2Qty(group.id, item.id, 1)}
+                                    onClick={() => updateV2Qty(group.id, item, 1, max)}
                                     aria-label={`Aumentar quantidade de ${item.name}`}
+                                    disabled={selectedQuantity >= getMaximumOptionQuantity(item.allowQuantity)}
                                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
                                   >
                                     <Plus className="w-4 h-4" />
