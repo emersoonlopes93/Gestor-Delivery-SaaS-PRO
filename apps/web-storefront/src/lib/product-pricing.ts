@@ -24,7 +24,16 @@ export function getStorefrontStartingPrice(product: StorefrontProductPayload): n
 }
 
 export function hasStorefrontStartingPrice(product: StorefrontProductPayload): boolean {
-  return getStorefrontStartingPrice(product) !== product.basePrice;
+  return (product.optionGroupLinks ?? []).some((link) =>
+    link.pricingAxis === 'primary'
+    && link.optionGroup.isActive
+    && link.optionGroup.items.some((item) =>
+      item.isActive
+      && item.effectiveIsActive !== false
+      && item.priceImpactType === 'replace'
+      && Number.isFinite(Number(item.priceImpactValue)),
+    ),
+  );
 }
 
 /** Preview-only counterpart of Checkout's structural replace rule. Checkout remains authoritative. */

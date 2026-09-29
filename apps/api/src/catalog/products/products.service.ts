@@ -488,7 +488,7 @@ export class ProductsService {
         optionGroupLinks: true,
 
         comboBundleItems: true,
-        publication: true,
+        publication: { include: { rules: true } },
         recipeIngredients: true,
 
         optionItemPrices: true,
@@ -594,15 +594,40 @@ export class ProductsService {
         });
       }
 
-      // Create Draft Publication
-      await tx.catalogPublication.create({
-        data: {
-          tenantId,
-          productId: duplicate.id,
-          publicationStatus: 'draft',
-          operationalStatus: 'inactive',
-        },
-      });
+      // The product itself starts inactive, so copying the source publication is
+      // safe. Once activated, a copy of a sellable product must retain the same
+      // publication contract instead of remaining permanently draft/inactive.
+      if (source.publication) {
+        await tx.catalogPublication.create({
+          data: {
+            tenantId,
+            productId: duplicate.id,
+            publicationStatus: source.publication.publicationStatus,
+            operationalStatus: source.publication.operationalStatus,
+            rules: {
+              create: source.publication.rules.map((rule) => ({
+                tenantId,
+                channel: rule.channel,
+                daysOfWeek: rule.daysOfWeek,
+                startTime: rule.startTime,
+                endTime: rule.endTime,
+                isActive: rule.isActive,
+              })),
+            },
+          },
+        });
+      } else if (source.sellableOnline) {
+        // Older products can legitimately lack a publication record. Match the
+        // create-product default so activation restores storefront visibility.
+        await tx.catalogPublication.create({
+          data: {
+            tenantId,
+            productId: duplicate.id,
+            publicationStatus: 'published',
+            operationalStatus: 'active',
+          },
+        });
+      }
 
       return duplicate;
     });

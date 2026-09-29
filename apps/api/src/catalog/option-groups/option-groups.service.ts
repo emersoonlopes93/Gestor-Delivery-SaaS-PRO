@@ -1,4 +1,6 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { Cache } from 'cache-manager';
 import { Prisma, PriceImpactType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
@@ -12,6 +14,7 @@ export class OptionGroupsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -32,6 +35,19 @@ export class OptionGroupsService {
     await this.prisma.auditLog.create({
       data: { tenantId, userId: actorId ?? null, userType: 'tenant_user', action, resource, details },
     });
+  }
+
+  private async invalidateStorefrontCache(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+    if (!tenant?.slug) return;
+
+    await Promise.all([
+      this.cacheManager.del(`storefront:${tenant.slug}:delivery`),
+      this.cacheManager.del(`storefront:${tenant.slug}:pickup`),
+    ]);
   }
 
   private validateGroupRules(input: {
@@ -200,14 +216,18 @@ export class OptionGroupsService {
       },
       include: { items: { orderBy: { order: 'asc' } } },
     });
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_group.updated', 'option_group', { optionGroupId: id });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.option_group.updated', 'option_group', { optionGroupId: id });
+    await this.invalidateStorefrontCache(tenantId);
     return group;
   }
 
   async archiveGroup(id: string, actorId?: string) {
     await this.getGroup(id);
     const group = await this.prisma.tenantClient.optionGroup.update({ where: { id }, data: { deletedAt: new Date() } });
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_group.archived', 'option_group', { optionGroupId: id });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.option_group.archived', 'option_group', { optionGroupId: id });
+    await this.invalidateStorefrontCache(tenantId);
     return group;
   }
 
@@ -215,7 +235,9 @@ export class OptionGroupsService {
     const group = await this.getGroup(id, true);
     if (!group.deletedAt) throw new BadRequestException('Grupo não está arquivado.');
     const restored = await this.prisma.tenantClient.optionGroup.update({ where: { id }, data: { deletedAt: null } });
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_group.restored', 'option_group', { optionGroupId: id });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.option_group.restored', 'option_group', { optionGroupId: id });
+    await this.invalidateStorefrontCache(tenantId);
     return restored;
   }
 
@@ -258,6 +280,7 @@ export class OptionGroupsService {
       } satisfies Prisma.OptionItemUncheckedCreateInput,
     });
     await this.audit(tenantId, actorId, 'catalog.option_item.created', 'option_item', { optionItemId: item.id, optionGroupId: dto.optionGroupId });
+    await this.invalidateStorefrontCache(tenantId);
     return item;
   }
 
@@ -293,7 +316,9 @@ export class OptionGroupsService {
         maxQty: dto.maxQty ?? undefined,
       },
     });
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_item.updated', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.option_item.updated', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    await this.invalidateStorefrontCache(tenantId);
     return updated;
   }
 
@@ -305,7 +330,9 @@ export class OptionGroupsService {
     if (!item) throw new NotFoundException('Item não encontrado.');
 
     const archived = await this.prisma.tenantClient.optionItem.update({ where: { id }, data: { deletedAt: new Date() } });
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_item.archived', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.option_item.archived', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    await this.invalidateStorefrontCache(tenantId);
     return archived;
   }
 
@@ -314,7 +341,9 @@ export class OptionGroupsService {
     if (!item) throw new NotFoundException('Item não encontrado.');
     if (!item.deletedAt) throw new BadRequestException('Item não está arquivado.');
     const restored = await this.prisma.tenantClient.optionItem.update({ where: { id }, data: { deletedAt: null } });
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.option_item.restored', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.option_item.restored', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    await this.invalidateStorefrontCache(tenantId);
     return restored;
   }
 
@@ -346,6 +375,8 @@ export class OptionGroupsService {
           }),
         ),
       );
+
+      await this.invalidateStorefrontCache(this.getRequiredTenantId());
 
       return this.getGroup(optionGroupId);
     } catch (err) {

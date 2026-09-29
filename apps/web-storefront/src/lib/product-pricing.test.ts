@@ -80,6 +80,39 @@ describe('getStorefrontStartingPrice', () => {
     expect(getStorefrontStartingPrice(product)).toBe(12);
     expect(hasStorefrontStartingPrice(product)).toBe(false);
   });
+
+  it('keeps the starting-price semantic when a primary replace equals the base price', () => {
+    const product: StorefrontProductPayload = {
+      ...baseProduct,
+      optionGroupLinks: [{
+        id: 'size-link',
+        optionGroupId: 'size',
+        order: 0,
+        pricingAxis: 'primary',
+        optionGroup: {
+          id: 'size',
+          name: 'Tamanho',
+          selectionType: 'single',
+          isRequired: true,
+          minSelect: 1,
+          maxSelect: 1,
+          isActive: true,
+          items: [{
+            id: 'default-size',
+            name: 'Padrão',
+            isActive: true,
+            effectiveIsActive: true,
+            allowQuantity: false,
+            priceImpactType: 'replace',
+            priceImpactValue: 12,
+          }],
+        },
+      }],
+    };
+
+    expect(getStorefrontStartingPrice(product)).toBe(12);
+    expect(hasStorefrontStartingPrice(product)).toBe(true);
+  });
 });
 
 describe('calculateStorefrontGenericUnitPrice', () => {

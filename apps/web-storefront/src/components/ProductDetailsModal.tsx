@@ -24,7 +24,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { reconcileGenericSelections } from './product-details-selection';
 import { getGenericOptionGroupError, getMaximumOptionQuantity, getPizzaValidation } from './product-details-validation';
-import { calculateStorefrontGenericUnitPrice, getStorefrontStartingPrice } from '../lib/product-pricing';
+import { calculateStorefrontGenericUnitPrice, getStorefrontStartingPrice, hasStorefrontStartingPrice } from '../lib/product-pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -541,7 +541,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
             <p className="text-gray-500 mt-2 leading-relaxed text-sm">
               {product.shortDescription || 'Sem detalhes adicionais.'}
             </p>
-            {!isPizzaTemplate ? (
+            {!isPizzaTemplate && hasStorefrontStartingPrice(product) ? (
               <p className="mt-3 text-sm font-black text-primary-700">
                 A partir de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(startingPrice)}
               </p>
