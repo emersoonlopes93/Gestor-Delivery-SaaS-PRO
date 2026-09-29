@@ -44,7 +44,6 @@ export function calculateStorefrontGenericUnitPrice(
       if (!item || !item.isActive || item.effectiveIsActive === false) continue;
 
       const impactValue = Number(item.priceImpactValue);
-      const qty = Math.max(1, Number(selected.qty ?? 1));
       if (link.pricingAxis === 'primary' && item.priceImpactType === 'replace') {
         effectiveBasePrice = impactValue;
       }

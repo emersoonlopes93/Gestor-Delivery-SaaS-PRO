@@ -839,7 +839,6 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                                     <Plus className="w-4 h-4" />
                                   </button>
                                   </div>
-                                </div>
                               ) : null}
                             </div>
                           );
