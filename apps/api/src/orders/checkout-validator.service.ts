@@ -470,8 +470,6 @@ export class CheckoutValidatorService {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
     }
 
-    const hasNewSelections = item.selections && item.selections.length > 0;
-
     // Fetch product with legacy complement groups and/or new option groups
     const product = await this.prisma.product.findFirst({
       where: { id: item.productId, tenantId, deletedAt: null },
@@ -562,7 +560,9 @@ export class CheckoutValidatorService {
       }>; 
     }> = [];
 
-    if (hasNewSelections) {
+    // Generic option groups are part of the product contract even when the
+    // client sends no selection. Pizza keeps its existing dedicated flow.
+    if (!isPizzaTemplate && (typedProduct.optionGroupLinks.length > 0 || (item.selections?.length ?? 0) > 0)) {
       const pricing = this.validateAndPriceOptionSelections(
         item.selections || [],
         typedProduct.optionGroupLinks,
@@ -682,6 +682,33 @@ export class CheckoutValidatorService {
       }>;
     }>;
   } {
+    const normalizedSelections = selections.map((selection) => ({
+      ...selection,
+      items: selection.items.filter((item) => {
+        const qty = item.qty ?? 1;
+        if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty < 0) {
+          throw new BadRequestException('Quantidade de opção deve ser um inteiro finito maior ou igual a zero.');
+        }
+        return qty > 0;
+      }),
+    }));
+
+    const selectedGroupIds = new Set<string>();
+    for (const selection of normalizedSelections) {
+      if (selectedGroupIds.has(selection.optionGroupId)) {
+        throw new BadRequestException(`Grupo de opções duplicado para "${productName}".`);
+      }
+      selectedGroupIds.add(selection.optionGroupId);
+
+      const selectedItemIds = new Set<string>();
+      for (const item of selection.items) {
+        if (selectedItemIds.has(item.optionItemId)) {
+          throw new BadRequestException(`Opção duplicada no grupo "${selection.optionGroupId}".`);
+        }
+        selectedItemIds.add(item.optionItemId);
+      }
+    }
+
     // Build lookup of groups available to this product (respect active group)
     const groupLinkMap = new Map<string, OptionGroupLinkWithData>();
     for (const link of optionGroupLinks) {
@@ -692,7 +719,7 @@ export class CheckoutValidatorService {
     }
 
     // Validate extraneous groups early
-    for (const sel of selections) {
+    for (const sel of normalizedSelections) {
       if (!groupLinkMap.has(sel.optionGroupId)) {
         throw new BadRequestException(`Grupo de opções não reconhecido para "${productName}".`);
       }
@@ -701,7 +728,7 @@ export class CheckoutValidatorService {
     // Validate min/max per group (using overrides if present)
     for (const [groupId, link] of groupLinkMap.entries()) {
       const group = link.optionGroup;
-      const selectedGroup = selections.find((s) => s.optionGroupId === groupId);
+      const selectedGroup = normalizedSelections.find((s) => s.optionGroupId === groupId);
       const selectedCount = selectedGroup ? selectedGroup.items.length : 0;
 
       const rules = resolveEffectiveSelectionRules({
@@ -734,6 +761,19 @@ export class CheckoutValidatorService {
 
     let hasReplace = false;
 
+    const percentageSnapshotItems: Array<{
+      impactValue: number;
+      qty: number;
+      snapshotItem: {
+        itemId: string;
+        name: string;
+        qty: number;
+        priceImpactType: string;
+        priceImpactValue: number;
+        appliedAmount: number;
+      };
+    }> = [];
+
     const compositionParts: string[] = [];
     const selectionsSnapshot: Array<{
       groupId: string;
@@ -754,7 +794,7 @@ export class CheckoutValidatorService {
       }>;
     }> = [];
 
-    for (const selGroup of selections) {
+    for (const selGroup of normalizedSelections) {
       const link = groupLinkMap.get(selGroup.optionGroupId);
       if (!link) continue;
       const group = link.optionGroup;
@@ -800,7 +840,18 @@ export class CheckoutValidatorService {
         if (allowQuantity) {
           groupAllowQuantity = true;
         }
-        const qty = allowQuantity ? Math.max(1, Number(chosen.qty ?? 1)) : 1;
+        const requestedQty = chosen.qty ?? 1;
+        if (!allowQuantity && requestedQty !== 1) {
+          throw new BadRequestException(`A opção "${itemRecord.name}" não permite quantidade.`);
+        }
+        const qty = allowQuantity ? requestedQty : 1;
+        if (allowQuantity) {
+          const minQty = itemRecord.minQty ?? 1;
+          const maxQty = itemRecord.maxQty;
+          if (qty < minQty || (maxQty !== null && maxQty !== undefined && qty > maxQty)) {
+            throw new BadRequestException(`Quantidade inválida para a opção "${itemRecord.name}".`);
+          }
+        }
 
         const impactType = itemRecord.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage';
         const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
@@ -825,19 +876,20 @@ export class CheckoutValidatorService {
         } else if (impactType === 'fixed') {
           appliedAmount = impactValue * qty;
           fixedTotal += appliedAmount;
-        } else if (impactType === 'percentage') {
-          appliedAmount = effectiveBasePrice * (impactValue / 100) * qty;
-          percentageTotal += appliedAmount;
         }
 
-        groupSnapshotItems.push({
+        const snapshotItem = {
           itemId: chosen.optionItemId,
           name: itemRecord.name,
           qty,
           priceImpactType: impactType,
           priceImpactValue: impactValue,
           appliedAmount,
-        });
+        };
+        groupSnapshotItems.push(snapshotItem);
+        if (impactType === 'percentage') {
+          percentageSnapshotItems.push({ impactValue, qty, snapshotItem });
+        }
 
         chosenNames.push(allowQuantity && qty > 1 ? `${itemRecord.name} x${qty}` : itemRecord.name);
       }
@@ -859,6 +911,12 @@ export class CheckoutValidatorService {
           items: groupSnapshotItems,
         });
       }
+    }
+
+    for (const percentageItem of percentageSnapshotItems) {
+      const appliedAmount = effectiveBasePrice * (percentageItem.impactValue / 100) * percentageItem.qty;
+      percentageItem.snapshotItem.appliedAmount = appliedAmount;
+      percentageTotal += appliedAmount;
     }
 
     const unitPrice = effectiveBasePrice + fixedTotal + percentageTotal;
