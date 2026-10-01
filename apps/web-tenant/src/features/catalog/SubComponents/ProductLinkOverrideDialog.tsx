@@ -115,6 +115,9 @@ export const ProductLinkOverrideDialog: React.FC<ProductLinkOverrideDialogProps>
             <option value="secondary">Secundário (Adicionais/Complementos padrão)</option>
             <option value="primary">Primário (Principal/Tamanhos com substituição)</option>
           </select>
+          <p className="text-xs text-muted-foreground">
+            Use <strong>Primário</strong> para o grupo que define o preço principal do produto. Opções “Define o preço final” só podem ser usadas nesse eixo.
+          </p>
         </div>
 
         {/* Override Required */}

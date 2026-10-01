@@ -1,4 +1,6 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { Cache } from 'cache-manager';
 import { Prisma, PricingAxis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
@@ -11,6 +13,7 @@ export class ProductOptionGroupsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -29,6 +32,19 @@ export class ProductOptionGroupsService {
     await this.prisma.auditLog.create({
       data: { tenantId, userId: actorId ?? null, userType: 'tenant_user', action, resource, details },
     });
+  }
+
+  private async invalidateStorefrontCache(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+    if (!tenant?.slug) return;
+
+    await Promise.all([
+      this.cacheManager.del(`storefront:${tenant.slug}:delivery`),
+      this.cacheManager.del(`storefront:${tenant.slug}:pickup`),
+    ]);
   }
 
   private async ensureProduct(tenantId: string, productId: string) {
@@ -139,6 +155,7 @@ export class ProductOptionGroupsService {
       await this.assertNoPrimaryReplaceConflict(tenantId, dto.productId);
 
       await this.audit(tenantId, actorId, 'catalog.product_option_group.linked', 'product_option_group_link', { productId: dto.productId, optionGroupId: dto.optionGroupId, linkId: created.id });
+      await this.invalidateStorefrontCache(tenantId);
       return created;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -188,6 +205,7 @@ export class ProductOptionGroupsService {
         });
       }
       await this.audit(tenantId, actorId, 'catalog.product_option_item.override_cleared', 'product_option_item_price', { productId, optionItemId });
+      await this.invalidateStorefrontCache(tenantId);
       return { success: true, effectiveIsActive: item.isActive, override: null };
     }
 
@@ -208,6 +226,7 @@ export class ProductOptionGroupsService {
 
     const effectiveIsActive = item.isActive && (updated.isActive ?? true);
     await this.audit(tenantId, actorId, 'catalog.product_option_item.override_updated', 'product_option_item_price', { productId, optionItemId });
+    await this.invalidateStorefrontCache(tenantId);
     return {
       success: true,
       effectiveIsActive,
@@ -243,7 +262,9 @@ export class ProductOptionGroupsService {
 
     await this.prisma.tenantClient.productOptionGroupLink.delete({ where: { id: linkId } });
 
-    await this.audit(this.getRequiredTenantId(), actorId, 'catalog.product_option_group.unlinked', 'product_option_group_link', { productId: link.productId, optionGroupId: link.optionGroupId, linkId });
+    const tenantId = this.getRequiredTenantId();
+    await this.audit(tenantId, actorId, 'catalog.product_option_group.unlinked', 'product_option_group_link', { productId: link.productId, optionGroupId: link.optionGroupId, linkId });
+    await this.invalidateStorefrontCache(tenantId);
 
     return { success: true };
   }
@@ -285,6 +306,7 @@ export class ProductOptionGroupsService {
     await this.assertNoPrimaryReplaceConflict(tenantId, existing.productId);
 
     await this.audit(tenantId, actorId, 'catalog.product_option_group.updated', 'product_option_group_link', { productId: existing.productId, optionGroupId: existing.optionGroupId, linkId });
+    await this.invalidateStorefrontCache(tenantId);
 
     return updated;
   }
@@ -363,6 +385,7 @@ export class ProductOptionGroupsService {
     );
 
     await this.audit(tenantId, actorId, 'catalog.product_option_group.reordered', 'product_option_group_link', { productId, count: orderedLinkIds.length });
+    await this.invalidateStorefrontCache(tenantId);
 
     return this.listByProduct(productId);
   }

@@ -53,6 +53,7 @@ export function ProductSquareCard({
         <h3 className="font-bold text-white text-sm line-clamp-2 leading-tight">
           {product.name}
         </h3>
+        {product.pricePrefix ? <span className="text-[10px] font-bold uppercase tracking-wide text-white/75">{product.pricePrefix}</span> : null}
         <span className="font-black text-white text-base">
           {currencyFormatter(product.price)}
         </span>

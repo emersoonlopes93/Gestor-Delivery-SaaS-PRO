@@ -1,6 +1,7 @@
 import type { BusinessSegment, StorefrontProductPayload, StorefrontShowcasePayload } from '@gestor/types';
 import type { StorefrontImageMode, StorefrontProductLayout } from '@gestor/theme';
 import { SmartShowcase as SharedSmartShowcase, toStorefrontProduct } from '@gestor/storefront-ui';
+import { getStorefrontStartingPrice, hasStorefrontStartingPrice } from '../lib/product-pricing';
 
 type SmartShowcaseProps = {
   showcase?: StorefrontShowcasePayload;
@@ -26,7 +27,10 @@ export function SmartShowcase({
   return (
     <SharedSmartShowcase
       title={showcase.title}
-      products={showcase.products.map(toStorefrontProduct)}
+      products={showcase.products.map((product) => toStorefrontProduct({
+        ...product,
+        startingPrice: hasStorefrontStartingPrice(product) ? getStorefrontStartingPrice(product) : null,
+      }))}
       productLayout={productLayout}
       imageMode={imageMode}
       showDescription={showDescription}

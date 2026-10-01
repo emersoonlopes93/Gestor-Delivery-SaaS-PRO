@@ -81,6 +81,7 @@ export function ProductPremiumCard({
                 {currencyFormatter(product.compareAtPrice)}
               </span>
             )}
+            {product.pricePrefix ? <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--storefront-muted-foreground)]">{product.pricePrefix}</span> : null}
             <span className="text-2xl font-black text-[var(--storefront-foreground)]">
               {currencyFormatter(product.price)}
             </span>

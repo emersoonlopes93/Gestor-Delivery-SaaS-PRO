@@ -8,6 +8,7 @@ export type StorefrontProduct = {
   categoryName?: string | null;
   isAvailable?: boolean;
   badges?: Array<{ id: string; label: string; variant: 'success' | 'danger' | 'warning' | 'info' | 'neutral' }>;
+  pricePrefix?: string;
 };
 
 export type StorefrontProductSource = {
@@ -19,6 +20,7 @@ export type StorefrontProductSource = {
   compareAtPrice?: number | null;
   isAvailable?: boolean;
   badges?: StorefrontProduct['badges'];
+  startingPrice?: number | null;
 };
 
 export function toStorefrontProduct(source: StorefrontProductSource): StorefrontProduct {
@@ -27,9 +29,10 @@ export function toStorefrontProduct(source: StorefrontProductSource): Storefront
     name: source.name,
     description: source.shortDescription,
     imageUrl: source.image,
-    price: source.basePrice,
+    price: source.startingPrice ?? source.basePrice,
     compareAtPrice: source.compareAtPrice,
     isAvailable: source.isAvailable,
     badges: source.badges,
+    pricePrefix: source.startingPrice !== null && source.startingPrice !== undefined ? 'A partir de' : undefined,
   };
 }

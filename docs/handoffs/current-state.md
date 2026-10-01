@@ -1,3 +1,10 @@
+## Storefront C2.5E.3 - preco e semantica de selecao (2026-09-28)
+
+- O Storefront agora deriva o preco exibido "A partir de" somente de itens `replace` ativos, efetivamente disponiveis e ligados ao eixo `primary`; o payload publico ja filtra grupos/itens arquivados e resolve o override de preco por produto antes dessa exibicao. Sem candidato elegivel, o preco-base continua sendo mostrado.
+- No modal generico, uma opcao `replace` selecionada no eixo `primary` passa a substituir o preco-base na previa local; adicionais fixos e percentuais sao calculados sobre essa base efetiva. O Checkout continua como autoridade e reaplica a mesma regra no servidor.
+- `single` usa radio, `multiple` usa checkbox e `quantity` usa somente stepper, com quantidade inicial zero e remocao explicita ao voltar para zero. Pizza Engine, schema, migrations, C2.6, checkout payload e comportamento de loja fechada nao foram alterados.
+- O Web Tenant explica `replace` como "Define o preco final" e esclarece que `primary` identifica o grupo que define o preco principal. Validacoes focadas: Storefront 10/10, Checkout 3/3 e builds Storefront/API passaram; gates globais permanecem em execucao nesta sessao.
+
 ## Operational Control Center (2026-09-13)
 
 - O Gestor V2 passou a reutilizar o board canônico para um cockpit compacto: estado operacional da loja, atalhos permissionados para taxas, Radar, caixa e mesas, e contadores de Delivery, Retirada e Comandas sem pedidos terminais ou dupla contagem.
@@ -2658,3 +2665,17 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Checkout reaplica as mesmas invariantes antes de validar e gravar o snapshot. O middleware Prisma invalida cache do Storefront para `ProductOptionGroupLink`, `OptionItem` e `ProductOptionItemPrice`, alem dos modelos ja relevantes; nenhum TTL ou migration foi alterado.
 - A biblioteca autenticada recebe `_count.optionGroupLinks` compativel com a UI e distingue itens ativos de arquivados. O endpoint de detalhe aceita `includeArchived=true` para contexto administrativo.
 - Validacao local: `pnpm db:generate`, testes focados Storefront 5/5, API 10/10 e Web Tenant 1/1, `check:no-any` e lint dos pacotes alterados. Build Storefront concluiu; gates longos globais/API/tenant exigem conclusao confirmada antes de PR. Nenhum deploy, banco remoto, migration ou Preview foi executado.
+
+## C2.5E - redesign do configurador publico (2026-09-27)
+
+- Branch: `feat/product-configurator-ux-redesign`, iniciada de `main-copy` apos a integracao da C2.5A-D.
+- O modal publico agora usa dialog semantico, titulo associado, Escape, foco inicial/restaurado, trap de Tab e scroll lock. O conteudo possui uma unica area vertical rolavel, imagem mais contida em mobile e footer compacto permanente.
+- Grupos genericos permanecem na mesma logica C2.5A-D, mas apresentam radios para escolha unica e checkboxes para multiplas escolhas; a linha inteira e clicavel e o estado selecionado e visivel. Uma tentativa invalida mostra o erro no grupo, rola e move o foco ao primeiro grupo generico invalido.
+- Nenhuma regra de preco, Checkout, Pizza Engine, schema, migration ou API foi alterada. A loja fechada continua permitindo configurar e bloqueia apenas a finalizacao.
+- Validacao local: teste focado `ProductDetailsModal` 6/6 e `tsc -p apps/web-storefront/tsconfig.json --noEmit` passaram. Build Vite e homologacao visual/autenticada desktop/mobile permanecem pendentes nesta sessao. Nenhum commit, push, deploy ou acao remota foi executado.
+- Revisao C2.5E: erros genericos permanecem apenas inline; Pizza identifica e focaliza tamanho, montagem, sabores ou preco em seu proprio bloco, tambem com feedback inline. Produtos genericos exibem preco-base no cabecalho, as linhas de opcao ocupam integralmente o card com alvo de toque de pelo menos 44px, e o estado de loja fechada explica que a configuracao continua disponivel enquanto a finalizacao aguarda a abertura. A suite focada cobre a prioridade do controle Pizza; o workspace nao possui `jsdom` nem Testing Library instalados, portanto a interacao DOM autenticada/visual segue como gate manual.
+## Storefront C2.5E.2 — Option group density (2026-09-28)
+
+- O refinamento visual do configurador publico preserva integralmente o contrato de option groups: `single` usa radio sem stepper, `multiple` usa checkbox sem stepper e `quantity` mostra stepper somente para item selecionado com `allowQuantity`. Nenhuma decisao depende do nome do grupo, inclusive “Escolha o Tamanho”.
+- Os grupos genericos agora usam lista vertical compacta, estado selecionado discreto, preco alinhado e stepper em linha propria curta; imagem foi reduzida e footer, validacao inline, foco/scroll e Pizza Engine permanecem inalterados.
+- Validacao local desta iteracao: teste focal do ProductDetailsModal 8/8, `check:no-any`, typecheck, lint, `git diff --check` e build oficial do Storefront passaram. Commit, push e Preview permanecem pendentes para homologacao visual.
