@@ -138,13 +138,12 @@ function validateGroupConfiguration(group: CatalogOptionGroup): void {
     invalid(`Single group ${group.id} must have minSelect and maxSelect at most 1.`);
   }
   if (min > max) invalid(`Group ${group.id} minSelect cannot exceed maxSelect.`);
-  if (max > group.items.length) invalid(`Group ${group.id} maxSelect exceeds its item count.`);
 
   const itemIds = new Set<string>();
   for (const item of group.items) {
     if (itemIds.has(item.id)) invalid(`Group ${group.id} contains duplicate item ${item.id}.`);
     itemIds.add(item.id);
-    validateItemConfiguration(group, item);
+    if (isEligibleItem(item)) validateItemConfiguration(group, item);
   }
 }
 

@@ -41,6 +41,9 @@ importers:
       '@gestor/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gestor/pricing':
+        specifier: workspace:*
+        version: link:../../packages/pricing
       '@gestor/theme':
         specifier: workspace:*
         version: link:../../packages/theme

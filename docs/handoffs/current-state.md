@@ -2685,3 +2685,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - The package has no Prisma, NestJS, React, HTTP, schema, migration, or consumer dependency. Checkout, Storefront, POS, cart, Pizza, Combo, snapshots and cache remain unchanged.
 - Contract enforced: `replace` is primary-only and quantity 1; fixed follows replacement; percentage uses the effective base with HALF_UP rounding; option overrides replace only effective values; `minSelect` counts distinct selected item IDs while `minQty`/`maxQty` constrain each item.
 - The package test suite covers base/fixed/replace/percentage behavior, payload-order independence, quantity invariants, and required/optional starting-price configurations. Migration of consumers is deferred to P1.2.
+# P1.2 — Checkout canonical catalog pricing (2026-10-01)
+
+- `CheckoutValidatorService` now keeps server-side tenant, product, activity, required/min/max, duplicate, quantity and snapshot validation, then adapts only validated generic option data into `@gestor/pricing`.
+- The adapter converts persisted reais to integer cents and percentages to basis points; `ProductOptionItemPrice` supplies the effective value without changing the persisted impact type. The Checkout remains the final authority because no client price enters the adapter.
+- Pizza and Combo flows, POS, Storefront, cart, schema, migrations, snapshots, printer/KDS and cache remain unchanged. A compatibility adjustment in the pricing core permits a configured `maxSelect` above the current available item count.
+- Validation: pricing suite 12/12; focused CheckoutValidator suite 12/12; package/API builds, `check:no-any`, global typecheck, lint and `git diff --check` passed. Consumer migration beyond Checkout is deferred to P1.3.

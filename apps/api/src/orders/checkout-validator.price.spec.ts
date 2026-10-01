@@ -137,7 +137,7 @@ function selection(optionGroupId: string, optionItemId: string): CreateOrderItem
 
 describe('CheckoutValidatorService option pricing', () => {
   const service = Reflect.construct(CheckoutValidatorService, [{}, {}, {}, {}, {}, {}, {}, {}]);
-  const calculate = Reflect.get(service, 'validateAndPriceOptionSelections') as OptionPriceCalculator;
+  const calculate = Reflect.get(service, 'validateAndPriceOptionSelections').bind(service) as OptionPriceCalculator;
 
   it('uses the selected primary replace price instead of the product base price', () => {
     expect(calculate([selection('size', 'large')], [primaryReplaceLink], 'Açai', 12)).toMatchObject({
@@ -164,6 +164,19 @@ describe('CheckoutValidatorService option pricing', () => {
       extrasTotal: 2,
       unitPrice: 14,
     });
+  });
+
+  it('uses the product override as the effective fixed value without changing its impact type', () => {
+    const result = calculate(
+      [selection('extra', 'granola')],
+      [fixedExtraLink],
+      'Açaí',
+      12,
+      [{ optionItemId: 'granola', price: 3, isActive: true }],
+    ) as PriceResult & { selectionsSnapshot: Array<{ items: Array<{ priceImpactType: string; appliedAmount: number }> }> };
+
+    expect(result).toMatchObject({ effectiveBasePrice: 12, extrasTotal: 3, unitPrice: 15 });
+    expect(result.selectionsSnapshot[0]?.items[0]).toMatchObject({ priceImpactType: 'fixed', appliedAmount: 3 });
   });
 
   it('applies percentage after replace regardless of selection order', () => {
@@ -207,6 +220,20 @@ describe('CheckoutValidatorService option pricing', () => {
       optionGroupId: 'quantity',
       items: [{ optionItemId: 'quantity-item', qty: 3 }],
     }], [quantityExtraLink], 'AÃ§ai', 12)).toThrow('Quantidade inválida');
+  });
+
+  it('rejects quantity above one outside a quantity group even when the item allows quantity', () => {
+    const invalidMultipleQuantityLink = {
+      ...fixedExtraLink,
+      optionGroup: {
+        ...fixedExtraLink.optionGroup,
+        items: [{ ...fixedExtraLink.optionGroup.items[0], allowQuantity: true }],
+      },
+    };
+    expect(() => calculate([{
+      optionGroupId: 'extra',
+      items: [{ optionItemId: 'granola', qty: 2 }],
+    }], [invalidMultipleQuantityLink], 'Açaí', 12)).toThrow('Multiple group extra only accepts quantity 1');
   });
 
   it('validates required groups even when selections are empty', async () => {

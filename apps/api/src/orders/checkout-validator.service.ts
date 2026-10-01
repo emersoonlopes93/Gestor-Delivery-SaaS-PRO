@@ -14,6 +14,16 @@ import type {
   CheckoutValidationResult,
 } from '@gestor/types';
 import { resolveEffectiveSelectionRules } from '@gestor/types';
+import {
+  CatalogPricingValidationError,
+  resolveCatalogOptionPricing,
+} from '@gestor/pricing';
+import type {
+  CatalogOptionGroup,
+  CatalogOptionPricingInput,
+  CatalogPricingResult,
+  PriceImpactType,
+} from '@gestor/pricing';
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
@@ -569,6 +579,7 @@ export class CheckoutValidatorService {
         typedProduct.name,
         basePrice,
         typedProduct.optionItemPrices,
+        effectiveBasePrice,
       );
 
       effectiveBasePrice = pricing.effectiveBasePrice;
@@ -658,6 +669,7 @@ export class CheckoutValidatorService {
     productName: string,
     basePrice: number,
     optionItemPrices?: Prisma.ProductOptionItemPriceGetPayload<Record<string, never>>[],
+    upsellAdjustedBasePrice: number = basePrice,
   ): {
     effectiveBasePrice: number;
     unitPrice: number;
@@ -754,25 +766,8 @@ export class CheckoutValidatorService {
       }
     }
 
-    // Pricing
-    let effectiveBasePrice = basePrice;
-    let fixedTotal = 0;
-    let percentageTotal = 0;
-
-    let hasReplace = false;
-
-    const percentageSnapshotItems: Array<{
-      impactValue: number;
-      qty: number;
-      snapshotItem: {
-        itemId: string;
-        name: string;
-        qty: number;
-        priceImpactType: string;
-        priceImpactValue: number;
-        appliedAmount: number;
-      };
-    }> = [];
+    // The Checkout validates ownership, availability and effective selection
+    // rules above. The pure pricing package receives only that server-side data.
 
     const compositionParts: string[] = [];
     const selectionsSnapshot: Array<{
@@ -799,8 +794,6 @@ export class CheckoutValidatorService {
       if (!link) continue;
       const group = link.optionGroup;
       const groupName = link.overrideName ?? group.name;
-      const pricingAxis = link.pricingAxis || 'secondary';
-
       const selectionType = group.selectionType;
       const rules = resolveEffectiveSelectionRules({
         selectionType,
@@ -853,30 +846,9 @@ export class CheckoutValidatorService {
           }
         }
 
-        const impactType = itemRecord.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage';
+        const impactType = this.toCanonicalPriceImpactType(itemRecord.priceImpactType, itemRecord.id);
         const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
         const impactValue = overridePrice ?? Number(itemRecord.priceImpactValue);
-
-        let appliedAmount = 0;
-
-        if (impactType === 'replace') {
-          if (pricingAxis !== 'primary') {
-            throw new BadRequestException(
-              `Opção de substituição de preço não permitida fora do eixo principal em "${groupName}".`,
-            );
-          }
-          if (hasReplace) {
-            throw new BadRequestException(
-              `Mais de uma opção de substituição de preço selecionada para "${productName}".`,
-            );
-          }
-          hasReplace = true;
-          effectiveBasePrice = impactValue;
-          appliedAmount = 0;
-        } else if (impactType === 'fixed') {
-          appliedAmount = impactValue * qty;
-          fixedTotal += appliedAmount;
-        }
 
         const snapshotItem = {
           itemId: chosen.optionItemId,
@@ -884,12 +856,9 @@ export class CheckoutValidatorService {
           qty,
           priceImpactType: impactType,
           priceImpactValue: impactValue,
-          appliedAmount,
+          appliedAmount: 0,
         };
         groupSnapshotItems.push(snapshotItem);
-        if (impactType === 'percentage') {
-          percentageSnapshotItems.push({ impactValue, qty, snapshotItem });
-        }
 
         chosenNames.push(allowQuantity && qty > 1 ? `${itemRecord.name} x${qty}` : itemRecord.name);
       }
@@ -903,7 +872,7 @@ export class CheckoutValidatorService {
           groupId: selGroup.optionGroupId,
           groupName,
           selectionType,
-          pricingAxis,
+          pricingAxis: link.pricingAxis || 'secondary',
           isRequired: rules.effectiveIsRequired,
           minSelect: rules.effectiveMinSelect,
           maxSelect: rules.effectiveMaxSelect,
@@ -913,16 +882,132 @@ export class CheckoutValidatorService {
       }
     }
 
-    for (const percentageItem of percentageSnapshotItems) {
-      const appliedAmount = effectiveBasePrice * (percentageItem.impactValue / 100) * percentageItem.qty;
-      percentageItem.snapshotItem.appliedAmount = appliedAmount;
-      percentageTotal += appliedAmount;
+    const canonicalPricing = this.resolveCanonicalCatalogOptionPricing({
+      basePrice,
+      upsellAdjustedBasePrice,
+      optionGroupLinks: [...groupLinkMap.values()],
+      selections: normalizedSelections.filter((selection) => selection.items.length > 0),
+      optionItemPrices,
+    });
+    const appliedAmounts = new Map<string, number>();
+    for (const entry of [...canonicalPricing.breakdown.fixed, ...canonicalPricing.breakdown.percentages]) {
+      appliedAmounts.set(`${entry.optionGroupId}:${entry.optionItemId}`, entry.totalCents / 100);
+    }
+    for (const selectionSnapshot of selectionsSnapshot) {
+      for (const snapshotItem of selectionSnapshot.items) {
+        snapshotItem.appliedAmount = appliedAmounts.get(`${selectionSnapshot.groupId}:${snapshotItem.itemId}`) ?? 0;
+      }
     }
 
-    const unitPrice = effectiveBasePrice + fixedTotal + percentageTotal;
+    const effectiveBasePrice = canonicalPricing.effectiveBasePriceCents / 100;
+    const unitPrice = canonicalPricing.unitPriceCents / 100;
     const extrasTotal = unitPrice - basePrice;
     const composition = compositionParts.join('; ');
     return { effectiveBasePrice, unitPrice, extrasTotal, composition, selectionsSnapshot };
+  }
+
+  private resolveCanonicalCatalogOptionPricing(input: {
+    basePrice: number;
+    upsellAdjustedBasePrice: number;
+    optionGroupLinks: OptionGroupLinkWithData[];
+    selections: CreateOrderItemSelectionGroupDTO[];
+    optionItemPrices?: Prisma.ProductOptionItemPriceGetPayload<Record<string, never>>[];
+  }): CatalogPricingResult {
+    const pricingInput: CatalogOptionPricingInput = {
+      basePriceCents: this.decimalToCents(input.basePrice, 'Preço base'),
+      upsellDeltaCents: this.decimalToCents(input.upsellAdjustedBasePrice, 'Preço de upsell')
+        - this.decimalToCents(input.basePrice, 'Preço base'),
+      optionGroups: input.optionGroupLinks.map((link): CatalogOptionGroup => {
+        const group = link.optionGroup;
+        const rules = resolveEffectiveSelectionRules({
+          selectionType: group.selectionType,
+          isRequired: group.isRequired,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          overrideIsRequired: link.overrideIsRequired,
+          overrideMinSelect: link.overrideMinSelect,
+          overrideMaxSelect: link.overrideMaxSelect,
+        });
+        return {
+          id: group.id,
+          selectionType: this.toCanonicalSelectionType(group.selectionType, group.id),
+          pricingAxis: link.pricingAxis === 'primary' ? 'primary' : 'secondary',
+          isActive: true,
+          isRequired: rules.effectiveIsRequired,
+          minSelect: rules.effectiveMinSelect,
+          maxSelect: rules.effectiveMaxSelect,
+          items: group.items.map((itemRecord) => {
+            const override = (input.optionItemPrices ?? []).find((price) => price.optionItemId === itemRecord.id);
+            const priceImpactType = this.toCanonicalPriceImpactType(itemRecord.priceImpactType, itemRecord.id);
+            const sourceValue = Number(itemRecord.priceImpactValue);
+            const overrideValue = override?.price === null || override?.price === undefined
+              ? undefined
+              : Number(override.price);
+            return {
+              id: itemRecord.id,
+              isActive: itemRecord.isActive,
+              effectiveIsActive: itemRecord.deletedAt === null && (override?.isActive ?? true),
+              allowQuantity: itemRecord.allowQuantity,
+              minQty: itemRecord.minQty ?? undefined,
+              maxQty: itemRecord.maxQty ?? undefined,
+              priceImpactType,
+              priceImpactValueCents: priceImpactType === 'fixed' || priceImpactType === 'replace'
+                ? this.decimalToCents(sourceValue, `Preço da opção ${itemRecord.id}`)
+                : undefined,
+              priceImpactBasisPoints: priceImpactType === 'percentage'
+                ? this.percentageToBasisPoints(sourceValue, `Percentual da opção ${itemRecord.id}`)
+                : undefined,
+              effectivePriceImpactValueCents: overrideValue !== undefined && (priceImpactType === 'fixed' || priceImpactType === 'replace')
+                ? this.decimalToCents(overrideValue, `Override da opção ${itemRecord.id}`)
+                : undefined,
+              effectivePriceImpactBasisPoints: overrideValue !== undefined && priceImpactType === 'percentage'
+                ? this.percentageToBasisPoints(overrideValue, `Override da opção ${itemRecord.id}`)
+                : undefined,
+            };
+          }),
+        };
+      }),
+      selections: input.selections.map((selection) => ({
+        optionGroupId: selection.optionGroupId,
+        items: selection.items.map((item) => ({
+          optionItemId: item.optionItemId,
+          qty: item.qty ?? 1,
+        })),
+      })),
+    };
+
+    try {
+      return resolveCatalogOptionPricing(pricingInput);
+    } catch (error: unknown) {
+      if (error instanceof CatalogPricingValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private toCanonicalSelectionType(value: string, groupId: string): CatalogOptionGroup['selectionType'] {
+    if (value === 'single' || value === 'multiple' || value === 'quantity') return value;
+    throw new BadRequestException(`Tipo de seleção inválido para o grupo ${groupId}.`);
+  }
+
+  private toCanonicalPriceImpactType(value: string, itemId: string): PriceImpactType {
+    if (value === 'none' || value === 'fixed' || value === 'replace' || value === 'percentage') return value;
+    throw new BadRequestException(`Tipo de preço inválido para a opção ${itemId}.`);
+  }
+
+  private decimalToCents(value: number, label: string): number {
+    if (!Number.isFinite(value)) throw new BadRequestException(`${label} inválido.`);
+    const cents = Math.round(value * 100);
+    if (!Number.isSafeInteger(cents)) throw new BadRequestException(`${label} excede o limite suportado.`);
+    return cents;
+  }
+
+  private percentageToBasisPoints(value: number, label: string): number {
+    if (!Number.isFinite(value)) throw new BadRequestException(`${label} inválido.`);
+    const basisPoints = Math.round(value * 100);
+    if (!Number.isSafeInteger(basisPoints)) throw new BadRequestException(`${label} excede o limite suportado.`);
+    return basisPoints;
   }
 
 

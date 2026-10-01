@@ -73,6 +73,7 @@
         "@gestor/auth": "workspace:*",
         "@gestor/config": "workspace:*",
         "@gestor/core": "workspace:*",
+        "@gestor/pricing": "workspace:*",
         "@gestor/theme": "workspace:*",
         "@gestor/types": "workspace:*",
         "@gestor/utils": "workspace:*",
