@@ -806,6 +806,15 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  packages/pricing:
+    devDependencies:
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.5.0
+        version: 5.5.4
+
   packages/storefront-preview:
     dependencies:
       '@gestor/theme':
