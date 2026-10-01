@@ -23,8 +23,7 @@
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
-      "@gestor/utils": ["packages/utils/src/index.ts"],
-      "@gestor/pricing": ["packages/pricing/src/index.ts"]
+      "@gestor/utils": ["packages/utils/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist"]
