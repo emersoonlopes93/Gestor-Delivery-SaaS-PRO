@@ -2679,3 +2679,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - O refinamento visual do configurador publico preserva integralmente o contrato de option groups: `single` usa radio sem stepper, `multiple` usa checkbox sem stepper e `quantity` mostra stepper somente para item selecionado com `allowQuantity`. Nenhuma decisao depende do nome do grupo, inclusive “Escolha o Tamanho”.
 - Os grupos genericos agora usam lista vertical compacta, estado selecionado discreto, preco alinhado e stepper em linha propria curta; imagem foi reduzida e footer, validacao inline, foco/scroll e Pizza Engine permanecem inalterados.
 - Validacao local desta iteracao: teste focal do ProductDetailsModal 8/8, `check:no-any`, typecheck, lint, `git diff --check` e build oficial do Storefront passaram. Commit, push e Preview permanecem pendentes para homologacao visual.
+# P1.1 — Canonical catalog pricing core (2026-10-01)
+
+- Created the pure `@gestor/pricing` workspace package with integer-cent and basis-point types, a deterministic generic option resolver, and starting-price calculation.
+- The package has no Prisma, NestJS, React, HTTP, schema, migration, or consumer dependency. Checkout, Storefront, POS, cart, Pizza, Combo, snapshots and cache remain unchanged.
+- Contract enforced: `replace` is primary-only and quantity 1; fixed follows replacement; percentage uses the effective base with HALF_UP rounding; option overrides replace only effective values; `minSelect` counts distinct selected item IDs while `minQty`/`maxQty` constrain each item.
+- The package test suite covers base/fixed/replace/percentage behavior, payload-order independence, quantity invariants, and required/optional starting-price configurations. Migration of consumers is deferred to P1.2.
