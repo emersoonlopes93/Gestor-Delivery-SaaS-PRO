@@ -24,7 +24,11 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { reconcileGenericSelections } from './product-details-selection';
 import { getGenericOptionGroupError, getMaximumOptionQuantity, getPizzaValidation } from './product-details-validation';
-import { calculateStorefrontGenericUnitPrice, getStorefrontStartingPrice, hasStorefrontStartingPrice } from '../lib/product-pricing';
+import {
+  getStorefrontGenericOptionPricingPreview,
+  getStorefrontStartingPrice,
+  hasStorefrontStartingPrice,
+} from '../lib/product-pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -321,7 +325,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
 
   const computed = useMemo(() => {
     const parts: string[] = [];
-    const genericExtras = calculateStorefrontGenericUnitPrice(product, selections) - product.basePrice;
+    const genericPricing = getStorefrontGenericOptionPricingPreview(product, selections, genericOptionLinks);
+    const genericUnitPrice = genericPricing?.unitPriceCents !== undefined
+      ? genericPricing.unitPriceCents / 100
+      : product.basePrice;
+    const genericExtras = genericUnitPrice - product.basePrice;
 
     selections.forEach((group) => {
       group.items.forEach((item) => {
@@ -347,11 +355,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     return {
-      unitPrice: calculateStorefrontGenericUnitPrice(product, selections),
-      totalPrice: calculateStorefrontGenericUnitPrice(product, selections) * quantity,
+      unitPrice: genericUnitPrice,
+      totalPrice: genericUnitPrice * quantity,
       compositionLabel: parts.join(', '),
     };
-  }, [isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product, quantity, selectedPizzaFlavorIds, selections]);
+  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product, quantity, selectedPizzaFlavorIds, selections]);
 
   const pizzaValidation = useMemo(() => isPizzaTemplate ? getPizzaValidation({
     hasMountingGroup: Boolean(mountingGroup),
@@ -541,7 +549,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
             <p className="text-gray-500 mt-2 leading-relaxed text-sm">
               {product.shortDescription || 'Sem detalhes adicionais.'}
             </p>
-            {!isPizzaTemplate && hasStorefrontStartingPrice(product) ? (
+            {!isPizzaTemplate && hasStorefrontStartingPrice(product) && startingPrice !== null ? (
               <p className="mt-3 text-sm font-black text-primary-700">
                 A partir de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(startingPrice)}
               </p>

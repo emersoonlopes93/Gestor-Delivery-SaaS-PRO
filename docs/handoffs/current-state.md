@@ -2692,3 +2692,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Pizza and Combo flows, POS, Storefront, cart, schema, migrations, snapshots, printer/KDS and cache remain unchanged. A compatibility adjustment in the pricing core permits a configured `maxSelect` above the current available item count.
 - Validation: pricing suite 12/12; focused CheckoutValidator suite 12/12; package/API builds, `check:no-any`, global typecheck, lint and `git diff --check` passed. Consumer migration beyond Checkout is deferred to P1.3.
 - CI integration follow-up: API `prebuild` and `pretest` build `@gestor/pricing` before isolated API jobs. The API's own TypeScript configs resolve the package source, including `tsconfig.build.json`, which replaces inherited paths. This prevents isolated CI jobs from depending on a prior root build artifact.
+
+# P1.3 — Storefront canonical catalog pricing (2026-10-01)
+
+- The public Storefront payload now includes individual option quantity limits. The Storefront adapts that effective public data, including link-level selection overrides and item availability/price overrides, to `@gestor/pricing`; it does not calculate generic option prices locally.
+- Product cards and the modal use canonical starting-price and unit-price results. Invalid in-progress selections retain the base-price preview until their existing inline validation is satisfied; the Checkout remains the server-side pricing authority.
+- Pizza Engine, Checkout, cart, POS, Combo, schema, migrations, snapshots, printing/KDS and cache remain unchanged. Consumer migration after this work is deferred to P1.4.

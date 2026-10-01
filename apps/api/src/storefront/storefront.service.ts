@@ -275,6 +275,8 @@ export class StorefrontService {
                       isActive: oi.isActive,
                       effectiveIsActive,
                       allowQuantity: oi.allowQuantity,
+                      minQty: oi.minQty,
+                      maxQty: oi.maxQty,
                       priceImpactType: oi.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage',
                       priceImpactValue: overridePrice ?? Number(oi.priceImpactValue),
                     };

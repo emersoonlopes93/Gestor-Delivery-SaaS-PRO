@@ -62,6 +62,8 @@ export interface StorefrontOptionItemPayload {
   isAvailable?: boolean;
   effectiveIsActive?: boolean;
   allowQuantity: boolean;
+  minQty?: number | null;
+  maxQty?: number | null;
   priceImpactType: PriceImpactType;
   priceImpactValue: number;
 }
