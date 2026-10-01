@@ -14,15 +14,19 @@ describe('OptionGroupsService archive lifecycle', () => {
           update: jest.fn(),
         },
       },
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({ slug: 'tenant-store' }),
+      },
       auditLog: { create: jest.fn() },
     };
+    const cacheManager = { del: jest.fn().mockResolvedValue(undefined) };
     const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) };
-    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext]) as OptionGroupsService;
-    return { prisma, service };
+    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext, cacheManager]) as OptionGroupsService;
+    return { prisma, service, cacheManager };
   }
 
   it('archives a group without removing its links and writes a tenant audit record', async () => {
-    const { prisma, service } = makeService();
+    const { prisma, service, cacheManager } = makeService();
     prisma.tenantClient.optionGroup.findFirst.mockResolvedValue(activeGroup);
     prisma.tenantClient.optionGroup.update.mockResolvedValue({ ...activeGroup, deletedAt: new Date() });
 
@@ -31,6 +35,9 @@ describe('OptionGroupsService archive lifecycle', () => {
     expect(prisma.tenantClient.optionGroup.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: activeGroup.id, deletedAt: null } }));
     expect(prisma.tenantClient.optionGroup.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: activeGroup.id }, data: { deletedAt: expect.any(Date) } }));
     expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId, userId: actorId, action: 'catalog.option_group.archived', resource: 'option_group' }) }));
+    expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: tenantId }, select: { slug: true } });
+    expect(cacheManager.del).toHaveBeenCalledWith('storefront:tenant-store:delivery');
+    expect(cacheManager.del).toHaveBeenCalledWith('storefront:tenant-store:pickup');
   });
 
   it('lists only active groups unless the archived library is requested', async () => {
