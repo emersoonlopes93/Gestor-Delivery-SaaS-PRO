@@ -143,4 +143,16 @@ describe('getCatalogStartingPrice', () => {
     });
     expect(getCatalogStartingPrice(pricingInput({ optionGroups: [impossible] }))).toBeNull();
   });
+
+  it('accepts a configured maximum above the number of currently available items', () => {
+    const extras = group('extras', {
+      selectionType: 'multiple',
+      maxSelect: 2,
+      items: [item('granola', { priceImpactType: 'fixed', priceImpactValueCents: 200 })],
+    });
+    expect(resolveCatalogOptionPricing(pricingInput({
+      optionGroups: [extras],
+      selections: [{ optionGroupId: 'extras', items: [{ optionItemId: 'granola', qty: 1 }] }],
+    })).unitPriceCents).toBe(1400);
+  });
 });
