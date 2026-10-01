@@ -27,9 +27,10 @@ describe('R6 mobile safe-area and theme contracts', () => {
     expect(appLayout).toContain('md:static');
   });
 
-  it('protects fixed delivery and checkout actions with a bottom inset', () => {
+  it('protects fixed delivery sheets and checkout actions while keeping the radar in responsive document flow', () => {
     expect(bottomSheet).toContain('safe-sheet');
-    expect(deliveryMap).toContain('safe-sheet lg:static fixed');
+    expect(deliveryMap).toContain('grid flex-1 gap-4 lg:grid-cols-[350px_minmax(0,1fr)_330px]');
+    expect(deliveryMap).not.toContain('safe-sheet lg:static fixed');
     expect(checkout).toContain('storefront-safe-action sticky bottom-0');
   });
 

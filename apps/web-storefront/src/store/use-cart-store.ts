@@ -154,18 +154,10 @@ export const useCartStore = create<CartState>()(
               };
             }
 
-            const legacyExtras = (item.selectedOptions?.reduce((s, o) => s + o.price, 0) || 0) +
-              (item.selectedComboItems?.reduce((s, i) => s + i.price, 0) || 0);
-            
-            const v2Extras = (item.selections?.reduce((s, g) => s + g.items.reduce((ss, i) => {
-              if (i.priceImpactType === 'fixed') return ss + (i.priceImpactValue * (i.qty || 1));
-              if (i.priceImpactType === 'percentage') return ss + (item.snapshot.basePrice * (i.priceImpactValue / 100) * (i.qty || 1));
-              return ss;
-            }, 0), 0) || 0) + 
-            (item.slots?.reduce((s, slot) => s + (slot.items?.reduce((ss, i) => ss + (i.additionalPrice * (i.qty || 1)), 0) || 0), 0) || 0);
-
-            const unitPrice = item.snapshot.basePrice + legacyExtras + v2Extras;
-
+            // The modal already resolved replace/fixed/percentage before the
+            // line entered the cart. Reusing that stored unit price avoids a
+            // second pricing implementation that can lose a primary replace.
+            const unitPrice = item.snapshot.lineSubtotal / item.quantity;
             const lineSubtotal = unitPrice * quantity;
             return {
               ...item,

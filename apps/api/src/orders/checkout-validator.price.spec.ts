@@ -1,4 +1,4 @@
-import type { CreateOrderItemSelectionGroupDTO } from '@gestor/types';
+import type { CreateOrderItemDTO, CreateOrderItemSelectionGroupDTO } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 
 type PriceResult = {
@@ -71,6 +71,66 @@ const fixedExtraLink = {
   },
 };
 
+const percentageExtraLink = {
+  id: 'percentage-link',
+  pricingAxis: 'secondary',
+  overrideName: null,
+  overrideIsRequired: null,
+  overrideMinSelect: null,
+  overrideMaxSelect: null,
+  optionGroup: {
+    id: 'percentage',
+    name: 'Cobertura',
+    isActive: true,
+    deletedAt: null,
+    selectionType: 'multiple',
+    isRequired: false,
+    minSelect: 0,
+    maxSelect: 1,
+    items: [{
+      id: 'percentage-item',
+      name: 'Calda especial',
+      deletedAt: null,
+      isActive: true,
+      allowQuantity: false,
+      minQty: null,
+      maxQty: null,
+      priceImpactType: 'percentage',
+      priceImpactValue: 10,
+    }],
+  },
+};
+
+const quantityExtraLink = {
+  id: 'quantity-link',
+  pricingAxis: 'secondary',
+  overrideName: null,
+  overrideIsRequired: null,
+  overrideMinSelect: null,
+  overrideMaxSelect: null,
+  optionGroup: {
+    id: 'quantity',
+    name: 'Complemento por quantidade',
+    isActive: true,
+    deletedAt: null,
+    selectionType: 'quantity',
+    isRequired: false,
+    minSelect: 0,
+    maxSelect: 1,
+    items: [{
+      id: 'quantity-item',
+      name: 'Granola',
+      deletedAt: null,
+      isActive: true,
+      allowQuantity: true,
+      minQty: 1,
+      maxQty: 2,
+      priceImpactType: 'fixed',
+      priceImpactValue: 2,
+    }],
+  },
+};
+
 function selection(optionGroupId: string, optionItemId: string): CreateOrderItemSelectionGroupDTO {
   return { optionGroupId, items: [{ optionItemId, qty: 1 }] };
 }
@@ -104,5 +164,84 @@ describe('CheckoutValidatorService option pricing', () => {
       extrasTotal: 2,
       unitPrice: 14,
     });
+  });
+
+  it('applies percentage after replace regardless of selection order', () => {
+    const replaceThenPercentage = calculate([
+      selection('size', 'large'),
+      selection('percentage', 'percentage-item'),
+    ], [primaryReplaceLink, percentageExtraLink], 'AÃ§ai', 12);
+    const percentageThenReplace = calculate([
+      selection('percentage', 'percentage-item'),
+      selection('size', 'large'),
+    ], [primaryReplaceLink, percentageExtraLink], 'AÃ§ai', 12);
+
+    expect(replaceThenPercentage.unitPrice).toBe(16.5);
+    expect(percentageThenReplace.unitPrice).toBe(16.5);
+  });
+
+  it('rejects duplicate groups and items before pricing', () => {
+    expect(() => calculate([
+      selection('size', 'large'),
+      selection('size', 'large'),
+    ], [primaryReplaceLink], 'AÃ§ai', 12)).toThrow('Grupo de opções duplicado');
+
+    expect(() => calculate([{
+      optionGroupId: 'size',
+      items: [
+        { optionItemId: 'large', qty: 1 },
+        { optionItemId: 'large', qty: 1 },
+      ],
+    }], [primaryReplaceLink], 'AÃ§ai', 12)).toThrow('Opção duplicada');
+  });
+
+  it.each([1.5, -1, Number.POSITIVE_INFINITY])('rejects invalid option quantity %s', (qty) => {
+    expect(() => calculate([{
+      optionGroupId: 'quantity',
+      items: [{ optionItemId: 'quantity-item', qty }],
+    }], [quantityExtraLink], 'AÃ§ai', 12)).toThrow('Quantidade de opção');
+  });
+
+  it('rejects a quantity beyond the item maximum', () => {
+    expect(() => calculate([{
+      optionGroupId: 'quantity',
+      items: [{ optionItemId: 'quantity-item', qty: 3 }],
+    }], [quantityExtraLink], 'AÃ§ai', 12)).toThrow('Quantidade inválida');
+  });
+
+  it('validates required groups even when selections are empty', async () => {
+    const requiredLink = {
+      ...primaryReplaceLink,
+      optionGroup: { ...primaryReplaceLink.optionGroup, isRequired: true, minSelect: 1 },
+    };
+    const prisma = {
+      product: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'product-a',
+          name: 'AÃ§ai',
+          basePrice: 12,
+          isActive: true,
+          isAvailable: true,
+          sellableOnline: true,
+          category: null,
+          optionItemPrices: [],
+          optionGroupLinks: [requiredLink],
+        }),
+      },
+    };
+    const validator: CheckoutValidatorService = Reflect.construct(CheckoutValidatorService, [prisma, {}, {}, {}, {}, {}, {}, {}]);
+    const validateProductLine = Reflect.get(validator, 'validateProductLine').bind(validator) as (
+      tenantId: string,
+      item: CreateOrderItemDTO,
+      checkSellableOnline: boolean,
+      channel: 'pos',
+    ) => Promise<unknown>;
+
+    await expect(validateProductLine('tenant-a', {
+      lineType: 'product',
+      productId: 'product-a',
+      quantity: 1,
+      selections: [],
+    }, false, 'pos')).rejects.toThrow('Selecione pelo menos 1 opções');
   });
 });
