@@ -9,6 +9,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@gestor/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
       '@gestor/core': path.resolve(__dirname, '../../packages/core/src/index.ts'),
+      '@gestor/pricing': path.resolve(__dirname, '../../packages/pricing/src/index.ts'),
       '@gestor/utils': path.resolve(__dirname, '../../packages/utils/src/index.ts'),
       '@gestor/auth': path.resolve(__dirname, '../../packages/auth/src/index.ts'),
       '@gestor/config': path.resolve(__dirname, '../../packages/config/src/index.ts'),
