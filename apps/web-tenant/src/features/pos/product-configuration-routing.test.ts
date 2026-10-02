@@ -39,4 +39,11 @@ describe('product configuration routing', () => {
     const type: PublicProductType = 'configurable';
     expect(type).toBe('configurable');
   });
+
+  it('explains simple and configurable products in the catalog authoring UI', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/features/catalog/SubComponents/ProductBasicInfo.tsx'), 'utf8');
+
+    expect(source).toContain('venda direta, sem personalização');
+    expect(source).toContain('tamanhos, adicionais, escolhas ou personalizações');
+  });
 });
