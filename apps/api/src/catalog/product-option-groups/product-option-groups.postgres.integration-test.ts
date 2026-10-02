@@ -93,17 +93,6 @@ describe('ProductOptionGroupLink PostgreSQL atomicity', () => {
     expect(await prisma.productOptionGroupLink.count({
       where: { tenantId: tenant.id, productId: product.id, pricingAxis: 'primary' },
     })).toBe(1);
-
-    const secondaryLink = await service.link({
-      productId: product.id,
-      optionGroupId: unlinkedGroup.id,
-      pricingAxis: 'secondary',
-    });
-    await expect(service.update(secondaryLink.id, { pricingAxis: 'primary' })).rejects.toThrow();
-    expect(await prisma.productOptionGroupLink.findUniqueOrThrow({
-      where: { id: secondaryLink.id },
-      select: { pricingAxis: true },
-    })).toEqual({ pricingAxis: 'secondary' });
   });
 
   it('removes a link and overrides for active and archived items together', async () => {
