@@ -10,6 +10,7 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
     productType?: 'simple' | 'configurable' | 'combo';
     primaryLinks?: Array<{ optionGroupId: string }>;
     replaceItems?: Array<{ id: string }>;
+    activeReplaceItem?: { id: string; allowQuantity?: boolean; minQty?: number | null; maxQty?: number | null } | null;
   } = {}) {
     const productType = options.productType ?? 'simple';
     const tx = {
@@ -24,9 +25,13 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
           isRequired: false,
           minSelect: 0,
           maxSelect: 1,
+          isActive: true,
         }),
       },
-      optionItem: { findMany: jest.fn().mockResolvedValue(options.replaceItems ?? []) },
+      optionItem: {
+        findMany: jest.fn().mockResolvedValue(options.replaceItems ?? []),
+        findFirst: jest.fn().mockResolvedValue(options.activeReplaceItem ?? null),
+      },
       productOptionGroupLink: {
         create: jest.fn().mockResolvedValue({ id: 'link-a' }),
         findFirst: jest.fn().mockResolvedValue({ id: 'link-a', productId: dto.productId, optionGroupId: dto.optionGroupId }),
@@ -87,6 +92,40 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
     expect(tx.productOptionGroupLink.update).toHaveBeenCalled();
     expect(prisma.auditLog.create).not.toHaveBeenCalled();
     expect(cacheManager.del).not.toHaveBeenCalled();
+  });
+
+  it('rejects linking an active replace group to the secondary axis before persisting', async () => {
+    const { prisma, tx, cacheManager, service } = makeService({
+      activeReplaceItem: { id: 'replace-a', allowQuantity: false, minQty: 1, maxQty: 1 },
+    });
+
+    await expect(service.link({ ...dto, pricingAxis: 'secondary' }, actorId)).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.productOptionGroupLink.create).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    expect(cacheManager.del).not.toHaveBeenCalled();
+  });
+
+  it('rejects changing a replace group from primary to secondary before persisting', async () => {
+    const { prisma, tx, cacheManager, service } = makeService({
+      activeReplaceItem: { id: 'replace-a', allowQuantity: false, minQty: 1, maxQty: 1 },
+    });
+
+    await expect(service.update('link-a', { pricingAxis: 'secondary' }, actorId)).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.productOptionGroupLink.update).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    expect(cacheManager.del).not.toHaveBeenCalled();
+  });
+
+  it('rejects linking an active replace item with an invalid quantity range', async () => {
+    const { tx, service } = makeService({
+      activeReplaceItem: { id: 'replace-a', allowQuantity: false, minQty: 1, maxQty: null },
+    });
+
+    await expect(service.link(dto, actorId)).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.productOptionGroupLink.create).not.toHaveBeenCalled();
   });
 
   it('removes overrides for active and archived items together with the link', async () => {

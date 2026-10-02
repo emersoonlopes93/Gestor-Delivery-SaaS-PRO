@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { OptionGroupsService } from '../option-groups/option-groups.service';
 import { ProductOptionGroupsService } from './product-option-groups.service';
 
 const allowedDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
@@ -41,6 +42,12 @@ describe('ProductOptionGroupLink PostgreSQL atomicity', () => {
     return Reflect.construct(ProductOptionGroupsService, [prisma, tenantContext, cacheManager]) as ProductOptionGroupsService;
   }
 
+  function optionGroupsServiceFor(currentTenantId: string): OptionGroupsService {
+    const cacheManager = { del: async () => undefined };
+    const tenantContext = { getTenantId: () => currentTenantId };
+    return Reflect.construct(OptionGroupsService, [prisma, tenantContext, cacheManager]) as OptionGroupsService;
+  }
+
   it('keeps one primary replace link when concurrent mutations race', async () => {
     const tenant = await prisma.tenant.create({
       data: { name: `Option links ${suffix}`, slug: `option-links-${suffix}` },
@@ -60,8 +67,8 @@ describe('ProductOptionGroupLink PostgreSQL atomicity', () => {
     ]);
     await prisma.optionItem.createMany({
       data: [
-        { tenantId: tenant.id, optionGroupId: firstGroup.id, name: 'A', priceImpactType: 'replace', priceImpactValue: 15 },
-        { tenantId: tenant.id, optionGroupId: secondGroup.id, name: 'B', priceImpactType: 'replace', priceImpactValue: 18 },
+        { tenantId: tenant.id, optionGroupId: firstGroup.id, name: 'A', priceImpactType: 'replace', priceImpactValue: 15, minQty: 1, maxQty: 1 },
+        { tenantId: tenant.id, optionGroupId: secondGroup.id, name: 'B', priceImpactType: 'replace', priceImpactValue: 18, minQty: 1, maxQty: 1 },
       ],
     });
 
@@ -86,17 +93,6 @@ describe('ProductOptionGroupLink PostgreSQL atomicity', () => {
     expect(await prisma.productOptionGroupLink.count({
       where: { tenantId: tenant.id, productId: product.id, pricingAxis: 'primary' },
     })).toBe(1);
-
-    const secondaryLink = await service.link({
-      productId: product.id,
-      optionGroupId: unlinkedGroup.id,
-      pricingAxis: 'secondary',
-    });
-    await expect(service.update(secondaryLink.id, { pricingAxis: 'primary' })).rejects.toThrow();
-    expect(await prisma.productOptionGroupLink.findUniqueOrThrow({
-      where: { id: secondaryLink.id },
-      select: { pricingAxis: true },
-    })).toEqual({ pricingAxis: 'secondary' });
   });
 
   it('removes a link and overrides for active and archived items together', async () => {
@@ -129,5 +125,50 @@ describe('ProductOptionGroupLink PostgreSQL atomicity', () => {
 
     expect(await prisma.productOptionGroupLink.findUnique({ where: { id: link.id } })).toBeNull();
     expect(await prisma.productOptionItemPrice.count({ where: { tenantId: currentTenantId, productId: product.id } })).toBe(0);
+  });
+
+  it('rolls back item edits that would make a secondary linked group use replace', async () => {
+    const currentTenantId = tenantId;
+    if (!currentTenantId) throw new Error('Tenant fixture was not created.');
+
+    const [product, group] = await Promise.all([
+      prisma.product.create({
+        data: { tenantId: currentTenantId, name: 'Produto secondary', slug: `secondary-${suffix}`, basePrice: 12 },
+      }),
+      prisma.optionGroup.create({
+        data: { tenantId: currentTenantId, name: 'Grupo secondary', selectionType: 'single', minSelect: 0, maxSelect: 1 },
+      }),
+    ]);
+    const item = await prisma.optionItem.create({
+      data: { tenantId: currentTenantId, optionGroupId: group.id, name: 'Fixo', priceImpactType: 'fixed', priceImpactValue: 2 },
+    });
+    await serviceFor(currentTenantId).link({ productId: product.id, optionGroupId: group.id, pricingAxis: 'secondary' });
+
+    const optionGroupsService = optionGroupsServiceFor(currentTenantId);
+    await expect(optionGroupsService.updateItem(item.id, {
+      priceImpactType: 'replace',
+      priceImpactValue: 15,
+      allowQuantity: false,
+      minQty: 1,
+      maxQty: 1,
+    })).rejects.toThrow();
+
+    await expect(optionGroupsService.createItem({
+      optionGroupId: group.id,
+      name: 'Replace inválido',
+      priceImpactType: 'replace',
+      priceImpactValue: 16,
+      allowQuantity: false,
+      minQty: 1,
+      maxQty: 1,
+    })).rejects.toThrow();
+
+    expect(await prisma.optionItem.findUniqueOrThrow({
+      where: { id: item.id },
+      select: { priceImpactType: true, priceImpactValue: true },
+    })).toEqual({ priceImpactType: 'fixed', priceImpactValue: expect.anything() });
+    expect(await prisma.optionItem.count({
+      where: { tenantId: currentTenantId, optionGroupId: group.id, priceImpactType: 'replace' },
+    })).toBe(0);
   });
 });

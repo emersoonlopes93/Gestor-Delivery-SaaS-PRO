@@ -2705,3 +2705,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - O unlink remove, na mesma transação, os overrides de todos os itens do grupo — inclusive itens soft-deleted — antes de remover o vínculo. Audit log e invalidação de cache permanecem estritamente pós-commit.
 - A cobertura unitária valida rollback lógico e ausência de efeitos pós-commit em falhas; a nova integração PostgreSQL entra no gate de concorrência da CI e prova que duas mutations simultâneas mantêm apenas um vínculo `primary` com `replace`.
 - Não houve migration, alteração de pricing, Pizza, Combo, Storefront, Checkout, archive/restore ou outbox. A integração PostgreSQL não foi executada localmente por ausência de `DATABASE_URL`/`DIRECT_URL` efêmeros.
+
+# P3.2 — Invariantes de replace, secondary e quantidade (2026-10-02)
+
+- A autoria no backend agora rejeita item `replace` ativo em grupo vinculado ao eixo `secondary`. A projeção acontece antes de criar/editar item, ativar/editar grupo, criar vínculo e mover o eixo; a escrita só ocorre se o estado final for válido.
+- Um item `replace` exige `allowQuantity=false`, `minQty=1` e `maxQty=1`, impedindo faixa que permita quantidade maior que um. As operações usam transações serializáveis; audit log e invalidação de cache continuam pós-commit.
+- Cobertura unitária verifica rejeição sem persistência e edição válida fora de grupo vinculado. A prova PostgreSQL ampliada confirma que criar ou editar `replace` em grupo `secondary` preserva o item original e não insere o novo. Sem migration, alteração de `@gestor/pricing`, Pizza, Combo, override/reset, archive/restore ou outbox.
