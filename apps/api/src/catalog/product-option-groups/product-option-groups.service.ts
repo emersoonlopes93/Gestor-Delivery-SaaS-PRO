@@ -227,7 +227,8 @@ export class ProductOptionGroupsService {
   }
 
   private overrideDecimal(value: number | null | undefined, field: 'price' | 'costPrice'): Prisma.Decimal | null | undefined {
-    if (value === undefined || value === null) return value;
+    if (value === undefined) return undefined;
+    if (value === null) return null;
     if (!Number.isFinite(value) || value < 0) {
       throw new BadRequestException(`${field} deve ser um valor finito e não negativo.`);
     }
