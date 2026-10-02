@@ -4,6 +4,7 @@ import type { Cache } from 'cache-manager';
 import { Prisma, PricingAxis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
+import { runSerializableTransactionWithRetry } from '../../database/serializable-transaction';
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';
 import { UpdateProductOptionGroupLinkDto } from './dto/update-product-option-group-link.dto';
 import { UpdateProductOptionItemOverrideDto } from './dto/update-product-option-item-override.dto';
@@ -89,8 +90,12 @@ export class ProductOptionGroupsService {
     }
   }
 
-  private async assertNoPrimaryReplaceConflict(tenantId: string, productId: string) {
-    const primaryLinks = await this.prisma.tenantClient.productOptionGroupLink.findMany({
+  private async assertNoPrimaryReplaceConflict(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    productId: string,
+  ) {
+    const primaryLinks = await tx.productOptionGroupLink.findMany({
       where: { tenantId, productId, pricingAxis: 'primary' },
       select: { optionGroupId: true },
     });
@@ -99,7 +104,7 @@ export class ProductOptionGroupsService {
 
     const groupIds = primaryLinks.map((l) => l.optionGroupId);
 
-    const replaceItems = await this.prisma.tenantClient.optionItem.findMany({
+    const replaceItems = await tx.optionItem.findMany({
       where: {
         tenantId,
         optionGroupId: { in: groupIds },
@@ -120,52 +125,61 @@ export class ProductOptionGroupsService {
 
   async link(dto: CreateProductOptionGroupLinkDto, actorId?: string) {
     const tenantId = this.getRequiredTenantId();
-    const product = await this.ensureProduct(tenantId, dto.productId);
-    const group = await this.ensureOptionGroup(tenantId, dto.optionGroupId);
-
-    const pricingAxis = (dto.pricingAxis ?? 'secondary') as PricingAxis;
-
-    const isRequired = dto.overrideIsRequired ?? group.isRequired;
-    const minSelect = dto.overrideMinSelect ?? group.minSelect;
-    const maxSelect = dto.overrideMaxSelect ?? group.maxSelect;
-
-    this.validateOverrideRules({
-      selectionType: group.selectionType,
-      isRequired,
-      minSelect,
-      maxSelect,
-    });
 
     try {
-      const created = await this.prisma.tenantClient.productOptionGroupLink.create({
-        data: {
-          tenantId,
-          productId: dto.productId,
-          optionGroupId: dto.optionGroupId,
-          order: dto.order ?? 0,
-          overrideName: dto.overrideName ?? null,
-          overrideDescription: dto.overrideDescription ?? null,
-          overrideIsRequired: dto.overrideIsRequired ?? null,
-          overrideMinSelect: dto.overrideMinSelect ?? null,
-          overrideMaxSelect: dto.overrideMaxSelect ?? null,
-          pricingAxis,
-        } satisfies Prisma.ProductOptionGroupLinkUncheckedCreateInput,
-      });
+      const { created, promotedToConfigurable } = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx) => {
+          const product = await tx.product.findFirst({
+            where: { id: dto.productId, tenantId, deletedAt: null },
+            select: { id: true, type: true },
+          });
+          if (!product) throw new NotFoundException('Produto não encontrado.');
 
-      await this.assertNoPrimaryReplaceConflict(tenantId, dto.productId);
+          const group = await tx.optionGroup.findFirst({
+            where: { id: dto.optionGroupId, tenantId, deletedAt: null },
+            select: { id: true, selectionType: true, isRequired: true, minSelect: true, maxSelect: true },
+          });
+          if (!group) throw new NotFoundException('Grupo não encontrado.');
 
-      const promotion = product.type === 'simple'
-        ? await this.prisma.tenantClient.product.updateMany({
-          where: { id: product.id, tenantId, type: 'simple', deletedAt: null },
-          data: { type: 'configurable' },
-        })
-        : { count: 0 };
+          const isRequired = dto.overrideIsRequired ?? group.isRequired;
+          const minSelect = dto.overrideMinSelect ?? group.minSelect;
+          const maxSelect = dto.overrideMaxSelect ?? group.maxSelect;
+          this.validateOverrideRules({ selectionType: group.selectionType, isRequired, minSelect, maxSelect });
+
+          const created = await tx.productOptionGroupLink.create({
+            data: {
+              tenantId,
+              productId: dto.productId,
+              optionGroupId: dto.optionGroupId,
+              order: dto.order ?? 0,
+              overrideName: dto.overrideName ?? null,
+              overrideDescription: dto.overrideDescription ?? null,
+              overrideIsRequired: dto.overrideIsRequired ?? null,
+              overrideMinSelect: dto.overrideMinSelect ?? null,
+              overrideMaxSelect: dto.overrideMaxSelect ?? null,
+              pricingAxis: (dto.pricingAxis ?? 'secondary') as PricingAxis,
+            } satisfies Prisma.ProductOptionGroupLinkUncheckedCreateInput,
+          });
+
+          await this.assertNoPrimaryReplaceConflict(tx, tenantId, dto.productId);
+
+          const promotion = product.type === 'simple'
+            ? await tx.product.updateMany({
+              where: { id: product.id, tenantId, type: 'simple', deletedAt: null },
+              data: { type: 'configurable' },
+            })
+            : { count: 0 };
+
+          return { created, promotedToConfigurable: promotion.count > 0 };
+        },
+      );
 
       await this.audit(tenantId, actorId, 'catalog.product_option_group.linked', 'product_option_group_link', {
         productId: dto.productId,
         optionGroupId: dto.optionGroupId,
         linkId: created.id,
-        promotedToConfigurable: promotion.count > 0,
+        promotedToConfigurable,
       });
       await this.invalidateStorefrontCache(tenantId);
       return created;
@@ -251,30 +265,30 @@ export class ProductOptionGroupsService {
   }
 
   async unlink(linkId: string, actorId?: string) {
-    const link = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
-      where: { id: linkId },
-      select: { id: true, productId: true, optionGroupId: true },
-    });
-    if (!link) throw new NotFoundException('Vínculo não encontrado.');
-
-    const items = await this.prisma.tenantClient.optionItem.findMany({
-      where: { optionGroupId: link.optionGroupId, deletedAt: null },
-      select: { id: true },
-    });
-    const itemIds = items.map((i) => i.id);
-
-    if (itemIds.length > 0) {
-      await this.prisma.tenantClient.productOptionItemPrice.deleteMany({
-        where: {
-          productId: link.productId,
-          optionItemId: { in: itemIds },
-        },
-      });
-    }
-
-    await this.prisma.tenantClient.productOptionGroupLink.delete({ where: { id: linkId } });
-
     const tenantId = this.getRequiredTenantId();
+    const link = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const existing = await tx.productOptionGroupLink.findFirst({
+        where: { id: linkId, tenantId },
+        select: { id: true, productId: true, optionGroupId: true },
+      });
+      if (!existing) throw new NotFoundException('Vínculo não encontrado.');
+
+      const items = await tx.optionItem.findMany({
+        where: { optionGroupId: existing.optionGroupId, tenantId },
+        select: { id: true },
+      });
+      const itemIds = items.map((item) => item.id);
+
+      if (itemIds.length > 0) {
+        await tx.productOptionItemPrice.deleteMany({
+          where: { tenantId, productId: existing.productId, optionItemId: { in: itemIds } },
+        });
+      }
+
+      await tx.productOptionGroupLink.delete({ where: { id: existing.id } });
+      return existing;
+    });
+
     await this.audit(tenantId, actorId, 'catalog.product_option_group.unlinked', 'product_option_group_link', { productId: link.productId, optionGroupId: link.optionGroupId, linkId });
     await this.invalidateStorefrontCache(tenantId);
 
@@ -282,40 +296,41 @@ export class ProductOptionGroupsService {
   }
 
   async update(linkId: string, dto: UpdateProductOptionGroupLinkDto, actorId?: string) {
-    const existing = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
-      where: { id: linkId },
-      select: { id: true, productId: true, optionGroupId: true, pricingAxis: true, overrideIsRequired: true, overrideMinSelect: true, overrideMaxSelect: true },
-    });
-    if (!existing) throw new NotFoundException('Vínculo não encontrado.');
-
     const tenantId = this.getRequiredTenantId();
-    const group = await this.ensureOptionGroup(tenantId, existing.optionGroupId);
+    const { existing, updated } = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const existing = await tx.productOptionGroupLink.findFirst({
+        where: { id: linkId, tenantId },
+        select: { id: true, productId: true, optionGroupId: true, overrideIsRequired: true, overrideMinSelect: true, overrideMaxSelect: true },
+      });
+      if (!existing) throw new NotFoundException('Vínculo não encontrado.');
 
-    const isRequired = dto.overrideIsRequired ?? existing.overrideIsRequired ?? group.isRequired;
-    const minSelect = dto.overrideMinSelect ?? existing.overrideMinSelect ?? group.minSelect;
-    const maxSelect = dto.overrideMaxSelect ?? existing.overrideMaxSelect ?? group.maxSelect;
+      const group = await tx.optionGroup.findFirst({
+        where: { id: existing.optionGroupId, tenantId, deletedAt: null },
+        select: { selectionType: true, isRequired: true, minSelect: true, maxSelect: true },
+      });
+      if (!group) throw new NotFoundException('Grupo não encontrado.');
 
-    this.validateOverrideRules({
-      selectionType: group.selectionType,
-      isRequired,
-      minSelect,
-      maxSelect,
+      const isRequired = dto.overrideIsRequired ?? existing.overrideIsRequired ?? group.isRequired;
+      const minSelect = dto.overrideMinSelect ?? existing.overrideMinSelect ?? group.minSelect;
+      const maxSelect = dto.overrideMaxSelect ?? existing.overrideMaxSelect ?? group.maxSelect;
+      this.validateOverrideRules({ selectionType: group.selectionType, isRequired, minSelect, maxSelect });
+
+      const updated = await tx.productOptionGroupLink.update({
+        where: { id: linkId },
+        data: {
+          order: dto.order,
+          overrideName: dto.overrideName ?? undefined,
+          overrideDescription: dto.overrideDescription ?? undefined,
+          overrideIsRequired: dto.overrideIsRequired ?? undefined,
+          overrideMinSelect: dto.overrideMinSelect ?? undefined,
+          overrideMaxSelect: dto.overrideMaxSelect ?? undefined,
+          pricingAxis: dto.pricingAxis as PricingAxis | undefined,
+        },
+      });
+
+      await this.assertNoPrimaryReplaceConflict(tx, tenantId, existing.productId);
+      return { existing, updated };
     });
-
-    const updated = await this.prisma.tenantClient.productOptionGroupLink.update({
-      where: { id: linkId },
-      data: {
-        order: dto.order,
-        overrideName: dto.overrideName ?? undefined,
-        overrideDescription: dto.overrideDescription ?? undefined,
-        overrideIsRequired: dto.overrideIsRequired ?? undefined,
-        overrideMinSelect: dto.overrideMinSelect ?? undefined,
-        overrideMaxSelect: dto.overrideMaxSelect ?? undefined,
-        pricingAxis: dto.pricingAxis as PricingAxis | undefined,
-      },
-    });
-
-    await this.assertNoPrimaryReplaceConflict(tenantId, existing.productId);
 
     await this.audit(tenantId, actorId, 'catalog.product_option_group.updated', 'product_option_group_link', { productId: existing.productId, optionGroupId: existing.optionGroupId, linkId });
     await this.invalidateStorefrontCache(tenantId);
