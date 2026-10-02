@@ -120,7 +120,7 @@ export class ProductOptionGroupsService {
 
   async link(dto: CreateProductOptionGroupLinkDto, actorId?: string) {
     const tenantId = this.getRequiredTenantId();
-    await this.ensureProduct(tenantId, dto.productId);
+    const product = await this.ensureProduct(tenantId, dto.productId);
     const group = await this.ensureOptionGroup(tenantId, dto.optionGroupId);
 
     const pricingAxis = (dto.pricingAxis ?? 'secondary') as PricingAxis;
@@ -154,7 +154,19 @@ export class ProductOptionGroupsService {
 
       await this.assertNoPrimaryReplaceConflict(tenantId, dto.productId);
 
-      await this.audit(tenantId, actorId, 'catalog.product_option_group.linked', 'product_option_group_link', { productId: dto.productId, optionGroupId: dto.optionGroupId, linkId: created.id });
+      const promotion = product.type === 'simple'
+        ? await this.prisma.tenantClient.product.updateMany({
+          where: { id: product.id, tenantId, type: 'simple', deletedAt: null },
+          data: { type: 'configurable' },
+        })
+        : { count: 0 };
+
+      await this.audit(tenantId, actorId, 'catalog.product_option_group.linked', 'product_option_group_link', {
+        productId: dto.productId,
+        optionGroupId: dto.optionGroupId,
+        linkId: created.id,
+        promotedToConfigurable: promotion.count > 0,
+      });
       await this.invalidateStorefrontCache(tenantId);
       return created;
     } catch (err) {
