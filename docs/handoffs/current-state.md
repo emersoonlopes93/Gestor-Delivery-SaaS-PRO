@@ -2698,3 +2698,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - The public Storefront payload now includes individual option quantity limits. The Storefront adapts that effective public data, including link-level selection overrides and item availability/price overrides, to `@gestor/pricing`; it does not calculate generic option prices locally.
 - Product cards and the modal use canonical starting-price and unit-price results. Invalid in-progress selections retain the base-price preview until their existing inline validation is satisfied; the Checkout remains the server-side pricing authority.
 - Pizza Engine, Checkout, cart, POS, Combo, schema, migrations, snapshots, printing/KDS and cache remain unchanged. Consumer migration after this work is deferred to P1.4.
+
+# P3.1 — Atomicidade de ProductOptionGroupLink (2026-10-02)
+
+- `link`, atualização de vínculo/eixo e `unlink` agora executam em transação PostgreSQL serializável, com retry limitado para conflitos `P2034`. A validação de conflito `primary + replace`, a promoção administrativa `simple → configurable` e a escrita do vínculo fazem parte da mesma unidade de commit.
+- O unlink remove, na mesma transação, os overrides de todos os itens do grupo — inclusive itens soft-deleted — antes de remover o vínculo. Audit log e invalidação de cache permanecem estritamente pós-commit.
+- A cobertura unitária valida rollback lógico e ausência de efeitos pós-commit em falhas; a nova integração PostgreSQL entra no gate de concorrência da CI e prova que duas mutations simultâneas mantêm apenas um vínculo `primary` com `replace`.
+- Não houve migration, alteração de pricing, Pizza, Combo, Storefront, Checkout, archive/restore ou outbox. A integração PostgreSQL não foi executada localmente por ausência de `DATABASE_URL`/`DIRECT_URL` efêmeros.
