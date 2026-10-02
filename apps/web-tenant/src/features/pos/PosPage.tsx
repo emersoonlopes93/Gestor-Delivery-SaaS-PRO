@@ -34,7 +34,8 @@ import { TransferTableModal } from './components/TransferTableModal';
 import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
 import { SplitPaymentModal } from './components/SplitPaymentModal';
 import { PosCustomerDrawer } from './components/PosCustomerDrawer';
-import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
+import type { CategoryTemplateType, CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
+import { getProductConfigurationRoute } from '@gestor/utils';
 
 interface CatalogProduct {
   id: string;
@@ -43,8 +44,9 @@ interface CatalogProduct {
   image: string | null;
   categoryName: string;
   categoryId: string;
-  categoryTemplateType?: string | null;
+  categoryTemplateType?: CategoryTemplateType | null;
   type: 'simple' | 'configurable' | 'combo';
+  activeOptionGroupCount: number;
 }
 
 interface CartItem {
@@ -222,8 +224,9 @@ export default function PosPage() {
         image: (p['image'] as string | null) || null,
         categoryId: ((p['category'] as Record<string, unknown>)?.['id'] as string) || 'uncategorized',
         categoryName: ((p['category'] as Record<string, unknown>)?.['name'] as string) || 'Sem Categoria',
-        categoryTemplateType: ((p['category'] as Record<string, unknown>)?.['templateType'] as string) || null,
+        categoryTemplateType: ((p['category'] as Record<string, unknown>)?.['templateType'] as CategoryTemplateType) || null,
         type: (p['type'] as 'simple' | 'configurable' | 'combo') || 'simple',
+        activeOptionGroupCount: Number(((p['_count'] as Record<string, unknown> | undefined)?.['optionGroupLinks']) ?? 0),
       }));
     },
     refetchOnWindowFocus: false,
@@ -458,8 +461,7 @@ export default function PosPage() {
   }, [products, selectedCategoryId]);
 
   const addToCart = useCallback((product: CatalogProduct) => {
-    // Produtos configuráveis/combos devem passar pelo fluxo de configuração.
-    if (product.type === 'configurable' || product.type === 'combo' || product.categoryTemplateType === 'pizza') {
+    if (getProductConfigurationRoute(product) !== 'direct') {
       setConfigProductId(product.id);
       return;
     }
@@ -701,7 +703,7 @@ export default function PosPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                 {filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
+                 {filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={() => addToCart(p)} />)}
                </div>
             </div>
            </>
