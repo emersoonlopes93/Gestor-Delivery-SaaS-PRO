@@ -123,6 +123,37 @@ export class ProductOptionGroupsService {
     }
   }
 
+  private async assertPricingAxisSupportsReplace(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    optionGroupId: string,
+    groupIsActive: boolean,
+    pricingAxis: PricingAxis,
+  ): Promise<void> {
+    if (!groupIsActive) return;
+
+    const activeReplaceItem = await tx.optionItem.findFirst({
+      where: {
+        tenantId,
+        optionGroupId,
+        deletedAt: null,
+        isActive: true,
+        priceImpactType: 'replace',
+      },
+      select: { id: true, allowQuantity: true, minQty: true, maxQty: true },
+    });
+
+    if (!activeReplaceItem) return;
+
+    if (activeReplaceItem.allowQuantity || activeReplaceItem.minQty !== 1 || activeReplaceItem.maxQty !== 1) {
+      throw new BadRequestException('Item REPLACE ativo deve usar allowQuantity=false e faixa 1..1.');
+    }
+
+    if (pricingAxis === 'secondary') {
+      throw new BadRequestException('Grupo com item REPLACE ativo deve usar eixo PRIMARY.');
+    }
+  }
+
   async link(dto: CreateProductOptionGroupLinkDto, actorId?: string) {
     const tenantId = this.getRequiredTenantId();
 
@@ -138,7 +169,7 @@ export class ProductOptionGroupsService {
 
           const group = await tx.optionGroup.findFirst({
             where: { id: dto.optionGroupId, tenantId, deletedAt: null },
-            select: { id: true, selectionType: true, isRequired: true, minSelect: true, maxSelect: true },
+            select: { id: true, selectionType: true, isRequired: true, minSelect: true, maxSelect: true, isActive: true },
           });
           if (!group) throw new NotFoundException('Grupo não encontrado.');
 
@@ -146,6 +177,8 @@ export class ProductOptionGroupsService {
           const minSelect = dto.overrideMinSelect ?? group.minSelect;
           const maxSelect = dto.overrideMaxSelect ?? group.maxSelect;
           this.validateOverrideRules({ selectionType: group.selectionType, isRequired, minSelect, maxSelect });
+          const pricingAxis = (dto.pricingAxis ?? 'secondary') as PricingAxis;
+          await this.assertPricingAxisSupportsReplace(tx, tenantId, group.id, group.isActive, pricingAxis);
 
           const created = await tx.productOptionGroupLink.create({
             data: {
@@ -158,7 +191,7 @@ export class ProductOptionGroupsService {
               overrideIsRequired: dto.overrideIsRequired ?? null,
               overrideMinSelect: dto.overrideMinSelect ?? null,
               overrideMaxSelect: dto.overrideMaxSelect ?? null,
-              pricingAxis: (dto.pricingAxis ?? 'secondary') as PricingAxis,
+              pricingAxis,
             } satisfies Prisma.ProductOptionGroupLinkUncheckedCreateInput,
           });
 
@@ -300,13 +333,13 @@ export class ProductOptionGroupsService {
     const { existing, updated } = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       const existing = await tx.productOptionGroupLink.findFirst({
         where: { id: linkId, tenantId },
-        select: { id: true, productId: true, optionGroupId: true, overrideIsRequired: true, overrideMinSelect: true, overrideMaxSelect: true },
+        select: { id: true, productId: true, optionGroupId: true, pricingAxis: true, overrideIsRequired: true, overrideMinSelect: true, overrideMaxSelect: true },
       });
       if (!existing) throw new NotFoundException('Vínculo não encontrado.');
 
       const group = await tx.optionGroup.findFirst({
         where: { id: existing.optionGroupId, tenantId, deletedAt: null },
-        select: { selectionType: true, isRequired: true, minSelect: true, maxSelect: true },
+        select: { selectionType: true, isRequired: true, minSelect: true, maxSelect: true, isActive: true },
       });
       if (!group) throw new NotFoundException('Grupo não encontrado.');
 
@@ -314,6 +347,8 @@ export class ProductOptionGroupsService {
       const minSelect = dto.overrideMinSelect ?? existing.overrideMinSelect ?? group.minSelect;
       const maxSelect = dto.overrideMaxSelect ?? existing.overrideMaxSelect ?? group.maxSelect;
       this.validateOverrideRules({ selectionType: group.selectionType, isRequired, minSelect, maxSelect });
+      const pricingAxis = (dto.pricingAxis ?? existing.pricingAxis) as PricingAxis;
+      await this.assertPricingAxisSupportsReplace(tx, tenantId, existing.optionGroupId, group.isActive, pricingAxis);
 
       const updated = await tx.productOptionGroupLink.update({
         where: { id: linkId },
