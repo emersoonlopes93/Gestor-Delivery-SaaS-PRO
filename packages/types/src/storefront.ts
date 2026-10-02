@@ -131,7 +131,7 @@ export interface StorefrontProductPayload {
   id: string;
   name: string;
   slug: string;
-  type?: 'simple' | 'combo';
+  type?: 'simple' | 'configurable' | 'combo';
   shortDescription?: string | null;
   description?: string | null;
   longDescription?: string | null; // Added for AI agent
@@ -308,7 +308,7 @@ export interface CartLineItem {
   options?: unknown[];
 
   comboItems?: CartSelectedComboItem[];
-  type?: 'simple' | 'combo';
+  type?: 'simple' | 'configurable' | 'combo';
   selections?: CartSelectedOptionGroup[];
   slots?: CartSelectedComboSlot[];
   pizzaComposition?: PizzaCompositionDTO;
