@@ -36,6 +36,16 @@ export class ProductOptionGroupsController {
     return this.service.upsertItemOverride(productId, optionItemId, dto, actorId);
   }
 
+  @Delete('items/:optionItemId/override')
+  @RequirePermissions('catalog.manage_products')
+  resetItemOverride(
+    @Param('productId') productId: string,
+    @Param('optionItemId') optionItemId: string,
+    @CurrentUser('sub') actorId: string,
+  ) {
+    return this.service.resetItemOverride(productId, optionItemId, actorId);
+  }
+
   @Patch(':linkId')
   @RequirePermissions('catalog.manage_products')
   update(@Param('linkId') linkId: string, @Body() dto: UpdateProductOptionGroupLinkDto, @CurrentUser('sub') actorId: string) {
