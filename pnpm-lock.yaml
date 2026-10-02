@@ -639,6 +639,9 @@ importers:
       '@gestor/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gestor/pricing':
+        specifier: workspace:*
+        version: link:../../packages/pricing
       '@gestor/storefront-preview':
         specifier: workspace:*
         version: link:../../packages/storefront-preview
