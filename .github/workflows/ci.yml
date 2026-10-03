@@ -104,10 +104,9 @@ jobs:
       - name: Validate Prisma schema after ephemeral migration
         run: pnpm --filter @gestor/api exec prisma validate
 
-      - name: Test 99Food contracts with ephemeral PostgreSQL
+      - name: Test 99Food contracts
         run: >-
           pnpm --filter @gestor/api test --
-          src/marketplace/food99-financial-reconciliation.postgres.integration-test.ts
           src/marketplace/services/food99-financial-token.service.spec.ts
           src/marketplace/services/food99-financial-client.service.spec.ts
           src/marketplace/services/food99-financial-reconciliation.service.spec.ts
@@ -116,6 +115,13 @@ jobs:
           src/marketplace/services/marketplace-order-ingestion.service.spec.ts
           src/marketplace/providers/food99.provider.spec.ts
           src/marketplace/controllers/marketplace-tenant.controller.spec.ts
+
+      - name: Test 99Food reconciliation with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/marketplace/food99-financial-reconciliation.postgres.integration-test.ts
 
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
