@@ -226,6 +226,61 @@ export class ProductOptionGroupsService {
     }
   }
 
+  private overrideDecimal(value: number | null | undefined, field: 'price' | 'costPrice'): Prisma.Decimal | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (!Number.isFinite(value) || value < 0) {
+      throw new BadRequestException(`${field} deve ser um valor finito e não negativo.`);
+    }
+    return new Prisma.Decimal(value);
+  }
+
+  private async findOverrideTarget(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    productId: string,
+    optionItemId: string,
+  ) {
+    const product = await tx.product.findFirst({
+      where: { id: productId, tenantId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Produto não encontrado.');
+
+    const item = await tx.optionItem.findFirst({
+      where: { id: optionItemId, tenantId, deletedAt: null, optionGroup: { deletedAt: null } },
+      select: { id: true, optionGroupId: true, isActive: true, priceImpactValue: true },
+    });
+    if (!item) throw new NotFoundException('Item de opção não encontrado.');
+
+    const link = await tx.productOptionGroupLink.findFirst({
+      where: { productId, optionGroupId: item.optionGroupId, tenantId },
+      select: { id: true },
+    });
+    if (!link) {
+      throw new BadRequestException('Este item de opção não pertence a um grupo vinculado a este produto.');
+    }
+    return item;
+  }
+
+  private overrideResponse(
+    item: { isActive: boolean },
+    override: { id: string; isActive: boolean | null; price: Prisma.Decimal | null; costPrice: Prisma.Decimal | null } | null,
+  ) {
+    return {
+      success: true,
+      effectiveIsActive: item.isActive && (override?.isActive ?? true),
+      override: override
+        ? {
+            id: override.id,
+            isActive: override.isActive,
+            price: override.price === null ? null : Number(override.price),
+            costPrice: override.costPrice === null ? null : Number(override.costPrice),
+          }
+        : null,
+    };
+  }
+
   async upsertItemOverride(
     productId: string,
     optionItemId: string,
@@ -233,68 +288,71 @@ export class ProductOptionGroupsService {
     actorId?: string,
   ) {
     const tenantId = this.getRequiredTenantId();
-    await this.ensureProduct(tenantId, productId);
+    const result = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const item = await this.findOverrideTarget(tx, tenantId, productId, optionItemId);
+      const existing = await tx.productOptionItemPrice.findUnique({
+        where: { productId_optionItemId: { productId, optionItemId } },
+      });
 
-    const item = await this.prisma.tenantClient.optionItem.findFirst({
-      where: { id: optionItemId, tenantId, deletedAt: null, optionGroup: { deletedAt: null } },
-      select: { id: true, optionGroupId: true, isActive: true },
-    });
-    if (!item) throw new NotFoundException('Item de opção não encontrado.');
+      const requestedPrice = this.overrideDecimal(dto.price, 'price');
+      const requestedCostPrice = this.overrideDecimal(dto.costPrice, 'costPrice');
+      const nextIsActive = dto.isActive === undefined ? (existing?.isActive ?? null) : (dto.isActive ? null : false);
+      const nextPrice = requestedPrice === undefined ? (existing?.price ?? null) : requestedPrice;
+      const nextCostPrice = requestedCostPrice === undefined ? (existing?.costPrice ?? null) : requestedCostPrice;
+      const normalizedPrice = nextPrice !== null && nextPrice.equals(item.priceImpactValue) ? null : nextPrice;
 
-    const link = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
-      where: { productId, optionGroupId: item.optionGroupId, tenantId },
-      select: { id: true },
-    });
-    if (!link) {
-      throw new BadRequestException('Este item de opção não pertence a um grupo vinculado a este produto.');
-    }
-
-    const existing = await this.prisma.tenantClient.productOptionItemPrice.findUnique({
-      where: { productId_optionItemId: { productId, optionItemId } },
-    });
-
-    const nextIsActive = dto.isActive !== undefined ? dto.isActive : (existing?.isActive ?? null);
-    const nextPrice = dto.price !== undefined ? (dto.price !== null ? new Prisma.Decimal(dto.price) : null) : (existing?.price ?? null);
-
-    // Se nenhum override for mantido (isActive é true/null e preço é null), deletar o registro para herdar padrão
-    if ((nextIsActive === null || nextIsActive === true) && nextPrice === null) {
-      if (existing) {
-        await this.prisma.tenantClient.productOptionItemPrice.delete({
-          where: { productId_optionItemId: { productId, optionItemId } },
-        });
+      if (nextIsActive === null && normalizedPrice === null && nextCostPrice === null) {
+        if (existing) {
+          await tx.productOptionItemPrice.delete({ where: { productId_optionItemId: { productId, optionItemId } } });
+        }
+        return { cleared: Boolean(existing), response: this.overrideResponse(item, null) };
       }
+
+      const override = await tx.productOptionItemPrice.upsert({
+        where: { productId_optionItemId: { productId, optionItemId } },
+        create: {
+          tenantId,
+          productId,
+          optionItemId,
+          isActive: nextIsActive,
+          price: normalizedPrice,
+          costPrice: nextCostPrice,
+        },
+        update: {
+          isActive: nextIsActive,
+          price: normalizedPrice,
+          costPrice: nextCostPrice,
+        },
+      });
+      return { cleared: false, response: this.overrideResponse(item, override) };
+    });
+
+    await this.audit(
+      tenantId,
+      actorId,
+      result.cleared ? 'catalog.product_option_item.override_cleared' : 'catalog.product_option_item.override_updated',
+      'product_option_item_price',
+      { productId, optionItemId },
+    );
+    await this.invalidateStorefrontCache(tenantId);
+    return result.response;
+  }
+
+  async resetItemOverride(productId: string, optionItemId: string, actorId?: string) {
+    const tenantId = this.getRequiredTenantId();
+    const result = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const item = await this.findOverrideTarget(tx, tenantId, productId, optionItemId);
+      const deleted = await tx.productOptionItemPrice.deleteMany({
+        where: { tenantId, productId, optionItemId },
+      });
+      return { deleted: deleted.count > 0, response: this.overrideResponse(item, null) };
+    });
+
+    if (result.deleted) {
       await this.audit(tenantId, actorId, 'catalog.product_option_item.override_cleared', 'product_option_item_price', { productId, optionItemId });
       await this.invalidateStorefrontCache(tenantId);
-      return { success: true, effectiveIsActive: item.isActive, override: null };
     }
-
-    const updated = await this.prisma.tenantClient.productOptionItemPrice.upsert({
-      where: { productId_optionItemId: { productId, optionItemId } },
-      create: {
-        tenantId,
-        productId,
-        optionItemId,
-        isActive: nextIsActive,
-        price: nextPrice,
-      },
-      update: {
-        isActive: nextIsActive,
-        price: nextPrice,
-      },
-    });
-
-    const effectiveIsActive = item.isActive && (updated.isActive ?? true);
-    await this.audit(tenantId, actorId, 'catalog.product_option_item.override_updated', 'product_option_item_price', { productId, optionItemId });
-    await this.invalidateStorefrontCache(tenantId);
-    return {
-      success: true,
-      effectiveIsActive,
-      override: {
-        id: updated.id,
-        isActive: updated.isActive,
-        price: updated.price ? Number(updated.price) : null,
-      },
-    };
+    return result.response;
   }
 
   async unlink(linkId: string, actorId?: string) {
@@ -408,6 +466,7 @@ export class ProductOptionGroupsService {
                   id: override.id,
                   isActive: override.isActive,
                   price: override.price ? Number(override.price) : null,
+                  costPrice: override.costPrice ? Number(override.costPrice) : null,
                 }
               : null,
           };

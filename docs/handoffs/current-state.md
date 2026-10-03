@@ -2711,3 +2711,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A autoria no backend agora rejeita item `replace` ativo em grupo vinculado ao eixo `secondary`. A projeção acontece antes de criar/editar item, ativar/editar grupo, criar vínculo e mover o eixo; a escrita só ocorre se o estado final for válido.
 - Um item `replace` exige `allowQuantity=false`, `minQty=1` e `maxQty=1`, impedindo faixa que permita quantidade maior que um. As operações usam transações serializáveis; audit log e invalidação de cache continuam pós-commit.
 - Cobertura unitária verifica rejeição sem persistência e edição válida fora de grupo vinculado. A prova PostgreSQL ampliada confirma que criar ou editar `replace` em grupo `secondary` preserva o item original e não insere o novo. Sem migration, alteração de `@gestor/pricing`, Pizza, Combo, override/reset, archive/restore ou outbox.
+
+# P3.3 — Integridade de ProductOptionItemPrice (2026-10-02)
+
+- `ProductOptionItemPrice` é tratado como override local apenas de `price`, `costPrice` e `isActive`; não há escrita de semântica global do `OptionItem`. A rota de reset remove o registro de override, sem copiar preço global nem editar o item mestre.
+- Produto, item ativo não arquivado e vínculo item-grupo-produto são validados dentro da transação serializável antes de qualquer upsert/delete. Overrides iguais ao `priceImpactValue` global são removidos, para que mudanças globais futuras sejam herdadas novamente.
+- Audit e invalidação de cache ocorrem somente após commit. Não houve migration, mudança no pricing canônico, Product.type, Pizza, Combo, archive/restore ou outbox.

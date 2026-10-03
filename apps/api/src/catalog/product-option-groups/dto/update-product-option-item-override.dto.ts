@@ -7,5 +7,9 @@ export class UpdateProductOptionItemOverrideDto {
 
   @IsOptional()
   @IsNumber()
-  price?: number;
+  price?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  costPrice?: number | null;
 }
