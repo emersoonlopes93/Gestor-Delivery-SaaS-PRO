@@ -13,14 +13,16 @@ Este contrato separa quatro fatos que não podem ser usados como sinônimos:
 
 ## Provider read-only
 
-As leituras usam Bearer token da conexão e os endpoints:
+As leituras usam token financeiro de aplicação, separado do token operacional por loja. O adapter chama `POST https://openapi.99food.com/v3/auth/authtoken/signIn` com as credenciais já configuradas da aplicação e mantém o `accessToken` apenas em cache até `expiresIn`; ele nunca sobrescreve o token operacional da conexão.
+
+Os endpoints são:
 
 - `POST https://openapi.99food.com/v3/finance/finance/getShopBillDetail`;
 - `POST https://openapi.99food.com/v3/finance/finance/getShopBillWeek`.
 
 O body envia `acceptor_code=app_shop_id`, datas `YYYYMMDD`, `page_no` e `page_size=200`. Uma requisição cobre no máximo 31 dias; um backfill manual cobre no máximo três meses e é dividido em janelas não sobrepostas. Não há scheduler automático enquanto rate limits oficiais não estiverem disponíveis.
 
-Os dois endpoints exigem WhiteList especial. Negação de acesso é `FINANCE_ACCESS_NOT_ENABLED`, nunca uma coleção vazia nem um valor de R$ 0,00.
+Falhas reais de autenticação, autorização, negócio, provider, conteúdo inválido ou conteúdo inesperado não viram coleção vazia nem valor de R$ 0,00. A sincronização não pressupõe WhiteList financeira.
 
 IDs e timestamps de identidade (`orderId`, `dayPaymentId`, `weekPaymentId`, `shopId`, `businessTs`) são strings lossless desde o texto HTTP. O adapter protege também IDs numéricos dentro de `dayPaymentIDList` antes do `JSON.parse`. Valores monetários são strings inteiras no adapter e `BigInt` em centavos no banco; o sinal recebido é preservado.
 
@@ -28,7 +30,9 @@ IDs e timestamps de identidade (`orderId`, `dayPaymentId`, `weekPaymentId`, `sho
 
 `MarketplaceBillEntry` representa cada evento. Sua identidade é `(tenantId, provider, connectionId, orderId, orderType, businessTs)`. O mesmo pedido pode ter receita, refunds e ajustes distintos. `orderType=5` não exige pedido interno.
 
-`MarketplaceSettlement` representa um repasse. Sua identidade é `(tenantId, provider, weekPaymentId)`. A relação `MarketplaceSettlementDayPayment` persiste cada `dayPaymentId` de forma estruturada e única por repasse.
+`MarketplaceSettlement` representa um repasse por loja. Sua identidade é `(tenantId, provider, connectionId, weekPaymentId)`. A relação `MarketplaceSettlementDayPayment` persiste cada `dayPaymentId` de forma estruturada e única por repasse. `dayPaymentAmountList`, quando presente, fica preservado no payload bruto e não cria posting.
+
+Bill aceita os tipos 1, 2, 3, 4, 5, 8 e 9, preservando sempre o sinal recebido. VAT, apelação do merchant, perda de refeição, CNPJ e CERC são fatos auditáveis do provider; não são saldo nem lançamento por si só.
 
 A correlação permitida é exclusivamente:
 
@@ -67,5 +71,5 @@ A página Financeiro mostra bills e repasses separados, conta de destino, status
 ## Limites operacionais
 
 - Nenhum BillEntry é lançado individualmente no DRE nesta entrega, evitando duplicar venda/refund/comissão/repasse.
-- Homologação real depende da WhiteList e de uma fase explicitamente autorizada.
+- Homologação real depende de uma fase explicitamente autorizada com credenciais válidas; nenhuma chamada real faz parte dos testes locais.
 - Sync real, banco remoto, Dokploy e deploy não fazem parte da validação local deste contrato.

@@ -29,6 +29,8 @@ import { Food99TokenService } from './services/food99-token.service';
 import { Food99PollingService } from './services/food99-polling.service';
 import { Food99FinancialController } from './controllers/food99-financial.controller';
 import { Food99FinancialClientService } from './services/food99-financial-client.service';
+import { Food99FinancialTokenService } from './services/food99-financial-token.service';
+import { Food99CashConfirmationService } from './services/food99-cash-confirmation.service';
 import { Food99FinancialReconciliationService } from './services/food99-financial-reconciliation.service';
 import { MarketplaceCatalogMappingService } from './services/marketplace-catalog-mapping.service';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -83,6 +85,8 @@ const enableMarketplaceQueue =
     MarketplacePollingService,
     Food99PollingService,
     Food99FinancialClientService,
+    Food99FinancialTokenService,
+    Food99CashConfirmationService,
     Food99FinancialReconciliationService,
     MarketplaceCatalogMappingService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),

@@ -64,7 +64,7 @@ describe('Food99FinancialClientService', () => {
 
   it('uses the finance endpoint, Bearer token, exact acceptor_code and page_size 200', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(
-      '{"errno":0,"data":{"list":[],"total_page":1}}',
+      '{"errno":0,"data":{"data":[],"total_page":1}}',
       { status: 200 },
     ));
     const { service, connection } = makeService();
@@ -89,11 +89,11 @@ describe('Food99FinancialClientService', () => {
   it('paginates until total_page and stops safely on an empty page', async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(new Response(
-        '{"errno":0,"data":{"list":[{"weekPaymentId":9007199254740993}],"total_page":3}}',
+        '{"errno":0,"data":{"data":[{"weekPaymentId":9007199254740993}],"total_page":3}}',
         { status: 200 },
       ))
       .mockResolvedValueOnce(new Response(
-        '{"errno":0,"data":{"list":[],"total_page":3}}',
+        '{"errno":0,"data":{"data":[],"total_page":3}}',
         { status: 200 },
       ));
     const { service, connection } = makeService();
@@ -108,7 +108,7 @@ describe('Food99FinancialClientService', () => {
 
   it('accepts an official empty dataset with total_page zero', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(
-      '{"errno":0,"data":{"list":[],"total_page":0}}',
+      '{"errno":0,"data":{"data":[],"total_page":0}}',
       { status: 200 },
     ));
     const { service, connection } = makeService();
@@ -123,7 +123,7 @@ describe('Food99FinancialClientService', () => {
   it('refreshes an expired Bearer token once before accepting a financial page', async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(new Response('{"errno":401}', { status: 401 }))
-      .mockResolvedValueOnce(new Response('{"errno":0,"data":{"list":[],"total_page":1}}', { status: 200 }));
+      .mockResolvedValueOnce(new Response('{"errno":0,"data":{"data":[],"total_page":1}}', { status: 200 }));
     const { service, connection, tokens } = makeService();
     tokens.getAccessToken.mockResolvedValueOnce('expired-token').mockResolvedValueOnce('fresh-token');
     await expect(service.fetchBillEntries(
@@ -131,16 +131,16 @@ describe('Food99FinancialClientService', () => {
       { startDate: '2026-09-01', endDate: '2026-09-12' },
       'correlation-1',
     )).resolves.toEqual([]);
-    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, connection, true);
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, true);
     expect((global.fetch as jest.Mock).mock.calls[1][1].headers).toMatchObject({
       authorization: 'Bearer fresh-token',
     });
   });
 
-  it('maps special access denial to FINANCE_ACCESS_NOT_ENABLED instead of an empty dataset', async () => {
+  it('surfaces a business errno without converting it to a whitelist assumption', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(
-      '{"errno":403,"errmsg":"shop is not in finance whitelist"}',
-      { status: 403 },
+      '{"errno":10050,"errmsg":"provider business rejection"}',
+      { status: 200 },
     ));
     const { service, connection } = makeService();
     const promise = service.fetchBillEntries(
@@ -149,7 +149,7 @@ describe('Food99FinancialClientService', () => {
       'correlation-1',
     );
     await expect(promise).rejects.toMatchObject<Partial<Food99ApiError>>({
-      providerCode: 'FINANCE_ACCESS_NOT_ENABLED',
+      providerCode: 'provider business rejection',
     });
   });
 
@@ -164,6 +164,34 @@ describe('Food99FinancialClientService', () => {
       { startDate: '2026-09-01', endDate: '2026-09-12' },
       'correlation-1',
     )).rejects.toMatchObject({ retryable: true, httpStatus: 500 });
+  });
+
+  it('rejects an explicit non-JSON financial response before interpreting it as an empty result', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('<html>upstream error</html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    }));
+    const { service, connection } = makeService();
+    await expect(service.fetchSettlements(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-1',
+    )).rejects.toMatchObject({ providerCode: 'UNEXPECTED_CONTENT_TYPE' });
+  });
+
+  it('retains an alternate provider error description as diagnostics without treating it as success', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"error_code":10050,"error_description":"provider business rejection"}',
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-09-01', endDate: '2026-09-12' },
+      'correlation-1',
+    )).rejects.toMatchObject<Partial<Food99ApiError>>({
+      providerCode: '10050',
+    });
   });
 
   it('preserves the global 99Food kill switch before any provider request', async () => {

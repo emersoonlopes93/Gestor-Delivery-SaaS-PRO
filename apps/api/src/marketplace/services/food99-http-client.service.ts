@@ -103,6 +103,13 @@ export class Food99HttpClientService {
     return { accepted: true as const, httpStatus: 200 };
   }
 
+  async confirmCashPayment(connection: MarketplaceConnection, externalOrderId: string, correlationId: string) {
+    await this.requestStandard(connection, {
+      method: 'POST', path: '/v1/order/order/payConfirm', externalOrderId, correlationId,
+    });
+    return { accepted: true as const, httpStatus: 200 };
+  }
+
   async readyOrder(connection: MarketplaceConnection, externalOrderId: string, correlationId: string) {
     await this.requestStandard(connection, { method: 'GET', path: '/v1/order/order/ready', externalOrderId, correlationId });
     return { accepted: true as const, httpStatus: 200 };
@@ -150,7 +157,7 @@ export class Food99HttpClientService {
     const payload = this.asRecord(await this.readNativeUnknown(response));
     if (response.status !== 200 || payload?.errno !== 0) {
       this.logNativeRejection({ endpoint: input.path, correlationId: input.correlationId, httpStatus: response.status, payload });
-      throw new Food99ApiError('99Food native request failed.', response.status === 429 || response.status >= 500, response.status, typeof payload?.errmsg === 'string' ? payload.errmsg : undefined);
+      throw new Food99ApiError('99Food native request failed.', response.status === 429 || response.status >= 500, response.status, typeof payload?.errno === 'number' ? String(payload.errno) : typeof payload?.errmsg === 'string' ? payload.errmsg : undefined);
     }
     return payload?.data as T;
   }

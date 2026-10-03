@@ -30,15 +30,33 @@ import {
 
 type ParsedBillEntry = {
   orderId: string;
-  orderType: 1 | 2 | 3 | 4 | 5;
+  orderType: 1 | 2 | 3 | 4 | 5 | 8 | 9;
+  orderIndex: string | null;
+  deliveryType: number | null;
   businessTs: string;
   businessAt: Date | null;
   dayPaymentId: string;
   commissionAmount: bigint;
+  mealOriginalAmount: bigint | null;
+  shopDeliveryAmount: bigint | null;
+  shopPreTips: bigint | null;
+  freeDeliveryOutcome: bigint | null;
+  freeDeliverySubsidy: bigint | null;
+  commissionBaseAmount: bigint | null;
+  commissionSubsidyAmount: bigint | null;
+  b2pDeliveryAmount: bigint | null;
+  payCommissionAmount: bigint | null;
+  minValueDifferenceAmount: bigint | null;
   settlementAmount: bigint;
   orderAmount: bigint;
   shopActivityOutcome: bigint;
   shopActivitySubsidy: bigint;
+  mealLossDeductAmount: bigint | null;
+  vatAmount: bigint | null;
+  merchantAppealAmount: bigint | null;
+  monthlyServicePrice: bigint | null;
+  gmv: bigint | null;
+  monthlyServiceBasePrice: bigint | null;
   expectSettleDate: Date | null;
   rawPayload: Prisma.InputJsonValue;
 };
@@ -52,6 +70,10 @@ type ParsedSettlement = {
   settleStartDate: Date;
   settleEndDate: Date;
   currency: string;
+  payeeCnpj: string | null;
+  payerCnpj: string | null;
+  cnpjWithdrawAmount: bigint | null;
+  cercAmount: bigint | null;
   dayPaymentIds: string[];
   rawPayload: Prisma.InputJsonValue;
 };
@@ -115,12 +137,7 @@ export class Food99FinancialReconciliationService {
       return result;
     } catch (error) {
       if (error instanceof Food99ApiError) {
-        if (error.providerCode === 'FINANCE_ACCESS_NOT_ENABLED') {
-          throw new ForbiddenException({
-            message: 'A integracao financeira da 99Food requer liberacao/WhiteList.',
-            error: 'FINANCE_ACCESS_NOT_ENABLED',
-          });
-        }
+        if (error.httpStatus === 401 || error.httpStatus === 403) throw new ForbiddenException({ message: 'A autenticacao financeira da 99Food foi recusada.', error: 'FOOD99_FINANCIAL_AUTH_ERROR' });
         throw new BadGatewayException({
           message: error.message,
           error: error.providerCode || 'FOOD99_FINANCIAL_PROVIDER_ERROR',
@@ -326,13 +343,31 @@ export class Food99FinancialReconciliationService {
       where: { tenantId_provider_connectionId_orderId_orderType_businessTs: identity },
       create: { ...identity, ...parsed },
       update: {
+        orderIndex: parsed.orderIndex,
+        deliveryType: parsed.deliveryType,
         businessAt: parsed.businessAt,
         dayPaymentId: parsed.dayPaymentId,
         commissionAmount: parsed.commissionAmount,
+        mealOriginalAmount: parsed.mealOriginalAmount,
+        shopDeliveryAmount: parsed.shopDeliveryAmount,
+        shopPreTips: parsed.shopPreTips,
+        freeDeliveryOutcome: parsed.freeDeliveryOutcome,
+        freeDeliverySubsidy: parsed.freeDeliverySubsidy,
+        commissionBaseAmount: parsed.commissionBaseAmount,
+        commissionSubsidyAmount: parsed.commissionSubsidyAmount,
+        b2pDeliveryAmount: parsed.b2pDeliveryAmount,
+        payCommissionAmount: parsed.payCommissionAmount,
+        minValueDifferenceAmount: parsed.minValueDifferenceAmount,
         settlementAmount: parsed.settlementAmount,
         orderAmount: parsed.orderAmount,
         shopActivityOutcome: parsed.shopActivityOutcome,
         shopActivitySubsidy: parsed.shopActivitySubsidy,
+        mealLossDeductAmount: parsed.mealLossDeductAmount,
+        vatAmount: parsed.vatAmount,
+        merchantAppealAmount: parsed.merchantAppealAmount,
+        monthlyServicePrice: parsed.monthlyServicePrice,
+        gmv: parsed.gmv,
+        monthlyServiceBasePrice: parsed.monthlyServiceBasePrice,
         expectSettleDate: parsed.expectSettleDate,
         rawPayload: parsed.rawPayload,
       },
@@ -351,9 +386,10 @@ export class Food99FinancialReconciliationService {
       return await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       const existing = await tx.marketplaceSettlement.findUnique({
         where: {
-          tenantId_provider_weekPaymentId: {
+          tenantId_provider_connectionId_weekPaymentId: {
             tenantId,
             provider: MarketplaceProvider.FOOD_99,
+            connectionId,
             weekPaymentId: parsed.weekPaymentId,
           },
         },
@@ -497,6 +533,10 @@ export class Food99FinancialReconciliationService {
       settleStartDate: settlement.settleStartDate.toISOString(),
       settleEndDate: settlement.settleEndDate.toISOString(),
       currency: settlement.currency,
+      payeeCnpj: settlement.payeeCnpj,
+      payerCnpj: settlement.payerCnpj,
+      cnpjWithdrawAmountCents: settlement.cnpjWithdrawAmount?.toString() ?? null,
+      cercAmountCents: settlement.cercAmount?.toString() ?? null,
       status: settlement.status,
       financialTransactionId: settlement.financialTransactionId,
       postedAt: settlement.postedAt?.toISOString() ?? null,
@@ -511,21 +551,39 @@ export class Food99FinancialReconciliationService {
 
 function parseBillEntry(record: Food99FinancialRecord): ParsedBillEntry {
   const orderType = requiredInteger(record, 'orderType');
-  if (![1, 2, 3, 4, 5].includes(orderType)) {
+  if (![1, 2, 3, 4, 5, 8, 9].includes(orderType)) {
     throw new BadGatewayException(`99Food returned unsupported orderType ${orderType}.`);
   }
   const businessTs = requiredLosslessString(record, 'businessTs');
   return {
     orderId: requiredLosslessString(record, 'orderId'),
-    orderType: orderType as 1 | 2 | 3 | 4 | 5,
+    orderType: orderType as 1 | 2 | 3 | 4 | 5 | 8 | 9,
+    orderIndex: optionalLosslessString(record.orderIndex),
+    deliveryType: optionalInteger(record.deliveryType),
     businessTs,
     businessAt: parseOptionalTimestamp(businessTs),
     dayPaymentId: requiredLosslessString(record, 'dayPaymentId'),
     commissionAmount: requiredCents(record, 'commissionAmount'),
+    mealOriginalAmount: optionalCents(record, 'mealOriginalAmount'),
+    shopDeliveryAmount: optionalCents(record, 'shopDeliveryAmount'),
+    shopPreTips: optionalCents(record, 'shopPreTips'),
+    freeDeliveryOutcome: optionalCents(record, 'freeDeliveryOutcome'),
+    freeDeliverySubsidy: optionalCents(record, 'freeDeliverySubsidy'),
+    commissionBaseAmount: optionalCents(record, 'commissionBaseAmount'),
+    commissionSubsidyAmount: optionalCents(record, 'commissionSubsidyAmount'),
+    b2pDeliveryAmount: optionalCents(record, 'b2pDeliveryAmount'),
+    payCommissionAmount: optionalCents(record, 'payCommissionAmount'),
+    minValueDifferenceAmount: optionalCents(record, 'minValueDifferenceAmount'),
     settlementAmount: requiredCents(record, 'settlementAmount'),
     orderAmount: requiredCents(record, 'orderAmount'),
     shopActivityOutcome: requiredCents(record, 'shopActivityOutcome'),
     shopActivitySubsidy: requiredCents(record, 'shopActivitySubsidy'),
+    mealLossDeductAmount: optionalCents(record, 'mealLossDeductAmount'),
+    vatAmount: optionalCents(record, 'vatAmount'),
+    merchantAppealAmount: optionalCents(record, 'merchantAppealAmount'),
+    monthlyServicePrice: optionalCents(record, 'monthlyServicePrice'),
+    gmv: optionalCents(record, 'gmv'),
+    monthlyServiceBasePrice: optionalCents(record, 'monthlyServiceBasePrice'),
     expectSettleDate: optionalProviderDate(record.expectSettleDate, 'expectSettleDate'),
     rawPayload: record as Prisma.InputJsonValue,
   };
@@ -546,6 +604,10 @@ function parseSettlement(record: Food99FinancialRecord): ParsedSettlement {
     settleStartDate: requiredProviderDate(record.settleStartDate, 'settleStartDate'),
     settleEndDate: requiredProviderDate(record.settleEndDate, 'settleEndDate'),
     currency: requiredText(record, 'currency').toUpperCase(),
+    payeeCnpj: optionalText(record.payeeCnpj),
+    payerCnpj: optionalText(record.payerCnpj) ?? optionalText(record.payerCNpj),
+    cnpjWithdrawAmount: optionalCents(record, 'cnpjWithdrawAmount'),
+    cercAmount: optionalCents(record, 'cercAmount'),
     dayPaymentIds,
     rawPayload: record as Prisma.InputJsonValue,
   };
@@ -561,6 +623,10 @@ function settlementFacts(parsed: ParsedSettlement) {
     settleStartDate: parsed.settleStartDate,
     settleEndDate: parsed.settleEndDate,
     currency: parsed.currency,
+    payeeCnpj: parsed.payeeCnpj,
+    payerCnpj: parsed.payerCnpj,
+    cnpjWithdrawAmount: parsed.cnpjWithdrawAmount,
+    cercAmount: parsed.cercAmount,
     rawPayload: parsed.rawPayload,
   };
 }
@@ -620,12 +686,30 @@ function requiredInteger(record: Food99FinancialRecord, field: string): number {
   return value;
 }
 
+function optionalInteger(value: unknown): number | null {
+  return value === undefined || value === null ? null : (typeof value === 'number' && Number.isInteger(value) ? value : null);
+}
+
+function optionalLosslessString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function optionalText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
 function requiredCents(record: Food99FinancialRecord, field: string): bigint {
   const value = record[field];
   if (typeof value !== 'string' || !/^-?\d+$/.test(value)) {
     throw new BadGatewayException(`99Food money field ${field} must be integer cents.`);
   }
   return BigInt(value);
+}
+
+function optionalCents(record: Food99FinancialRecord, field: string): bigint | null {
+  const value = record[field];
+  if (value === undefined || value === null || value === '') return null;
+  return requiredCents(record, field);
 }
 
 function parseOptionalTimestamp(value: string): Date | null {
@@ -664,6 +748,8 @@ function mapBillEntry(entry: {
   id: string;
   orderId: string;
   orderType: number;
+  orderIndex: string | null;
+  deliveryType: number | null;
   businessTs: string;
   businessAt: Date | null;
   dayPaymentId: string;
@@ -672,12 +758,17 @@ function mapBillEntry(entry: {
   orderAmount: bigint;
   shopActivityOutcome: bigint;
   shopActivitySubsidy: bigint;
+  mealLossDeductAmount: bigint | null;
+  vatAmount: bigint | null;
+  merchantAppealAmount: bigint | null;
   expectSettleDate: Date | null;
 }): Food99BillEntryDTO {
   return {
     id: entry.id,
     orderId: entry.orderId,
-    orderType: entry.orderType as 1 | 2 | 3 | 4 | 5,
+    orderType: entry.orderType as 1 | 2 | 3 | 4 | 5 | 8 | 9,
+    orderIndex: entry.orderIndex,
+    deliveryType: entry.deliveryType,
     businessTs: entry.businessTs,
     businessAt: entry.businessAt?.toISOString() ?? null,
     dayPaymentId: entry.dayPaymentId,
@@ -686,6 +777,9 @@ function mapBillEntry(entry: {
     orderAmountCents: entry.orderAmount.toString(),
     shopActivityOutcomeCents: entry.shopActivityOutcome.toString(),
     shopActivitySubsidyCents: entry.shopActivitySubsidy.toString(),
+    mealLossDeductAmountCents: entry.mealLossDeductAmount?.toString() ?? null,
+    vatAmountCents: entry.vatAmount?.toString() ?? null,
+    merchantAppealAmountCents: entry.merchantAppealAmount?.toString() ?? null,
     expectSettleDate: entry.expectSettleDate?.toISOString() ?? null,
   };
 }

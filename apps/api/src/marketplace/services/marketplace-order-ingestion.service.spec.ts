@@ -18,6 +18,12 @@ function reconcileFood99Lifecycle(service: MarketplaceOrderIngestionService, inp
   return (candidate as (request: Food99LifecycleInput) => Promise<void>).call(service, input);
 };
 
+function reconcileFood99DetailsCompletion(service: MarketplaceOrderIngestionService, input: Record<string, unknown>): Promise<void> {
+  const candidate: unknown = Reflect.get(service, 'reconcileFood99DetailsCompletion');
+  if (typeof candidate !== 'function') throw new Error('99Food detail-status reconciler is unavailable.');
+  return (candidate as (request: Record<string, unknown>) => Promise<void>).call(service, input);
+}
+
 function applyFood99DeliveryStatus(service: MarketplaceOrderIngestionService, input: {
   tenantId: string;
   connectionId: string;
@@ -91,6 +97,25 @@ describe('MarketplaceOrderIngestionService', () => {
       customerName: 'Cliente 99Food',
       items: [{ name: 'Pizza' }],
     })).toBe(true);
+  });
+
+  it('reconciles official Order Details status 600 through the canonical terminal transition', async () => {
+    const tx = {
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = {
+      order: { findFirst: jest.fn().mockResolvedValue({ status: OrderStatus.out_for_delivery, fulfillmentType: 'delivery' }) },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    };
+    const ordersService = { updateOrderStatus: jest.fn(), applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}) };
+    const { service } = makeFood99LifecycleService(prisma, ordersService);
+    await reconcileFood99DetailsCompletion(service, {
+      tenantId: 'tenant-1', marketplaceOrderId: 'marketplace-order-1', internalOrderId: 'order-1', externalOrderId: '5764687916991317793', externalStatus: '600', rawPayload: { complete_time: '1768815260' },
+    });
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledWith(tx, expect.objectContaining({ targetStatus: OrderStatus.completed, transitionPolicy: 'food99_authoritative' }));
+    expect(tx.orderTimeline.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ createdAt: new Date('2026-01-19T09:34:20.000Z') }) }));
   });
 
   it('advances orderConfirm through preparing exactly once for the canonical KDS entry point', async () => {

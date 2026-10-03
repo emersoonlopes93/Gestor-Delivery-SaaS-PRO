@@ -27,6 +27,13 @@ describe('Food99HttpClientService native V1 actions', () => {
     expect(String(request.body)).not.toContain(`"order_id":"${orderId}"`);
   });
 
+  it('confirms eligible cash payment through the native payConfirm endpoint', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: true }), { status: 200 }));
+    const { service, connection } = makeService();
+    await expect(service.confirmCashPayment(connection, '5764656197621845665', 'correlation-1')).resolves.toEqual({ accepted: true, httpStatus: 200 });
+    expect(String((global.fetch as jest.Mock).mock.calls[0][0])).toBe('https://food99.test/v1/order/order/payConfirm');
+  });
+
   it.each([
     [{ errno: 3, errmsg: 'rejected', data: true }, '99Food native request failed.'],
     [{ errno: 0, data: false }, '99Food did not confirm the order.'],

@@ -80,8 +80,8 @@ describe('Food99FinancialReconciliationService', () => {
     return { service, prisma, client, tx };
   }
 
-  it.each([1, 2, 3, 4, 5])('ingests orderType %s without changing provider money signs', async (orderType) => {
-    const settlementAmount = orderType === 2 || orderType === 3 || orderType === 4 ? '-1000' : '5000';
+  it.each([1, 2, 3, 4, 5, 8, 9])('ingests orderType %s without changing provider money signs', async (orderType) => {
+    const settlementAmount = orderType === 2 || orderType === 3 || orderType === 4 || orderType === 8 ? '-1000' : '5000';
     const { service, prisma } = setup({ bills: [{ ...baseBill, orderType, settlementAmount }] });
     await service.sync('tenant-1', {
       connectionId: 'connection-1',
@@ -126,8 +126,9 @@ describe('Food99FinancialReconciliationService', () => {
     });
   });
 
-  it('persists one structured settlement with signed cents and multiple dayPaymentIds', async () => {
-    const { service, tx } = setup({ settlements: [baseSettlement, baseSettlement] });
+  it('persists one structured settlement with signed cents, CNPJ/CERC and multiple dayPaymentIds', async () => {
+    const settlement = { ...baseSettlement, payeeCnpj: '12345678000199', payerCNpj: '99887766000100', cnpjWithdrawAmount: '4100', cercAmount: '-100' };
+    const { service, tx } = setup({ settlements: [settlement, settlement] });
     const result = await service.sync('tenant-1', {
       connectionId: 'connection-1',
       startDate: '2026-09-01',
@@ -143,6 +144,10 @@ describe('Food99FinancialReconciliationService', () => {
         withdrawDate: new Date('2026-09-12T00:00:00.000Z'),
         shopId: baseSettlement.shopId,
         currency: 'BRL',
+        payeeCnpj: '12345678000199',
+        payerCnpj: '99887766000100',
+        cnpjWithdrawAmount: 4100n,
+        cercAmount: -100n,
         dayPayments: { create: [
           { dayPaymentId: '1945389697417496990' },
           { dayPaymentId: '1945389697417496991' },

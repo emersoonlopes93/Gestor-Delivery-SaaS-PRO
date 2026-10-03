@@ -167,6 +167,7 @@ export class MarketplaceOrderIngestionService {
           topic: inbox.topic,
         },
       );
+      let internalOrderId = marketplaceOrder.internalOrderId;
       if (catalogResolution.unmappedExternalItemIds.length > 0) {
         await this.divergenceService.record({
           tenantId: connection.tenantId,
@@ -217,7 +218,7 @@ export class MarketplaceOrderIngestionService {
         }
       }
       if (!marketplaceOrder.internalOrderId) {
-        const internalOrderId = await this.createInternalOrderFromNormalized(catalogResolution.order);
+        internalOrderId = await this.createInternalOrderFromNormalized(catalogResolution.order);
         await this.prisma.marketplaceOrder.update({
           where: {
             connectionId_provider_externalOrderId: {
@@ -254,6 +255,16 @@ export class MarketplaceOrderIngestionService {
       }
 
       await this.applyLifecycleForInbox(connection.tenantId, connection.id, externalOrderId, inbox.topic, inbox.rawPayload);
+      if (catalogResolution.order.provider === MarketplaceProvider.FOOD_99 && internalOrderId) {
+        await this.reconcileFood99DetailsCompletion({
+          tenantId: connection.tenantId,
+          marketplaceOrderId: marketplaceOrder.id,
+          internalOrderId,
+          externalOrderId,
+          externalStatus: catalogResolution.order.externalStatus,
+          rawPayload: catalogResolution.order.rawPayload,
+        });
+      }
 
       await this.markInboxProcessed(inbox.id);
     } catch (error) {
@@ -924,7 +935,7 @@ export class MarketplaceOrderIngestionService {
     const data = this.asRecord(rawPayload)?.data;
     const delivery = this.asRecord(data);
     const deliveryStatus = this.readRecordString(delivery, ['delivery_status']);
-    if (!deliveryStatus || !['120', '130', '140', '150', '160', '170', '180'].includes(deliveryStatus)) return;
+    if (!deliveryStatus || !['120', '130', '140', '150', '160', '170', '180', '190'].includes(deliveryStatus)) return;
 
     const marketplaceOrder = await this.prisma.marketplaceOrder.findFirst({
       where: { tenantId, connectionId, provider: MarketplaceProvider.FOOD_99, externalOrderId },
@@ -1174,6 +1185,30 @@ export class MarketplaceOrderIngestionService {
     }
   }
 
+  private async reconcileFood99DetailsCompletion(input: {
+    tenantId: string;
+    marketplaceOrderId: string;
+    internalOrderId: string;
+    externalOrderId: string;
+    externalStatus: string | null;
+    rawPayload: Record<string, unknown>;
+  }): Promise<void> {
+    if (input.externalStatus !== '600') return;
+    const order = await this.prisma.order.findFirst({
+      where: { id: input.internalOrderId, tenantId: input.tenantId },
+      select: { status: true, fulfillmentType: true },
+    });
+    if (!order) return;
+    const completedAt = this.readFood99CompletionTime(input.rawPayload);
+    await this.reconcileFood99AuthoritativeStatus({
+      ...input,
+      topic: 'ORDER_DETAILS:600',
+      currentStatus: order.status,
+      fulfillmentType: order.fulfillmentType,
+      externalCompletedAt: completedAt,
+    }, OrderStatus.completed, '99Food confirmou a conclusão no detalhe oficial do pedido.');
+  }
+
   private async advanceFood99OperationalOrder(
     input: {
       tenantId: string;
@@ -1216,6 +1251,7 @@ export class MarketplaceOrderIngestionService {
       topic?: string;
       currentStatus: OrderStatus;
       fulfillmentType: string;
+      externalCompletedAt?: Date | null;
     },
     targetStatus: OrderStatus,
     note: string,
@@ -1243,6 +1279,7 @@ export class MarketplaceOrderIngestionService {
             status: targetStatus,
             note,
             actorId: null,
+            ...(input.externalCompletedAt ? { createdAt: input.externalCompletedAt } : {}),
           },
         });
         await tx.marketplaceOrder.updateMany({
@@ -1272,6 +1309,16 @@ export class MarketplaceOrderIngestionService {
       where: { id: marketplaceOrderId, tenantId },
       data: { statusInternal: status, lastSyncedAt: new Date() },
     });
+  }
+
+  private readFood99CompletionTime(rawPayload: Record<string, unknown>): Date | null {
+    const rawValue = rawPayload.complete_time;
+    const value = typeof rawValue === 'string' ? rawValue : typeof rawValue === 'number' && Number.isSafeInteger(rawValue) ? String(rawValue) : null;
+    if (!value || !/^\d+$/.test(value)) return null;
+    const seconds = Number(value);
+    if (!Number.isSafeInteger(seconds)) return null;
+    const date = new Date(seconds * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 
   private isOrderStatusStaleError(error: unknown): boolean {

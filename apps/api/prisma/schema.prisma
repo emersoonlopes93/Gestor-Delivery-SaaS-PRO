@@ -2021,15 +2021,33 @@ model MarketplaceBillEntry {
   provider              MarketplaceProvider
   connectionId          String                @map("connection_id")
   orderId               String                @map("order_id") @db.VarChar(120)
+  orderIndex            String?               @map("order_index") @db.VarChar(120)
   orderType             Int                   @map("order_type")
+  deliveryType          Int?                  @map("delivery_type")
   businessTs            String                @map("business_ts") @db.VarChar(120)
   businessAt            DateTime?             @map("business_at")
   dayPaymentId          String                @map("day_payment_id") @db.VarChar(120)
   commissionAmount      BigInt                @map("commission_amount")
+  mealOriginalAmount    BigInt?               @map("meal_original_amount")
+  shopDeliveryAmount    BigInt?               @map("shop_delivery_amount")
+  shopPreTips           BigInt?               @map("shop_pre_tips")
+  freeDeliveryOutcome   BigInt?               @map("free_delivery_outcome")
+  freeDeliverySubsidy   BigInt?               @map("free_delivery_subsidy")
+  commissionBaseAmount  BigInt?               @map("commission_base_amount")
+  commissionSubsidyAmount BigInt?             @map("commission_subsidy_amount")
+  b2pDeliveryAmount     BigInt?               @map("b2p_delivery_amount")
+  payCommissionAmount   BigInt?               @map("pay_commission_amount")
+  minValueDifferenceAmount BigInt?            @map("min_value_difference_amount")
   settlementAmount      BigInt                @map("settlement_amount")
   orderAmount           BigInt                @map("order_amount")
   shopActivityOutcome   BigInt                @map("shop_activity_outcome")
   shopActivitySubsidy   BigInt                @map("shop_activity_subsidy")
+  mealLossDeductAmount  BigInt?               @map("meal_loss_deduct_amount")
+  vatAmount             BigInt?               @map("vat_amount")
+  merchantAppealAmount  BigInt?               @map("merchant_appeal_amount")
+  monthlyServicePrice   BigInt?               @map("monthly_service_price")
+  gmv                   BigInt?               @map("gmv")
+  monthlyServiceBasePrice BigInt?             @map("monthly_service_base_price")
   expectSettleDate      DateTime?             @map("expect_settle_date")
   rawPayload            Json?                 @map("raw_payload")
   createdAt             DateTime              @default(now()) @map("created_at")
@@ -2056,6 +2074,10 @@ model MarketplaceSettlement {
   settleStartDate        DateTime                    @map("settle_start_date")
   settleEndDate          DateTime                    @map("settle_end_date")
   currency               String                      @db.VarChar(12)
+  payeeCnpj              String?                     @map("payee_cnpj") @db.VarChar(32)
+  payerCnpj              String?                     @map("payer_cnpj") @db.VarChar(32)
+  cnpjWithdrawAmount     BigInt?                     @map("cnpj_withdraw_amount")
+  cercAmount             BigInt?                     @map("cerc_amount")
   status                 MarketplaceSettlementStatus @default(LIQUIDATED_UNPOSTED)
   financialTransactionId String?                     @unique @map("financial_transaction_id")
   postedAt               DateTime?                   @map("posted_at")
@@ -2069,7 +2091,7 @@ model MarketplaceSettlement {
   financialTransaction   FinancialTransaction?       @relation("MarketplaceSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
   dayPayments            MarketplaceSettlementDayPayment[]
 
-  @@unique([tenantId, provider, weekPaymentId], map: "marketplace_settlement_identity_key")
+  @@unique([tenantId, provider, connectionId, weekPaymentId], map: "marketplace_settlement_identity_key")
   @@index([tenantId, provider, connectionId, withdrawDate], map: "marketplace_settlement_withdraw_date_idx")
   @@index([tenantId, status], map: "marketplace_settlement_status_idx")
   @@map("marketplace_settlements")
@@ -4295,6 +4317,7 @@ enum MarketplacePollingStatus {
 
 enum MarketplaceOperationType {
   CONFIRM
+  PAY_CONFIRM
   READY
   DISPATCH
   DELIVER

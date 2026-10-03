@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketplaceConnection } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
-import { Food99TokenService } from './food99-token.service';
+import { Food99FinancialTokenService } from './food99-financial-token.service';
 
 export type Food99FinancialRecord = Record<string, unknown>;
 
@@ -13,15 +13,33 @@ export type Food99FinancialWindow = {
 
 const FINANCIAL_IDENTIFIER_FIELDS = [
   'orderId',
+  'orderIndex',
   'dayPaymentId',
   'weekPaymentId',
   'shopId',
   'acceptor_code',
   'businessTs',
+  'businessDateTime',
 ] as const;
 
 const FINANCIAL_MONEY_FIELDS = [
   'commissionAmount',
+  'mealOriginalAmount',
+  'shopDeliveryAmount',
+  'shopPreTips',
+  'freeDeliveryOutcome',
+  'freeDeliverySubsidy',
+  'commissionBaseAmount',
+  'commissionSubsidyAmount',
+  'b2pDeliveryAmount',
+  'payCommissionAmount',
+  'minValueDifferenceAmount',
+  'mealLossDeductAmount',
+  'vatAmount',
+  'merchantAppealAmount',
+  'monthlyServicePrice',
+  'gmv',
+  'monthlyServiceBasePrice',
   'settlementAmount',
   'orderAmount',
   'shopActivityOutcome',
@@ -100,7 +118,7 @@ export function splitFood99FinancialBackfill(
 export class Food99FinancialClientService {
   constructor(
     private readonly config: ConfigService,
-    private readonly tokens: Food99TokenService,
+    private readonly tokens: Food99FinancialTokenService,
   ) {}
 
   fetchBillEntries(
@@ -154,7 +172,7 @@ export class Food99FinancialClientService {
       );
     }
 
-    let token = await this.tokens.getAccessToken(connection);
+    let token = await this.tokens.getAccessToken();
     const all: Food99FinancialRecord[] = [];
     let pageNo = 1;
     let totalPages = 1;
@@ -168,9 +186,17 @@ export class Food99FinancialClientService {
       };
       let response = await this.execute(connection, token, path, correlationId, body);
       if (response.status === 401) {
-        token = await this.tokens.getAccessToken(connection, true);
+        token = await this.tokens.getAccessToken(true);
         response = await this.execute(connection, token, path, correlationId, body);
-        if (response.status === 401) await this.tokens.markAuthenticationFailed(connection);
+      }
+      const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+      if (contentType.includes('text/html') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
+        throw new Food99ApiError(
+          '99Food financial API returned an unexpected content type.',
+          false,
+          502,
+          'UNEXPECTED_CONTENT_TYPE',
+        );
       }
       const raw = await response.text();
       const payload = this.asRecord(this.tryParse(raw));
@@ -229,13 +255,11 @@ export class Food99FinancialClientService {
 
   private isProviderSuccess(payload: Record<string, unknown> | null): boolean {
     if (!payload) return false;
-    if (typeof payload.errno === 'number') return payload.errno === 0;
-    if (typeof payload.code === 'number') return payload.code === 0 || payload.code === 200;
-    return payload.data !== undefined;
+    return typeof payload.errno === 'number' && payload.errno === 0 && payload.data !== undefined;
   }
 
   private readRows(data: Record<string, unknown> | null): Food99FinancialRecord[] {
-    const candidate = data?.list ?? data?.records ?? data?.items;
+    const candidate = data?.data ?? data?.list ?? data?.records ?? data?.items;
     if (!Array.isArray(candidate)) {
       throw new Food99ApiError(
         '99Food financial response does not contain a paged record list.',
@@ -284,17 +308,19 @@ export class Food99FinancialClientService {
     httpStatus: number,
     payload: Record<string, unknown> | null,
   ): Food99ApiError {
-    const providerMessage = [payload?.errmsg, payload?.message]
+    const providerMessage = [payload?.errmsg, payload?.message, payload?.error_description]
       .find((value): value is string => typeof value === 'string');
-    const whitelistDenied = httpStatus === 403
-      || Boolean(providerMessage?.toLowerCase().includes('whitelist'));
+    const errno = typeof payload?.errno === 'number' ? payload.errno : null;
+    const providerCode = typeof payload?.error_code === 'number' ? String(payload.error_code) : null;
     return new Food99ApiError(
-      whitelistDenied
-        ? 'A integracao financeira da 99Food requer liberacao/WhiteList.'
-        : `99Food financial request failed with HTTP ${httpStatus}.`,
+      errno !== null
+        ? `99Food financial request was rejected (errno ${errno}).`
+        : providerCode
+          ? `99Food financial request was rejected (code ${providerCode}).`
+          : `99Food financial request failed with HTTP ${httpStatus}.`,
       httpStatus === 429 || httpStatus >= 500,
       httpStatus,
-      whitelistDenied ? 'FINANCE_ACCESS_NOT_ENABLED' : providerMessage,
+      providerCode ?? providerMessage ?? undefined,
     );
   }
 

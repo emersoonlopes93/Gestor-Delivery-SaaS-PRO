@@ -2717,3 +2717,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - `ProductOptionItemPrice` é tratado como override local apenas de `price`, `costPrice` e `isActive`; não há escrita de semântica global do `OptionItem`. A rota de reset remove o registro de override, sem copiar preço global nem editar o item mestre.
 - Produto, item ativo não arquivado e vínculo item-grupo-produto são validados dentro da transação serializável antes de qualquer upsert/delete. Overrides iguais ao `priceImpactValue` global são removidos, para que mudanças globais futuras sejam herdadas novamente.
 - Audit e invalidação de cache ocorrem somente após commit. Não houve migration, mudança no pricing canônico, Product.type, Pizza, Combo, archive/restore ou outbox.
+## 99Food contract closure (2026-10-02)
+
+- Financeiro 99Food usa token de aplicação separado via `v3/auth/authtoken/signIn`; o cache em memória respeita `expiresIn` e não grava nem substitui o token operacional por loja.
+- Bill Data aceita o envelope oficial `errno` + `data.data`, os tipos 1/2/3/4/5/8/9 e preserva sinal. VAT, apelação, perda de refeição, CNPJ/CERC e demais fatos novos permanecem somente explicativos; Bill nunca posta saldo.
+- Settlement passou a ser único por tenant/provider/conexão/weekPaymentId. A migration é aditiva para campos e substitui somente a constraint de identidade, cuja forma anterior já impedia colisões históricas.
+- Order Details com status nativo 600 chega à transição canônica de conclusão; cash 99Food usa `shop_paid_money` para entrega da plataforma e `customer_need_paying_money` para entrega própria. `payConfirm` é explícito, protegido por elegibilidade/idempotência e não cria lançamento financeiro.
+- ACK de webhook permanece deliberadamente inalterado (`204`), pois esta entrega não reabre seu contrato específico. Nenhuma chamada real à 99Food, banco remoto, deploy ou merge foi executado.

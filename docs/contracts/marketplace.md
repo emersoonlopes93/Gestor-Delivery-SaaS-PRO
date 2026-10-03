@@ -258,7 +258,7 @@ The native `OrderModel` payment source is `pay_channel`, with the documented leg
 
 ### Native financial and collection semantics (2026-09-09)
 
-`price.order_price` is the gross product sale. `price.customer_need_paying_money` is the customer's payable total; it is not payment evidence by itself. Detailed `pay_channel` takes precedence over legacy `pay_type` when classifying collection. Online channels (`150`, `212`, `280`) establish marketplace collection and a paid customer amount, so `amountToCollect=0`. Cash/POS delivery channels (`153`, `154`, `262`, `263`) establish pending driver collection for the exact customer payable amount. Unknown or missing modes preserve payment, collection and amount-to-collect as unknown rather than zero.
+`price.order_price` is the gross product sale. `price.customer_need_paying_money` is the customer's payable total; it is not payment evidence by itself. Detailed `pay_channel` takes precedence over legacy `pay_type` when classifying collection. Online channels (`150`, `212`, `280`) establish marketplace collection and a paid customer amount, so `amountToCollect=0`. For native cash (`pay_type=2`), platform delivery (`delivery_type=1`) uses the provider fact `shop_paid_money`; store delivery (`delivery_type=2`) uses `customer_need_paying_money`. Neither amount creates a financial transaction or account movement. Unknown or missing modes preserve payment, collection and amount-to-collect as unknown rather than zero.
 
 The native `order_index` is the provider's shop order number for the day and is preserved as the operational display number; the internal PedeHub order number remains visible. `order_id` remains a lossless string because official examples exceed JavaScript's safe integer range.
 
@@ -267,6 +267,8 @@ The raw Swagger formula for `real_price`, `real_pay_price`, and `shop_paid_money
 **Official 99Food support business-semantics clarification (2026-09-12; support response retained in the task record):** `real_price` is the total estimated to be received by the merchant for this order, including delivery and excluding promotions subsidized by 99Food; `real_pay_price` is the total effectively paid by the customer; and `customer_need_paying_money` is the amount the customer needs to pay. Therefore the normalized snapshot adds `merchantEstimatedReceivable` from `real_price`, `customerActuallyPaid` from `real_pay_price`, and `customerNeedsToPay` from `customer_need_paying_money`. These are explicit provider facts, not reinterpretations of legacy generic fields.
 
 `real_price` is never a settled payout, `FinancialAccount.balance`, cash received, or a `FinancialTransaction`. `real_pay_price` is never used as `amountToCollect` or merchant receivable. `customer_need_paying_money` remains the operational collection reference selected only through documented payment mode. `shop_paid_money` remains a cash-order rider advance scenario. `promotions[].shop_subside_price` is the documented merchant-borne promotion cost. Only the order-level promotions array is aggregated because the official fixture repeats item promotions in `promotion_detail`/`promo_list`; item and order arrays must never be summed together. External/platform funding remains unknown.
+
+For a native cash order, the explicit `POST /marketplaces/orders/:marketplaceOrderId/pay-confirm` action is available only after the exact tenant-scoped 99Food order is accepted (`statusExternal=200`), has `pay_type=2`, and uses 99Food delivery (`delivery_type=1`). It writes an idempotent marketplace operation before calling the native `v1/order/order/payConfirm` endpoint. A repeated successful request returns the prior operation and never creates a financial transaction, account movement, or automatic settlement.
 
 `others_fees.service_price` is preserved as the provider-reported service fee. The available snapshot does not prove that it is merchant revenue, merchant cost, or part of the merchant estimate, so operational copy remains neutral and no receivable calculation consumes it.
 
@@ -283,7 +285,7 @@ as strings. `120` updates courier metadata only; `130` activates the persisted
 canonical CAS primitive to `out_for_delivery`; `150` persists the external arrival fact;
 `160` reconciles to `completed`; `170` records a delivery-only reconciliation divergence and
 never cancels the commercial order; `180` refreshes courier metadata and clears the current
-arrival condition until a later `130`. Alerts recover on 140/170/180 and terminal orders.
+arrival condition until a later `130`. Alerts recover on 140/170/180 and terminal orders. `190` is retained as provider logistics evidence and does not cancel or complete the commercial order without an independently authoritative lifecycle event. Native Order Details status `600` is also authoritative completion and reaches the existing canonical transition; `complete_time`, when supplied, is retained as the timeline occurrence time.
 
 Canonical stock remains local and recipe-driven: a tenant-scoped
 `MarketplaceCatalogMapping(connectionId, provider, externalItemId) -> Product` resolves the

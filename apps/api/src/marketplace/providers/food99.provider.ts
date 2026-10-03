@@ -302,7 +302,7 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const merchantFundedDiscount = this.nativeMerchantFundedDiscount(order.promotions);
     const itemsSubtotal = orderPrice
       ?? normalizedItems.reduce((sum, item) => this.roundMoney(sum + item.totalPrice), 0);
-    const payment = this.nativePaymentSemantics(order, customerPayable);
+    const payment = this.nativePaymentSemantics(order, customerPayable, deliveryType, shopPaidMoney);
     const discountValues = [itemDiscount, deliveryDiscount, couponDiscount]
       .filter((value): value is number => value !== null);
 
@@ -483,9 +483,25 @@ export class Food99Provider implements MarketplaceProviderAdapter {
   private nativePaymentSemantics(
     order: Record<string, unknown>,
     customerPayable: number | null,
+    deliveryType: number | null,
+    shopPaidMoney: number | null,
   ): Pick<NormalizedMarketplaceOrder,
     'customerPaidAmount' | 'amountToCollect' | 'paymentStatus' | 'collectionResponsibility'> {
     const payChannel = this.numberValue(order.pay_channel);
+    const payType = this.numberValue(order.pay_type);
+    if (payType === 2 && (payChannel === null || payChannel === 153)) {
+      const amountToCollect = deliveryType === 1
+        ? shopPaidMoney
+        : deliveryType === 2
+          ? customerPayable
+          : null;
+      return {
+        customerPaidAmount: null,
+        amountToCollect,
+        paymentStatus: amountToCollect === null ? 'UNKNOWN' : 'PENDING',
+        collectionResponsibility: amountToCollect === null ? 'UNKNOWN' : 'DRIVER',
+      };
+    }
     if (payChannel !== null) {
       if ([150, 212, 280].includes(payChannel)) {
         return {
@@ -511,7 +527,6 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       };
     }
 
-    const payType = this.numberValue(order.pay_type);
     if (payType === 1) {
       return {
         customerPaidAmount: customerPayable,

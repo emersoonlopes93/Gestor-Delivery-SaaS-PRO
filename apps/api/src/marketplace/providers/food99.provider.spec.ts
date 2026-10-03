@@ -438,6 +438,21 @@ describe('Food99Provider', () => {
     });
   });
 
+  it.each([
+    [1, 1750],
+    [2, 4200],
+  ])('uses the documented cash collection amount for delivery_type %s', async (deliveryType, expectedAmount) => {
+    const normalized = await provider.normalizeOrder({
+      connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,
+      externalOrder: {
+        order_id: '5764656197621845665', delivery_type: deliveryType, pay_type: 2,
+        price: { customer_need_paying_money: 4200, shop_paid_money: 1750 }, order_items: [],
+      },
+    });
+    expect(normalized.amountToCollect).toBe(expectedAmount / 100);
+    expect(normalized.paymentStatus).toBe('PENDING');
+  });
+
   it('uses documented legacy online pay_type only when pay_channel is absent', async () => {
     const normalized = await provider.normalizeOrder({
       connection: { id: 'connection-1', tenantId: 'tenant-1' } as never,

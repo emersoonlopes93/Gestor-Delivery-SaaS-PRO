@@ -25,6 +25,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       food99Client as never,
       featureControl as never,
       {} as never,
+      {} as never,
     );
     const request = { user: { tenantId: 'tenant-1' } } as never;
     return { controller, connectionService, food99Client, featureControl, providerRegistry, request };

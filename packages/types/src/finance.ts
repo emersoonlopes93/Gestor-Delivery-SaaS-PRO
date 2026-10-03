@@ -81,7 +81,9 @@ export interface Food99SettlementAccountDTO {
 export interface Food99BillEntryDTO {
   id: string;
   orderId: string;
-  orderType: 1 | 2 | 3 | 4 | 5;
+  orderType: 1 | 2 | 3 | 4 | 5 | 8 | 9;
+  orderIndex: string | null;
+  deliveryType: number | null;
   businessTs: string;
   businessAt: string | null;
   dayPaymentId: string;
@@ -90,6 +92,9 @@ export interface Food99BillEntryDTO {
   orderAmountCents: string;
   shopActivityOutcomeCents: string;
   shopActivitySubsidyCents: string;
+  mealLossDeductAmountCents: string | null;
+  vatAmountCents: string | null;
+  merchantAppealAmountCents: string | null;
   expectSettleDate: string | null;
 }
 
@@ -105,6 +110,10 @@ export interface Food99SettlementDTO {
   settleStartDate: string;
   settleEndDate: string;
   currency: string;
+  payeeCnpj: string | null;
+  payerCnpj: string | null;
+  cnpjWithdrawAmountCents: string | null;
+  cercAmountCents: string | null;
   status: MarketplaceSettlementPostingStatus;
   financialTransactionId: string | null;
   postedAt: string | null;

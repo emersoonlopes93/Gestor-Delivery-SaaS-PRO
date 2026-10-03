@@ -6,8 +6,8 @@ import type {
   Food99ReconciliationDTO,
   Food99SettlementDTO,
 } from '@gestor/types';
-import { AlertTriangle, CheckCircle2, RefreshCw, WalletCards } from 'lucide-react';
-import { ApiError, api } from '../../lib/api-client';
+import { CheckCircle2, RefreshCw, WalletCards } from 'lucide-react';
+import { api } from '../../lib/api-client';
 import { Card } from '../../components/ui/Card';
 
 type Props = { canManage: boolean; startDate?: string; endDate?: string };
@@ -34,7 +34,6 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [accessNotEnabled, setAccessNotEnabled] = useState(false);
   const [syncSummary, setSyncSummary] = useState<Food99FinancialSyncResultDTO | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -71,7 +70,6 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
     if (!connectionId) return;
     setWorking(true);
     setError(null);
-    setAccessNotEnabled(false);
     try {
       const response = await api.post<Food99FinancialSyncResultDTO>('/finance/marketplaces/99food/sync', {
         connectionId,
@@ -81,11 +79,7 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
       if (response.success) setSyncSummary(response.data);
       await load(connectionId);
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'FINANCE_ACCESS_NOT_ENABLED') {
-        setAccessNotEnabled(true);
-      } else {
-        setError(caught instanceof Error ? caught.message : 'Falha ao sincronizar a 99Food.');
-      }
+      setError(caught instanceof Error ? caught.message : 'Falha ao sincronizar a 99Food.');
     } finally {
       setWorking(false);
     }
@@ -195,12 +189,6 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 )}
               </div>
 
-              {accessNotEnabled && (
-                <div role="alert" className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-foreground">
-                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-                  <p><strong>Integração financeira indisponível.</strong> A 99Food requer liberação/WhiteList para Bill Data e Settlements Data.</p>
-                </div>
-              )}
               {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
               {syncSummary && (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> Sincronização concluída: {syncSummary.billEntriesReceived} eventos e {syncSummary.settlementsReceived} repasses recebidos.</p>
@@ -210,13 +198,14 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 <h3 className="text-sm font-semibold text-foreground">Repasses processados</h3>
                 <div className="mt-2 overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-full divide-y divide-border text-sm">
-                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">weekPaymentId</th><th className="px-3 py-2">Desembolso</th><th className="px-3 py-2">Valor</th><th className="px-3 py-2">Composição Bill</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Ação</th></tr></thead>
+                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Repasse</th><th className="px-3 py-2">Desembolso</th><th className="px-3 py-2">Valor</th><th className="px-3 py-2">CNPJ / CERC</th><th className="px-3 py-2">Composição Bill</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Ação</th></tr></thead>
                     <tbody className="divide-y divide-border">
-                      {data.settlements.length === 0 ? <tr><td className="px-3 py-5 text-muted-foreground" colSpan={6}>Nenhum repasse no período.</td></tr> : data.settlements.map((settlement) => (
+                      {data.settlements.length === 0 ? <tr><td className="px-3 py-5 text-muted-foreground" colSpan={7}>Nenhum repasse no período.</td></tr> : data.settlements.map((settlement) => (
                         <tr key={settlement.id}>
                           <td className="max-w-48 break-all px-3 py-3 font-mono text-xs text-foreground">{settlement.weekPaymentId}</td>
                           <td className="px-3 py-3 text-muted-foreground">{format(new Date(settlement.withdrawDate), 'dd/MM/yyyy')}</td>
                           <td className="px-3 py-3 font-semibold text-foreground">{formatCents(settlement.withdrawAmountCents, settlement.currency)}</td>
+                          <td className="px-3 py-3 text-xs text-muted-foreground">{settlement.payeeCnpj || settlement.payerCnpj || 'Não informado'}{settlement.cercAmountCents ? <><br />CERC: {formatCents(settlement.cercAmountCents, settlement.currency)}</> : null}</td>
                           <td className="px-3 py-3 text-muted-foreground">
                             <span>{formatCents(settlement.linkedSettlementAmountCents, settlement.currency)}</span>
                             {settlement.hasCompositionDiscrepancy && <span className="ml-2 text-amber-700 dark:text-amber-400">Divergência: {formatCents(settlement.compositionDifferenceCents, settlement.currency)}</span>}
@@ -238,14 +227,15 @@ export function Food99ReconciliationPanel({ canManage, startDate: providedStartD
                 <h3 className="text-sm font-semibold text-foreground">Eventos do Bill Data</h3>
                 <div className="mt-2 overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-full divide-y divide-border text-sm">
-                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Pedido</th><th className="px-3 py-2">Evento</th><th className="px-3 py-2">dayPaymentId</th><th className="px-3 py-2">Comissão</th><th className="px-3 py-2">Valor final</th><th className="px-3 py-2">Previsão</th></tr></thead>
+                    <thead className="bg-muted/45 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Pedido</th><th className="px-3 py-2">Evento</th><th className="px-3 py-2">dayPaymentId</th><th className="px-3 py-2">Comissão</th><th className="px-3 py-2">Ajustes</th><th className="px-3 py-2">Valor final</th><th className="px-3 py-2">Previsão</th></tr></thead>
                     <tbody className="divide-y divide-border">
-                      {data.billEntries.length === 0 ? <tr><td className="px-3 py-5 text-muted-foreground" colSpan={6}>Nenhum evento financeiro no período.</td></tr> : data.billEntries.map((entry) => (
+                      {data.billEntries.length === 0 ? <tr><td className="px-3 py-5 text-muted-foreground" colSpan={7}>Nenhum evento financeiro no período.</td></tr> : data.billEntries.map((entry) => (
                         <tr key={entry.id}>
                           <td className="max-w-48 break-all px-3 py-3 font-mono text-xs text-foreground">{entry.orderId}</td>
                           <td className="px-3 py-3 text-muted-foreground">{orderTypeLabel(entry.orderType)}</td>
                           <td className="max-w-48 break-all px-3 py-3 font-mono text-xs text-muted-foreground">{entry.dayPaymentId}</td>
                           <td className="px-3 py-3 text-muted-foreground">{formatCents(entry.commissionAmountCents, 'BRL')}</td>
+                          <td className="px-3 py-3 text-xs text-muted-foreground"><BillAdjustments entry={entry} /></td>
                           <td className="px-3 py-3 font-medium text-foreground">{formatCents(entry.settlementAmountCents, 'BRL')}</td>
                           <td className="px-3 py-3 text-muted-foreground">{entry.expectSettleDate ? format(new Date(entry.expectSettleDate), 'dd/MM/yyyy') : '—'}</td>
                         </tr>
@@ -274,8 +264,17 @@ function Summary({ label, value, tone }: { label: string; value: number; tone: '
   return <div className="rounded-lg border border-border bg-muted/25 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className={`mt-1 text-xl font-semibold tabular-nums ${valueClass}`}>{value}</p></div>;
 }
 
-function orderTypeLabel(type: 1 | 2 | 3 | 4 | 5): string {
-  return ({ 1: 'Receita', 2: 'Refund total', 3: 'Refund parcial na venda', 4: 'Refund pós-venda', 5: 'Ajuste' })[type];
+function orderTypeLabel(type: 1 | 2 | 3 | 4 | 5 | 8 | 9): string {
+  return ({ 1: 'Receita', 2: 'Refund total', 3: 'Refund parcial na venda', 4: 'Refund pós-venda', 5: 'Despesa não vinculada a pedido', 8: 'Perda de refeição', 9: 'Ajuste por troca de item' })[type];
+}
+
+function BillAdjustments({ entry }: { entry: Food99ReconciliationDTO['billEntries'][number] }) {
+  const adjustments = [
+    entry.mealLossDeductAmountCents !== null ? `Perda: ${formatCents(entry.mealLossDeductAmountCents, 'BRL')}` : null,
+    entry.vatAmountCents !== null ? `VAT: ${formatCents(entry.vatAmountCents, 'BRL')}` : null,
+    entry.merchantAppealAmountCents !== null ? `Apelação: ${formatCents(entry.merchantAppealAmountCents, 'BRL')}` : null,
+  ].filter((value): value is string => value !== null);
+  return adjustments.length > 0 ? <>{adjustments.map((value) => <span key={value} className="block">{value}</span>)}</> : <>—</>;
 }
 
 function formatCents(rawCents: string, currency: string): string {

@@ -15,6 +15,7 @@ import { MarketplaceStatusSyncService } from '../services/marketplace-status-syn
 import { Food99HttpClientService } from '../services/food99-http-client.service';
 import { FeatureControlService } from '../../feature-control/feature-control.service';
 import { MarketplaceCatalogMappingService } from '../services/marketplace-catalog-mapping.service';
+import { Food99CashConfirmationService } from '../services/food99-cash-confirmation.service';
 import { randomUUID } from 'crypto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
@@ -33,6 +34,7 @@ export class MarketplaceTenantController {
     private readonly food99Client: Food99HttpClientService,
     private readonly featureControl: FeatureControlService,
     private readonly catalogMappings: MarketplaceCatalogMappingService,
+    private readonly cashConfirmation: Food99CashConfirmationService,
   ) {}
 
   @Get('catalog-mappings')
@@ -316,6 +318,15 @@ export class MarketplaceTenantController {
     });
     if (order) await this.assertProviderAccess(req.user.tenantId, order.provider);
     return this.ingestionService.reprocessMarketplaceOrder(marketplaceOrderId, req.user.tenantId);
+  }
+
+  @Post('orders/:marketplaceOrderId/pay-confirm')
+  @RequirePermissions('orders.update_status')
+  async confirmFood99CashPayment(
+    @Req() req: TenantRequest,
+    @Param('marketplaceOrderId') marketplaceOrderId: string,
+  ) {
+    return this.cashConfirmation.confirm(req.user.tenantId, marketplaceOrderId);
   }
 
   @Get('orders/:marketplaceOrderId/cancellation-reasons')

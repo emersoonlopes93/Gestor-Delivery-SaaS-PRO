@@ -126,6 +126,23 @@ describe('99Food financial reconciliation PostgreSQL constraints and concurrency
         currency: 'BRL',
       },
     })).rejects.toMatchObject({ code: 'P2002' });
+    const secondSettlementConnection = await prisma.marketplaceConnection.create({
+      data: { tenantId: fixture.tenant.id, provider: 'FOOD_99', status: 'CONNECTED', externalStoreId: `${Date.now()}${Math.floor(Math.random() * 100000)}` },
+    });
+    await expect(prisma.marketplaceSettlement.create({
+      data: {
+        tenantId: fixture.tenant.id,
+        provider: 'FOOD_99',
+        connectionId: secondSettlementConnection.id,
+        weekPaymentId: settlement.weekPaymentId,
+        withdrawAmount: 4000n,
+        withdrawDate: new Date('2026-09-12T00:00:00.000Z'),
+        shopId: '5764608924570091910',
+        settleStartDate: new Date('2026-09-01T00:00:00.000Z'),
+        settleEndDate: new Date('2026-09-07T00:00:00.000Z'),
+        currency: 'BRL',
+      },
+    })).resolves.toBeDefined();
     await expect(prisma.marketplaceSettlementDayPayment.create({
       data: { settlementId: settlement.id, dayPaymentId: '1945389697417496990' },
     })).rejects.toMatchObject({ code: 'P2002' });
