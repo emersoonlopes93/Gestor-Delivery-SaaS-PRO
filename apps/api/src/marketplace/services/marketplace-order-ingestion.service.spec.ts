@@ -263,6 +263,64 @@ describe('MarketplaceOrderIngestionService', () => {
     expect(alerts.refreshTenant).toHaveBeenCalledWith('tenant-1');
   });
 
+  it.each(['120', '130', '150', '180', '190'])('records deliveryStatus %s without forcing a commercial transition', async (deliveryStatus) => {
+    const prisma = {
+      marketplaceOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'marketplace-order-1', internalOrderId: 'order-1', deliveryOwnership: 'PROVIDER', normalizedPayload: {},
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      order: { findFirst: jest.fn().mockResolvedValue({ status: OrderStatus.preparing, fulfillmentType: 'delivery' }) },
+    };
+    const alerts = { refreshTenant: jest.fn().mockResolvedValue(undefined) };
+    const { service, ordersService } = makeFood99LifecycleService(prisma, undefined, { orderAlertsService: alerts });
+
+    await applyFood99DeliveryStatus(service, {
+      tenantId: 'tenant-1', connectionId: 'conn-1', externalOrderId: '5764607618872501234',
+      rawPayload: { data: { delivery_status: deliveryStatus } },
+    });
+
+    expect(prisma.marketplaceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ normalizedPayload: expect.objectContaining({ logistics: expect.objectContaining({ deliveryStatus }) }) }),
+    }));
+    expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
+    expect(ordersService.applyOrderStatusTransitionInTransaction).not.toHaveBeenCalled();
+    expect(alerts.refreshTenant).toHaveBeenCalledWith('tenant-1');
+  });
+
+  it('reconciles deliveryStatus 160 through the canonical terminal transition', async () => {
+    const tx = {
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = {
+      marketplaceOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'marketplace-order-1', internalOrderId: 'order-1', deliveryOwnership: 'PROVIDER', normalizedPayload: {},
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      order: { findFirst: jest.fn().mockResolvedValue({ status: OrderStatus.out_for_delivery, fulfillmentType: 'delivery' }) },
+      $transaction: jest.fn().mockImplementation((callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    };
+    const ordersService = { updateOrderStatus: jest.fn(), applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}) };
+    const alerts = { refreshTenant: jest.fn().mockResolvedValue(undefined) };
+    const { service } = makeFood99LifecycleService(prisma, ordersService, { orderAlertsService: alerts });
+
+    await applyFood99DeliveryStatus(service, {
+      tenantId: 'tenant-1', connectionId: 'conn-1', externalOrderId: '5764607618872501234',
+      rawPayload: { data: { delivery_status: 160 } },
+    });
+
+    expect(ordersService.applyOrderStatusTransitionInTransaction).toHaveBeenCalledWith(tx, expect.objectContaining({
+      expectedCurrentStatus: OrderStatus.out_for_delivery,
+      targetStatus: OrderStatus.completed,
+      transitionPolicy: 'food99_authoritative',
+    }));
+    expect(alerts.refreshTenant).toHaveBeenCalledWith('tenant-1');
+  });
+
   it('preserves the commercial order when 99Food cancels only delivery', async () => {
     const divergence = { record: jest.fn().mockResolvedValue({}) };
     const prisma = {
