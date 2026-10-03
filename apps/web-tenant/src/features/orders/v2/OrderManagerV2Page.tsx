@@ -318,7 +318,7 @@ export function OrderManagerV2Page() {
         <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2 sm:p-3">
           <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
             <div className="min-w-0 flex-1 sm:mr-auto sm:flex-none"><h1 className="text-base font-black tracking-tight text-foreground sm:text-xl">Painel de Operações</h1><p className="truncate text-[9px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
-            <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[9px] font-black sm:px-2.5 sm:py-2 sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{realtime.connectionState === "connected" ? "Sincronizado" : "Reconectando"}</span>
+            <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[9px] font-black sm:px-2.5 sm:py-2 sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{realtime.connectionState === "connected" ? "Atualizações em tempo real" : "Reconectando"}</span>
             <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-9 sm:w-9"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}</button>
           </div>
           <div className="mt-2"><OperationalQuickActions orders={orders} onOpenOrder={setSelected} /></div>
@@ -488,7 +488,7 @@ export function OrderManagerV2Page() {
             {realtime.isStale
               ? "Dados aguardando atualização"
               : realtime.connectionState === "connected"
-                ? "Sincronizado"
+                ? "Atualizações em tempo real"
                 : "Reconectando"}
           </span>
         </div>

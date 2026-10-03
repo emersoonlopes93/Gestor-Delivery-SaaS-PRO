@@ -468,6 +468,12 @@ export interface OrderOperationalCapabilities {
   canComplete: boolean;
   canPrint: boolean;
   canEdit: boolean;
+  /** Capability derived by the API from canonical 99Food order facts. */
+  courierCashConfirmation?: {
+    eligible: boolean;
+    amountToCollect: number | null;
+    reasonUnavailable: string | null;
+  };
 }
 
 export interface OrderOperationalAction {
@@ -519,6 +525,11 @@ export interface OrderDeliverySummary {
   ownership: OrderDeliveryOwnership;
   label: string;
   driverName?: string | null;
+  providerStatus?: string | null;
+  providerStatusLabel?: string | null;
+  riderName?: string | null;
+  riderPhone?: string | null;
+  riderToBusinessEta?: string | null;
 }
 
 export interface OrderProductionSummary {
@@ -530,6 +541,8 @@ export interface OrderOperationalViewModel {
   origin: OrderOrigin;
   provider: string | null;
   providerOrderNumber?: string | null;
+  /** Tenant-scoped marketplace order identity for an eligible provider action. */
+  marketplaceOrderId?: string | null;
   displayChannel: string;
   deliveryOwnership: OrderDeliveryOwnership;
   fulfillmentMode: FulfillmentType;

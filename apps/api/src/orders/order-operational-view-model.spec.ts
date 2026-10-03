@@ -159,6 +159,57 @@ describe('getOrderOperationalViewModel', () => {
     });
   });
 
+  it('exposes 99Food courier cash confirmation only from the same stored facts enforced by the provider action', () => {
+    const eligible = getOrderOperationalViewModel({
+      ...base,
+      provider: 'FOOD_99',
+      externalDisplayId: '210007',
+      marketplaceOrderId: 'marketplace-order-1',
+      marketplaceExternalStatus: '200',
+      marketplaceRawPayload: { pay_type: 2, delivery_type: 1 },
+      marketplaceNormalizedPayload: { amountToCollect: 52.9 },
+    });
+
+    expect(eligible.marketplaceOrderId).toBe('marketplace-order-1');
+    expect(eligible.capabilities.courierCashConfirmation).toEqual({
+      eligible: true,
+      amountToCollect: 52.9,
+      reasonUnavailable: null,
+    });
+
+    const ineligible = getOrderOperationalViewModel({
+      ...base,
+      provider: 'FOOD_99',
+      marketplaceExternalStatus: '100',
+      marketplaceRawPayload: { pay_type: 2, delivery_type: 1 },
+    });
+    expect(ineligible.capabilities.courierCashConfirmation).toMatchObject({ eligible: false });
+  });
+
+  it('presents stored 99Food logistics facts without inferring a commercial status change', () => {
+    const result = getOrderOperationalViewModel({
+      ...base,
+      status: 'preparing',
+      provider: 'FOOD_99',
+      marketplaceNormalizedPayload: {
+        logistics: {
+          deliveryStatus: '170',
+          riderName: 'Entregador da plataforma',
+          riderPhone: '11999999999',
+          riderToBusinessEta: '2026-10-03T16:30:00.000Z',
+        },
+      },
+    });
+
+    expect(result.deliverySummary).toMatchObject({
+      providerStatus: '170',
+      providerStatusLabel: 'Ocorrência logística',
+      riderName: 'Entregador da plataforma',
+      riderPhone: '11999999999',
+    });
+    expect(result.primaryAction?.type).toBe('MARK_READY');
+  });
+
   it('preserves unknown payment and collection values as null', () => {
     const result = getOrderOperationalViewModel({
       ...base,

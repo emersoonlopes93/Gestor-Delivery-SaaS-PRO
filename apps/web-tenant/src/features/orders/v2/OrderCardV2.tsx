@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ChevronRight, MapPin, Printer, Radio, Store, Truck, UserRound } from 'lucide-react';
+import { AlertTriangle, ChevronRight, MapPin, Printer, Radio, Store, Truck, UserRound } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderOperationalAction } from '@gestor/types';
 import { deliveryStatement, ORDER_STATUS_PRESENTATION, providerLabel } from '../order-presenters';
 import { formatElapsed, isRunnableStatusAction } from './order-manager-v2';
@@ -45,7 +45,10 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, alertSeveri
     ? 'Falha de sincronizacao'
     : order.operational.syncState === 'PENDING'
       ? 'Sincronizando'
-    : 'Sincronizado';
+      : 'Sem operação pendente';
+  const displayedOrderNumber = order.operational.origin === 'FOOD_99' && order.operational.providerOrderNumber
+    ? order.operational.providerOrderNumber
+    : order.orderNumber;
   const status = ORDER_STATUS_PRESENTATION[order.status];
   return (
     <article className={`group relative rounded-xl border border-border bg-card p-2.5 pl-3.5 shadow-sm transition before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l-xl hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:p-3 sm:pl-4 ${STATUS_ACCENT[order.status] ?? 'before:bg-border'}`}>
@@ -54,7 +57,8 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, alertSeveri
         <div className="flex items-start justify-between gap-3 border-b border-border pb-2.5">
           <div className="min-w-0">
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{providerLabel(order.operational)}</p>
-            <h3 className="mt-1 text-lg font-black leading-none text-foreground sm:text-xl">#{order.orderNumber}</h3>
+            <h3 className="mt-1 text-lg font-black leading-none text-foreground sm:text-xl">#{displayedOrderNumber}</h3>
+            {order.operational.origin === 'FOOD_99' && order.operational.providerOrderNumber ? <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">PedeHub #{order.orderNumber}</p> : null}
           </div>
           <div className="flex max-w-[11rem] flex-wrap items-center justify-end gap-1.5">
             {alertSeverity && onOpenAlert ? <button type="button" onClick={(event) => { event.stopPropagation(); onOpenAlert(); }} aria-label={`Abrir alerta ${alertSeverity} do pedido ${order.orderNumber}`} className={`pointer-events-auto relative z-10 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[9px] font-black uppercase tracking-wide ${alertSeverity === 'CRITICAL' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300'}`}><AlertTriangle className="h-3 w-3" />{alertSeverity}</button> : null}
@@ -74,9 +78,9 @@ export function OrderCardV2({ order, now, onOpen, onAction, onPrint, alertSeveri
             <span className="inline-flex items-center gap-1 border border-border px-2 py-1 text-[9px] font-black uppercase tracking-wide text-muted-foreground">
               <MapPin className="h-3 w-3" />{ownershipLabel}
             </span>
-            <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[9px] font-black uppercase tracking-wide ${order.operational.syncState === 'FAILED' ? 'border-destructive/40 bg-destructive/10 text-destructive' : order.operational.syncState === 'PENDING' ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'}`}>
-              {order.operational.syncState === 'NONE' ? <CheckCircle2 className="h-3 w-3" /> : <Radio className="h-3 w-3" />}{syncLabel}
-            </span>
+            {order.operational.syncState !== 'NONE' ? <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[9px] font-black uppercase tracking-wide ${order.operational.syncState === 'FAILED' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300'}`}>
+              <Radio className="h-3 w-3" />{syncLabel}
+            </span> : null}
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-border pt-3">

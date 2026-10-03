@@ -39,6 +39,9 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, on
   const [manualOpen, setManualOpen] = useState(false);
   const [manualPending, setManualPending] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
+  const [cashConfirmationOpen, setCashConfirmationOpen] = useState(false);
+  const [cashConfirmationPending, setCashConfirmationPending] = useState(false);
+  const [cashConfirmationError, setCashConfirmationError] = useState<string | null>(null);
 
   useEffect(() => {
     setDetail(null);
@@ -62,6 +65,8 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, on
     setDeliveryRun(null);
     setManualOpen(false);
     setManualError(null);
+    setCashConfirmationOpen(false);
+    setCashConfirmationError(null);
     if (!order || order.status !== 'out_for_delivery' || order.operational.deliveryOwnership !== 'MERCHANT') return;
     void api.get<DeliveryRunDTO | null>(`/delivery/runs/order/${order.id}`)
       .then((response) => setDeliveryRun(response.data ?? null))
@@ -71,6 +76,23 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, on
   const manualStop = deliveryRun?.stops.find((stop) => stop.orderId === order?.id);
   const canCompleteManually = Boolean(manualStop && (manualStop.status === DeliveryStopStatus.CURRENT || manualStop.status === DeliveryStopStatus.ARRIVED));
   const selectedReason = MANUAL_DELIVERY_REASONS.find((reason) => reason.code === manualReason) ?? MANUAL_DELIVERY_REASONS[0];
+  const cashConfirmation = order?.operational.capabilities.courierCashConfirmation;
+  const canConfirmCourierCash = Boolean(cashConfirmation?.eligible && order?.operational.marketplaceOrderId);
+  const confirmCourierCash = async () => {
+    if (!order?.operational.marketplaceOrderId || !canConfirmCourierCash || cashConfirmationPending) return;
+    setCashConfirmationPending(true);
+    setCashConfirmationError(null);
+    try {
+      const response = await api.post(`/marketplaces/orders/${order.operational.marketplaceOrderId}/pay-confirm`);
+      if (!response.success) throw new Error('Confirmação não aceita.');
+      setCashConfirmationOpen(false);
+      onManualDeliveryCompleted(order);
+    } catch {
+      setCashConfirmationError('Não foi possível confirmar o recebimento com a 99Food. Atualize o pedido antes de tentar novamente.');
+    } finally {
+      setCashConfirmationPending(false);
+    }
+  };
   const submitManualCompletion = async () => {
     if (!order || !deliveryRun || !manualStop || manualPending) return;
     const note = manualNote.trim();
@@ -110,12 +132,20 @@ export function OrderDetailsModalV2({ order, now, onClose, onAction, onPrint, on
         {order ? <section className="mb-5 grid gap-px border border-border bg-border sm:grid-cols-4" aria-label="Resumo operacional do pedido">
           <OperationalSummary label="Status" value={ORDER_STATUS_PRESENTATION[order.status].label} icon={<Activity className="h-3.5 w-3.5" />} />
           <OperationalSummary label="Tempo aberto" value={formatElapsed(order.createdAt, now)} icon={<Radio className="h-3.5 w-3.5" />} />
-          <OperationalSummary label="Sincronizacao" value={order.operational.syncState === 'FAILED' ? 'Falha - verificar' : order.operational.syncState === 'PENDING' ? 'Em andamento' : 'Confirmada'} icon={order.operational.syncState === 'FAILED' ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> : <Radio className="h-3.5 w-3.5" />} />
+          <OperationalSummary label="Operação do canal" value={order.operational.syncState === 'FAILED' ? 'Falha - verificar' : order.operational.syncState === 'PENDING' ? 'Em andamento' : 'Sem operação pendente'} icon={order.operational.syncState === 'FAILED' ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> : <Radio className="h-3.5 w-3.5" />} />
           <OperationalSummary label="Proxima acao" value={order.operational.primaryAction?.label ?? 'Somente consulta'} icon={<ClipboardList className="h-3.5 w-3.5" />} />
         </section> : null}
         {order ? <section className="mb-5 flex flex-wrap gap-2" aria-label="Acoes de status do pedido">
           {order.operational.availableActions.filter(isRunnableStatusAction).map((action) => <button key={action.type} type="button" disabled={isActionPending} onClick={() => onAction(order, action)} className="border border-primary bg-primary px-3 py-2 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60">{isActionPending ? 'Atualizando...' : action.label}</button>)}
           {canCompleteManually ? <button type="button" disabled={isActionPending || manualPending} onClick={() => setManualOpen(true)} className="border border-amber-600 bg-amber-500 px-3 py-2 text-xs font-black text-amber-950 hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60">Marcar como entregue</button> : null}
+          {canConfirmCourierCash ? <button type="button" disabled={cashConfirmationPending} onClick={() => setCashConfirmationOpen(true)} className="border border-amber-600 bg-amber-500 px-3 py-2 text-xs font-black text-amber-950 hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60">Confirmar dinheiro do entregador</button> : null}
+        </section> : null}
+        {order?.operational.origin === 'FOOD_99' && cashConfirmation && !cashConfirmation.eligible ? <p className="mb-5 text-xs font-semibold text-muted-foreground">{cashConfirmation.reasonUnavailable ?? 'A confirmação de dinheiro ainda não está disponível para este pedido.'}</p> : null}
+        {cashConfirmationOpen && cashConfirmation ? <section className="mb-5 border border-amber-500/50 bg-amber-500/10 p-4" aria-label="Confirmar dinheiro do entregador">
+          <h3 className="text-sm font-black text-foreground">Confirmar dinheiro recebido pelo entregador</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Confirme somente após receber {cashConfirmation.amountToCollect === null ? 'o valor informado pela 99Food' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cashConfirmation.amountToCollect)}. Esta ação registra a confirmação no canal e não cria lançamento financeiro.</p>
+          {cashConfirmationError ? <p role="alert" className="mt-2 text-xs font-bold text-destructive">{cashConfirmationError}</p> : null}
+          <div className="mt-4 flex gap-2"><button type="button" disabled={cashConfirmationPending} onClick={() => setCashConfirmationOpen(false)} className="border border-border px-3 py-2 text-xs font-black">Cancelar</button><button type="button" disabled={cashConfirmationPending} onClick={() => void confirmCourierCash()} className="bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{cashConfirmationPending ? 'Confirmando...' : 'Confirmar recebimento'}</button></div>
         </section> : null}
         {manualOpen ? <section className="mb-5 border border-amber-500/50 bg-amber-500/10 p-4" aria-label="Confirmação de entrega manual">
           <h3 className="text-sm font-black text-foreground">Confirmar entrega manual</h3>
@@ -147,9 +177,24 @@ function Summary({ detail, detailState, origin, deliveryLabel, channel }: { deta
       <section className="border border-border bg-muted/20 p-4"><h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Observações</h3><p className="mt-2 text-sm text-foreground">{detail.notes || 'Sem observações.'}</p></section>
     </div>
     <aside className="space-y-6">
-      <section className="border border-border p-4"><p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Logística</p><p className="mt-2 text-sm font-bold text-foreground">{deliveryLabel}</p><p className="mt-1 text-xs text-muted-foreground">Canal: {channel}</p></section>
+      <section className="border border-border p-4"><p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Logística</p><p className="mt-2 text-sm font-bold text-foreground">{deliveryLabel}</p><ProviderLogisticsFacts detail={detail} channel={channel} /></section>
       <OrderPaymentSection itemsSubtotal={detail.itemsSubtotal} deliveryFee={detail.deliveryFee} serviceFee={detail.serviceFee} discountTotal={detail.discountTotal} total={detail.total} paymentMethod={detail.paymentMethod} changeFor={detail.changeFor} financialSummary={detail.operational?.financialSummary} />
     </aside>
+  </div>;
+}
+
+function ProviderLogisticsFacts({ detail, channel }: { detail: OrderResponseDTO; channel?: string }) {
+  const logistics = detail.operational?.deliverySummary;
+  const facts = [
+    logistics?.providerStatusLabel ? `Status: ${logistics.providerStatusLabel}` : null,
+    logistics?.riderName ? `Entregador: ${logistics.riderName}` : null,
+    logistics?.riderPhone ? `Telefone do entregador: ${logistics.riderPhone}` : null,
+    logistics?.riderToBusinessEta ? `Previsão até a loja: ${logistics.riderToBusinessEta}` : null,
+  ].filter((fact): fact is string => Boolean(fact));
+  return <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+    {facts.map((fact) => <p key={fact}>{fact}</p>)}
+    <p>Canal: {channel}</p>
+    {facts.length === 0 ? <p>Os dados de logística ainda não foram confirmados pelo canal.</p> : null}
   </div>;
 }
 

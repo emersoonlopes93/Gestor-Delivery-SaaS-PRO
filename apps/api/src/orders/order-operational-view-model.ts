@@ -24,7 +24,10 @@ export type OperationalOrderInput = {
   deliveryDriverName?: string | null;
   provider?: string | null;
   externalDisplayId?: string | null;
+  marketplaceOrderId?: string | null;
+  marketplaceExternalStatus?: string | null;
   deliveryOwnership?: string | null;
+  marketplaceRawPayload?: unknown;
   marketplaceNormalizedPayload?: unknown;
   latestMarketplaceOperation?: MarketplaceOperationInput;
 };
@@ -135,6 +138,50 @@ function food99FinancialSummary(input: OperationalOrderInput): OrderOperationalV
   };
 }
 
+function food99CourierCashCapability(input: OperationalOrderInput): NonNullable<OrderOperationalCapabilities['courierCashConfirmation']> {
+  const rawPayload = asRecord(input.marketplaceRawPayload);
+  const payType = finiteNumber(rawPayload, 'pay_type');
+  const deliveryType = finiteNumber(rawPayload, 'delivery_type');
+  const normalizedPayload = asRecord(input.marketplaceNormalizedPayload);
+  const amountToCollect = finiteNumber(normalizedPayload, 'amountToCollect');
+
+  if (payType !== 2) {
+    return { eligible: false, amountToCollect: null, reasonUnavailable: 'Disponível somente para pedidos em dinheiro.' };
+  }
+  if (deliveryType !== 1) {
+    return { eligible: false, amountToCollect: null, reasonUnavailable: 'Disponível somente para entregas realizadas pela 99Food.' };
+  }
+  if (input.marketplaceExternalStatus !== '200') {
+    return { eligible: false, amountToCollect, reasonUnavailable: 'Disponível quando a 99Food confirmar o aceite do pedido.' };
+  }
+  return { eligible: true, amountToCollect, reasonUnavailable: null };
+}
+
+function food99DeliveryFacts(input: OperationalOrderInput): Pick<OrderOperationalViewModel['deliverySummary'], 'providerStatus' | 'providerStatusLabel' | 'riderName' | 'riderPhone' | 'riderToBusinessEta'> {
+  const logistics = asRecord(asRecord(input.marketplaceNormalizedPayload)?.logistics);
+  const deliveryStatus = typeof logistics?.deliveryStatus === 'string' ? logistics.deliveryStatus : null;
+  const labels: Record<string, string> = {
+    '120': 'Entregador atribuído',
+    '130': 'Chegou ao restaurante',
+    '140': 'Retirou o pedido',
+    '150': 'Chegou ao cliente',
+    '160': 'Entregue',
+    '170': 'Ocorrência logística',
+    '180': 'Entregador reassociado',
+    '190': 'Operação logística abortada',
+  };
+  const stringFact = (field: string): string | null => typeof logistics?.[field] === 'string' && logistics[field].trim()
+    ? logistics[field]
+    : null;
+  return {
+    providerStatus: deliveryStatus,
+    providerStatusLabel: deliveryStatus ? labels[deliveryStatus] ?? 'Atualização logística recebida' : null,
+    riderName: stringFact('riderName'),
+    riderPhone: stringFact('riderPhone'),
+    riderToBusinessEta: stringFact('riderToBusinessEta'),
+  };
+}
+
 function action(
   type: OrderOperationalActionType,
   label: string,
@@ -172,6 +219,7 @@ export function getOrderOperationalViewModel(input: OperationalOrderInput): Orde
     canComplete: (!isMarketplace || supportedMarketplace) && (input.fulfillmentType !== 'delivery' || ownFleet),
     canPrint: true,
     canEdit: !isMarketplace,
+    ...(origin === 'FOOD_99' ? { courierCashConfirmation: food99CourierCashCapability(input) } : {}),
   };
 
   const availableActions: OrderOperationalAction[] = [];
@@ -273,6 +321,7 @@ export function getOrderOperationalViewModel(input: OperationalOrderInput): Orde
     origin,
     provider: input.provider ?? null,
     providerOrderNumber: input.externalDisplayId ?? null,
+    marketplaceOrderId: input.marketplaceOrderId ?? null,
     displayChannel,
     deliveryOwnership: ownership,
     fulfillmentMode: input.fulfillmentType,
@@ -293,7 +342,12 @@ export function getOrderOperationalViewModel(input: OperationalOrderInput): Orde
       paymentState: 'UNKNOWN',
       paymentLabel: 'Pagamento não confirmado',
     },
-    deliverySummary: { ownership, label: deliveryLabel, driverName: input.deliveryDriverName ?? null },
+    deliverySummary: {
+      ownership,
+      label: deliveryLabel,
+      driverName: input.deliveryDriverName ?? null,
+      ...(origin === 'FOOD_99' ? food99DeliveryFacts(input) : {}),
+    },
     productionSummary: { state: productionState, label: productionLabel },
     primaryAction,
     secondaryActions,

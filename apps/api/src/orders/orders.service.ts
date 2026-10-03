@@ -699,9 +699,12 @@ export class OrdersService {
             deliveryDriver: { select: { name: true } },
             marketplaceOrders: {
               select: {
+                id: true,
                 provider: true,
                 externalDisplayId: true,
+                statusExternal: true,
                 deliveryOwnership: true,
+                rawPayload: true,
                 normalizedPayload: true,
                 operations: {
                   orderBy: { createdAt: 'desc' },
@@ -739,7 +742,10 @@ export class OrdersService {
             deliveryDriverName: o.deliveryDriver?.name,
             provider: o.marketplaceOrders[0]?.provider,
             externalDisplayId: o.marketplaceOrders[0]?.externalDisplayId,
+            marketplaceOrderId: o.marketplaceOrders[0]?.id,
+            marketplaceExternalStatus: o.marketplaceOrders[0]?.statusExternal,
             deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+            marketplaceRawPayload: o.marketplaceOrders[0]?.rawPayload,
             marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
             latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
           }),
@@ -887,9 +893,12 @@ export class OrdersService {
         table: { select: { id: true, name: true } },
         marketplaceOrders: {
           select: {
+            id: true,
             provider: true,
             externalDisplayId: true,
+            statusExternal: true,
             deliveryOwnership: true,
+            rawPayload: true,
             normalizedPayload: true,
             operations: {
               orderBy: { createdAt: 'desc' },
@@ -930,7 +939,10 @@ export class OrdersService {
         deliveryDriverName: o.deliveryDriver?.name,
         provider: o.marketplaceOrders[0]?.provider,
         externalDisplayId: o.marketplaceOrders[0]?.externalDisplayId,
+        marketplaceOrderId: o.marketplaceOrders[0]?.id,
+        marketplaceExternalStatus: o.marketplaceOrders[0]?.statusExternal,
         deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+        marketplaceRawPayload: o.marketplaceOrders[0]?.rawPayload,
         marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
         latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
       }),
@@ -995,9 +1007,12 @@ export class OrdersService {
         timeline: { orderBy: { createdAt: 'asc' } },
         marketplaceOrders: {
           select: {
+            id: true,
             provider: true,
             externalDisplayId: true,
+            statusExternal: true,
             deliveryOwnership: true,
+            rawPayload: true,
             normalizedPayload: true,
             operations: {
               orderBy: { createdAt: 'desc' },
@@ -1184,8 +1199,11 @@ export class OrdersService {
     }>;
     marketplaceOrders?: Array<{
       provider: string;
+      id?: string;
       externalDisplayId?: string | null;
+      statusExternal?: string | null;
       deliveryOwnership: string;
+      rawPayload?: Prisma.JsonValue | null;
       normalizedPayload?: Prisma.JsonValue | null;
       operations: Array<{ operation: string; status: string }>;
     }>;
@@ -1222,7 +1240,10 @@ export class OrdersService {
           deliveryDriverName: order.deliveryDriver?.name,
           provider: marketplaceOrder?.provider,
           externalDisplayId: marketplaceOrder?.externalDisplayId,
+          marketplaceOrderId: marketplaceOrder?.id,
+          marketplaceExternalStatus: marketplaceOrder?.statusExternal,
           deliveryOwnership: marketplaceOrder?.deliveryOwnership,
+          marketplaceRawPayload: marketplaceOrder?.rawPayload,
           marketplaceNormalizedPayload: marketplaceOrder?.normalizedPayload,
           latestMarketplaceOperation: marketplaceOrder?.operations[0] ?? null,
         }),

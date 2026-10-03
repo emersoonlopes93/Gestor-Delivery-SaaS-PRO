@@ -19,12 +19,17 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('Registrar no financeiro');
     expect(panel).toContain("settlement.status === 'LIQUIDATED_UNPOSTED'");
     expect(panel).toContain('connection.id === settlement.connectionId');
+    expect(panel).toContain('reconciliationResponse.data.connections.length === 1');
+    expect(panel).toContain('Selecione uma loja para configurar ou sincronizar');
+    expect(panel).toContain('Gerenciar contas financeiras');
+    expect(panel).toContain('/management/finance');
   });
 
   it('does not turn missing WhiteList access into a zero-valued settlement state', () => {
     expect(panel).toContain("caught.code === 'FINANCE_ACCESS_NOT_ENABLED'");
     expect(panel).toContain('A 99Food requer liberação/WhiteList');
     expect(panel).not.toContain("accessNotEnabled ? 'R$ 0,00'");
+    expect(panel).toContain('caught.status === 401 || caught.status === 403');
   });
 
   it('keeps settlement amount aggregate and Bill composition visibly distinct', () => {
@@ -34,7 +39,7 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('Divergência');
     expect(panel).toContain('weekPaymentId');
     expect(panel).toContain('dayPaymentId');
-    expect(panel).toContain('Ver detalhes e suporte');
+    expect(panel).toContain("'Detalhes'");
   });
 
   it('preserves the shared legacy/V2 order payment contract', () => {

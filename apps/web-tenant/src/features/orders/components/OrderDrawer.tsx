@@ -1,7 +1,7 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { AlertCircle, Clock3, MapPinned, Route, X, RefreshCw } from 'lucide-react';
+import { AlertCircle, Clock3, MapPinned, Route, X, RefreshCw, WalletCards } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import type { DeliveryRunBuilderDataDTO, DeliveryRunDTO, OrderOperationalAction, OrderResponseDTO, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
+import type { DeliveryRunBuilderDataDTO, DeliveryRunDTO, OrderDeliverySummary, OrderOperationalAction, OrderResponseDTO, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
@@ -41,6 +41,9 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+  const [cashConfirmationOpen, setCashConfirmationOpen] = useState(false);
+  const [cashConfirmationPending, setCashConfirmationPending] = useState(false);
+  const [cashConfirmationError, setCashConfirmationError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const trackingRunQuery = useQuery({
@@ -65,6 +68,8 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     ? presentOrderTime(order.createdAt, Date.now(), { status: order.status, timeline: order.timeline })
     : null;
   const closeTracking = useCallback(() => setIsTrackingOpen(false), []);
+  const cashConfirmation = order?.operational?.capabilities.courierCashConfirmation;
+  const canConfirmCourierCash = Boolean(cashConfirmation?.eligible && order?.operational?.marketplaceOrderId);
 
   useEffect(() => {
     if (!orderId) return;
@@ -216,6 +221,24 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     } catch (err) {
       console.error('[OrderDrawer] Erro ao registrar impressao:', err);
       setIsPrinting(false);
+    }
+  };
+
+  const confirmCourierCash = async () => {
+    if (!order?.operational?.marketplaceOrderId || !canConfirmCourierCash || cashConfirmationPending) return;
+    setCashConfirmationPending(true);
+    setCashConfirmationError(null);
+    try {
+      const response = await api.post(`/marketplaces/orders/${order.operational.marketplaceOrderId}/pay-confirm`);
+      if (!response.success) throw new Error('Confirmação não aceita.');
+      toast.success('Confirmação enviada à 99Food. Nenhum lançamento financeiro foi criado.');
+      setCashConfirmationOpen(false);
+      await fetchDetail(true);
+      onUpdated();
+    } catch {
+      setCashConfirmationError('Não foi possível confirmar o recebimento com a 99Food. Atualize o pedido antes de tentar novamente.');
+    } finally {
+      setCashConfirmationPending(false);
     }
   };
 
@@ -371,6 +394,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                     <div className="rounded-2xl border border-border bg-background p-4">
                       <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Logística</p>
                       <p className="mt-2 text-sm font-bold text-foreground">{order.operational?.deliverySummary.label}</p>
+                      <ProviderLogisticsFacts logistics={order.operational?.deliverySummary} />
                     </div>
                   )}
                    {routingSummary ? (
@@ -405,6 +429,11 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 couponCode={order.couponId} // Backend DTO has couponId as string, could be code
                 cashbackUsed={order.cashbackUsed}
               />
+              {order.operational?.origin === 'FOOD_99' && cashConfirmation ? <section className="rounded-xl border border-border bg-muted/20 p-4" aria-label="Dinheiro com entregador">
+                <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Dinheiro com entregador</p>
+                {canConfirmCourierCash ? <><p className="mt-2 text-sm font-bold text-foreground">{cashConfirmation.amountToCollect === null ? 'Confirme o valor informado pela 99Food.' : `Confirmar recebimento de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cashConfirmation.amountToCollect)}.`}</p><p className="mt-1 text-xs text-muted-foreground">A confirmação é enviada à 99Food e não cria lançamento financeiro.</p><button type="button" disabled={cashConfirmationPending} onClick={() => setCashConfirmationOpen(true)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-black text-primary hover:bg-primary/15 disabled:opacity-60"><WalletCards className="h-4 w-4" />Confirmar dinheiro recebido</button></> : <p className="mt-2 text-sm text-muted-foreground">{cashConfirmation.reasonUnavailable ?? 'A confirmação de dinheiro ainda não está disponível para este pedido.'}</p>}
+                {cashConfirmationOpen ? <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"><p className="text-sm font-bold text-foreground">Confirmar recebimento pelo entregador?</p><p className="mt-1 text-xs text-muted-foreground">Esta ação confirma o recebimento no canal; ela não altera o saldo do financeiro.</p>{cashConfirmationError ? <p role="alert" className="mt-2 text-xs font-bold text-destructive">{cashConfirmationError}</p> : null}<div className="mt-3 flex gap-2"><button type="button" disabled={cashConfirmationPending} onClick={() => setCashConfirmationOpen(false)} className="min-h-9 rounded-lg border border-border bg-card px-3 text-xs font-bold text-foreground">Cancelar</button><button type="button" disabled={cashConfirmationPending} onClick={() => void confirmCourierCash()} className="min-h-9 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-60">{cashConfirmationPending ? 'Confirmando...' : 'Confirmar recebimento'}</button></div></div> : null}
+              </section> : null}
 
               {/* Timeline */}
               <OrderTimelineSection timeline={order.timeline} />
@@ -462,3 +491,14 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     </>
   );
 });
+
+function ProviderLogisticsFacts({ logistics }: { logistics?: OrderDeliverySummary }) {
+  const facts = [
+    logistics?.providerStatusLabel ? `Status: ${logistics.providerStatusLabel}` : null,
+    logistics?.riderName ? `Entregador: ${logistics.riderName}` : null,
+    logistics?.riderPhone ? `Telefone do entregador: ${logistics.riderPhone}` : null,
+    logistics?.riderToBusinessEta ? `Previsão até a loja: ${logistics.riderToBusinessEta}` : null,
+  ].filter((fact): fact is string => Boolean(fact));
+  if (facts.length === 0) return <p className="mt-1 text-xs text-muted-foreground">Aguardando confirmação de logística pelo canal.</p>;
+  return <div className="mt-2 space-y-1 text-xs text-muted-foreground">{facts.map((fact) => <p key={fact}>{fact}</p>)}</div>;
+}
