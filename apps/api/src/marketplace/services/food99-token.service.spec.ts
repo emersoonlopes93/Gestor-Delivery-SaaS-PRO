@@ -52,4 +52,17 @@ describe('Food99TokenService', () => {
     expect(new URL(String((global.fetch as jest.Mock).mock.calls[0][0])).pathname).toBe('/v1/auth/authtoken/refresh');
     expect(new URL(String((global.fetch as jest.Mock).mock.calls[1][0])).pathname).toBe('/v1/auth/authtoken/get');
   });
+
+  it('keeps a new self-service connection pending when the shop has not authorized it yet', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 401, errmsg: 'not authorized' }), { status: 200 }));
+    const { service, prisma } = makeService();
+    const pendingConnection = {
+      id: 'connection-pending', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99,
+      externalStoreId: '5764607523034234882', accessTokenEnc: null, tokenExpiresAt: null,
+      status: 'DISCONNECTED',
+    } as never;
+
+    await expect(service.getAccessToken(pendingConnection)).rejects.toThrow('99Food shop authentication failed.');
+    expect(prisma.marketplaceConnection.updateMany).not.toHaveBeenCalled();
+  });
 });

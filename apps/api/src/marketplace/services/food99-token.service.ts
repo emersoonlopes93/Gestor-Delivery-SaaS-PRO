@@ -38,6 +38,7 @@ export class Food99TokenService {
 
   async markAuthenticationFailed(connection: MarketplaceConnection): Promise<void> {
     this.cache.delete(connection.id);
+    if (connection.status === MarketplaceConnectionStatus.DISCONNECTED && !connection.accessTokenEnc) return;
     await this.prisma.marketplaceConnection.updateMany({
       where: { id: connection.id, tenantId: connection.tenantId },
       data: { status: MarketplaceConnectionStatus.TOKEN_EXPIRED },

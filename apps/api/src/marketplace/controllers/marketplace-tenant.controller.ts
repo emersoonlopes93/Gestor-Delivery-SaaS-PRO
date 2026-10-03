@@ -12,10 +12,10 @@ import { MarketplaceEventInboxService } from '../services/marketplace-event-inbo
 import { MarketplaceOrderIngestionService } from '../services/marketplace-order-ingestion.service';
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceStatusSyncService } from '../services/marketplace-status-sync.service';
-import { Food99HttpClientService } from '../services/food99-http-client.service';
 import { FeatureControlService } from '../../feature-control/feature-control.service';
 import { MarketplaceCatalogMappingService } from '../services/marketplace-catalog-mapping.service';
 import { Food99CashConfirmationService } from '../services/food99-cash-confirmation.service';
+import { Food99SelfServiceConnectionService } from '../services/food99-self-service-connection.service';
 import { randomUUID } from 'crypto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
@@ -31,10 +31,10 @@ export class MarketplaceTenantController {
     private readonly ingestionService: MarketplaceOrderIngestionService,
     private readonly prisma: PrismaService,
     private readonly statusSyncService: MarketplaceStatusSyncService,
-    private readonly food99Client: Food99HttpClientService,
     private readonly featureControl: FeatureControlService,
     private readonly catalogMappings: MarketplaceCatalogMappingService,
     private readonly cashConfirmation: Food99CashConfirmationService,
+    private readonly food99SelfService: Food99SelfServiceConnectionService,
   ) {}
 
   @Get('catalog-mappings')
@@ -66,12 +66,23 @@ export class MarketplaceTenantController {
     });
   }
 
-  @Post('99food/authorization-url')
+  @Post('99food/self-service/authorization')
   @RequirePermissions('settings.manage')
-  async getFood99AuthorizationUrl(@Body() body: { appShopId?: string }) {
-    const appShopId = body.appShopId?.trim();
-    if (!appShopId) throw new BadRequestException('99Food app shop ID is required.');
-    return { url: await this.food99Client.getAuthorizationUrl(randomUUID(), appShopId) };
+  async startFood99SelfServiceAuthorization(@Req() req: TenantRequest, @Body() body: { connectionId?: string }) {
+    const started = await this.food99SelfService.start(req.user.tenantId, body.connectionId?.trim() || undefined);
+    return {
+      authorizationUrl: started.authorizationUrl,
+      connection: this.connectionService.maskConnection(started.connection),
+    };
+  }
+
+  @Post('99food/self-service/verify')
+  @RequirePermissions('settings.manage')
+  async verifyFood99SelfServiceAuthorization(@Req() req: TenantRequest, @Body() body: { connectionId?: string }) {
+    const connectionId = body.connectionId?.trim();
+    if (!connectionId) throw new BadRequestException('99Food connection is required to verify authorization.');
+    const result = await this.food99SelfService.verify(req.user.tenantId, connectionId);
+    return { authorized: result.authorized, connection: this.connectionService.maskConnection(result.connection) };
   }
 
   @Get('connections')

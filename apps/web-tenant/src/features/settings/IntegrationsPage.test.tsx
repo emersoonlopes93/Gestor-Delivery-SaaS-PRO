@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IntegrationsPage } from './IntegrationsPage';
 import {
   useBillingPreview,
@@ -12,7 +15,8 @@ import {
   useReconnectMarketplace,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
-  useFood99AuthorizationUrl,
+  useStartFood99SelfServiceAuthorization,
+  useVerifyFood99SelfServiceAuthorization,
   useMarketplaceCatalogMappings,
   useMarketplaceCatalogMappingCandidates,
   useUpsertMarketplaceCatalogMapping,
@@ -35,7 +39,8 @@ vi.mock('../marketplace/hooks', () => ({
   useReconnectMarketplace: vi.fn(),
   useReprocessMarketplaceEvent: vi.fn(),
   useReprocessMarketplaceOrder: vi.fn(),
-  useFood99AuthorizationUrl: vi.fn(),
+  useStartFood99SelfServiceAuthorization: vi.fn(),
+  useVerifyFood99SelfServiceAuthorization: vi.fn(),
   useMarketplaceCatalogMappings: vi.fn(),
   useMarketplaceCatalogMappingCandidates: vi.fn(),
   useUpsertMarketplaceCatalogMapping: vi.fn(),
@@ -47,7 +52,17 @@ vi.mock('../../hooks/useTenantCapabilities', () => ({
 const mutation = () => ({ isPending: false, mutate: vi.fn(), mutateAsync: vi.fn() });
 const refetch = vi.fn();
 
+const food99Connection = {
+  id: 'food99-connection-1', tenantId: 'tenant-1', provider: '99food' as const, status: 'DISCONNECTED' as const,
+  externalMerchantId: null, externalStoreId: null, displayName: null, authType: 'authorization_page', settingsJson: null,
+  hasAccessToken: false, hasRefreshToken: false, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+};
+
 describe('IntegrationsPage multi-iFood connections', () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
   beforeEach(() => {
     ifoodEnabled = true;
     vi.mocked(useMarketplaceStatus).mockReturnValue({ data: null, isLoading: false, refetch } as never);
@@ -79,7 +94,8 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useReconnectMarketplace).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceEvent).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceOrder).mockReturnValue(mutation() as never);
-    vi.mocked(useFood99AuthorizationUrl).mockReturnValue(mutation() as never);
+    vi.mocked(useStartFood99SelfServiceAuthorization).mockReturnValue(mutation() as never);
+    vi.mocked(useVerifyFood99SelfServiceAuthorization).mockReturnValue(mutation() as never);
     vi.mocked(useMarketplaceCatalogMappings).mockReturnValue({ data: [], isLoading: false } as never);
     vi.mocked(useMarketplaceCatalogMappingCandidates).mockReturnValue({ data: [], isLoading: false } as never);
     vi.mocked(useUpsertMarketplaceCatalogMapping).mockReturnValue(mutation() as never);
@@ -137,5 +153,80 @@ describe('IntegrationsPage multi-iFood connections', () => {
     expect(html).toContain('iFood');
     expect(html).toContain('Gerenciar');
     expect(useMarketplaceStatus).toHaveBeenCalledWith('ifood', true);
+  });
+
+  it('opens the guided 99Food journey without technical fields, then waits for verification', async () => {
+    const user = userEvent.setup();
+    const start = mutation();
+    start.mutateAsync.mockResolvedValue({ authorizationUrl: 'https://99food.example/authorize', connection: food99Connection });
+    vi.mocked(useStartFood99SelfServiceAuthorization).mockReturnValue(start as never);
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
+
+    expect(screen.getByRole('dialog', { name: 'Conectar 99Food' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Autorizar na 99Food' })).toBeTruthy();
+    expect(screen.queryByLabelText('Código da empresa')).toBeNull();
+    expect(screen.queryByLabelText('Código da loja')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Autorizar na 99Food' }));
+    await screen.findByText('Aguardando autorização');
+    expect(start.mutateAsync).toHaveBeenCalledWith({ connectionId: undefined });
+    expect(open).toHaveBeenCalledWith('https://99food.example/authorize', '_blank', 'noopener,noreferrer');
+    expect(screen.getByRole('button', { name: 'Verificar autorização' })).toBeTruthy();
+    open.mockRestore();
+  });
+
+  it('keeps verification available after a temporary verification error', async () => {
+    const user = userEvent.setup();
+    const start = mutation();
+    const verify = mutation();
+    start.mutateAsync.mockResolvedValue({ authorizationUrl: 'https://99food.example/authorize', connection: food99Connection });
+    verify.mutateAsync.mockRejectedValue(new Error('temporary provider failure'));
+    vi.mocked(useStartFood99SelfServiceAuthorization).mockReturnValue(start as never);
+    vi.mocked(useVerifyFood99SelfServiceAuthorization).mockReturnValue(verify as never);
+    vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Autorizar na 99Food' }));
+    await screen.findByText('Aguardando autorização');
+    await user.click(screen.getByRole('button', { name: 'Verificar autorização' }));
+
+    await waitFor(() => expect(verify.mutateAsync).toHaveBeenCalledWith({ connectionId: 'food99-connection-1' }));
+    expect(screen.getByRole('button', { name: 'Verificar autorização' })).toBeTruthy();
+  });
+
+  it('completes the guided 99Food connection only after token verification succeeds', async () => {
+    const user = userEvent.setup();
+    const start = mutation();
+    const verify = mutation();
+    start.mutateAsync.mockResolvedValue({ authorizationUrl: 'https://99food.example/authorize', connection: food99Connection });
+    verify.mutateAsync.mockResolvedValue({ authorized: true, connection: { ...food99Connection, status: 'CONNECTED' } });
+    vi.mocked(useStartFood99SelfServiceAuthorization).mockReturnValue(start as never);
+    vi.mocked(useVerifyFood99SelfServiceAuthorization).mockReturnValue(verify as never);
+    vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Autorizar na 99Food' }));
+    await screen.findByText('Aguardando autorização');
+    await user.click(screen.getByRole('button', { name: 'Verificar autorização' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Conectar 99Food' })).toBeNull());
+    expect(verify.mutateAsync).toHaveBeenCalledWith({ connectionId: 'food99-connection-1' });
+  });
+
+  it('only reveals the manual 99Food support fields after the fallback is expanded', async () => {
+    const user = userEvent.setup();
+    render(<IntegrationsPage />);
+    await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
+
+    expect(screen.queryByLabelText('Código da empresa')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Conexão manual para suporte' }));
+    expect(screen.getByLabelText('Código da empresa')).toBeTruthy();
+    expect(screen.getByLabelText('Código da loja')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Conectar com ajuda do suporte' })).toBeTruthy();
   });
 });

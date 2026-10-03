@@ -12,7 +12,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connectManual: jest.fn(),
       maskConnection: jest.fn((value: unknown) => value),
     };
-    const food99Client = { getAuthorizationUrl: jest.fn() };
+    const food99SelfService = { start: jest.fn(), verify: jest.fn() };
     const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
     const providerRegistry = { parseProvider: jest.fn().mockReturnValue(MarketplaceProvider.IFOOD) };
     const controller = new MarketplaceTenantController(
@@ -22,13 +22,13 @@ describe('MarketplaceTenantController connection tenancy', () => {
       {} as never,
       {} as never,
       {} as never,
-      food99Client as never,
       featureControl as never,
       {} as never,
       {} as never,
+      food99SelfService as never,
     );
     const request = { user: { tenantId: 'tenant-1' } } as never;
-    return { controller, connectionService, food99Client, featureControl, providerRegistry, request };
+    return { controller, connectionService, food99SelfService, featureControl, providerRegistry, request };
   };
 
   it('lists only connections from the authenticated tenant', async () => {
@@ -64,16 +64,27 @@ describe('MarketplaceTenantController connection tenancy', () => {
     })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('requires the 99Food app shop id before requesting an authorization URL', async () => {
-    const { controller } = makeController();
-    await expect(controller.getFood99AuthorizationUrl({})).rejects.toThrow('app shop ID is required');
+  it('starts 99Food self-service authorization without accepting tenant-provided store identifiers', async () => {
+    const { controller, food99SelfService, connectionService, request } = makeController();
+    food99SelfService.start.mockResolvedValue({ connection: { id: 'connection-99' }, authorizationUrl: 'https://auth.99food.test/start' });
+
+    await expect(controller.startFood99SelfServiceAuthorization(request, {})).resolves.toEqual({
+      authorizationUrl: 'https://auth.99food.test/start',
+      connection: { id: 'connection-99' },
+    });
+    expect(food99SelfService.start).toHaveBeenCalledWith('tenant-1', undefined);
+    expect(connectionService.maskConnection).toHaveBeenCalledWith({ id: 'connection-99' });
   });
 
-  it('passes the exact 99Food app shop id to the native authorization client', async () => {
-    const { controller, food99Client } = makeController();
-    food99Client.getAuthorizationUrl.mockResolvedValue('https://auth.99food.test/start');
-    await expect(controller.getFood99AuthorizationUrl({ appShopId: 'shop-99' })).resolves.toEqual({ url: 'https://auth.99food.test/start' });
-    expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String), 'shop-99');
+  it('verifies only the tenant-owned 99Food self-service connection', async () => {
+    const { controller, food99SelfService, request } = makeController();
+    food99SelfService.verify.mockResolvedValue({ authorized: true, connection: { id: 'connection-99', status: 'CONNECTED' } });
+
+    await expect(controller.verifyFood99SelfServiceAuthorization(request, { connectionId: 'connection-99' })).resolves.toEqual({
+      authorized: true,
+      connection: { id: 'connection-99', status: 'CONNECTED' },
+    });
+    expect(food99SelfService.verify).toHaveBeenCalledWith('tenant-1', 'connection-99');
   });
 
   it('blocks direct iFood administration when the tenant lacks ifood_marketplace', async () => {

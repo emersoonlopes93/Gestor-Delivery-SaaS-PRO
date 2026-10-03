@@ -265,11 +265,42 @@ export function useBillingPreview() {
   });
 }
 
-export function useFood99AuthorizationUrl() {
+export type Food99SelfServiceAuthorizationDTO = {
+  authorizationUrl: string;
+  connection: MarketplaceConnectionDTO;
+};
+
+export type Food99SelfServiceVerificationDTO = {
+  authorized: boolean;
+  connection: MarketplaceConnectionDTO;
+};
+
+export function useStartFood99SelfServiceAuthorization() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (appShopId: string) => {
-      const res = await api.post<{ url: string }>('/marketplaces/99food/authorization-url', { appShopId });
-      return res.data.url;
+    mutationFn: async (input: { connectionId?: string }) => {
+      const res = await api.post<Food99SelfServiceAuthorizationDTO>('/marketplaces/99food/self-service/authorization', input);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status', '99food'] });
+    },
+  });
+}
+
+export function useVerifyFood99SelfServiceAuthorization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { connectionId: string }) => {
+      const res = await api.post<Food99SelfServiceVerificationDTO>('/marketplaces/99food/self-service/verify', input);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status', '99food'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-events'] });
     },
   });
 }
