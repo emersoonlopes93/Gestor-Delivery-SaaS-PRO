@@ -34,6 +34,14 @@ describe('Food99HttpClientService native V1 actions', () => {
     expect(String((global.fetch as jest.Mock).mock.calls[0][0])).toBe('https://food99.test/v1/order/order/payConfirm');
   });
 
+  it.each([12013, 12014, 12015, 12016])('fails closed when payConfirm returns provider errno %i', async (errno) => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno, errmsg: 'provider rejection', data: false }), { status: 200 }));
+    const { service, connection } = makeService();
+
+    await expect(service.confirmCashPayment(connection, '5764656197621845665', 'correlation-1'))
+      .rejects.toThrow('99Food native request failed.');
+  });
+
   it.each([
     [{ errno: 3, errmsg: 'rejected', data: true }, '99Food native request failed.'],
     [{ errno: 0, data: false }, '99Food did not confirm the order.'],
