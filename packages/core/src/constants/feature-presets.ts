@@ -15,9 +15,12 @@ export type FeaturePresetEntry = {
   disabledFeatures: CatalogFeatureKey[];
 };
 
-const OPTIONAL_KEYS = FEATURE_CATALOG.filter((feature) => !feature.essential).map((feature) => feature.key);
+const OPTIONAL_KEYS = FEATURE_CATALOG
+  .filter((feature) => !feature.essential && !feature.requiresExplicitTenantEnablement)
+  .map((feature) => feature.key);
 
 const MVP_DISABLED: CatalogFeatureKey[] = [
+  'order_manager_v2',
   'crm_enterprise',
   'campaigns',
   'whatsapp_connect',
@@ -76,7 +79,9 @@ export const FEATURE_PRESETS: readonly FeaturePresetEntry[] = [
     name: 'Full Platform',
     description: 'Ativa tudo que ja esta estavel ou beta, sem liberar coming soon.',
     enabledFeatures: FEATURE_CATALOG
-      .filter((feature) => !feature.essential && (feature.status === 'stable' || feature.status === 'beta'))
+      .filter((feature) => !feature.essential
+        && !feature.requiresExplicitTenantEnablement
+        && (feature.status === 'stable' || feature.status === 'beta'))
       .map((feature) => feature.key),
     disabledFeatures: FEATURE_CATALOG
       .filter((feature) => !feature.essential && (feature.status === 'coming_soon' || feature.status === 'internal' || feature.status === 'legacy'))

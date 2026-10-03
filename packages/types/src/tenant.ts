@@ -6,6 +6,28 @@ import { TenantStatus } from './enums';
 import { TenantRole } from './rbac';
 export type { TenantRole };
 
+export const BUSINESS_SEGMENTS = [
+  'PIZZARIA',
+  'HAMBURGUERIA',
+  'RESTAURANTE',
+  'MERCADO',
+  'ACAI',
+  'PADARIA',
+  'OTHER',
+] as const;
+
+export type BusinessSegment = (typeof BUSINESS_SEGMENTS)[number];
+
+export const BUSINESS_SEGMENT_LABELS: Record<BusinessSegment, string> = {
+  PIZZARIA: 'Pizzaria',
+  HAMBURGUERIA: 'Hamburgueria',
+  RESTAURANTE: 'Restaurante',
+  MERCADO: 'Mercado',
+  ACAI: 'Açaí',
+  PADARIA: 'Padaria',
+  OTHER: 'Outro',
+};
+
 export interface Tenant {
   id: string;
   name: string;
@@ -73,6 +95,7 @@ export interface TenantSettings {
   currency: string;
   language: string;
   businessPhone?: string;
+  businessSegment?: BusinessSegment | null;
   orderWhatsappNumber?: string;
   businessEmail?: string;
   address?: string; // Legacy/Plain text
@@ -126,6 +149,10 @@ export interface TenantSettings {
   readySound?: string;
   notificationVolume?: number;
   browserNotificationsEnabled?: boolean;
+  autoAcceptOrdersEnabled?: boolean;
+  autoAcceptDelaySeconds?: 0 | 30 | 60;
+  autoAcceptDeliveryOrders?: boolean;
+  autoAcceptPickupOrders?: boolean;
   loyaltyEnabled?: boolean;
   loyaltyPointsPerReal?: number;
   cashbackEnabled?: boolean;
@@ -133,6 +160,13 @@ export interface TenantSettings {
   cashbackValidityDays?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OrderAutoAcceptSettings {
+  autoAcceptOrdersEnabled: boolean;
+  autoAcceptDelaySeconds: 0 | 30 | 60;
+  autoAcceptDeliveryOrders: boolean;
+  autoAcceptPickupOrders: boolean;
 }
 
 export type OnboardingBackendStep =

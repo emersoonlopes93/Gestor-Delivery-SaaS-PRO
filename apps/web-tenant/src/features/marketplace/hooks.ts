@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api-client';
 
-export type MarketplaceProvider = 'ifood';
-export type MarketplaceConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'PENDING' | 'ERROR';
-export type MarketplaceEventStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
+export type MarketplaceProvider = 'ifood' | '99food';
+export type MarketplaceConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'TOKEN_EXPIRED' | 'ERROR' | 'PAUSED';
+export type MarketplaceEventStatus = 'RECEIVED' | 'QUEUED' | 'PROCESSING' | 'PROCESSED' | 'FAILED' | 'IGNORED';
 
 export type MarketplaceConnectionDTO = {
   id: string;
@@ -15,6 +15,8 @@ export type MarketplaceConnectionDTO = {
   displayName: string | null;
   authType: string | null;
   settingsJson: Record<string, unknown> | null;
+  hasAccessToken: boolean;
+  hasRefreshToken: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -52,6 +54,36 @@ export type MarketplaceOrderDTO = {
 
 export type MarketplaceStatusDTO = MarketplaceConnectionDTO | null;
 
+export type MarketplaceCatalogMappingDTO = {
+  id: string;
+  connectionId: string;
+  provider: string;
+  externalItemId: string;
+  externalItemName: string | null;
+  externalReferenceId: string | null;
+  productId: string;
+  status: 'ACTIVE' | 'DISABLED';
+  connection: Pick<MarketplaceConnectionDTO, 'provider' | 'externalStoreId' | 'displayName'>;
+  product: { id: string; name: string; sku: string | null };
+};
+
+export type UpsertMarketplaceCatalogMappingInput = {
+  connectionId: string;
+  externalItemId: string;
+  externalItemName?: string;
+  externalReferenceId?: string;
+  productId: string;
+  status?: 'ACTIVE' | 'DISABLED';
+};
+
+export type MarketplaceCatalogMappingCandidateDTO = {
+  connectionId: string;
+  provider: string;
+  externalItemId: string;
+  externalItemName: string | null;
+  connection: { displayName: string | null; externalStoreId: string | null };
+};
+
 export type ConnectMarketplaceManualInput = {
   externalMerchantId?: string;
   externalStoreId?: string;
@@ -84,13 +116,14 @@ export function useMarketplaceConnections() {
   });
 }
 
-export function useMarketplaceStatus(provider: MarketplaceProvider = 'ifood') {
+export function useMarketplaceStatus(provider: MarketplaceProvider = 'ifood', enabled = true) {
   return useQuery({
     queryKey: ['marketplace-status', provider],
     queryFn: async () => {
       const res = await api.get<MarketplaceStatusDTO>(`/marketplaces/${provider}/status`);
       return res.data ?? null;
     },
+    enabled,
   });
 }
 
@@ -110,15 +143,29 @@ export function useConnectMarketplaceManual(provider: MarketplaceProvider = 'ifo
   });
 }
 
-export function useDisconnectMarketplace(provider: MarketplaceProvider = 'ifood') {
+export function useDisconnectMarketplace() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/${provider}/disconnect`);
+    mutationFn: async (connectionId: string) => {
+      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/connections/${connectionId}/disconnect`);
       return res.data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['marketplace-status', provider] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+    },
+  });
+}
+
+export function useReconnectMarketplace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (connectionId: string) => {
+      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/connections/${connectionId}/connect/manual`, {});
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status'] });
       await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
     },
   });
@@ -140,6 +187,41 @@ export function useMarketplaceEvents() {
     queryFn: async () => {
       const res = await api.get<MarketplaceEventInboxDTO[]>('/marketplaces/events');
       return res.data ?? [];
+    },
+  });
+}
+
+export function useMarketplaceCatalogMappings() {
+  return useQuery({
+    queryKey: ['marketplace-catalog-mappings'],
+    queryFn: async () => {
+      const res = await api.get<MarketplaceCatalogMappingDTO[]>('/marketplaces/catalog-mappings');
+      return res.data ?? [];
+    },
+  });
+}
+
+export function useMarketplaceCatalogMappingCandidates() {
+  return useQuery({
+    queryKey: ['marketplace-catalog-mapping-candidates'],
+    queryFn: async () => {
+      const res = await api.get<MarketplaceCatalogMappingCandidateDTO[]>('/marketplaces/catalog-mapping-candidates');
+      return res.data ?? [];
+    },
+  });
+}
+
+export function useUpsertMarketplaceCatalogMapping() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpsertMarketplaceCatalogMappingInput) => {
+      const res = await api.post<MarketplaceCatalogMappingDTO>('/marketplaces/catalog-mappings', input);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-catalog-mappings'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-catalog-mapping-candidates'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-orders'] });
     },
   });
 }
@@ -179,6 +261,46 @@ export function useBillingPreview() {
     queryFn: async () => {
       const res = await api.get<{ usagePreview?: BillingPreviewDTO }>('/billing/me');
       return res.data?.usagePreview ?? null;
+    },
+  });
+}
+
+export type Food99SelfServiceAuthorizationDTO = {
+  authorizationUrl: string;
+  connection: MarketplaceConnectionDTO;
+};
+
+export type Food99SelfServiceVerificationDTO = {
+  authorized: boolean;
+  connection: MarketplaceConnectionDTO;
+};
+
+export function useStartFood99SelfServiceAuthorization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { connectionId?: string }) => {
+      const res = await api.post<Food99SelfServiceAuthorizationDTO>('/marketplaces/99food/self-service/authorization', input);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status', '99food'] });
+    },
+  });
+}
+
+export function useVerifyFood99SelfServiceAuthorization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { connectionId: string }) => {
+      const res = await api.post<Food99SelfServiceVerificationDTO>('/marketplaces/99food/self-service/verify', input);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status', '99food'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-events'] });
     },
   });
 }

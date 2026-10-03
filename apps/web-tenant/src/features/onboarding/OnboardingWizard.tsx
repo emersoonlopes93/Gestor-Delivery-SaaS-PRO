@@ -18,7 +18,7 @@ import {
   Link2,
 } from 'lucide-react';
 
-import { useOnboardingState, AutoSaveStatus } from './useOnboardingState';
+import { useOnboardingState, AutoSaveStatus, type SaveStepOptions } from './useOnboardingState';
 import { Step1Identity } from './steps/Step1Identity';
 import { Step2Location } from './steps/Step2Location';
 import { Step3Delivery } from './steps/Step3Delivery';
@@ -106,8 +106,8 @@ export function OnboardingWizard() {
     triggerAutoSave,
   } = useOnboardingState();
 
-  const handleSaveAndNext = useCallback((saveFn: () => Promise<void>) => {
-    saveStep(saveFn);
+  const handleSaveAndNext = useCallback(async (saveFn: () => Promise<void>, options?: SaveStepOptions) => {
+    return saveStep(saveFn, options);
   }, [saveStep]);
 
   const handleContinueLater = useCallback(() => {

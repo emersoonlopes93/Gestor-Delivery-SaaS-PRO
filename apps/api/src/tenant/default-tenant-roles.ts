@@ -203,20 +203,12 @@ export async function ensureDefaultTenantRoles(
       .map((permissionSlug) => permissionBySlug.get(permissionSlug))
       .filter((permissionId): permissionId is string => typeof permissionId === 'string');
 
-    for (const permissionId of permissionIds) {
-      await client.tenantRolePermission.upsert({
-        where: {
-          roleId_permissionId: {
-            roleId: role.id,
-            permissionId,
-          },
-        },
-        update: {},
-        create: {
-          roleId: role.id,
-          permissionId,
-        },
-      });
-    }
+    await client.tenantRolePermission.createMany({
+      data: permissionIds.map((permissionId) => ({
+        roleId: role.id,
+        permissionId,
+      })),
+      skipDuplicates: true,
+    });
   }
 }

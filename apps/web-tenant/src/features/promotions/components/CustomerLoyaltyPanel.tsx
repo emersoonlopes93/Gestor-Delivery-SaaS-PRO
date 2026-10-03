@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api-client';
 import { ArrowDown, ArrowUp, Star, Gift } from 'lucide-react';
 import { BalanceAdjustmentModal } from './BalanceAdjustmentModal';
@@ -23,7 +23,7 @@ export function CustomerLoyaltyPanel({ customerId, customerName }: CustomerLoyal
   
   const [modalType, setModalType] = useState<'add' | 'remove' | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await api.get<{ balance: number; transactions: LoyaltyTransaction[] }>(`/loyalty/customer/${customerId}`);
@@ -36,11 +36,11 @@ export function CustomerLoyaltyPanel({ customerId, customerName }: CustomerLoyal
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerId]);
 
   useEffect(() => {
     if (customerId) loadData();
-  }, [customerId]);
+  }, [customerId, loadData]);
 
   const handleAdjustment = async (points: number, description: string) => {
     if (modalType === 'add') {

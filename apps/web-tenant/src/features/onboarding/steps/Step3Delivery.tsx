@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CircleDot, Info, Truck } from 'lucide-react';
 import { CurrencyInput } from '@gestor/ui';
 import { api } from '../../../lib/api-client';
+import type { SaveStepOptions } from '../useOnboardingState';
 
 interface TenantMeResponse {
   settings?: {
@@ -23,7 +24,7 @@ interface DeliveryCoverageConfigSnapshot {
 }
 
 interface Step3Props {
-  onNext: (saveFn: () => Promise<void>) => void;
+  onNext: (saveFn: () => Promise<void>, options?: SaveStepOptions) => Promise<boolean>;
   onPrev: () => void;
   onMarkValid: (valid: boolean) => void;
 }
@@ -104,6 +105,8 @@ export function Step3Delivery({ onNext, onPrev, onMarkValid }: Step3Props) {
   const [originLng, setOriginLng] = useState<number | null>(null);
   const [coverageConfig, setCoverageConfig] = useState<DeliveryCoverageConfigSnapshot | null>(null);
   const [radiusDraft, setRadiusDraft] = useState<RadiusDeliveryDraft>(DEFAULT_RADIUS_DRAFT);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -159,7 +162,8 @@ export function Step3Delivery({ onNext, onPrev, onMarkValid }: Step3Props) {
     onMarkValid(isStepValid);
   }, [isStepValid, onMarkValid]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (submittingRef.current) return;
     if (!configValid) {
       setSavingError(radiusDraftError(radiusDraft));
       return;
@@ -172,34 +176,46 @@ export function Step3Delivery({ onNext, onPrev, onMarkValid }: Step3Props) {
 
     setSavingError(null);
 
-    onNext(async () => {
-      const storeLat = hasOrigin ? originLat : coverageConfig?.storeLat ?? null;
-      const storeLng = hasOrigin ? originLng : coverageConfig?.storeLng ?? null;
-      const hasPersistableOrigin = hasRealCoordinates(storeLat, storeLng);
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const advanced = await onNext(async () => {
+        const storeLat = hasOrigin ? originLat : coverageConfig?.storeLat ?? null;
+        const storeLng = hasOrigin ? originLng : coverageConfig?.storeLng ?? null;
+        const hasPersistableOrigin = hasRealCoordinates(storeLat, storeLng);
 
-      if (!deliveryEnabled && !coverageConfig && !hasOrigin) {
-        return;
+        if (!deliveryEnabled && !coverageConfig && !hasOrigin) {
+          return;
+        }
+
+        if (deliveryEnabled && !hasPersistableOrigin) {
+          throw new Error('Origem da loja invalida para entrega.');
+        }
+
+        if (!deliveryEnabled && !hasPersistableOrigin) {
+          return;
+        }
+
+        const response = await api.put('/delivery/coverage', {
+          storeLat,
+          storeLng,
+          maxRadiusKm: radiusDraft.maxRadiusKm,
+          defaultPricePerKm: radiusDraft.defaultPricePerKm,
+          minimumFee: radiusDraft.minimumFee,
+          maximumFee: radiusDraft.maximumFee ?? undefined,
+          defaultEstimatedDeliveryMinutes: radiusDraft.defaultEstimatedDeliveryMinutes,
+          isDeliveryEnabled: deliveryEnabled,
+        });
+        if (!response.success) throw new Error('Nao foi possivel salvar a cobertura de entrega.');
+      }, { resumePersistedDeliveryCoverage: true });
+
+      if (!advanced) {
+        setSavingError('Nao foi possivel concluir a configuracao. Tente novamente.');
       }
-
-      if (deliveryEnabled && !hasPersistableOrigin) {
-        throw new Error('Origem da loja invalida para entrega.');
-      }
-
-      if (!deliveryEnabled && !hasPersistableOrigin) {
-        return;
-      }
-
-      await api.put('/delivery/coverage', {
-        storeLat,
-        storeLng,
-        maxRadiusKm: radiusDraft.maxRadiusKm,
-        defaultPricePerKm: radiusDraft.defaultPricePerKm,
-        minimumFee: radiusDraft.minimumFee,
-        maximumFee: radiusDraft.maximumFee ?? undefined,
-        defaultEstimatedDeliveryMinutes: radiusDraft.defaultEstimatedDeliveryMinutes,
-        isDeliveryEnabled: deliveryEnabled,
-      });
-    });
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -399,10 +415,10 @@ export function Step3Delivery({ onNext, onPrev, onMarkValid }: Step3Props) {
         </button>
         <button
           onClick={handleNext}
-          disabled={!configValid || (deliveryEnabled && !hasOrigin)}
+          disabled={isSubmitting || !configValid || (deliveryEnabled && !hasOrigin)}
           className="flex-[2] rounded-2xl bg-emerald-600 py-4 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:disabled:bg-slate-700"
         >
-          Proximo
+          {isSubmitting ? 'Salvando...' : 'Proximo'}
         </button>
       </div>
     </div>

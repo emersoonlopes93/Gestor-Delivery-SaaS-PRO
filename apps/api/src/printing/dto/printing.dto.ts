@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsUUID } from 'class-validator';
 
 export class CreatePrinterDeviceDto {
   @IsOptional()
@@ -102,6 +102,11 @@ export class UpdatePrinterDeviceDto {
   isActive?: boolean;
 }
 
+export class UpdatePrintStationDto {
+  @IsBoolean()
+  isActive!: boolean;
+}
+
 export class AckSpoolerJobDto {
   @IsString()
   printerDeviceId: string;
@@ -113,4 +118,16 @@ export class FailSpoolerJobDto {
 
   @IsString()
   errorMessage: string;
+}
+
+export class CreateTestPrintDto {
+  @IsString()
+  stationSlug: string;
+
+  @IsString()
+  deviceName: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }

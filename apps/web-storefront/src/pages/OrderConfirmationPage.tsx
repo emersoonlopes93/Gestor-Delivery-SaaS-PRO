@@ -78,6 +78,48 @@ export function OrderConfirmationPage() {
     }
   };
 
+  const generateWhatsappMessage = () => {
+    if (!order) return '';
+    let msg = `Olá, acabei de fazer o pedido #${order.orderNumber}\n\n`;
+    
+    msg += `*Resumo do Pedido*\n`;
+    order.items.forEach(item => {
+      msg += `${item.quantity}x ${item.snapshotName}\n`;
+      if (item.snapshotComposition) {
+        msg += `  _${item.snapshotComposition}_\n`;
+      }
+    });
+    
+    msg += `\n*Subtotal:* ${fmt(order.itemsSubtotal)}`;
+    if (order.deliveryFee > 0) {
+      msg += `\n*Taxa de entrega:* ${fmt(order.deliveryFee)}`;
+    }
+    msg += `\n*Total:* ${fmt(order.total)}\n`;
+    
+    msg += `\n*Tipo:* ${order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}`;
+    if (order.fulfillmentType === 'delivery' && order.deliveryAddress) {
+      msg += `\n${order.deliveryAddress.street}, ${order.deliveryAddress.number}`;
+      if (order.deliveryAddress.complement) msg += ` - ${order.deliveryAddress.complement}`;
+      msg += `\n${order.deliveryAddress.neighborhood} - ${order.deliveryAddress.city}/${order.deliveryAddress.state}`;
+    }
+    
+    if (order.paymentMethod) {
+      const paymentMethods: Record<string, string> = {
+        'pix': 'Pix',
+        'credit_card': 'Cartão de Crédito',
+        'debit_card': 'Cartão de Débito',
+        'cash': 'Dinheiro'
+      };
+      msg += `\n*Pagamento:* ${paymentMethods[order.paymentMethod] || order.paymentMethod}`;
+    }
+
+    if (order.notes) {
+      msg += `\n\n*Observações:*\n${order.notes}`;
+    }
+    
+    return encodeURIComponent(msg);
+  };
+
   return (
     <div className="px-4 py-8 max-w-lg mx-auto">
       {/* Success Header */}
@@ -220,7 +262,7 @@ export function OrderConfirmationPage() {
 
       {whatsappNumber && (
         <a
-          href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=Ol%C3%A1%2C%20acabei%20de%20fazer%20o%20pedido%20%23${order.orderNumber}`}
+          href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${generateWhatsappMessage()}`}
           target="_blank"
           rel="noopener noreferrer"
           className="w-full flex items-center justify-center gap-2 h-14 bg-[#25D366] text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-[#128C7E] transition-colors mb-4"

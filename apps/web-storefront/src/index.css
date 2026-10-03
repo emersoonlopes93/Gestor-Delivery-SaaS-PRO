@@ -28,6 +28,10 @@
     --storefront-border: #e5e7eb;           /* borda padrão - gray-200 */
     --storefront-input: #e5e7eb;          /* borda de inputs - gray-200 */
     --storefront-radius: 0.75rem;
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
   }
 
   /* Escopo específico para storefront - não usa .dark global */
@@ -54,6 +58,7 @@
     background-color: var(--storefront-background);
     color: var(--storefront-foreground);
     min-height: 100vh;
+    min-height: 100dvh;
   }
 
   #root {
@@ -104,6 +109,22 @@
   }
   .animate-slide-up {
     animation: slide-up 0.35s cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+
+  .storefront-safe-action {
+    padding-right: max(1rem, var(--safe-area-right));
+    padding-bottom: max(1rem, var(--safe-area-bottom));
+    padding-left: max(1rem, var(--safe-area-left));
+  }
+
+  .storefront-safe-sheet {
+    padding-right: var(--safe-area-right);
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+  }
+
+  .storefront-safe-floating-bottom {
+    bottom: calc(6rem + var(--safe-area-bottom));
   }
 }
 

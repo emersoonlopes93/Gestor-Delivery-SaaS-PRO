@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Megaphone, Plus, Users, Send, PauseCircle, Play, Square } from 'lucide-react';
+import { Megaphone, Plus, Users, Send, Play, Square } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import type { Campaign } from '@gestor/types';
 import { CreateCampaignModal } from '../components/CreateCampaignModal';
@@ -38,13 +38,6 @@ export function CampaignsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
   });
 
-  const pauseMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.post(`/campaigns/${id}/pause`);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
-  });
-
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
       await api.post(`/campaigns/${id}/cancel`);
@@ -75,7 +68,7 @@ export function CampaignsPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Campanhas Ativas</p>
               <h3 className="text-2xl font-bold text-foreground">
-                {campaigns.filter(c => c.status === 'running').length}
+                {campaigns.filter(c => c.status === 'processing').length}
               </h3>
             </div>
           </div>
@@ -144,16 +137,18 @@ export function CampaignsPage() {
                 <TableCell>
                   <StatusBadge
                     status={
-                      c.status === 'running' ? 'success' : 
-                      c.status === 'paused' ? 'warning' :
+                      c.status === 'processing' ? 'success' :
+                      c.status === 'queued' || c.status === 'scheduled' ? 'warning' :
                       c.status === 'completed' ? 'info' :
-                      c.status === 'cancelled' ? 'error' :
+                      c.status === 'cancelled' || c.status === 'failed' ? 'error' :
                       'neutral'
                     }
                   >
-                    {c.status === 'running' ? 'Em execução' : 
-                     c.status === 'paused' ? 'Pausada' :
+                    {c.status === 'processing' ? 'Em execução' :
+                     c.status === 'queued' ? 'Na Fila' :
+                     c.status === 'scheduled' ? 'Agendada' :
                      c.status === 'completed' ? 'Concluída' :
+                     c.status === 'failed' ? 'Falhou' :
                      c.status === 'cancelled' ? 'Cancelada' :
                      'Rascunho'}
                   </StatusBadge>
@@ -193,17 +188,7 @@ export function CampaignsPage() {
                 <TableCell className="text-sm text-muted-foreground">{new Date(c.createdAt).toLocaleDateString('pt-BR')}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    {c.status === 'running' && (
-                      <button 
-                        onClick={() => pauseMutation.mutate(c.id)}
-                        disabled={pauseMutation.isPending}
-                        className="p-2 text-muted-foreground hover:text-status-warning transition-colors" 
-                        title="Pausar"
-                      >
-                        <PauseCircle className="w-5 h-5" />
-                      </button>
-                    )}
-                    {(c.status === 'draft' || c.status === 'paused') && (
+                    {(c.status === 'draft') && (
                       <button 
                         onClick={() => startMutation.mutate(c.id)}
                         disabled={startMutation.isPending}
@@ -213,7 +198,7 @@ export function CampaignsPage() {
                         <Play className="w-5 h-5" />
                       </button>
                     )}
-                    {(c.status === 'draft' || c.status === 'paused' || c.status === 'running') && (
+                    {(c.status === 'draft' || c.status === 'scheduled' || c.status === 'queued' || c.status === 'processing') && (
                       <button 
                         onClick={() => cancelMutation.mutate(c.id)}
                         disabled={cancelMutation.isPending}

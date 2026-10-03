@@ -7,13 +7,15 @@ interface OrderCustomerSectionProps {
   customerPhone?: string | null;
   customerEmail?: string | null;
   notes?: string | null;
+  missingPhoneMessage?: string;
 }
 
 export const OrderCustomerSection = memo(function OrderCustomerSection({ 
   customerName, 
   customerPhone, 
   customerEmail,
-  notes 
+  notes,
+  missingPhoneMessage,
 }: OrderCustomerSectionProps) {
   
   const handleCopyPhone = () => {
@@ -61,12 +63,17 @@ export const OrderCustomerSection = memo(function OrderCustomerSection({
           )}
         </div>
 
-        {customerPhone && (
+        {customerPhone ? (
           <div className="flex items-center gap-2 mt-2">
             <Phone className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">{customerPhone}</span>
           </div>
-        )}
+        ) : missingPhoneMessage ? (
+          <div className="mt-2 flex items-center gap-2">
+            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">{missingPhoneMessage}</span>
+          </div>
+        ) : null}
 
         {notes && (
           <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/40 rounded-xl">

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
@@ -12,6 +12,8 @@ import {
   PrintType as PrismaPrintType
 } from '@prisma/client';
 import { PrinterService } from '../pos/printer.service';
+import { OrdersService } from '../orders/orders.service';
+import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
 import { 
   OrderResponseDTO, 
   PrintType, 
@@ -43,6 +45,9 @@ export class KdsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly printerService: PrinterService,
+    @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
+    @Optional() @Inject(forwardRef(() => MarketplaceStatusSyncService))
+    private readonly marketplaceStatusSyncService?: MarketplaceStatusSyncService,
   ) {}
 
   private buildIdempotencyKey(prefix: string, parts: Array<string | number | null | undefined>) {
@@ -62,6 +67,17 @@ export class KdsService {
       create: data,
       update: {},
     });
+  }
+
+  private async assertOrderBelongsToTenant(orderId: string, tenantId: string): Promise<void> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
   }
 
   /**
@@ -93,6 +109,7 @@ export class KdsService {
         by: ['station'],
         where: {
           tenantId,
+          type: PrismaPrintType.kitchen,
           status: {
             notIn: [PrismaPrintJobStatus.completed]
           }
@@ -124,6 +141,7 @@ export class KdsService {
       where: {
         tenantId,
         station,
+        type: PrismaPrintType.kitchen,
         status: PrismaPrintJobStatus.pending,
       },
       orderBy: {
@@ -194,6 +212,7 @@ export class KdsService {
 
     const where: Prisma.PrintJobWhereInput = {
       tenantId,
+      type: PrismaPrintType.kitchen,
       station: station && station !== 'ALL' ? station : undefined,
     };
 
@@ -229,6 +248,34 @@ export class KdsService {
       page,
       limit,
     };
+  }
+
+  /**
+   * Retrieves a single print job while preserving tenant isolation.
+   */
+  async getPrintJob(printJobId: string): Promise<PrintJobWithOrder> {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new Error('Tenant context not found');
+    }
+
+    const printJob = await this.prisma.printJob.findFirst({
+      where: { id: printJobId, tenantId },
+      include: {
+        order: {
+          include: {
+            items: true,
+            customer: true,
+          },
+        },
+      },
+    });
+
+    if (!printJob) {
+      throw new NotFoundException('Print job not found');
+    }
+
+    return printJob;
   }
 
   /**
@@ -276,13 +323,33 @@ export class KdsService {
       throw new Error('Tenant context not found');
     }
 
-    return this.prisma.printJob.update({
+    const printJob = await this.prisma.printJob.findFirst({
+      where: { id: printJobId, tenantId },
+      include: { order: { select: { id: true, status: true, fulfillmentType: true } } },
+    });
+    if (!printJob) throw new NotFoundException('Print job not found');
+    if (printJob.status === PrismaPrintJobStatus.completed) return printJob;
+
+    const completed = await this.prisma.printJob.update({
       where: { id: printJobId, tenantId },
       data: {
         status: PrismaPrintJobStatus.completed,
         printedAt: new Date(),
       },
     });
+    const openJobs = await this.prisma.printJob.count({
+      where: { tenantId, orderId: completed.orderId, type: PrismaPrintType.kitchen, status: { not: PrismaPrintJobStatus.completed } },
+    });
+    if (openJobs === 0 && printJob.order.status === 'preparing') {
+      const targetStatus: OrderStatus = printJob.order.fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
+      try {
+        await this.advanceOrderAfterKitchenCompletion(completed.orderId, tenantId, targetStatus);
+      } catch (error) {
+        const order = await this.prisma.order.findFirst({ where: { id: completed.orderId, tenantId }, select: { status: true } });
+        if (order?.status !== targetStatus) throw error;
+      }
+    }
+    return completed;
   }
 
   /**
@@ -323,6 +390,8 @@ export class KdsService {
     if (!tenantId) {
       throw new Error('Tenant context not found');
     }
+
+    await this.assertOrderBelongsToTenant(data.orderId, tenantId);
 
     const printJob = await this.prisma.printJob.create({
       data: {
@@ -408,12 +477,13 @@ export class KdsService {
   /**
    * Limpa jobs antigos (manutenção)
    */
-  async cleanupOldJobs(days = 7) {
+  async cleanupOldJobs(tenantId: string, days = 7) {
     const date = new Date();
     date.setDate(date.getDate() - days);
 
     return this.prisma.printJob.deleteMany({
       where: {
+        tenantId,
         createdAt: { lt: date },
         status: {
           in: [PrismaPrintJobStatus.completed, PrismaPrintJobStatus.failed],
@@ -490,6 +560,11 @@ export class KdsService {
         return [];
       }
 
+      if (order.status !== 'preparing') {
+        this.logger.debug(`createProductionJobs: order ${orderId} is ${order.status}; production jobs require preparing.`);
+        return [];
+      }
+
       // Agrupar itens por estação
       const mapItemsToTicket = (items: OrderWithItems['items']) => items.map(item => {
         const orderItem = item as OrderWithItems['items'][number];
@@ -563,6 +638,9 @@ export class KdsService {
       }
 
       const stationGroups: Record<string, OrderItem[]> = {};
+      const inactiveStations = new Set((await this.prisma.printStation.findMany({
+        where: { tenantId, isActive: false }, select: { name: true, slug: true },
+      })).flatMap((station) => [station.name.trim().toLocaleLowerCase('pt-BR'), station.slug.trim().toLocaleLowerCase('pt-BR')]));
       
       for (const item of (order as OrderWithItems).items) {
         const category = item.product?.category;
@@ -575,13 +653,21 @@ export class KdsService {
             : 'GERAL';
         }
         
+        if (inactiveStations.has(station.trim().toLocaleLowerCase('pt-BR'))) {
+          this.logger.debug(`createProductionJobs: skipping inactive station ${station} for order ${orderId}.`);
+          continue;
+        }
         if (!stationGroups[station]) stationGroups[station] = [];
         stationGroups[station].push(item);
       }
 
       if (Object.keys(stationGroups).length === 0) {
-        this.logger.warn(`createProductionJobs: order ${orderId} has no items. No KDS jobs created.`);
-        return [];
+        const targetStatus: OrderStatus = order.fulfillmentType === 'delivery'
+          ? 'ready_for_delivery'
+          : 'ready_for_pickup';
+        await this.advanceOrderAfterKitchenCompletion(orderId, tenantId, targetStatus);
+        this.logger.log(`createProductionJobs: order ${orderId} has no active KDS stations and was marked ready.`);
+        return jobs;
       }
 
       // Para cada estação, criar um job
@@ -647,12 +733,46 @@ export class KdsService {
       this.activeJobsCreations.delete(lockKey);
     }
   }
+
+  /**
+   * Kitchen completion is an internal operational fact. Marketplace actions are still
+   * enqueued first, but their asynchronous acknowledgement must not leave a completed
+   * kitchen ticket represented as `preparing` in the operational board.
+   */
+  private async advanceOrderAfterKitchenCompletion(
+    orderId: string,
+    tenantId: string,
+    targetStatus: OrderStatus,
+  ): Promise<void> {
+    const marketplaceSync = this.marketplaceStatusSyncService
+      ? await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+        tenantId,
+        orderId,
+        status: targetStatus,
+      })
+      : { deferred: false };
+
+    if (marketplaceSync.deferred) {
+      await this.ordersService.updateOrderStatus(
+        orderId,
+        tenantId,
+        { status: targetStatus },
+        undefined,
+        { marketplaceEvent: true },
+      );
+      return;
+    }
+
+    await this.ordersService.updateOrderStatus(orderId, tenantId, { status: targetStatus });
+  }
   /**
    * Cria jobs incrementais (ex: quando um item é adicionado a uma mesa)
    */
   async createIncrementalPrintJob(data: { orderId: string; station: string; content: string }) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return;
+
+    await this.assertOrderBelongsToTenant(data.orderId, tenantId);
 
     return this.createOrReusePrintJob({
       tenantId,
@@ -671,6 +791,8 @@ export class KdsService {
   async createIncrementalPrintJobsForOrder(data: { orderId: string; station: string; items: { content: string }[] }) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return;
+
+    await this.assertOrderBelongsToTenant(data.orderId, tenantId);
 
     const jobs = data.items.map((item) => this.createOrReusePrintJob({
       tenantId,

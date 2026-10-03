@@ -99,9 +99,8 @@ export class AdminTenantsController {
   @RequireAdminPermissions('saas.tenants.read')
   async getTenantFeatures(
     @Param('id') id: string,
-    @CurrentUser('sub') adminId: string,
   ) {
-    return this.featureControlService.getTenantFeatureCatalog(id, adminId);
+    return this.featureControlService.getTenantFeatureCatalog(id);
   }
 
   @Patch(':id/features/:featureKey/override')

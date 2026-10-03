@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Logger, ForbiddenException } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, CurrentUser, RequirePermissions } from '../common/decorators';
@@ -8,6 +8,7 @@ import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
 import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 import { FeatureControlService } from '../feature-control/feature-control.service';
+import { redactFinancialSecrets } from '../payment-foundation/payment-secret-redaction';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -43,6 +44,12 @@ export class TenantController {
     return this.featureControlService.getTenantCapabilities(tenantId, userId);
   }
 
+  @Get('platform-branding')
+  @RequirePermissions('dashboard.view')
+  async getPlatformBranding() {
+    return this.tenantService.getPlatformBranding();
+  }
+
   /**
    * Update tenant basic info.
    */
@@ -74,6 +81,14 @@ export class TenantController {
     @CurrentUser('sub') userId: string,
     @Body() body: CreateBranchRequest,
   ) {
+    const capability = this.featureControlService.getTenantActionCapability('branches.create');
+    if (!capability.enabled) {
+      throw new ForbiddenException({
+        code: capability.code,
+        message: capability.message,
+      });
+    }
+
     return this.tenantService.createBranch(tenantId, userId, body);
   }
 
@@ -194,7 +209,7 @@ export class TenantController {
       message: 'tenant_telemetry_event',
       tenantId,
       event: body.event,
-      payload: body.payload,
+      payload: redactFinancialSecrets(body.payload),
     });
     return { success: true };
   }

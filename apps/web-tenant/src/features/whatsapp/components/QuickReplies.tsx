@@ -14,10 +14,11 @@ interface QuickReply {
 interface QuickRepliesProps {
   onReplySelect: (reply: string) => void;
   onClose?: () => void;
+  canManage: boolean;
   className?: string;
 }
 
-export function QuickReplies({ onReplySelect, onClose, className = '' }: QuickRepliesProps) {
+export function QuickReplies({ onReplySelect, onClose, canManage, className = '' }: QuickRepliesProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [newReply, setNewReply] = useState('');
   const [editingReply, setEditingReply] = useState<string | null>(null);
@@ -65,23 +66,25 @@ export function QuickReplies({ onReplySelect, onClose, className = '' }: QuickRe
   });
 
   const handleCreateReply = () => {
-    if (newReply.trim()) {
+    if (canManage && newReply.trim()) {
       createReplyMutation.mutate(newReply.trim());
     }
   };
 
   const handleEditReply = (reply: QuickReply) => {
+    if (!canManage) return;
     setEditingReply(reply.id);
     setEditText(reply.text);
   };
 
   const handleUpdateReply = () => {
-    if (editingReply && editText.trim()) {
+    if (canManage && editingReply && editText.trim()) {
       updateReplyMutation.mutate({ id: editingReply, text: editText.trim() });
     }
   };
 
   const handleDeleteReply = (id: string) => {
+    if (!canManage) return;
     if (confirm('Tem certeza que deseja excluir esta resposta rápida?')) {
       deleteReplyMutation.mutate(id);
     }
@@ -94,7 +97,7 @@ export function QuickReplies({ onReplySelect, onClose, className = '' }: QuickRe
     return acc;
   }, {} as Record<string, QuickReply[]>);
 
-  if (isEditing) {
+  if (isEditing && canManage) {
     return (
       <div className={`bg-card p-4 ${className}`}>
         <div className="flex items-center justify-between mb-3">
@@ -214,13 +217,15 @@ export function QuickReplies({ onReplySelect, onClose, className = '' }: QuickRe
           <h3 className="font-medium text-xs text-foreground uppercase tracking-wider">Respostas Rápidas</h3>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setIsEditing(true)}
-            className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
-            title="Editar respostas"
-          >
-            <Edit className="w-3.5 h-3.5" />
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+              title="Editar respostas"
+            >
+              <Edit className="w-3.5 h-3.5" />
+            </button>
+          )}
           {onClose && (
             <button
               onClick={onClose}
@@ -254,12 +259,14 @@ export function QuickReplies({ onReplySelect, onClose, className = '' }: QuickRe
           <p className="text-xs text-muted-foreground mb-1">
             Nenhuma configurada.
           </p>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="text-primary hover:text-primary/80 text-xs font-medium"
-          >
-            Adicionar respostas
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-primary hover:text-primary/80 text-xs font-medium"
+            >
+              Adicionar respostas
+            </button>
+          )}
         </div>
       )}
     </div>

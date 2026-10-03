@@ -5,13 +5,19 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { GoalDTO, GoalType } from '@gestor/types';
+import { usePermissions } from '../../hooks/use-tenant-auth';
 
 export function GoalsPage() {
   const queryClient = useQueryClient();
+  const { has } = usePermissions();
+  const canCreateGoals = has('goals.create');
+  const canUpdateGoals = has('goals.update');
+  const canDeleteGoals = has('goals.delete');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<GoalDTO | null>(null);
 
   const handleOpenModal = (goal?: GoalDTO) => {
+    if (goal ? !canUpdateGoals : !canCreateGoals) return;
     setEditingGoal(goal || null);
     setIsModalOpen(true);
   };
@@ -52,12 +58,14 @@ export function GoalsPage() {
           <p className="text-muted-foreground">Defina objetivos e acompanhe o crescimento da sua loja.</p>
         </div>
         
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all shadow-sm"
-        >
-          <Plus size={20} /> Nova Meta
-        </button>
+        {canCreateGoals && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all shadow-sm"
+          >
+            <Plus size={20} /> Nova Meta
+          </button>
+        )}
       </div>
 
       {/* Goals Dashboard Area */}
@@ -70,12 +78,14 @@ export function GoalsPage() {
           <p className="text-muted-foreground max-w-sm mx-auto mt-2">
             Comece definindo objetivos de faturamento, volume de pedidos ou eficiência para motivar sua equipe.
           </p>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="mt-6 text-primary font-bold hover:underline"
-          >
-            Criar minha primeira meta
-          </button>
+          {canCreateGoals && (
+            <button
+              onClick={() => handleOpenModal()}
+              className="mt-6 text-primary font-bold hover:underline"
+            >
+              Criar minha primeira meta
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
@@ -83,17 +93,17 @@ export function GoalsPage() {
             <GoalListItem 
               key={goal.id} 
               goal={goal} 
-              onEdit={() => handleOpenModal(goal)}
-              onDelete={() => {
+              onEdit={canUpdateGoals ? () => handleOpenModal(goal) : undefined}
+              onDelete={canDeleteGoals ? () => {
                 if (window.confirm('Excluir esta meta?')) deleteMutation.mutate(goal.id);
-              }}
+              } : undefined}
             />
           ))}
         </div>
       )}
 
       {/* Modal Placeholder */}
-      {isModalOpen && (
+      {isModalOpen && (editingGoal ? canUpdateGoals : canCreateGoals) && (
         <GoalFormModal 
           onClose={handleCloseModal} 
           initialData={editingGoal || undefined} 
@@ -103,7 +113,7 @@ export function GoalsPage() {
   );
 }
 
-function GoalListItem({ goal, onEdit, onDelete }: { goal: GoalDTO, onEdit: () => void, onDelete: () => void }) {
+function GoalListItem({ goal, onEdit, onDelete }: { goal: GoalDTO, onEdit?: () => void, onDelete?: () => void }) {
   const isRevenue = goal.type === GoalType.REVENUE;
   const progressColor = goal.progressPercentage >= 100 
     ? 'bg-green-500' 
@@ -135,12 +145,16 @@ function GoalListItem({ goal, onEdit, onDelete }: { goal: GoalDTO, onEdit: () =>
                 {goal.trend === 'on_track' ? 'No Prazo' : goal.trend === 'at_risk' ? 'Em Risco' : 'Atrasado'}
               </span>
             </div>
-            <button onClick={onEdit} className="p-2 text-muted-foreground hover:text-primary transition-colors">
-              <span className="text-lg leading-none">✏️</span>
-            </button>
-            <button onClick={onDelete} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
-              <Trash2 size={18} />
-            </button>
+            {onEdit && (
+              <button onClick={onEdit} className="p-2 text-muted-foreground hover:text-primary transition-colors">
+                <span className="text-lg leading-none">✏️</span>
+              </button>
+            )}
+            {onDelete && (
+              <button onClick={onDelete} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
+                <Trash2 size={18} />
+              </button>
+            )}
           </div>
         </div>
 

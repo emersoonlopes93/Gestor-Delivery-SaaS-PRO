@@ -1,48 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
-import {
-  BarChart3,
-  BookOpen,
-  Handshake,
-  Box,
-  ChartLine,
-  ChefHat,
-  ClipboardList,
-  Goal,
-  LayoutGrid,
-  MapPin,
-  Menu,
-  Package,
-  Search,
-  Settings,
-  ShoppingCart,
-  SlidersHorizontal,
-  Ticket,
-  Truck,
-  Users,
-  Wallet,
-  Bell,
-  UserCircle,
-  ChevronRight,
-  CornerDownRight,
-  Moon,
-  Sun,
-  Building2,
-  LogOut,
-  Globe,
-  QrCode,
-  Printer,
-  MessageSquare,
-  Megaphone,
-  Bot,
-  Palette,
-  Link2,
-  CreditCard,
-  CalendarClock,
-  Smartphone
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Building2, ChevronRight, ClipboardList, Globe, LayoutGrid, LogOut, Menu, Moon, MoreHorizontal, QrCode, Sun, UserCircle, Users, Wallet } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
@@ -51,166 +10,21 @@ import type { BusinessGroupContext, Tenant, TenantLoginResponse, TenantSettings,
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useTenantCapabilities } from '../hooks/useTenantCapabilities';
+import { usePlatformBranding } from '../hooks/usePlatformBranding';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
-import { StoreStatusBadge } from '../components/store/StoreStatusControl';
-import { Toaster } from 'react-hot-toast';
+import { useChatSocket } from '../features/whatsapp/hooks/useChatSocket';
+import { StoreStatusControl } from '../components/store/StoreStatusControl';
+import { resolveStoreOperationalStatus } from '../components/store/store-operational-status';
+import toast, { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
-
-type SidebarItem = {
-  id: string;
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  permission?: string;
-  featureFlag?: string;
-  featureKey?: string;
-  isExternal?: boolean;
-  match?: (pathname: string) => boolean;
-};
-
-type SidebarGroup = {
-  id: string;
-  label: string;
-  items: readonly SidebarItem[];
-};
-
-const isFeatureVisibleByEnv = (flag?: string) => {
-  if (!flag) return true;
-  // Acessa a flag no import.meta.env, lidando de forma segura
-  const envValue = import.meta.env[flag];
-  if (envValue === undefined) {
-    return false; // Se a flag não existe, não mostrar.
-  }
-  return String(envValue).toLowerCase() === 'true';
-};
+import { NotificationCenter } from '../notifications/NotificationCenter';
+import { OrderAlertTopbarButton } from '../features/orders/v2/OrderAlertTopbarButton';
+import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
+import { filterSidebarNavigation, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
+import type { SidebarNavigationGroup, SidebarNavigationItem } from '../navigation/navigation.types';
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
-
-
-
-const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    items: [
-      {
-        id: 'dashboard-overview',
-        label: 'Visão Geral',
-        to: '/dashboard',
-        icon: LayoutGrid,
-        permission: 'dashboard.view',
-        match: (p) => p === '/dashboard',
-      },
-      {
-        id: 'billing-plan',
-        label: 'Plano e Cobrança',
-        to: '/billing',
-        icon: CreditCard,
-        permission: 'billing.read',
-        match: (p) => p === '/billing',
-      },
-      {
-        id: 'billing-partners',
-        label: 'Beneficios',
-        to: '/partners',
-        icon: Handshake,
-        permission: 'billing.read',
-        match: (p) => p === '/partners',
-      },
-    ],
-  },
-  {
-    id: 'catalog',
-    label: 'Cardápio',
-    items: [
-      { id: 'catalog-categories', label: 'Categorias', to: '/catalog/categories', icon: BookOpen, permission: 'catalog.read' },
-      { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
-      { id: 'catalog-complements', label: 'Grupos de Opções', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
-      { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
-      { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS', featureKey: 'upsells' },
-      { id: 'catalog-inventory', label: 'Estoque & Ficha Técnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
-    ],
-  },
-  {
-    id: 'orders',
-    label: 'Pedidos',
-    items: [
-      { id: 'orders-list', label: 'Lista de Pedidos', to: '/orders', icon: ClipboardList, permission: 'orders.read', match: (p) => p === '/orders' },
-      { id: 'orders-board', label: 'Kanban Operacional', to: '/orders/board', icon: BarChart3, permission: 'orders.use_kanban' },
-      { id: 'orders-kds', label: 'KDS (Cozinha)', to: '/orders/kds', icon: ChefHat, permission: 'kds.use' },
-    ],
-  },
-  {
-    id: 'delivery',
-    label: 'Logística',
-    items: [
-      { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
-      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read', featureFlag: 'VITE_FEATURE_DELIVERY_LIVE_MAP', featureKey: 'delivery_live_map' },
-      { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
-      { id: 'delivery-zones', label: 'Zonas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
-    ],
-  },
-  {
-    id: 'pos',
-    label: 'PDV e Caixa',
-    items: [
-      { id: 'pos', label: 'Ponto de Venda', to: '/pos', icon: ShoppingCart, permission: 'pos.read' },
-      { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read' },
-      { id: 'pos-printers', label: 'Impressoras', to: '/pos/printers', icon: Printer, permission: 'settings.manage' },
-      { id: 'cash', label: 'Caixa', to: '/cash', icon: Wallet, permission: 'cash.read' },
-    ],
-  },
-  {
-    id: 'management',
-    label: 'Gestão',
-    items: [
-      { id: 'management-employees', label: 'Funcionários', to: '/management/employees', icon: Users, permission: 'users.read' },
-      { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
-      { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
-      { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' },
-    ],
-  },
-  {
-    id: 'crm',
-    label: 'CRM e Marketing',
-    items: [
-      { id: 'customers', label: 'Clientes (CRM)', to: '/customers', icon: Users, permission: 'crm.read' },
-      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED', featureKey: 'crm_enterprise' },
-      { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' },
-      { id: 'promotions', label: 'Promoções & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
-    ],
-  },
-  {
-    id: 'analytics',
-    label: 'Gestão & Performance',
-    items: [
-      { id: 'analytics-reports', label: 'Relatórios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
-      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED', featureKey: 'bi_advanced' },
-      { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS', featureKey: 'goals' },
-    ],
-  },
-  {
-    id: 'whatsapp',
-    label: 'WhatsApp',
-    items: [
-      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED', featureKey: 'whatsapp_advanced' },
-      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS', featureKey: 'campaigns' },
-      { id: 'whatsapp-config', label: 'WhatsApp', to: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT', featureKey: 'whatsapp_connect' },
-    ],
-  },
-  {
-    id: 'system',
-    label: 'Sistema',
-    items: [
-      { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
-      { id: 'settings-network', label: 'Rede de Lojas', to: '/settings/network', icon: Building2, permission: 'settings.manage' },
-      { id: 'settings-integrations', label: 'Integrações', to: '/settings/integrations', icon: Link2, permission: 'settings.manage', featureKey: 'ifood_marketplace', match: (p) => p === '/settings/integrations' },
-      { id: 'settings-storefront', label: 'Personalizar Vitrine', to: '/settings/storefront', icon: Palette, permission: 'settings.manage' },
-      { id: 'settings-scheduling', label: 'Agendamentos', to: '/settings/scheduling', icon: CalendarClock, permission: 'settings.manage' },
-      { id: 'notifications', label: 'Notificações', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
-    ],
-  },
-];
+const SIDEBAR_GROUPS = getSidebarNavigation();
 
 type SidebarState = {
   collapsed: boolean;
@@ -239,12 +53,12 @@ function safeParseSidebarState(raw: string | null): SidebarState | null {
   }
 }
 
-function isItemActive(item: SidebarItem, pathname: string): boolean {
+function isItemActive(item: SidebarNavigationItem, pathname: string): boolean {
   if (item.match) return item.match(pathname);
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
-function firstActiveGroupId(groups: readonly SidebarGroup[], pathname: string): string | null {
+function firstActiveGroupId(groups: readonly SidebarNavigationGroup[], pathname: string): string | null {
   for (const g of groups) {
     for (const it of g.items) {
       if (isItemActive(it, pathname)) return g.id;
@@ -253,8 +67,48 @@ function firstActiveGroupId(groups: readonly SidebarGroup[], pathname: string): 
   return null;
 }
 
+function MobileBottomNavigation({ pathname, navigate, onOpenMore, canUseOperations, canReadOrders, canReadFinance, canReadCustomers }: {
+  pathname: string;
+  navigate: (to: string) => void;
+  onOpenMore: () => void;
+  canUseOperations: boolean;
+  canReadOrders: boolean;
+  canReadFinance: boolean;
+  canReadCustomers: boolean;
+}) {
+  const items = [
+    canUseOperations ? { label: 'Operações', to: '/orders/manager', icon: LayoutGrid, active: pathname === '/orders/manager' } : null,
+    canReadOrders ? { label: 'Pedidos', to: '/orders', icon: ClipboardList, active: pathname === '/orders' || pathname === '/orders/board' } : null,
+    canReadFinance ? { label: 'Financeiro', to: '/management/finance', icon: Wallet, active: pathname.startsWith('/management/finance') } : null,
+    canReadCustomers ? { label: 'Clientes', to: '/customers', icon: Users, active: pathname.startsWith('/customers') } : null,
+  ].filter((item): item is { label: string; to: string; icon: typeof LayoutGrid; active: boolean } => item !== null);
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 pb-[max(0.5rem,var(--safe-area-bottom))] pt-2 shadow-[0_-12px_30px_rgb(0_0_0_/_0.08)] backdrop-blur-xl md:hidden" aria-label="Navegação principal mobile">
+      <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+        {items.slice(0, 4).map((item) => {
+          const Icon = item.icon;
+          return <button key={item.to} type="button" onClick={() => navigate(item.to)} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${item.active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} aria-current={item.active ? 'page' : undefined}><Icon className="h-5 w-5" /><span className="truncate">{item.label}</span></button>;
+        })}
+        <button type="button" onClick={onOpenMore} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-black text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Abrir mais opções"><MoreHorizontal className="h-5 w-5" /><span>Mais</span></button>
+      </div>
+    </nav>
+  );
+}
+
+function MobileMoreSheet({ groups, onNavigate, onClose }: { groups: readonly SidebarNavigationGroup[]; onNavigate: (to: string) => void; onClose: () => void }) {
+  const items = groups.flatMap((group) => group.items).filter((item) => !item.isExternal);
+  return <section className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-border bg-card p-4 pb-[max(1rem,var(--safe-area-bottom))] shadow-2xl md:hidden" aria-label="Mais opções de navegação" aria-modal="true" role="dialog">
+    <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/35" />
+    <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-black text-foreground">Mais opções</h2><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">Fechar</button></div>
+    <div className="grid max-h-[55dvh] grid-cols-2 gap-2 overflow-y-auto pr-1">
+      {items.map((item) => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => onNavigate(item.to)} className="flex min-h-16 items-center gap-2 rounded-xl border border-border bg-background px-3 text-left text-xs font-bold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Icon className="h-4 w-4 shrink-0 text-primary" /><span className="line-clamp-2">{item.label}</span></button>; })}
+    </div>
+  </section>;
+}
+
 function SidebarGroupView(props: {
-  group: SidebarGroup;
+  group: SidebarNavigationGroup;
   collapsed: boolean;
   isOpen: boolean;
   isAnyItemActive: boolean;
@@ -268,23 +122,23 @@ function SidebarGroupView(props: {
         <button
           type="button"
           onClick={() => onToggle(group.id)}
-          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${isAnyItemActive
-              ? 'bg-sidebar-active text-sidebar-active-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 group ${isAnyItemActive
+            ? 'text-foreground'
+            : 'text-muted-foreground hover:text-foreground'
             }`}
         >
-          <span className="text-[10px] font-black uppercase tracking-[0.25em] transition-colors">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 transition-colors">
             {group.label}
           </span>
           <span
             className={`transition-transform duration-300 ${isOpen ? 'rotate-90' : 'rotate-0'}`}
             aria-hidden
           >
-            <ChevronRight className="h-3.5 w-3.5 opacity-50" aria-hidden />
+            <ChevronRight className="h-3.5 w-3.5 opacity-40" aria-hidden />
           </span>
         </button>
       ) : (
-        <div className="mx-auto w-8 h-px bg-muted/60 my-4" />
+        <div className="mx-auto w-5 h-px bg-border/50 my-3" />
       )}
 
       <div
@@ -319,14 +173,20 @@ function SidebarGroupView(props: {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
-                      ? 'bg-primary text-primary-foreground shadow-lg dark:bg-sidebar-active dark:text-sidebar-active-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
+                    ? 'bg-muted/80 text-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-primary-foreground dark:text-sidebar-active-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
+                    {isActive && !collapsed && (
+                      <span className="absolute -left-3 top-[18%] bottom-[18%] w-[3px] bg-primary rounded-r-full" aria-hidden />
+                    )}
+                    <span
+                      className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
+                      aria-hidden
+                    >
                       <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
@@ -335,9 +195,6 @@ function SidebarGroupView(props: {
                         {item.label}
                       </span>
                     ) : null}
-                    {isActive && !collapsed && (
-                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-primary-foreground dark:bg-sidebar-active-foreground animate-pulse" />
-                    )}
                   </>
                 )}
               </NavLink>
@@ -354,8 +211,9 @@ function SidebarGroupView(props: {
  */
 export function AppLayout() {
   const { user, clearUser, setUser } = useAuthStore();
-  const { theme, setTheme, initializeTheme } = useThemeStore();
+  const { resolvedTheme, setTheme, initializeTheme } = useThemeStore();
   const { isFeatureVisible } = useTenantCapabilities();
+  const platformBrandingQuery = usePlatformBranding();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -365,9 +223,16 @@ export function AppLayout() {
   }, [initializeTheme]);
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [desktopSearch, setDesktopSearch] = useState('');
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
+  const [platformLogoFailed, setPlatformLogoFailed] = useState(false);
+
+  const systemName = platformBrandingQuery.data?.systemName || 'PedeHub';
+  const platformLogoUrl = platformBrandingQuery.data?.logoUrl || null;
+
+  useEffect(() => {
+    setPlatformLogoFailed(false);
+  }, [platformLogoUrl]);
 
   const { data: tenantData } = useQuery({
     queryKey: ['tenant-settings'],
@@ -396,67 +261,36 @@ export function AppLayout() {
     },
     onError: (err) => {
       console.error('Erro ao trocar loja:', err);
-      alert('Não foi possível trocar de loja nesta rede.');
+      alert('NÃ£o foi possÃ­vel trocar de loja nesta rede.');
     },
   });
 
-  const storeStatus = useMemo((): 'open' | 'closed' | 'paused' => {
-    if (!tenantData) return 'open';
-    const settings = tenantData.settings;
-    const isPaused = settings?.isStorePaused ?? false;
-    if (isPaused) return 'paused';
+  const resolvedStoreStatus = useMemo(() => resolveStoreOperationalStatus(
+    tenantData?.settings,
+    tenantData?.operatingHours ?? [],
+  ), [tenantData]);
+  const storeStatus = resolvedStoreStatus.status;
 
-    const operatingHours = tenantData.operatingHours || [];
-    const timezone = settings?.timezone || 'America/Sao_Paulo';
-    
-    let localTimeStr: string;
-    let localDayStr: string;
-    try {
-      localTimeStr = new Date().toLocaleTimeString('pt-BR', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
-      localDayStr = new Date().toLocaleDateString('en-US', { timeZone: timezone, weekday: 'short' }).toLowerCase();
-    } catch {
-      localTimeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      localDayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-    }
-
-    const [hh, mm] = localTimeStr.split(':').map(Number);
-    const currentMinutes = hh * 60 + mm;
-
-    const weekdayMap: Record<string, number> = {
-      sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6
-    };
-    const dayOfWeek = weekdayMap[localDayStr] ?? 0;
-
-    let rules = operatingHours;
-    if (rules.length === 0) {
-      if (!import.meta.env.DEV) {
-        return 'closed';
+  const storePauseMutation = useMutation({
+    mutationFn: async (nextPaused: boolean) => {
+      if (!resolvedStoreStatus.canTogglePause) {
+        throw new Error('A pausa operacional sÃ³ pode ser alterada dentro do horÃ¡rio de funcionamento.');
       }
-      rules = Array.from({ length: 7 }, (_, i) => ({
-        id: `mock-${i}`,
-        tenantId: tenantData.id,
-        dayOfWeek: i,
-        isOpen: true,
-        openTime: '08:00',
-        closeTime: '23:00',
-      } as TenantOperatingHours));
-    }
+      return api.patch('/tenant/store-pause', {
+        isStorePaused: nextPaused,
+        storePauseReason: nextPaused ? 'Pausa operacional pelo sidebar' : '',
+      });
+    },
+    onSuccess: (_response, nextPaused) => {
+      void queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      toast.success(nextPaused ? 'Recebimento de pedidos pausado.' : 'Recebimento de pedidos retomado.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'NÃ£o foi possÃ­vel alterar a pausa operacional.');
+    },
+  });
 
-    const todayRule = rules.find((h: { dayOfWeek: number; isOpen: boolean; openTime: string | null; closeTime: string | null }) => h.dayOfWeek === dayOfWeek);
-
-    if (todayRule?.isOpen && todayRule.openTime && todayRule.closeTime) {
-      const [openH, openM] = todayRule.openTime.split(':').map(Number);
-      const [closeH, closeM] = todayRule.closeTime.split(':').map(Number);
-      const openMinutes = openH * 60 + openM;
-      const closeMinutes = closeH * 60 + closeM;
-
-      if (currentMinutes >= openMinutes && currentMinutes <= closeMinutes) {
-        return 'open';
-      }
-    }
-
-    return 'closed';
-  }, [tenantData]);
+  const previousStoreStatusRef = useRef<{ tenantId: string; status: 'open' | 'closed' | 'paused' } | null>(null);
 
   const handleSwitchStore = () => {
     if (!selectedTenantId || selectedTenantId === user?.tenantId) {
@@ -465,15 +299,12 @@ export function AppLayout() {
     switchStoreMutation.mutate(selectedTenantId);
   };
 
-  // Audio Notifications Integration
-  useNotificationAudio(tenantData?.id, {
-    enabled: tenantData?.settings?.audioNotificationEnabled ?? true,
-    volume: tenantData?.settings?.notificationVolume ?? 1.0,
-    newOrderSound: tenantData?.settings?.newOrderSound,
-    cancellationSound: tenantData?.settings?.cancellationSound,
-    handoffSound: tenantData?.settings?.handoffSound,
-    readySound: tenantData?.settings?.readySound,
-  });
+  useNotificationAudio(tenantData?.id);
+
+  // MantÃ©m conexÃ£o ao namespace /chat ativa em qualquer rota autenticada.
+  // NecessÃ¡rio para que whatsapp.handoff chegue ao bus de notificaÃ§Ã£o
+  // independentemente de o operador estar ou nÃ£o na InboxPage.
+  useChatSocket(tenantData?.id);
 
   // Browser Notifications Integration
   useBrowserNotifications(
@@ -487,7 +318,7 @@ export function AppLayout() {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
     if (saved) return saved;
     const openGroups: Record<string, boolean> = {};
-    for (const g of SIDEBAR_GROUPS) openGroups[g.id] = g.id === 'dashboard';
+    for (const g of SIDEBAR_GROUPS) openGroups[g.id] = g.id === 'operations';
     return { collapsed: false, openGroups } satisfies SidebarState;
   }, []);
 
@@ -500,6 +331,10 @@ export function AppLayout() {
   }, [collapsed, openGroups]);
 
   const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
+  const canUseOperations = Boolean(isFeatureVisible?.(undefined, 'order_manager_v2')) && hasPermission(userPermissions, 'orders.use_kanban');
+  const canReadOrders = hasPermission(userPermissions, 'orders.read');
+  const canReadFinance = hasPermission(userPermissions, 'finance.read');
+  const canReadCustomers = hasPermission(userPermissions, 'crm.read');
   const tenantSlug = user?.tenant?.slug;
   const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
 
@@ -512,10 +347,10 @@ export function AppLayout() {
 
     const { hostname, origin } = window.location;
 
-    // Capacitor/Android: hostname é 'capacitor://localhost', não fazer parsing
+    // Capacitor/Android: hostname Ã© 'capacitor://localhost', nÃ£o fazer parsing
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('capacitor://')) {
-      // Em Capacitor ou localhost, usar variável de ambiente ou fallback seguro
-      // Se não tiver VITE_STOREFRONT_BASE_URL configurado, usar a mesma origem da API
+      // Em Capacitor ou localhost, usar variÃ¡vel de ambiente ou fallback seguro
+      // Se nÃ£o tiver VITE_STOREFRONT_BASE_URL configurado, usar a mesma origem da API
       const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
       if (apiBase && !apiBase.startsWith('/')) {
         // Extrair origin da API URL (removendo /api/v1 ou similar)
@@ -523,7 +358,7 @@ export function AppLayout() {
         setStorefrontBaseUrl(apiOrigin);
         return;
       }
-      // Fallback final: não definir storefrontBaseUrl em Capacitor sem config
+      // Fallback final: nÃ£o definir storefrontBaseUrl em Capacitor sem config
       setStorefrontBaseUrl('');
       return;
     }
@@ -539,16 +374,11 @@ export function AppLayout() {
   }, []);
 
   const groups = useMemo(() => {
-    const filtered: SidebarGroup[] = [];
-    for (const g of SIDEBAR_GROUPS) {
-      const items = g.items
-        .filter((it) => (isFeatureVisible ? isFeatureVisible(it.featureFlag, it.featureKey) : isFeatureVisibleByEnv(it.featureFlag)))
-        .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
-        .map((it) => it);
-
-      if (items.length) filtered.push({ ...g, items });
-    }
-    return filtered;
+    return filterSidebarNavigation(
+      SIDEBAR_GROUPS,
+      (featureFlag, featureKey) => isFeatureVisible ? isFeatureVisible(featureFlag, featureKey) : !featureFlag || String(import.meta.env[featureFlag]).toLowerCase() === 'true',
+      (permission) => !permission || hasPermission(userPermissions, permission),
+    );
   }, [isFeatureVisible, userPermissions]);
 
   const activeGroupId = useMemo(() => {
@@ -630,18 +460,55 @@ export function AppLayout() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (!tenantData?.id) return;
 
+    const previous = previousStoreStatusRef.current;
+    if (!previous || previous.tenantId !== tenantData.id) {
+      previousStoreStatusRef.current = { tenantId: tenantData.id, status: storeStatus };
+      return;
+    }
+
+    const previousStatus = previous.status;
+    if (previousStatus !== storeStatus) {
+      if (storeStatus === 'open') {
+        emitNotificationEvent(createNotificationEvent({
+          id: `store:${previousStatus === 'paused' ? 'resumed' : 'opened'}:${tenantData?.id ?? 'tenant'}`,
+          type: previousStatus === 'paused' ? 'store.resumed' : 'store.opened',
+          title: 'Loja aberta',
+          message: 'A operacao voltou a receber pedidos.',
+          priority: 'low',
+          source: 'local',
+        }));
+      } else if (previousStatus === 'open') {
+        const type = storeStatus === 'paused' ? 'store.paused' : 'store.closed';
+        emitNotificationEvent(createNotificationEvent({
+          id: `store:${storeStatus}:${tenantData?.id ?? 'tenant'}`,
+          type,
+          title: 'Loja indisponivel para novos pedidos',
+          message: storeStatus === 'paused' ? 'A loja foi pausada manualmente.' : 'A loja esta fora do horario configurado.',
+          priority: 'high',
+          source: 'local',
+        }));
+      }
+    }
+
+    previousStoreStatusRef.current = { tenantId: tenantData.id, status: storeStatus };
+  }, [storeStatus, tenantData?.id]);
+
+
+
+  const breadcrumb = getBreadcrumbMetadata(location.pathname);
+
+  useEffect(() => {
+    document.title = breadcrumb.label ? `${systemName} - ${breadcrumb.label}` : systemName;
+  }, [breadcrumb.label, systemName]);
 
   return (
-    <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
+    <div className="app-shell min-h-screen flex transition-colors safe-x" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <NotificationCenter />
       <Toaster
         position="top-right"
-        containerClassName="safe-x"
-        containerStyle={{
-          top: 'calc(12px + var(--safe-area-top))',
-          right: 'calc(12px + var(--safe-area-right))',
-          left: 'calc(12px + var(--safe-area-left))',
-        }}
         toastOptions={{
           className: 'font-bold text-sm',
           success: {
@@ -655,99 +522,130 @@ export function AppLayout() {
         }}
       />
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden safe-inset" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
       ) : null}
 
+      {isMobileOpen ? <MobileMoreSheet groups={groups} onClose={closeMobile} onNavigate={(to) => { closeMobile(); navigate(to); }} /> : null}
+
       <aside
-        className={`tenant-sidebar fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
-          collapsed ? 'w-[72px]' : 'w-64'
-        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`tenant-sidebar safe-top safe-bottom hidden flex-col transition-[width,background-color] duration-200 ease-out md:static md:flex ${collapsed ? 'w-[72px]' : 'w-64'}`}
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
       >
-        <div className={`p-4 flex flex-col gap-4 ${collapsed ? 'items-center' : ''}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
-          <div className="flex items-center justify-between gap-3">
-            {!collapsed ? (
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
-                  P
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight flex items-center gap-1.5">
-                    PedeHub
-                  </h1>
-                  <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
-                  {tenantData?.businessGroup ? (
-                    <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
-                      <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="truncate">{tenantData.businessGroup.name}</span>
-                      <span className="text-muted-foreground font-bold normal-case tracking-normal">
-                        {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
-                      </span>
-                    </div>
-                  ) : null}
-                  {accessibleStores.length > 1 ? (
-                    <div className="mt-3 flex items-center gap-2">
-                      <select
-                        value={selectedTenantId}
-                        onChange={(e) => setSelectedTenantId(e.target.value)}
-                        disabled={switchStoreMutation.isPending}
-                        className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
-                      >
-                        {accessibleStores.map((store) => (
-                          <option key={store.tenantId} value={store.tenantId}>
-                            {store.tenant.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleSwitchStore}
-                        disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
-                        className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+        <div className={`p-3 flex flex-col gap-3 ${collapsed ? 'items-center' : ''}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
+          {/* Brand + toggle button row */}
+          <div className="flex items-center justify-between w-full gap-2">
+            {collapsed ? (
+              <div className="w-9 h-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-black text-lg shadow-md shrink-0 mx-auto">
+                {(systemName?.charAt(0) || 'P').toUpperCase()}
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 border-2 border-border">
-                P
+              <div className="min-w-0 flex flex-col items-start flex-1">
+                {platformLogoUrl && !platformLogoFailed ? (
+                  <div className="min-w-0 flex flex-col items-start gap-1">
+                    <img
+                      src={platformLogoUrl}
+                      alt={systemName}
+                      className="block max-w-[120px] max-h-[32px] object-contain"
+                      onError={() => setPlatformLogoFailed(true)}
+                    />
+                    <p className="text-[9px] font-black text-muted-foreground truncate leading-none uppercase tracking-wider max-w-[130px]">
+                      {user?.tenant?.name || 'Carregando...'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-black text-base shadow-md shrink-0">
+                      {(systemName?.charAt(0) || 'P').toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex flex-col items-start text-left">
+                      <h1 className="text-[12px] font-black text-foreground tracking-tight truncate leading-tight max-w-[110px]">
+                        {systemName}
+                      </h1>
+                      <p className="text-[9px] font-black text-muted-foreground truncate leading-none uppercase tracking-wider max-w-[110px]">
+                        {user?.tenant?.name || 'Carregando...'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="hidden md:flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
+              title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+            >
+              <Menu className="h-4 w-4" />
+            </button>
           </div>
 
           {!collapsed && (
-            <div className="space-y-4">
-              <StoreStatusBadge
+            <>
+              {tenantData?.businessGroup ? (
+                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
+                  <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="truncate">{tenantData.businessGroup.name}</span>
+                  <span className="text-muted-foreground font-bold normal-case tracking-normal">
+                    {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
+                  </span>
+                </div>
+              ) : null}
+              {accessibleStores.length > 1 ? (
+                <div className="flex items-center gap-2 w-full">
+                  <select
+                    value={selectedTenantId}
+                    onChange={(e) => setSelectedTenantId(e.target.value)}
+                    disabled={switchStoreMutation.isPending}
+                    className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
+                  >
+                    {accessibleStores.map((store) => (
+                      <option key={store.tenantId} value={store.tenantId}>
+                        {store.tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleSwitchStore}
+                    disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
+                    className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
+                  </button>
+                </div>
+              ) : null}
+
+              <StoreStatusControl
                 status={storeStatus}
-                compact
-                onManage={() => navigate('/settings')}
+                isPaused={Boolean(tenantData?.settings?.isStorePaused)}
+                canTogglePause={resolvedStoreStatus.canTogglePause}
+                nextOpenTime={resolvedStoreStatus.nextOpenTime}
+                isSaving={storePauseMutation.isPending}
+                onTogglePause={(nextPaused) => storePauseMutation.mutate(nextPaused)}
               />
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5 w-full">
                 <a
                   href={publicMenuUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-row items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all group shadow-sm h-[34px]"
                 >
-                  <Globe className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Cardápio</span>
+                  <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">CardÃ¡pio</span>
                 </a>
                 <button
                   type="button"
                   onClick={() => navigate('/settings/qr-codes')}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-row items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-all group shadow-sm h-[34px]"
                 >
-                  <QrCode className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">QR Code</span>
+                  <QrCode className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors truncate">QR Code</span>
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -782,103 +680,79 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="desktop-header hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
-          <div className="h-16 px-6 flex items-center gap-4 w-full">
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-              aria-label="Alternar sidebar"
-              title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-            >
-              <Menu className="h-5 w-5" aria-hidden />
-            </button>
+        <header className="desktop-header hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ height: '52px', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+          <div className="px-6 flex items-center justify-between w-full h-full min-w-0 gap-4">
+            <div className="flex items-center gap-3 min-w-0">
 
-            <div className="relative flex-1 max-w-[320px] lg:max-w-[520px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
-              <input
-                value={desktopSearch}
-                onChange={(e) => setDesktopSearch(e.target.value)}
-                placeholder="Buscar (atalhos, páginas, ações)"
-                className="input-premium pl-10"
-              />
+              <div className="flex items-center text-sm font-bold text-foreground min-w-0">
+                {breadcrumb.parentLabel && (
+                  <span className="hidden sm:inline text-muted-foreground shrink-0 select-none">
+                    {breadcrumb.parentLabel}
+                    <span className="mx-2 font-normal text-muted-foreground/65">/</span>
+                  </span>
+                )}
+                <span className="truncate select-none font-black text-foreground">
+                  {breadcrumb.label}
+                </span>
+              </div>
             </div>
 
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-3 shrink-0">
+              {location.pathname === '/orders/manager' ? <OrderAlertTopbarButton /> : null}
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-foreground hover:bg-muted transition-all"
-                title="Atalhos"
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all border-none"
+                title="Tema"
+                aria-label="Alternar Tema"
               >
-                <CornerDownRight className="h-4 w-4" aria-hidden />
-                <span className="hidden xl:inline font-bold">Atalhos</span>
+                {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
+              </button>
+
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-card p-1 sm:pr-3 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm select-none"
+                title="Perfil"
+              >
+                <div className="w-6 h-6 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
+                  <UserCircle className="h-4 w-4" aria-hidden />
+                </div>
+                <span className="hidden min-[1150px]:inline truncate max-w-[120px]">{user?.name || 'Conta'}</span>
+                <ChevronRight className="hidden min-[1150px]:inline h-3 w-3 text-muted-foreground rotate-90" aria-hidden />
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all border-none"
-              title="Tema"
-              aria-label="Alternar Tema"
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted/50 text-foreground hover:bg-muted transition-all"
-              title="Notificações"
-              aria-label="Notificações"
-            >
-              <Bell className="h-4 w-4" aria-hidden />
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 sm:pr-3 text-sm font-bold text-foreground hover:bg-muted transition-all shadow-sm"
-              title="Perfil"
-            >
-              <div className="w-8 h-8 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center">
-                <UserCircle className="h-5 w-5" aria-hidden />
-              </div>
-              <span className="hidden lg:inline truncate max-w-[120px] xl:max-w-[180px]">{user?.name || 'Conta'}</span>
-            </button>
           </div>
         </header>
 
-        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
-          <div className="h-14 px-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-10 h-10 text-foreground hover:bg-muted transition-all active:scale-95"
-              aria-label="Abrir menu"
-            >
-              <Menu className="h-5 w-5" aria-hidden />
-            </button>
-            <div className="min-w-0 text-center">
-              <div className="text-sm font-black text-foreground truncate flex items-center justify-center gap-1.5">
-                PedeHub
-              </div>
-              <div className="text-[10px] font-bold text-muted-foreground truncate uppercase tracking-widest leading-none mt-0.5">{user?.tenant?.name || 'Carregando...'}</div>
+        <header className={`mobile-header safe-top md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors ${location.pathname === '/orders/manager' ? 'hidden' : ''}`} style={{ height: 'calc(52px + var(--safe-area-top))', backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+          <div className="px-4 flex items-center justify-between w-full h-full gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-xs font-black text-primary-foreground">{(systemName?.charAt(0) || 'P').toUpperCase()}</div>
+              <div className="min-w-0"><p className="truncate text-xs font-black text-foreground select-none">{systemName}</p><p className="truncate text-[10px] font-semibold text-muted-foreground">{breadcrumb.label}</p></div>
             </div>
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all active:scale-95"
-            >
-               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {location.pathname === '/orders/manager' ? <OrderAlertTopbarButton /> : null}
+              <button
+                type="button"
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all"
+                aria-label="Alternar tema"
+              >
+                {resolvedTheme === 'dark' ? <Sun size={15} aria-hidden /> : <Moon size={15} aria-hidden />}
+              </button>
+              <div className="w-7 h-7 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center shrink-0">
+                <UserCircle className="h-4.5 w-4.5" aria-hidden />
+              </div>
+            </div>
           </div>
         </header>
 
-
-        <main className="app-main flex-1 overflow-auto bg-background safe-bottom">
+        <main className="app-main min-w-0 flex-1 overflow-auto bg-background pb-[calc(4.75rem+var(--safe-area-bottom))] safe-bottom md:pb-0">
           <div key={location.pathname} className="h-full">
             <Outlet />
           </div>
         </main>
+        <MobileBottomNavigation pathname={location.pathname} navigate={navigate} onOpenMore={openMobile} canUseOperations={canUseOperations} canReadOrders={canReadOrders} canReadFinance={canReadFinance} canReadCustomers={canReadCustomers} />
       </div>
     </div>
   );

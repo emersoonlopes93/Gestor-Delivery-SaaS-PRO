@@ -4,6 +4,7 @@ export default {
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
+    '../../packages/storefront-preview/src/**/*.{ts,tsx}',
     '../../packages/storefront-ui/src/**/*.{ts,tsx}'
   ],
   theme: {

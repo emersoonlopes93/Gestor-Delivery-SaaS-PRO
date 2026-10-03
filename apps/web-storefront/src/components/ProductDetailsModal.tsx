@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { X, Minus, Plus, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Minus, Plus, AlertCircle, Sparkles, Check } from 'lucide-react';
 import type {
   StorefrontProductPayload,
   StorefrontCategoryPayload,
@@ -7,6 +7,7 @@ import type {
   StorefrontOptionItemPayload,
   PizzaCompositionDTO,
 } from '@gestor/types';
+import { resolveEffectiveSelectionRules } from '@gestor/types';
 import {
   dedupeById,
   getPizzaFlavorSelectionLimit,
@@ -17,8 +18,17 @@ import {
 } from '@gestor/utils';
 import { api } from '../lib/api-client';
 import { useCartStore } from '../store/use-cart-store';
+import { useAnalytics } from '../features/analytics';
+import { shouldUsePizzaFlow } from '../lib/pizza-flow';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { reconcileGenericSelections } from './product-details-selection';
+import { getGenericOptionGroupError, getMaximumOptionQuantity, getPizzaValidation } from './product-details-validation';
+import {
+  getStorefrontGenericOptionPricingPreview,
+  getStorefrontStartingPrice,
+  hasStorefrontStartingPrice,
+} from '../lib/product-pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -45,7 +55,10 @@ type PizzaPreview = {
   calculatedPrice: number;
 };
 
+const EMPTY_OPTION_ITEMS: StorefrontOptionItemPayload[] = [];
+
 export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, isStoreClosed, onClose }: ProductDetailsModalProps) {
+  const analytics = useAnalytics();
   const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
@@ -56,29 +69,37 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   const [pizzaPreview, setPizzaPreview] = useState<PizzaPreview | null>(null);
   const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
   const [pizzaPreviewError, setPizzaPreviewError] = useState<string | null>(null);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const optionGroupRefs = useRef(new Map<string, HTMLFieldSetElement>());
+  const pizzaControlRefs = useRef(new Map<string, HTMLElement>());
+  const onCloseRef = useRef(onClose);
 
-  const optionGroupLinks = product.optionGroupLinks ?? [];
+  const optionGroupLinks = useMemo(() => product.optionGroupLinks ?? [], [product.optionGroupLinks]);
   const isProductAvailable = product.isAvailable && !isStoreClosed;
+  const isPizzaTemplate = shouldUsePizzaFlow(category, optionGroupLinks);
 
   const sizeGroup = useMemo(() => {
+    if (!isPizzaTemplate) return undefined;
     return optionGroupLinks.find((link) =>
       link.optionGroup?.isActive && (
         link.pricingAxis === 'primary' ||
         /tamanh/i.test(link.optionGroup.name)
       )
     );
-  }, [optionGroupLinks]);
+  }, [isPizzaTemplate, optionGroupLinks]);
 
   const mountingGroup = useMemo(() => {
+    if (!isPizzaTemplate) return undefined;
     return optionGroupLinks.find((link) =>
       link.optionGroup?.isActive && /montagem|montage/i.test(link.optionGroup.name)
     );
-  }, [optionGroupLinks]);
+  }, [isPizzaTemplate, optionGroupLinks]);
 
-  const isPizzaTemplate = isPizzaCategory(category) || Boolean(sizeGroup || mountingGroup);
-
-  const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
-  const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
+  const pizzaSizeItems = sizeGroup?.optionGroup.items ?? EMPTY_OPTION_ITEMS;
+  const pizzaMountingItems = mountingGroup?.optionGroup.items ?? EMPTY_OPTION_ITEMS;
   const isHalfAndHalf = isHalfAndHalfMounting(selectedMountingItemId, pizzaMountingItems);
   const flavorSelectionLimit = getPizzaFlavorSelectionLimit(selectedMountingItemId, pizzaMountingItems);
   const pizzaFlavorOptions = useMemo(() => {
@@ -98,25 +119,81 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   }, [isPizzaTemplate, mountingGroup?.optionGroup.id, optionGroupLinks, sizeGroup?.optionGroup.id]);
 
   const hasV2Options = genericOptionLinks.length > 0;
+  const startingPrice = useMemo(() => getStorefrontStartingPrice(product), [product]);
+  const genericOptionLinksRef = useRef(genericOptionLinks);
+
+  useEffect(() => {
+    genericOptionLinksRef.current = genericOptionLinks;
+  }, [genericOptionLinks]);
 
   useEffect(() => {
     setSelections(
-      genericOptionLinks.map((link) => ({
+      genericOptionLinksRef.current.map((link) => ({
         optionGroupId: link.optionGroup.id,
         name: link.overrideName || link.optionGroup.name,
         items: [],
       }))
     );
 
-    if (!isPizzaTemplate) {
-      setSelectedSizeId('');
-      setSelectedMountingItemId('');
-      setSelectedPizzaFlavorIds([]);
-      setPizzaPreview(null);
-      setPizzaPreviewError(null);
-      return;
-    }
+    setSelectedSizeId('');
+    setSelectedMountingItemId('');
+    setSelectedPizzaFlavorIds([]);
+    setPizzaPreview(null);
+    setPizzaPreviewError(null);
+  }, [product.id]);
 
+  useEffect(() => {
+    setHasAttemptedSubmit(false);
+  }, [product.id]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const frame = window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus());
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.hasAttribute('hidden'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      triggerRef.current?.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelections((current) => reconcileGenericSelections(genericOptionLinks, current));
+  }, [genericOptionLinks]);
+
+  useEffect(() => {
+    if (!isPizzaTemplate) return;
     const firstSize = pizzaSizeItems[0]?.id ?? '';
     setSelectedSizeId((current) => (pizzaSizeItems.some((size) => size.id === current) ? current : firstSize));
     const preferredMounting =
@@ -133,7 +210,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       if (validIds.length > 0) return validIds.slice(0, 2);
       return product.id ? [product.id] : [];
     });
-  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
+  }, [isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
 
   useEffect(() => {
     if (!isPizzaTemplate) return;
@@ -247,16 +324,15 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
 
   const computed = useMemo(() => {
-    let extras = 0;
     const parts: string[] = [];
+    const genericPricing = getStorefrontGenericOptionPricingPreview(product, selections, genericOptionLinks);
+    const genericUnitPrice = genericPricing?.unitPriceCents !== undefined
+      ? genericPricing.unitPriceCents / 100
+      : product.basePrice;
+    const genericExtras = genericUnitPrice - product.basePrice;
 
     selections.forEach((group) => {
       group.items.forEach((item) => {
-        if (item.priceImpactType === 'fixed') {
-          extras += item.priceImpactValue * (item.qty || 1);
-        } else if (item.priceImpactType === 'percentage') {
-          extras += (product.basePrice * (item.priceImpactValue / 100)) * (item.qty || 1);
-        }
         parts.push(item.qty && item.qty > 1 ? `${item.name} x${item.qty}` : item.name);
       });
     });
@@ -268,8 +344,8 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       const basePrice = pizzaPreview?.calculatedPrice ?? product.basePrice;
 
       return {
-        unitPrice: basePrice + extras,
-        totalPrice: (basePrice + extras) * quantity,
+        unitPrice: basePrice + genericExtras,
+        totalPrice: (basePrice + genericExtras) * quantity,
         compositionLabel: [
           pizzaPreview ? `Pizza ${pizzaPreview.sizeName}` : 'Pizza',
           flavorNames.join(' / '),
@@ -279,13 +355,24 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     return {
-      unitPrice: product.basePrice + extras,
-      totalPrice: (product.basePrice + extras) * quantity,
+      unitPrice: genericUnitPrice,
+      totalPrice: genericUnitPrice * quantity,
       compositionLabel: parts.join(', '),
     };
-  }, [isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product.basePrice, quantity, selectedPizzaFlavorIds, selections]);
+  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaPreview, product, quantity, selectedPizzaFlavorIds, selections]);
+
+  const pizzaValidation = useMemo(() => isPizzaTemplate ? getPizzaValidation({
+    hasMountingGroup: Boolean(mountingGroup),
+    selectedSizeId,
+    selectedMountingItemId,
+    selectedFlavorCount: selectedPizzaFlavorIds.length,
+    flavorSelectionLimit,
+    isPreviewLoading: pizzaPreviewLoading,
+    previewError: pizzaPreviewError,
+  }) : null, [flavorSelectionLimit, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId]);
 
   const validationError = useMemo(() => {
+    if (pizzaValidation) return pizzaValidation.message;
     if (isPizzaTemplate) {
       if (!selectedSizeId) return 'Selecione um tamanho.';
       if (mountingGroup && !selectedMountingItemId) return 'Selecione a montagem da pizza.';
@@ -296,11 +383,21 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     for (const link of genericOptionLinks) {
+      const groupError = getGenericOptionGroupError(link, selections);
+      if (groupError) return groupError;
+
       const group = link.optionGroup;
       const state = selections.find((s) => s.optionGroupId === group.id);
       const count = state?.items.length || 0;
-      const min = link.overrideMinSelect ?? group.minSelect;
-      const max = link.overrideMaxSelect ?? group.maxSelect;
+      const { effectiveMinSelect: min, effectiveMaxSelect: max } = resolveEffectiveSelectionRules({
+        selectionType: group.selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        overrideIsRequired: link.overrideIsRequired,
+        overrideMinSelect: link.overrideMinSelect,
+        overrideMaxSelect: link.overrideMaxSelect,
+      });
       const name = link.overrideName || group.name;
 
       if (count < min) return `Selecione pelo menos ${min} em "${name}"`;
@@ -308,7 +405,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     return null;
-  }, [flavorSelectionLimit, genericOptionLinks, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
+  }, [flavorSelectionLimit, genericOptionLinks, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, pizzaValidation, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
 
   const toggleV2Option = (groupId: string, item: StorefrontOptionItemPayload, _minSelect: number, maxSelect: number, selectionType: string) => {
     setSelections((prev) => {
@@ -344,18 +441,27 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     });
   };
 
-  const updateV2Qty = (groupId: string, itemId: string, delta: number) => {
+  const updateV2Qty = (groupId: string, item: StorefrontOptionItemPayload, delta: number, maxSelect: number) => {
     setSelections((prev) => {
       const group = prev.find((g) => g.optionGroupId === groupId);
       if (!group) return prev;
 
-      const newItems = group.items.map((i) => {
-        if (i.optionItemId === itemId) {
-          const newQty = Math.max(1, (i.qty || 1) + delta);
-          return { ...i, qty: newQty };
-        }
-        return i;
-      });
+      const currentItem = group.items.find((selected) => selected.optionItemId === item.id);
+      const nextQty = Math.min(getMaximumOptionQuantity(item.allowQuantity), Math.max(0, (currentItem?.qty ?? 0) + delta));
+      if (!currentItem && nextQty === 0) return prev;
+      if (!currentItem && group.items.length >= maxSelect) return prev;
+
+      const newItems = currentItem
+        ? nextQty === 0
+          ? group.items.filter((selected) => selected.optionItemId !== item.id)
+          : group.items.map((selected) => selected.optionItemId === item.id ? { ...selected, qty: nextQty } : selected)
+        : [...group.items, {
+          optionItemId: item.id,
+          name: item.name,
+          priceImpactType: item.priceImpactType,
+          priceImpactValue: item.priceImpactValue,
+          qty: nextQty,
+        }];
 
       return prev.map((g) => (g.optionGroupId === groupId ? { ...g, items: newItems } : g));
     });
@@ -374,7 +480,23 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   };
 
   const handleAddToCart = () => {
-    if (validationError || !isProductAvailable) return;
+    if (!isProductAvailable) return;
+    if (validationError) {
+      setHasAttemptedSubmit(true);
+      const invalidGroup = genericOptionLinks.find((link) => getGenericOptionGroupError(link, selections));
+      const target = invalidGroup
+        ? optionGroupRefs.current.get(invalidGroup.optionGroup.id)
+        : pizzaValidation
+          ? pizzaControlRefs.current.get(pizzaValidation.target)
+          : undefined;
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        window.setTimeout(() => target.focus(), 250);
+      } else {
+        contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      return;
+    }
 
     addItem({
       product,
@@ -385,37 +507,61 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       computedUnitPrice: computed.unitPrice,
       compositionLabel: computed.compositionLabel,
     });
+    analytics.track('add_to_cart', {
+      productId: product.id,
+      quantity,
+      unitPrice: computed.unitPrice,
+      value: computed.totalPrice,
+    });
 
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white w-full max-w-lg sm:rounded-3xl flex flex-col max-h-[85vh] sm:max-h-[92vh] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/65 p-0 sm:items-center sm:p-6" role="presentation">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-details-title"
+        className="flex max-h-[94dvh] w-full max-w-[44rem] flex-col overflow-hidden bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2rem]"
+      >
         <div className="relative">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="w-full h-48 sm:h-64 object-cover sm:rounded-t-3xl" />
+            <img src={product.image} alt={product.name} className="h-28 w-full object-cover sm:h-40 sm:rounded-t-[2rem]" />
           ) : (
-            <div className="w-full h-24 bg-primary-50 sm:rounded-t-3xl" />
+            <div className="h-16 w-full bg-primary-50 sm:rounded-t-[2rem]" />
           )}
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 backdrop-blur-md text-white p-2 rounded-full transition-colors"
+            data-initial-focus
+            aria-label="Fechar detalhes do produto"
+            className="absolute right-3 top-3 rounded-full bg-black/45 p-2.5 text-white shadow-sm transition-colors hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-hide">
-          <header className="mb-6">
-            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{product.name}</h2>
+        <div ref={contentRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7 sm:py-6">
+          <header className="mb-6 border-b border-slate-100 pb-5">
+            <h2 id="product-details-title" className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{product.name}</h2>
             <p className="text-gray-500 mt-2 leading-relaxed text-sm">
               {product.shortDescription || 'Sem detalhes adicionais.'}
             </p>
+            {!isPizzaTemplate && hasStorefrontStartingPrice(product) && startingPrice !== null ? (
+              <p className="mt-3 text-sm font-black text-primary-700">
+                A partir de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(startingPrice)}
+              </p>
+            ) : null}
           </header>
 
-          {!product.isAvailable ? (
+          {isStoreClosed ? (
+            <div className="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              Você pode montar seu pedido agora. A finalização estará disponível assim que a loja abrir.
+            </div>
+          ) : !product.isAvailable ? (
             <div className="mb-6 bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-700 text-xs font-medium">
               <AlertCircle className="w-4 h-4 shrink-0" />
               Indisponível no momento.
@@ -439,7 +585,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                   </div>
                 </div>
 
-                <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
+                <div ref={(element) => { if (element) pizzaControlRefs.current.set('pizza-size', element); }} tabIndex={-1} className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Tamanho</div>
@@ -467,10 +613,13 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                       );
                     })}
                   </div>
+                  {hasAttemptedSubmit && pizzaValidation?.target === 'pizza-size' ? (
+                    <p role="alert" className="mt-3 flex items-center gap-2 text-xs font-semibold text-amber-800"><AlertCircle className="h-4 w-4" />{pizzaValidation.message}</p>
+                  ) : null}
                 </div>
 
                 {mountingGroup ? (
-                  <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
+                  <div ref={(element) => { if (element) pizzaControlRefs.current.set('pizza-mounting', element); }} tabIndex={-1} className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Montagem</div>
@@ -505,10 +654,13 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                         );
                       })}
                     </div>
+                    {hasAttemptedSubmit && pizzaValidation?.target === 'pizza-mounting' ? (
+                      <p role="alert" className="mt-3 flex items-center gap-2 text-xs font-semibold text-amber-800"><AlertCircle className="h-4 w-4" />{pizzaValidation.message}</p>
+                    ) : null}
                   </div>
                 ) : null}
 
-                <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
+                <div ref={(element) => { if (element) pizzaControlRefs.current.set('pizza-flavors', element); }} tabIndex={-1} className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Sabores</div>
@@ -546,9 +698,12 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                         );
                       })}
                   </div>
+                  {hasAttemptedSubmit && pizzaValidation?.target === 'pizza-flavors' ? (
+                    <p role="alert" className="mt-3 flex items-center gap-2 text-xs font-semibold text-amber-800"><AlertCircle className="h-4 w-4" />{pizzaValidation.message}</p>
+                  ) : null}
                 </div>
 
-                <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <div ref={(element) => { if (element) pizzaControlRefs.current.set('pizza-price', element); }} tabIndex={-1} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Preço</div>
@@ -568,51 +723,86 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                       {pizzaPreview.sizeName} - {pizzaPreview.flavors.map((f) => f.name).join(' / ')}
                     </div>
                   ) : null}
+                  {hasAttemptedSubmit && pizzaValidation?.target === 'pizza-price' ? (
+                    <p role="alert" className="mt-3 flex items-center gap-2 text-xs font-semibold text-amber-800"><AlertCircle className="h-4 w-4" />{pizzaValidation.message}</p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
 
             {hasV2Options ? (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {genericOptionLinks.map((link) => {
                   const group = link.optionGroup;
-                  const min = link.overrideMinSelect ?? group.minSelect;
-                  const max = link.overrideMaxSelect ?? group.maxSelect;
+                  const rules = resolveEffectiveSelectionRules({
+                    selectionType: group.selectionType,
+                    isRequired: group.isRequired,
+                    minSelect: group.minSelect,
+                    maxSelect: group.maxSelect,
+                    overrideIsRequired: link.overrideIsRequired,
+                    overrideMinSelect: link.overrideMinSelect,
+                    overrideMaxSelect: link.overrideMaxSelect,
+                  });
+                  const min = rules.effectiveMinSelect;
+                  const max = rules.effectiveMaxSelect;
                   const state = selections.find((s) => s.optionGroupId === group.id);
                   const selectedIds = new Set((state?.items ?? []).map((item) => item.optionItemId));
 
                   return (
-                    <div key={group.id} className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
-                      <div className="flex items-start justify-between gap-4 mb-3">
+                    <fieldset
+                      key={group.id}
+                      ref={(element) => {
+                        if (element) optionGroupRefs.current.set(group.id, element);
+                        else optionGroupRefs.current.delete(group.id);
+                      }}
+                      tabIndex={-1}
+                      aria-label={link.overrideName || group.name}
+                      aria-describedby={hasAttemptedSubmit && getGenericOptionGroupError(link, selections) ? `option-group-error-${group.id}` : undefined}
+                      className={cn(
+                        'rounded-xl border bg-slate-50/80 p-3 transition-colors sm:p-4',
+                        hasAttemptedSubmit && getGenericOptionGroupError(link, selections) ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-100',
+                      )}
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-4">
                         <div>
                           <div className="text-gray-900 font-black text-sm uppercase tracking-wider">
                             {link.overrideName || group.name}
                           </div>
                           <div className="text-[10px] text-gray-400 font-bold">
-                            {min > 0 ? `Obrigatório • ` : ''}
+                            {rules.effectiveIsRequired ? `Obrigatório • ` : ''}
                             {max === 1 ? 'Escolha 1' : `Escolha até ${max}`}
                           </div>
                         </div>
-                        <div className="text-[10px] font-black uppercase text-gray-400">
-                          {(state?.items ?? []).length}/{max}
-                        </div>
+                        {max > 1 ? <div className="text-[10px] font-black uppercase text-gray-400">{(state?.items ?? []).length}/{max}</div> : null}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
                         {group.items.filter((item) => item.isActive).map((item) => {
                           const isSelected = selectedIds.has(item.id);
                           const priceImpactValue = Number(item.priceImpactValue ?? 0);
+                          const isQuantity = group.selectionType === 'quantity';
+                          const selectedQuantity = state?.items.find((selected) => selected.optionItemId === item.id)?.qty ?? 0;
 
                           return (
-                            <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-3">
-                              <button
-                                type="button"
-                                onClick={() => toggleV2Option(group.id, item, min, max, group.selectionType)}
-                                className="w-full text-left"
-                              >
-                                <div className="flex items-center justify-between gap-3">
+                            <div key={item.id} className={cn(
+                              'flex min-h-[44px] items-center justify-between gap-3 px-3 py-2.5 transition-colors',
+                              isSelected ? 'bg-primary-50' : 'hover:bg-slate-50',
+                            )}>
+                              <div className={cn(
+                                'flex min-h-[44px] min-w-0 flex-1 items-center gap-3 text-left',
+                                !isQuantity && 'cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-primary-500',
+                              )} onClick={!isQuantity ? () => toggleV2Option(group.id, item, min, max, group.selectionType) : undefined}>
+                                {!isQuantity ? <input
+                                  type={group.selectionType === 'single' ? 'radio' : 'checkbox'}
+                                  name={`option-group-${group.id}`}
+                                  checked={isSelected}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={() => toggleV2Option(group.id, item, min, max, group.selectionType)}
+                                  className="sr-only"
+                                /> : null}
+                                <div className="flex flex-1 items-center justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-gray-900 font-bold text-xs truncate">{item.name}</div>
+                                    <div className="text-sm font-semibold text-gray-900">{item.name}</div>
                                     <div className="text-[10px] text-gray-400 font-bold">
                                       {item.priceImpactType === 'fixed'
                                         ? `+ ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(priceImpactValue)}`
@@ -623,45 +813,52 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                                             : ''}
                                     </div>
                                   </div>
-                                  <div className={cn(
-                                    'w-5 h-5 rounded-md border flex items-center justify-center',
-                                    isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-200 text-gray-400'
-                                  )}>
-                                    {isSelected ? <ChevronRight className="w-3.5 h-3.5 stroke-[3]" /> : null}
-                                  </div>
+                                  {!isQuantity ? <div className={cn(
+                                      'w-5 h-5 border flex items-center justify-center',
+                                      group.selectionType === 'single' ? 'rounded-full' : 'rounded-md',
+                                      isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-200 text-gray-400'
+                                    )}>
+                                      {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                                    </div> : null}
                                 </div>
-                              </button>
+                              </div>
 
-                              {group.selectionType === 'quantity' && isSelected && item.allowQuantity ? (
-                                <div className="mt-3 flex items-center gap-3">
+                              {isQuantity ? (
+                                  <div className="flex shrink-0 items-center gap-2" aria-label={`Quantidade de ${item.name}`}>
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      const current = state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1;
-                                      updateV2Qty(group.id, item.id, -1);
-                                      if (current <= 1) return;
-                                    }}
-                                    className="w-8 h-8 rounded-xl bg-white border border-gray-100 text-gray-500 flex items-center justify-center"
+                                    onClick={() => updateV2Qty(group.id, item, -1, max)}
+                                    aria-label={`Diminuir quantidade de ${item.name}`}
+                                    disabled={selectedQuantity === 0}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
                                   >
                                     <Minus className="w-4 h-4" />
                                   </button>
-                                  <div className="text-gray-900 font-black">
-                                    {state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1}
+                                  <div aria-live="polite" className="min-w-5 text-center text-sm font-black text-slate-900">
+                                    {selectedQuantity}
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => updateV2Qty(group.id, item.id, 1)}
-                                    className="w-8 h-8 rounded-xl bg-white border border-gray-100 text-gray-500 flex items-center justify-center"
+                                    onClick={() => updateV2Qty(group.id, item, 1, max)}
+                                    aria-label={`Aumentar quantidade de ${item.name}`}
+                                    disabled={selectedQuantity >= getMaximumOptionQuantity(item.allowQuantity)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
                                   >
                                     <Plus className="w-4 h-4" />
                                   </button>
-                                </div>
+                                  </div>
                               ) : null}
                             </div>
                           );
                         })}
                       </div>
-                    </div>
+                      {hasAttemptedSubmit && getGenericOptionGroupError(link, selections) ? (
+                        <p id={`option-group-error-${group.id}`} role="alert" className="mt-3 flex items-center gap-2 text-xs font-semibold text-amber-800">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          {getGenericOptionGroupError(link, selections)}
+                        </p>
+                      ) : null}
+                    </fieldset>
                   );
                 })}
               </div>
@@ -740,21 +937,14 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
           </div>
         </div>
 
-        <div className="p-6 border-t bg-white sm:rounded-b-3xl">
-          {validationError ? (
-            <div className="mb-4 bg-amber-50 border border-amber-100 p-3 rounded-xl flex items-center gap-2 text-amber-700 text-xs font-medium animate-in fade-in zoom-in duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {validationError}
-            </div>
-          ) : null}
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-gray-100 rounded-2xl p-1 h-12">
-              <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
+        <div className="border-t bg-white px-4 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.06)] sm:rounded-b-[2rem] sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 items-center rounded-xl bg-slate-100 p-1">
+              <button type="button" aria-label="Diminuir quantidade" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500">
                 <Minus className="w-5 h-5" />
               </button>
-              <span className="w-8 text-center font-bold text-gray-900">{quantity}</span>
-              <button type="button" onClick={() => setQuantity((q) => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
+              <span className="w-7 text-center font-bold text-slate-900">{quantity}</span>
+              <button type="button" aria-label="Aumentar quantidade" onClick={() => setQuantity((q) => q + 1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500">
                 <Plus className="w-5 h-5" />
               </button>
             </div>
@@ -762,15 +952,15 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!!validationError || !isProductAvailable}
+              disabled={!isProductAvailable}
               className={cn(
-                'flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-bold transition-all active:scale-[0.98]',
-                (validationError || !isProductAvailable)
+                'flex h-11 flex-1 items-center justify-between rounded-xl px-4 font-bold transition-all active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600',
+                !isProductAvailable
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   : 'bg-primary-600 text-white shadow-lg shadow-primary-100'
               )}
             >
-              <span>{isStoreClosed ? 'Loja Fechada' : 'Adicionar'}</span>
+              <span>{isStoreClosed ? 'Finalização indisponível' : 'Adicionar'}</span>
               <span className="text-lg">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(computed.totalPrice)}
               </span>

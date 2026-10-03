@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { ChatMessage, ChatSession } from '@gestor/types';
 import { QuickReplies } from './QuickReplies';
+import { usePermissions } from '../../../hooks/use-tenant-auth';
 
 
 
@@ -15,6 +16,11 @@ interface ChatAreaProps {
 }
 
 export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
+  const { has } = usePermissions();
+  const canSendMessages = has('chat.send');
+  const canManageHandoff = has('chat.manage_handoff');
+  const canCloseSessions = has('chat.close');
+  const canManageQuickReplies = has('chat.manage_quick_replies');
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -51,7 +57,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string): Promise<Partial<ChatMessage> | null> => {
-      if (!session) return null;
+      if (!session || !canSendMessages) return null;
       const res = await api.post(`/chat/sessions/${session.id}/messages`, {
         direction: 'outbound',
         content,
@@ -128,14 +134,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   const [handoffReason, setHandoffReason] = useState('');
 
   const handleActivateHandoff = () => {
-    if (!session || session.handoffActive) return;
+    if (!session || session.handoffActive || !canManageHandoff) return;
     const reason = handoffReason.trim() || undefined;
     handoffMutation.mutate(reason);
   };
 
   const closeSessionMutation = useMutation({
     mutationFn: async () => {
-      if (!session) return;
+      if (!session || !canCloseSessions) return;
       const res = await api.post(`/chat/sessions/${session.id}/close`);
       return res.data;
     },
@@ -146,7 +152,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
 
   const deactivateHandoffMutation = useMutation({
     mutationFn: async () => {
-      if (!session) return;
+      if (!session || !canManageHandoff) return;
       const res = await api.post(`/chat/sessions/${session.id}/handoff/deactivate`);
       return res.data;
     },
@@ -167,7 +173,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     console.log(`[CHAT_HISTORY_UI] sessionId=${session?.id} count=${sessionMessages.length} containsMarker=${!!marker} markerMessageId=${marker?.id || ''} directionsSummary=${directionsSummary} senderTypesSummary=${senderTypesSummary}`);
     
     setMessages(sessionMessages);
-  }, [sessionMessages]);
+  }, [sessionMessages, session?.id]);
 
   useEffect(() => {
     if (session?.id) {
@@ -186,7 +192,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
 
   const handleSend = () => {
     const trimmed = message.trim();
-    if (trimmed && session) {
+    if (trimmed && session && canSendMessages) {
       sendMessageMutation.mutate(trimmed);
     }
   };
@@ -358,7 +364,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!session.handoffActive && session.state !== 'closed' && session.state !== 'expired' && (
+            {canManageHandoff && !session.handoffActive && session.state !== 'closed' && session.state !== 'expired' && (
               <>
                 <input
                   value={handoffReason}
@@ -375,7 +381,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
                 </button>
               </>
             )}
-            {session.state !== 'closed' && session.state !== 'expired' && (
+            {canCloseSessions && session.state !== 'closed' && session.state !== 'expired' && (
               <button
                 onClick={() => closeSessionMutation.mutate()}
                 disabled={closeSessionMutation.isPending}
@@ -420,15 +426,17 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               </div>
             </div>
             
-            <div className="flex gap-2 shrink-0 self-start sm:self-center">
-              <button
-                onClick={() => deactivateHandoffMutation.mutate()}
-                disabled={deactivateHandoffMutation.isPending}
-                className="px-3 py-1.5 bg-status-warning text-status-warning-foreground hover:bg-status-warning/90 text-xs font-semibold rounded-md transition-colors shadow-sm"
-              >
-                {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
-              </button>
-            </div>
+            {canManageHandoff && (
+              <div className="flex gap-2 shrink-0 self-start sm:self-center">
+                <button
+                  onClick={() => deactivateHandoffMutation.mutate()}
+                  disabled={deactivateHandoffMutation.isPending}
+                  className="px-3 py-1.5 bg-status-warning text-status-warning-foreground hover:bg-status-warning/90 text-xs font-semibold rounded-md transition-colors shadow-sm"
+                >
+                  {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -495,6 +503,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <QuickReplies 
               onReplySelect={handleQuickReply} 
               onClose={() => setShowQuickReplies(false)}
+              canManage={canManageQuickReplies}
               className="rounded-xl border border-border shadow-lg bg-card/95 backdrop-blur-sm"
             />
           </div>
@@ -503,32 +512,38 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         {/* Input */}
         <div className="p-3 border-t border-border bg-card">
           <div className="flex items-end gap-1.5 max-w-4xl mx-auto">
-            <button
-              onClick={handleFileUpload}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
-              title="Anexar arquivo"
-            >
-              <Paperclip className="w-5 h-5" />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileChange}
-              accept="image/*,video/*,audio/*,.pdf"
-              className="hidden"
-            />
+            {canSendMessages && (
+              <>
+                <button
+                  onClick={handleFileUpload}
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+                  title="Anexar arquivo"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*,video/*,audio/*,.pdf"
+                  className="hidden"
+                />
+              </>
+            )}
             
-            <button
-              onClick={() => setShowQuickReplies(!showQuickReplies)}
-              className={`p-2 rounded-full transition-colors ${
-                showQuickReplies 
-                  ? 'text-primary bg-primary/10' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-              title="Respostas Rápidas"
-            >
-              <Zap className="w-5 h-5" />
-            </button>
+            {canSendMessages && (
+              <button
+                onClick={() => setShowQuickReplies(!showQuickReplies)}
+                className={`p-2 rounded-full transition-colors ${
+                  showQuickReplies
+                    ? 'text-primary bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+                title="Respostas Rápidas"
+              >
+                <Zap className="w-5 h-5" />
+              </button>
+            )}
 
             <button
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors hidden sm:block"
@@ -543,10 +558,12 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 disabled={
-                  session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending
+                  !canSendMessages || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending
                 }
                 placeholder={
-                  session?.state === 'closed' || session?.state === 'expired'
+                  !canSendMessages
+                    ? 'Você não possui permissão para enviar mensagens'
+                    : session?.state === 'closed' || session?.state === 'expired'
                     ? 'Conversa encerrada'
                     : 'Digite uma mensagem...'
                 }
@@ -556,17 +573,19 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               />
             </div>
 
-            <button
-              onClick={handleSend}
-              disabled={!message.trim() || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending}
-              className="p-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 shadow-sm"
-            >
-              {sendMessageMutation.isPending ? (
-                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
+            {canSendMessages && (
+              <button
+                onClick={handleSend}
+                disabled={!message.trim() || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending}
+                className="p-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 shadow-sm"
+              >
+                {sendMessageMutation.isPending ? (
+                  <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

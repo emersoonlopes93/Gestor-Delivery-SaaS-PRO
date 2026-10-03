@@ -6,6 +6,7 @@
       "@/*": ["src/*"],
       "@gestor/types": ["../../packages/types/src"],
       "@gestor/core": ["../../packages/core/src"],
+      "@gestor/pricing": ["../../packages/pricing/src"],
       "@gestor/theme": ["../../packages/theme/src"],
       "@gestor/utils": ["../../packages/utils/src"],
       "@gestor/auth": ["../../packages/auth/src"],

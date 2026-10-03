@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Store, Image as ImageIcon, Phone, ChevronDown } from 'lucide-react';
 import { api } from '../../../lib/api-client';
-import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import { maskPhone, unmask } from '@gestor/utils';
-
-const STORE_CATEGORIES = [
-  'Restaurante', 'Hamburgueria', 'Pizzaria', 'Padaria / Confeitaria',
-  'Sushi / Japonês', 'Lanchonete', 'Açaí / Sorvetes', 'Churrascaria',
-  'Mexicano', 'Árabe / Mediterrâneo', 'Saudável / Fit', 'Bebidas',
-  'Marmitaria', 'Frutos do Mar', 'Vegano / Vegetariano', 'Outro',
-];
+import { BUSINESS_SEGMENTS, BUSINESS_SEGMENT_LABELS, type BusinessSegment } from '@gestor/types';
 
 interface Step1Data {
   name: string;
-  category: string;
+  category: BusinessSegment | '';
   logoUrl: string;
   businessPhone: string;
 }
@@ -31,8 +24,8 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
     businessPhone: '',
   });
   const [loading, setLoading] = useState(true);
-  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -47,12 +40,12 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
     try {
       const res = await api.get<{
         name: string;
-        settings?: { logoUrl?: string; businessPhone?: string };
+        settings?: { logoUrl?: string; businessPhone?: string; businessSegment?: BusinessSegment | null };
       }>('/tenant/me');
       if (res.success) {
         setForm({
           name: res.data.name || '',
-          category: '',
+          category: res.data.settings?.businessSegment || '',
           logoUrl: res.data.settings?.logoUrl || '',
           businessPhone: res.data.settings?.businessPhone || '',
         });
@@ -67,8 +60,13 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setUploadError('Use uma imagem JPG, PNG ou WebP.');
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter menos de 5MB.');
+      setUploadError('A imagem deve ter menos de 5MB.');
       return;
     }
     setUploading(true);
@@ -77,8 +75,11 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
       formData.append('file', file);
       const res = await api.upload<{ url: string }>('/upload/image?type=logo', formData);
       if (res.success) setForm(f => ({ ...f, logoUrl: res.data.url }));
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Não foi possível enviar a imagem.');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -98,6 +99,7 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
       await api.patch('/tenant/settings', {
         logoUrl: form.logoUrl || undefined,
         businessPhone: unmask(form.businessPhone),
+        businessSegment: form.category || undefined,
       });
     });
   };
@@ -128,10 +130,7 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
           Logo da Loja
         </label>
         <div className="flex items-center gap-5">
-          <div
-            className="relative w-20 h-20 rounded-2xl bg-white dark:bg-slate-700 border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center overflow-hidden cursor-pointer group"
-            onClick={() => setLogoPickerOpen(true)}
-          >
+          <label className="relative w-20 h-20 rounded-2xl bg-white dark:bg-slate-700 border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center overflow-hidden cursor-pointer group">
             {form.logoUrl ? (
               <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain" />
             ) : (
@@ -140,21 +139,21 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <span className="text-white text-xs font-bold">Alterar</span>
             </div>
-          </div>
+            <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={uploading} />
+          </label>
           <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setLogoPickerOpen(true)}
-              className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-            >
-              Selecionar da Biblioteca
-            </button>
             <label className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors cursor-pointer text-center">
-              {uploading ? 'Enviando...' : 'Upload do Computador'}
-              <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
+              {uploading ? 'Enviando...' : form.logoUrl ? 'Substituir logo' : 'Selecionar arquivo'}
+              <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={uploading} />
             </label>
+            {form.logoUrl ? (
+              <button type="button" onClick={() => setForm((current) => ({ ...current, logoUrl: '' }))} className="text-xs font-bold text-red-600 dark:text-red-400">
+                Remover logo
+              </button>
+            ) : null}
           </div>
         </div>
+        {uploadError ? <p role="alert" className="mt-3 text-xs font-medium text-red-600 dark:text-red-400">{uploadError}</p> : null}
       </div>
 
       {/* Nome da Loja */}
@@ -174,17 +173,17 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
       {/* Categoria */}
       <div>
         <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
-          Categoria / Tipo de Negócio
+          Segmento do negócio
         </label>
         <div className="relative">
           <select
             value={form.category}
-            onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+            onChange={e => setForm(f => ({ ...f, category: e.target.value as Step1Data['category'] }))}
             className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm appearance-none"
           >
-            <option value="">Selecione a categoria...</option>
-            {STORE_CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+            <option value="">Selecionar depois</option>
+            {BUSINESS_SEGMENTS.map((value) => (
+              <option key={value} value={value}>{BUSINESS_SEGMENT_LABELS[value]}</option>
             ))}
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -214,15 +213,6 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
         Continuar →
       </button>
 
-      <ImagePickerModal
-        isOpen={logoPickerOpen}
-        onClose={() => setLogoPickerOpen(false)}
-        onSelect={(asset) => {
-          setForm(f => ({ ...f, logoUrl: asset.publicUrl }));
-          setLogoPickerOpen(false);
-        }}
-        selectedAssetId={undefined}
-      />
     </div>
   );
 }

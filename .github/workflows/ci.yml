@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "fix/99food-contract-closure"]
   pull_request:
 
 jobs:
-  build-and-smoke:
+  build-and-migrate:
     runs-on: ubuntu-latest
 
     services:
@@ -23,12 +23,24 @@ jobs:
           --health-interval=10s 
           --health-timeout=5s 
           --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     env:
       NODE_ENV: test
       API_PORT: 3333
       API_PREFIX: /api/v1
       DATABASE_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      ANALYTICS_ROLLUP_POSTGRES_TEST: "true"
+      ANALYTICS_ROLLUP_REDIS_TEST_URL: redis://localhost:6379
       JWT_SECRET: test-jwt-secret-change-me-please
       JWT_REFRESH_SECRET: test-refresh-secret-change-me-please
       JWT_EXPIRES_IN: 15m
@@ -65,8 +77,20 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Check theme compatibility
+        run: pnpm check:theme
+
+      - name: Typecheck web tenant
+        run: pnpm --filter @gestor/web-tenant exec tsc --noEmit
+
       - name: Check No Any (Type Safety)
         run: pnpm check:no-any
+
+      - name: Check package boundaries
+        run: pnpm check:boundaries
+
+      - name: Check Android tenant branding
+        run: pnpm check:android-tenant-branding
 
       - name: Generate Prisma Client
         run: pnpm db:generate
@@ -77,24 +101,479 @@ jobs:
       - name: Migrate DB
         run: pnpm --filter @gestor/api prisma:migrate:deploy
 
-      - name: Seed DB
+      - name: Validate Prisma schema after ephemeral migration
+        run: pnpm --filter @gestor/api exec prisma validate
+
+      - name: Test 99Food contracts
+        run: >-
+          pnpm --filter @gestor/api test --
+          src/marketplace/services/food99-financial-token.service.spec.ts
+          src/marketplace/services/food99-financial-client.service.spec.ts
+          src/marketplace/services/food99-financial-reconciliation.service.spec.ts
+          src/marketplace/services/food99-cash-confirmation.service.spec.ts
+          src/marketplace/services/food99-http-client.service.spec.ts
+          src/marketplace/services/marketplace-order-ingestion.service.spec.ts
+          src/marketplace/providers/food99.provider.spec.ts
+          src/marketplace/controllers/marketplace-tenant.controller.spec.ts
+
+      - name: Test 99Food reconciliation with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/marketplace/food99-financial-reconciliation.postgres.integration-test.ts
+
+      - name: Test concurrent operational transactions
+        run: pnpm --filter @gestor/api test:operations-concurrency
+
+      - name: Test analytics deterministic rollups with ephemeral PostgreSQL and Redis
+        run: pnpm --filter @gestor/api test -- src/analytics/analytics-rollup src/analytics/analytics-retention
+
+      - name: Test consolidated milestone 1 analytics validation
+        run: pnpm --filter @gestor/api test -- src/analytics/milestone-1-consolidated-analytics.spec.ts
+
+  smoke-with-ephemeral-seed:
+    needs: build-and-migrate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gestor_delivery
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      API_PORT: 3333
+      API_PREFIX: /api/v1
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      JWT_SECRET: test-jwt-secret-change-me-please
+      JWT_REFRESH_SECRET: test-refresh-secret-change-me-please
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+      SWAGGER_ENABLED: "false"
+      RATE_LIMIT_TTL_SECONDS: "60"
+      RATE_LIMIT_MAX_REQUESTS: "9999"
+      RATE_LIMIT_AUTH_TTL_SECONDS: "60"
+      RATE_LIMIT_AUTH_MAX_REQUESTS: "9999"
+      RATE_LIMIT_PUBLIC_TTL_SECONDS: "60"
+      RATE_LIMIT_PUBLIC_MAX_REQUESTS: "9999"
+      SMOKE_API_BASE_URL: http://localhost:3333/api/v1
+      SMOKE_TENANT_SLUG: pizzaria-demo
+      SMOKE_TENANT_EMAIL: owner@pizzariademo.com
+      SMOKE_TENANT_PASSWORD: Owner@123
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Build API smoke artifact
+        run: pnpm --filter @gestor/api build
+
+      - name: Verify API smoke artifact
+        run: |
+          if ! test -f apps/api/dist/apps/api/src/main.js; then
+            echo "Expected API smoke artifact is missing."
+            find apps/api/dist -type f -name main.js -print 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Migrate ephemeral DB
+        run: pnpm --filter @gestor/api prisma:migrate:deploy
+
+      - name: Seed ephemeral smoke fixture
         run: pnpm --filter @gestor/api prisma:seed
 
       - name: Start API
-        run: pnpm --filter @gestor/api start:prod &
+        run: |
+          (
+            cd apps/api
+            exec node --max-old-space-size=512 dist/apps/api/src/main.js
+          ) >"$RUNNER_TEMP/api-smoke.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/api-smoke.pid"
 
       - name: Wait for health
         run: |
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3333/api/v1/health || true)
+          set +e
+          HEALTH_OK=0
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${API_PORT}${API_PREFIX}/health || true)
             if [ "$code" = "200" ]; then
+              HEALTH_OK=1
               echo "API healthy"
-              exit 0
+              break
             fi
             sleep 1
           done
+
+          set -e
+          if [ "$HEALTH_OK" = "1" ]; then
+            exit 0
+          fi
+
           echo "API failed health check"
+
+          echo "API diagnostic: required environment presence"
+          for name in DATABASE_URL DIRECT_URL NODE_ENV API_PORT JWT_SECRET JWT_REFRESH_SECRET; do
+            if [ -n "${!name:-}" ]; then
+              echo "$name=present"
+            else
+              echo "$name=missing"
+            fi
+          done
+
+          if [ -f "$RUNNER_TEMP/api-smoke.pid" ]; then
+            api_pid=$(cat "$RUNNER_TEMP/api-smoke.pid")
+            if kill -0 "$api_pid" 2>/dev/null; then
+              echo "API diagnostic: process=running"
+              ps -p "$api_pid" -o pid=,stat=,comm= || true
+            else
+              echo "API diagnostic: process=exited"
+            fi
+          else
+            echo "API diagnostic: process=pid-unavailable"
+          fi
+
+          echo "API diagnostic: listeners"
+          if command -v ss >/dev/null 2>&1; then
+            ss -lntp | grep -E '(:3333|:3333 )' || true
+          elif command -v netstat >/dev/null 2>&1; then
+            netstat -lntp 2>/dev/null | grep -E '(:3333|:3333 )' || true
+          fi
+
+          echo "API diagnostic: sanitized startup log"
+          if [ -f "$RUNNER_TEMP/api-smoke.log" ]; then
+            sed -E \
+              -e 's#postgres(ql)?://[^[:space:]]+#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(DATABASE_URL|DIRECT_URL|[A-Za-z_]*(PASSWORD|TOKEN|SECRET)[A-Za-z_]*)[[:space:]]*[:=][^[:space:]]*#\1=[REDACTED]#gI' \
+              -e 's#([0-9]{1,3}\.){3}[0-9]{1,3}#[REDACTED_IP]#g' \
+              "$RUNNER_TEMP/api-smoke.log"
+          else
+            echo "startup log unavailable"
+          fi
+
           exit 1
 
       - name: Smoke tests
         run: pnpm --filter @gestor/api smoke:all
+
+      - name: Cleanup smoke diagnostics
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/api-smoke.pid" ]; then
+            api_pid=$(cat "$RUNNER_TEMP/api-smoke.pid")
+            kill "$api_pid" 2>/dev/null || true
+          fi
+          rm -f "$RUNNER_TEMP/api-smoke.log" "$RUNNER_TEMP/api-smoke.pid"
+
+  notification-audio-e2e:
+    needs: build-and-migrate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gestor_delivery
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      API_PORT: 3333
+      API_PREFIX: /api/v1
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_ENABLED: "true"
+      BULLMQ_ENABLED: "false"
+      CAMPAIGNS_DISPATCH_ENABLED: "false"
+      JWT_SECRET: test-jwt-secret-change-me-please
+      JWT_REFRESH_SECRET: test-refresh-secret-change-me-please
+      CORS_ORIGINS: http://127.0.0.1:5173
+      NOTIFICATION_E2E_API_BASE: http://127.0.0.1:3333/api/v1
+      NOTIFICATION_E2E_WEB_URL: http://127.0.0.1:5173
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Build API and web tenant
+        run: pnpm --filter @gestor/api build && pnpm --filter @gestor/web-tenant build
+
+      - name: Migrate and seed ephemeral database
+        run: pnpm --filter @gestor/api prisma:migrate:deploy && pnpm --filter @gestor/api prisma:seed
+
+      - name: Start API and web tenant
+        run: |
+          (cd apps/api && exec node dist/apps/api/src/main.js) >"$RUNNER_TEMP/notification-api.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/notification-api.pid"
+          (exec pnpm --filter @gestor/web-tenant dev --host 127.0.0.1) >"$RUNNER_TEMP/notification-web.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/notification-web.pid"
+
+      - name: Wait for readiness
+        run: |
+          for url in http://127.0.0.1:3333/api/v1/health http://127.0.0.1:5173; do
+            for i in $(seq 1 60); do
+              if curl --fail --silent "$url" >/dev/null; then break; fi
+              if [ "$i" = "60" ]; then echo "Readiness failed: $url"; exit 1; fi
+              sleep 1
+            done
+          done
+
+      - name: Notification audio E2E
+        run: pnpm exec ts-node --transpile-only scripts/notification-audio-e2e.ts
+
+      - name: Notification mobile safe-area visual E2E
+        run: pnpm exec ts-node --transpile-only scripts/notification-mobile-visual-e2e.ts
+
+      - name: Upload notification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-audio-e2e
+          path: |
+            qa-artifacts/notification-audio
+            tmp/notification-visual-proof
+            ${{ runner.temp }}/notification-api.log
+            ${{ runner.temp }}/notification-web.log
+
+      - name: Cleanup notification processes
+        if: always()
+        run: |
+          for pid_file in "$RUNNER_TEMP/notification-api.pid" "$RUNNER_TEMP/notification-web.pid"; do
+            if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+              kill "$(cat "$pid_file")"
+            fi
+          done
+
+  dashboard-theme-e2e:
+    needs: build-and-migrate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gestor_delivery
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      API_PORT: 3333
+      API_PREFIX: /api/v1
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      JWT_SECRET: test-jwt-secret-change-me-please
+      JWT_REFRESH_SECRET: test-refresh-secret-change-me-please
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGINS: http://127.0.0.1:5173
+      DASHBOARD_THEME_E2E_API_BASE: http://127.0.0.1:3333/api/v1
+      DASHBOARD_THEME_E2E_WEB_URL: http://127.0.0.1:5173
+      DASHBOARD_THEME_E2E_TENANT_SLUG: pizzaria-demo
+      DASHBOARD_THEME_E2E_TENANT_EMAIL: owner@pizzariademo.com
+      DASHBOARD_THEME_E2E_TENANT_PASSWORD: Owner@123
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Build API and web tenant
+        run: pnpm --filter @gestor/api build && pnpm --filter @gestor/web-tenant build
+
+      - name: Migrate and seed ephemeral database
+        run: pnpm --filter @gestor/api prisma:migrate:deploy && pnpm --filter @gestor/api prisma:seed
+
+      - name: Start API and web tenant
+        run: |
+          (cd apps/api && exec node dist/apps/api/src/main.js) >"$RUNNER_TEMP/dashboard-theme-api.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/dashboard-theme-api.pid"
+          (exec pnpm --filter @gestor/web-tenant dev --host 127.0.0.1) >"$RUNNER_TEMP/dashboard-theme-web.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/dashboard-theme-web.pid"
+
+      - name: Wait for readiness
+        run: |
+          for url in http://127.0.0.1:3333/api/v1/health http://127.0.0.1:5173; do
+            for i in $(seq 1 60); do
+              if curl --fail --silent "$url" >/dev/null; then break; fi
+              if [ "$i" = "60" ]; then echo "Readiness failed: $url"; exit 1; fi
+              sleep 1
+            done
+          done
+
+      - name: Dashboard theme E2E
+        run: pnpm exec ts-node --transpile-only scripts/dashboard-theme-e2e.ts
+
+      - name: Upload dashboard theme artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-theme-e2e
+          path: |
+            qa-artifacts/dashboard-theme-consistency
+            ${{ runner.temp }}/dashboard-theme-api.log
+            ${{ runner.temp }}/dashboard-theme-web.log
+
+      - name: Cleanup dashboard theme processes
+        if: always()
+        run: |
+          for pid_file in "$RUNNER_TEMP/dashboard-theme-api.pid" "$RUNNER_TEMP/dashboard-theme-web.pid"; do
+            if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+              kill "$(cat "$pid_file")"
+            fi
+          done
+
+  storefront-consent-e2e:
+    needs: build-and-migrate
+    runs-on: ubuntu-latest
+
+    env:
+      STOREFRONT_CONSENT_E2E_WEB_URL: http://127.0.0.1:3000
+      STOREFRONT_CONSENT_E2E_ARTIFACT_DIR: qa-artifacts/storefront-consent
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build storefront
+        run: pnpm --filter @gestor/web-storefront build
+
+      - name: Start storefront
+        run: |
+          (exec pnpm --filter @gestor/web-storefront dev --host 127.0.0.1) >"$RUNNER_TEMP/storefront-consent-web.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/storefront-consent-web.pid"
+
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
+            if [ "$i" = "60" ]; then
+              echo "Readiness failed: http://127.0.0.1:3000"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Storefront consent E2E
+        run: pnpm exec ts-node --transpile-only scripts/storefront-consent-e2e.ts
+
+      - name: Upload storefront consent artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storefront-consent-e2e
+          path: |
+            qa-artifacts/storefront-consent
+            ${{ runner.temp }}/storefront-consent-web.log
+
+      - name: Cleanup storefront process
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/storefront-consent-web.pid" ] && kill -0 "$(cat "$RUNNER_TEMP/storefront-consent-web.pid")" 2>/dev/null; then
+            kill "$(cat "$RUNNER_TEMP/storefront-consent-web.pid")"
+          fi

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiProviderType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { resolveGoogleAiApiKey } from '../../config/environment-aliases';
 
 export type AiConfigSource = 'database' | 'env' | 'tenant_config' | 'default' | 'request';
 
@@ -190,11 +191,7 @@ export class AiProviderConfigService {
     if (provider === 'openrouter') return process.env.OPENROUTER_API_KEY?.trim() || '';
 
     if (provider === 'google_ai') {
-      return (
-        process.env.GOOGLE_AI_API_KEY?.trim() ||
-        process.env.GEMINI_API_KEY?.trim() ||
-        ''
-      );
+      return resolveGoogleAiApiKey(process.env);
     }
 
     if (provider === 'anthropic') {

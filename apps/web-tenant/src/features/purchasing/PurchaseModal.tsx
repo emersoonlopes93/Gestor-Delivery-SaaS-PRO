@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, PaymentStatus } from '@gestor/types';
+import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, FinancialAccountDTO, PaymentStatus } from '@gestor/types';
 import { api } from '../../lib/api-client';
 import { Plus, Trash2, ChevronDown } from 'lucide-react';
 
@@ -15,12 +15,18 @@ import { Modal } from '../../components/Modal';
 export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
 
-  const { register, control, handleSubmit, watch, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
+  const createIdempotencyKey = () => typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `purchase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const { register, control, handleSubmit, watch, reset, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
     defaultValues: {
       items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
       paymentStatus: PaymentStatus.PAID,
-      purchaseDate: new Date(),
+      purchaseDate: new Date().toISOString().split('T')[0],
+      idempotencyKey: createIdempotencyKey(),
     }
   });
 
@@ -34,18 +40,30 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
 
   useEffect(() => {
     if (isOpen) {
+      reset({
+        items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
+        paymentStatus: PaymentStatus.PAID,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        idempotencyKey: createIdempotencyKey(),
+      });
       loadData();
     }
-  }, [isOpen]);
+  }, [isOpen, reset]);
 
   const loadData = async () => {
     try {
       const [suppRes, ingRes] = await Promise.all([
         api.get<SupplierDTO[]>('/purchasing/suppliers'),
-        api.get<IngredientDTO[]>('/inventory/ingredients')
+        api.get<IngredientDTO[]>('/inventory/ingredients'),
       ]);
       if (suppRes.success) setSuppliers(suppRes.data);
       if (ingRes.success) setIngredients(ingRes.data);
+      try {
+        const accountRes = await api.get<FinancialAccountDTO[]>('/finance/accounts');
+        if (accountRes.success) setAccounts(accountRes.data.filter((account) => account.active));
+      } catch {
+        setAccounts([]);
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     }
@@ -77,6 +95,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
       }
     >
       <form onSubmit={handleSubmit(onSave)} className="space-y-6 text-left">
+        <input type="hidden" {...register('idempotencyKey', { required: true })} />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Fornecedor</label>
@@ -92,6 +111,24 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
+            {watch('paymentStatus') === PaymentStatus.PAID && (
+              <div className="mt-4">
+                <label className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Conta financeira
+                </label>
+                <select
+                  {...register('accountId', {
+                    validate: (value) => watch('paymentStatus') !== PaymentStatus.PAID || Boolean(value),
+                  })}
+                  className="input-premium"
+                >
+                  <option value="">Selecione a conta debitada</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>{account.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div>

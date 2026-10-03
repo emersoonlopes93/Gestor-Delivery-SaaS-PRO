@@ -1,8 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDrivers } from '../hooks/useDrivers';
 import type { DriverDTO } from '@gestor/types';
-import { DriverStatus, DriverVehicleType } from '@gestor/types';
-import { Copy, Check, AlertCircle } from 'lucide-react';
+import { DriverPayMode, DriverStatus, DriverVehicleType } from '@gestor/types';
+import { Copy, Check, AlertCircle, WalletCards } from 'lucide-react';
+import {
+  DriverPayFields,
+} from './DriverPayFields';
+import { DEFAULT_DRIVER_PAY_VALUE, driverPayOverridePayload, type DriverPayFormValue, validateDriverPay } from './driver-pay-form';
+import { DriverEarningsPanel } from './DriverEarningsPanel';
+import { useDriverEarnings } from '../hooks/useDriverEarnings';
+import { DriverSettlementsPanel } from './DriverSettlementsPanel';
+import { usePermissions } from '@/hooks/use-tenant-auth';
+import { useDriverShift } from '../hooks/useDriverShift';
 
 
 
@@ -14,6 +23,12 @@ interface Props {
 
 export function DriverFormModal({ isOpen, onClose, driver }: Props) {
   const { createDriver, updateDriver, resetPin } = useDrivers();
+  const earnings = useDriverEarnings(driver?.id ?? null);
+  const driverShift = useDriverShift(driver?.id ?? null);
+  const { has } = usePermissions();
+  const canReadFinance = has('finance.read');
+  const canManageFinance = has('finance.manage');
+  const canManageDrivers = has('delivery.manage_drivers');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [vehicleType, setVehicleType] = useState<DriverVehicleType>(DriverVehicleType.motorcycle);
@@ -23,11 +38,18 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedPin, setGeneratedPin] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [payOverrideEnabled, setPayOverrideEnabled] = useState(false);
+  const [payValue, setPayValue] = useState<DriverPayFormValue>(DEFAULT_DRIVER_PAY_VALUE);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [shiftError, setShiftError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setGeneratedPin(null);
       setCopied(false);
+      setPayError(null);
       if (driver) {
         setName(driver.name);
         setPhone(driver.phone);
@@ -35,6 +57,15 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
         setStatus(driver.status);
         setIsActive(driver.isActive);
         setNotes(driver.notes || '');
+        setPayOverrideEnabled(driver.payOverrideEnabled ?? false);
+        setPayValue({
+          mode: driver.payMode ?? DriverPayMode.FIXED,
+          dailyRate: driver.dailyRate ?? 0,
+          fixedAmount: driver.payFixedAmount ?? 0,
+          percentage: driver.payPercentage ?? 0,
+          rateTable: driver.payRateTable?.length ? driver.payRateTable : [{ upToKm: null, amount: 0 }],
+          payFailedAttempt: driver.payFailedAttempt ?? false,
+        });
       } else {
         setName('');
         setPhone('');
@@ -42,14 +73,54 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
         setStatus(DriverStatus.available);
         setIsActive(true);
         setNotes('');
+        setPayOverrideEnabled(false);
+        setPayValue(DEFAULT_DRIVER_PAY_VALUE);
       }
     }
   }, [driver, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousActive?.focus();
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (driver && payOverrideEnabled) {
+      const validationError = validateDriverPay(payValue);
+      if (validationError) {
+        setPayError(validationError);
+        return;
+      }
+    }
+    setPayError(null);
     setIsSubmitting(true);
     try {
       if (driver) {
@@ -60,6 +131,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
           status,
           isActive,
           notes,
+          ...driverPayOverridePayload(payOverrideEnabled, payValue),
         });
         onClose();
       } else {
@@ -109,13 +181,15 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
-      <div className="bg-card text-card-foreground border border-border rounded-2xl shadow-xl w-full max-w-md my-8">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="driver-form-modal-title" className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-xl">
         <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-foreground">
+          <h2 id="driver-form-modal-title" className="text-lg font-bold text-foreground">
             {driver ? 'Editar Entregador' : 'Novo Entregador'}
           </h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
+            aria-label="Fechar"
             className="text-muted-foreground hover:text-foreground dark:text-muted-foreground transition-colors text-2xl leading-none"
             type="button"
           >
@@ -162,7 +236,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto p-6">
             <div>
               <label className="block text-sm font-medium text-foreground">Nome</label>
               <input
@@ -214,6 +288,28 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                   </select>
                 </div>
 
+                <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="driver-shift-title" aria-busy={driverShift.isLoading || driverShift.isMutating}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 id="driver-shift-title" className="text-sm font-black text-foreground">Turno remunerado</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">Controlado pela loja. Alternar online/offline no app não cria diária.</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${driverShift.workState?.shift ? 'bg-status-success/10 text-status-success' : 'bg-muted text-muted-foreground'}`}>{driverShift.workState?.shift ? 'Aberto' : 'Encerrado'}</span>
+                  </div>
+                  {driverShift.error && <p role="alert" className="mt-3 text-sm text-status-danger">{driverShift.error}</p>}
+                  {shiftError && <p role="alert" className="mt-3 text-sm text-status-danger">{shiftError}</p>}
+                  <button
+                    type="button"
+                    disabled={!canManageDrivers || driverShift.isLoading || driverShift.isMutating || Boolean(driverShift.workState?.activeRun)}
+                    onClick={() => void (driverShift.workState?.shift ? driverShift.end() : driverShift.start()).then(() => setShiftError(null)).catch((error: unknown) => setShiftError(error instanceof Error ? error.message : 'Não foi possível alterar o turno.'))}
+                    className={`mt-4 min-h-11 w-full rounded-xl px-4 text-sm font-bold disabled:opacity-50 ${driverShift.workState?.shift ? 'border border-border bg-card text-foreground' : 'bg-primary text-primary-foreground'}`}
+                  >
+                    {driverShift.workState?.shift ? 'Encerrar turno' : 'Iniciar turno'}
+                  </button>
+                  {driverShift.workState?.activeRun && <p className="mt-2 text-xs text-status-warning">Finalize a rota e os retornos antes de encerrar o turno.</p>}
+                  {!canManageDrivers && <p className="mt-2 text-xs text-muted-foreground">Sua permissão atual não permite iniciar ou encerrar turnos.</p>}
+                </section>
+
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -237,6 +333,63 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                     Gerar Novo Código de Acesso (PIN)
                   </button>
                 </div>
+
+                <DriverEarningsPanel
+                  summary={earnings.summary}
+                  isLoading={earnings.isLoading}
+                  isError={earnings.isError}
+                  isMutating={earnings.isMutating}
+                  onCashTip={earnings.addCashTip}
+                  onAdjustment={earnings.addAdjustment}
+                />
+
+                <DriverSettlementsPanel
+                  driverId={driver.id}
+                  canRead={canReadFinance}
+                  canManage={canManageFinance}
+                />
+
+                <section className="space-y-4 border-t border-border pt-5" aria-labelledby="driver-pay-override-title">
+                  <div className="flex items-start gap-3">
+                    <span className="rounded-lg bg-primary/10 p-2 text-primary"><WalletCards className="h-4 w-4" /></span>
+                    <div>
+                      <h3 id="driver-pay-override-title" className="text-sm font-black text-foreground">Pagamento</h3>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Use a regra padrão da loja ou defina uma exceção somente para este entregador.</p>
+                    </div>
+                  </div>
+
+                  <fieldset>
+                    <legend className="sr-only">Origem da regra de pagamento</legend>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className={`flex cursor-pointer gap-2.5 rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-ring ${!payOverrideEnabled ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}>
+                        <input type="radio" name="driver-pay-source" checked={!payOverrideEnabled} onChange={() => { setPayOverrideEnabled(false); setPayError(null); }} className="mt-0.5 h-4 w-4 accent-primary" />
+                        <span>
+                          <span className="block text-sm font-bold text-foreground">Padrão da loja</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">Acompanha futuras alterações da regra geral.</span>
+                        </span>
+                      </label>
+                      <label className={`flex cursor-pointer gap-2.5 rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-ring ${payOverrideEnabled ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}>
+                        <input type="radio" name="driver-pay-source" checked={payOverrideEnabled} onChange={() => setPayOverrideEnabled(true)} className="mt-0.5 h-4 w-4 accent-primary" />
+                        <span>
+                          <span className="block text-sm font-bold text-foreground">Regra personalizada</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">Substitui o padrão apenas para este cadastro.</span>
+                        </span>
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  {payOverrideEnabled ? (
+                    <div className="rounded-xl border border-border bg-muted/20 p-3 sm:p-4">
+                      <DriverPayFields value={payValue} onChange={setPayValue} idPrefix={`driver-${driver.id}-pay`} compact disabled={isSubmitting} />
+                    </div>
+                  ) : (
+                    <div className="border-l-4 border-primary bg-primary/5 px-3 py-2.5">
+                      <p className="text-sm font-bold text-foreground">Este entregador usa a regra padrão da loja.</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">A taxa cobrada do cliente permanece independente do pagamento do entregador.</p>
+                    </div>
+                  )}
+                  {payError && <p role="alert" className="text-sm font-semibold text-status-danger">{payError}</p>}
+                </section>
               </>
             )}
 

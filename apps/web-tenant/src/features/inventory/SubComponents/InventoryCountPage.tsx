@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
 import { IngredientDTO, UnitType } from '@gestor/types';
 import { ClipboardList, Save, AlertTriangle, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { createInventoryCountSubmission, INVENTORY_API_PATHS } from '../inventory-api-contract';
 
 interface CountItem {
   ingredientId: string;
@@ -25,7 +26,7 @@ export function InventoryCountPage() {
   const loadIngredients = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get<IngredientDTO[]>('/inventory/ingredients');
+      const response = await api.get<IngredientDTO[]>(INVENTORY_API_PATHS.ingredients);
       if (response.success) {
         setIngredients(response.data);
         setCountItems(response.data.map((ing: IngredientDTO) => ({
@@ -55,10 +56,11 @@ export function InventoryCountPage() {
     try {
       const items = countItems.map(item => ({
         ingredientId: item.ingredientId,
+        theoreticalStock: item.theoreticalStock,
         physicalStock: Number(item.physicalStock),
       }));
 
-      await api.post('/inventory/counts', { items });
+      await api.post(INVENTORY_API_PATHS.counts, createInventoryCountSubmission(items));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 5000);
       loadIngredients(); // Refresh theoretical stock

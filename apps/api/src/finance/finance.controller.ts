@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Put, Param, UseGuards, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Body, Put, Param, UseGuards, Query } from '@nestjs/common';
 import { FinancialAccountsService } from './financial-accounts.service';
 import { FinancialTransactionsService } from './financial-transactions.service';
 import { 
@@ -59,8 +59,30 @@ export class FinanceController {
     @Query('accountId') accountId?: string,
     @Query('type') type?: FinancialTransactionType,
     @Query('status') status?: FinancialStatus,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ): Promise<FinancialTransactionDTO[]> {
-    return this.transactionsService.findAll(tenantId, { accountId, type, status });
+    return this.transactionsService.findAll(tenantId, {
+      accountId,
+      type,
+      status,
+      startDate: this.parseDate(startDate, false),
+      endDate: this.parseDate(endDate, true),
+    });
+  }
+
+  @Get('summary')
+  @RequirePermissions('finance.read')
+  async getSummary(
+    @CurrentTenant() tenantId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.transactionsService.getSummary(
+      tenantId,
+      this.parseDate(startDate, false),
+      this.parseDate(endDate, true),
+    );
   }
 
   @Post('transactions')
@@ -80,5 +102,12 @@ export class FinanceController {
     @Body() dto: UpdateFinancialTransactionDTO,
   ): Promise<FinancialTransactionDTO> {
     return this.transactionsService.update(tenantId, id, dto);
+  }
+
+  private parseDate(value: string | undefined, endOfDay: boolean): Date | undefined {
+    if (!value) return undefined;
+    const date = new Date(`${value}${endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z'}`);
+    if (Number.isNaN(date.getTime())) throw new BadRequestException('Informe uma data válida no formato AAAA-MM-DD.');
+    return date;
   }
 }

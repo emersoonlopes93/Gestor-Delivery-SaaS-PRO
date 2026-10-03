@@ -27,8 +27,8 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
   return (
     <section className="space-y-4">
       <div>
-        <h3 className="text-lg font-black text-slate-900">Áreas especiais no mapa</h3>
-        <p className="text-sm text-slate-500">Use o mapa para criar exceções de cobrança, bloqueio ou entrega grátis.</p>
+        <h3 className="text-lg font-black text-foreground">Áreas especiais no mapa</h3>
+        <p className="text-sm text-muted-foreground">Use o mapa para criar exceções de cobrança, bloqueio ou entrega grátis.</p>
       </div>
 
       {props.isDesktop ? (
@@ -39,8 +39,8 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
             className="rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-500/10"
           >
             <Map className="h-5 w-5 text-blue-600" />
-            <div className="mt-3 text-sm font-black text-slate-900">Cobrar valor diferente</div>
-            <div className="mt-1 text-xs text-slate-500">Desenhe uma área e defina taxa fixa ou por km.</div>
+            <div className="mt-3 text-sm font-black text-foreground">Cobrar valor diferente</div>
+            <div className="mt-1 text-xs text-muted-foreground">Desenhe uma área e defina taxa fixa ou por km.</div>
           </button>
           <button
             type="button"
@@ -48,8 +48,8 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
             className="rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-red-300 hover:bg-red-500/10"
           >
             <Ban className="h-5 w-5 text-red-600" />
-            <div className="mt-3 text-sm font-black text-slate-900">Bloquear área</div>
-            <div className="mt-1 text-xs text-slate-500">Clientes dentro dela não poderão finalizar entrega.</div>
+            <div className="mt-3 text-sm font-black text-foreground">Bloquear área</div>
+            <div className="mt-1 text-xs text-muted-foreground">Clientes dentro dela não poderão finalizar entrega.</div>
           </button>
           <button
             type="button"
@@ -57,8 +57,8 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
             className="rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-green-300 hover:bg-green-500/10"
           >
             <Gift className="h-5 w-5 text-green-600" />
-            <div className="mt-3 text-sm font-black text-slate-900">Entrega grátis</div>
-            <div className="mt-1 text-xs text-slate-500">Crie uma área promocional com taxa zerada.</div>
+            <div className="mt-3 text-sm font-black text-foreground">Entrega grátis</div>
+            <div className="mt-1 text-xs text-muted-foreground">Crie uma área promocional com taxa zerada.</div>
           </button>
         </div>
       ) : (
@@ -68,19 +68,19 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
       )}
 
       {props.drawing ? (
-        <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5">
+        <div className="rounded-3xl border border-primary/30 bg-primary/10 p-5">
           <div className="text-sm font-black uppercase tracking-[0.18em] text-blue-700">Desenhando área</div>
           <div className="mt-2 text-sm text-blue-900">
             Clique no mapa para marcar os pontos da área. Pontos marcados: <strong>{props.draftPointCount}</strong>
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" onClick={props.onUndoPoint} className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-bold text-blue-900">
+            <button type="button" onClick={props.onUndoPoint} className="rounded-xl border border-primary/30 px-4 py-2 text-sm font-bold text-foreground hover:bg-primary/10">
               Desfazer ponto
             </button>
-            <button type="button" onClick={props.onClearDrawing} className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-bold text-blue-900">
+            <button type="button" onClick={props.onClearDrawing} className="rounded-xl border border-primary/30 px-4 py-2 text-sm font-bold text-foreground hover:bg-primary/10">
               Limpar desenho
             </button>
-            <button type="button" onClick={props.onFinishDrawing} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
+            <button type="button" onClick={props.onFinishDrawing} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">
               Concluir área
             </button>
           </div>
@@ -89,12 +89,12 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
 
       {props.areaDraft.polygonCoordinates ? (
         <div className="rounded-3xl border border-border bg-muted/40 p-5">
-          <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+          <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
             {props.areaDraft.zoneKind === 'blocked_zone' ? 'Nova área bloqueada' : 'Nova área especial'}
           </div>
           <div className="mt-4 space-y-4">
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-700">Nome da área</span>
+              <span className="text-sm font-semibold text-foreground">Nome da área</span>
               <input
                 type="text"
                 value={props.areaDraft.name}
@@ -119,7 +119,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
                       className={
                         'rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ' +
                         (props.areaDraft.pricingMode === option.mode
-                          ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                          ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border bg-card text-foreground hover:border-border/80')
                       }
                     >
@@ -130,7 +130,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
 
                 {props.areaDraft.pricingMode === 'fixed' ? (
                   <label className="block space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Valor da entrega</span>
+                    <span className="text-sm font-semibold text-foreground">Valor da entrega</span>
                     <CurrencyInput
                       value={props.areaDraft.fixedFee ?? 0}
                       onChange={(value) => props.onAreaDraftChange({ ...props.areaDraft, fixedFee: value })}
@@ -141,7 +141,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
 
                 {props.areaDraft.pricingMode === 'distance' ? (
                   <label className="block space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Valor por km</span>
+                    <span className="text-sm font-semibold text-foreground">Valor por km</span>
                     <CurrencyInput
                       value={props.areaDraft.pricePerKm ?? 0}
                       onChange={(value) => props.onAreaDraftChange({ ...props.areaDraft, pricePerKm: value })}
@@ -151,7 +151,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
                 ) : null}
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Tempo estimado (min)</span>
+                  <span className="text-sm font-semibold text-foreground">Tempo estimado (min)</span>
                   <input
                     type="number"
                     min={1}
@@ -176,7 +176,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
             {props.areaError ? <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{props.areaError}</div> : null}
 
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={props.onSaveArea} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">
+              <button type="button" onClick={props.onSaveArea} className="rounded-xl bg-primary px-5 py-3 text-sm font-black text-primary-foreground">
                 Salvar área
               </button>
               <button type="button" onClick={props.onCancelArea} className="rounded-xl border border-border bg-background px-5 py-3 text-sm font-bold text-foreground">
@@ -197,8 +197,8 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
             <div key={area.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-black text-slate-900">{area.name || 'Área especial'}</div>
-                  <div className="mt-1 text-sm text-slate-500">
+                  <div className="text-sm font-black text-foreground">{area.name || 'Área especial'}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
                     {getAreaSummary(area)}
                     {area.zoneKind !== 'blocked_zone' ? ` • ${fmtMoney(Number(area.fixedFee ?? area.fixedRate ?? 0))}` : ''}
                     {area.zoneKind !== 'blocked_zone' && area.estimatedDeliveryMinutes ? ` • ${area.estimatedDeliveryMinutes} min` : ''}
@@ -218,7 +218,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
                   <button
                     type="button"
                     onClick={() => props.onDeleteArea(area)}
-                    className="inline-flex h-9 items-center gap-1 rounded-xl border border-red-200 px-3 text-sm font-bold text-red-600"
+                    className="inline-flex h-9 items-center gap-1 rounded-xl border border-destructive/30 px-3 text-sm font-bold text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="h-4 w-4" />
                     Remover

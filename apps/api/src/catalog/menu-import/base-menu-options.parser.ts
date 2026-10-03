@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { OptionSelectionType, PriceImpactType, PricingAxis, Prisma } from '@prisma/client';
 
 export type ParsedBaseMenuOptionItem = {

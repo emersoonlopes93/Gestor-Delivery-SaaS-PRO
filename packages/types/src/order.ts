@@ -54,6 +54,14 @@ export class PaymentInput {
   @IsNumber() @IsOptional() installments?: number;
 }
 
+// --- Queue Constants ---
+export const ORDERS_QUEUE = 'orders';
+export const ORDERS_QUEUE_EVENTS = {
+  AUTO_ACCEPT: 'auto-accept',
+  PRINT: 'print',
+  KDS_SYNC: 'kds-sync',
+} as const;
+
 // --- Valid status transitions ---
 
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -214,6 +222,43 @@ export class CreateOrderDTO {
   @IsNumber() @IsOptional() estimatedDuration?: number;
 }
 
+function normalizeIdempotencyValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeIdempotencyValue);
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const normalized: Record<string, unknown> = {};
+
+    for (const key of Object.keys(record).sort()) {
+      if (record[key] !== undefined) {
+        normalized[key] = normalizeIdempotencyValue(record[key]);
+      }
+    }
+
+    return normalized;
+  }
+
+  return value;
+}
+
+/**
+ * Produces the cross-runtime canonical request used by the checkout
+ * idempotency fingerprint. The key itself is deliberately excluded.
+ */
+export function canonicalizeOrderSubmission(dto: CreateOrderDTO): string {
+  const materialPayload: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(dto)) {
+    if (key !== 'idempotencyKey' && value !== undefined) {
+      materialPayload[key] = value;
+    }
+  }
+
+  return JSON.stringify(normalizeIdempotencyValue(materialPayload));
+}
+
 export class EditOrderOperationDTO {
   @IsString() @IsNotEmpty() type!: 'add_item' | 'remove_item' | 'update_quantity' | 'update_item_notes' | 'update_order_notes';
   
@@ -301,13 +346,16 @@ export interface OrderResponseDTO {
   itemsSubtotal: number;
   discountTotal: number;
   deliveryFee: number;
+  normalDeliveryFee?: number;
   serviceFee: number;
   total: number;
   sourceChannel: string;
   notes?: string | null;
   items: OrderItemResponseDTO[];
   deliveryAddress?: DeliveryAddressDTO | null;
+  tableId?: string | null;
   tableNumber?: string | null;
+  table?: { id: string; name: string } | null;
   timeline: OrderTimelineEntryDTO[];
 
   paymentMethod: PaymentMethod;
@@ -331,6 +379,7 @@ export interface OrderResponseDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  operational?: OrderOperationalViewModel;
 }
 
 export interface OrderListItemDTO {
@@ -350,11 +399,13 @@ export interface OrderListItemDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  operational?: OrderOperationalViewModel;
 }
 
 export class UpdateOrderStatusDTO {
   @IsString() @IsNotEmpty() status!: OrderStatus;
   @IsString() @IsOptional() note?: string;
+  @IsString() @IsOptional() marketplaceReasonCode?: string;
 }
 
 // --- Operation (Phase 5) DTOs ---
@@ -365,9 +416,13 @@ export interface OrderBoardItemDTO {
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
   customerName: string;
+  customerPhone: string;
   total: number;
+  itemsSubtotal: number;
   itemCount: number;
   itemsSummary: string; // Ex: "1x Pizza Calabresa, 2x Coca Cola"
+  /** Text derived from already-loaded item snapshots, used only for local board search. */
+  searchText?: string;
   sourceChannel?: string;
   createdAt: string;
   notes?: string | null;
@@ -377,6 +432,129 @@ export interface OrderBoardItemDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  operational: OrderOperationalViewModel;
+}
+
+export type OrderOrigin = 'PEDEHUB' | 'IFOOD' | 'FOOD_99' | 'MARKETPLACE';
+export type OrderDeliveryOwnership = 'MERCHANT' | 'PROVIDER' | 'UNKNOWN';
+export type OrderOperationalActionType =
+  | 'CONFIRM'
+  | 'START_PREPARATION'
+  | 'MARK_READY'
+  | 'CANCEL'
+  | 'ASSIGN_DRIVER'
+  | 'DISPATCH'
+  | 'RECALCULATE_ROUTE'
+  | 'COMPLETE'
+  | 'PRINT'
+  | 'EDIT'
+  | 'OPEN_DETAILS';
+export type OrderOperationalActionMode = 'LOCAL' | 'PROVIDER_ASYNC' | 'PROVIDER_SYNC' | 'DISABLED';
+
+export interface OrderOperationalCapability {
+  enabled: boolean;
+  mode: OrderOperationalActionMode;
+  reason?: string | null;
+}
+
+export interface OrderOperationalCapabilities {
+  canConfirm: boolean;
+  canStartPreparation: boolean;
+  canMarkReady: boolean;
+  canCancel: boolean;
+  canAssignDriver: boolean;
+  canDispatch: boolean;
+  canRecalculateRoute: boolean;
+  canComplete: boolean;
+  canPrint: boolean;
+  canEdit: boolean;
+  /** Capability derived by the API from canonical 99Food order facts. */
+  courierCashConfirmation?: {
+    eligible: boolean;
+    amountToCollect: number | null;
+    reasonUnavailable: string | null;
+  };
+}
+
+export interface OrderOperationalAction {
+  type: OrderOperationalActionType;
+  label: string;
+  mode: OrderOperationalActionMode;
+  enabled: boolean;
+  targetStatus?: OrderStatus;
+  reason?: string | null;
+}
+
+export interface OrderMarketplaceOperationSummary {
+  state: 'NONE' | 'PENDING' | 'FAILED';
+  action?: OrderOperationalActionType | null;
+  provider?: string | null;
+  friendlyMessage?: string | null;
+}
+
+export interface OrderFinancialSummary {
+  operationalValue: number;
+  operationalValueLabel: string;
+  saleAmount: number;
+  customerPaid: number | null;
+  /** Additive 99Food provider fact; not inferred from amount-to-collect. */
+  customerActuallyPaid?: number | null;
+  customerActuallyPaidState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  customerNeedsToPay?: number | null;
+  customerNeedsToPayState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  paymentState: 'UNKNOWN' | 'PENDING' | 'PAID';
+  paymentLabel: string;
+  amountToCollect?: number | null;
+  amountToCollectState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  collectionResponsibility?: 'MARKETPLACE' | 'MERCHANT' | 'DRIVER' | 'UNKNOWN';
+  merchantReceivable?: number | null;
+  merchantReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  /** Additive 99Food provider estimate; never a settled payout or balance. */
+  merchantEstimatedReceivable?: number | null;
+  merchantEstimatedReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  settledReceivable?: number | null;
+  settledReceivableState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  merchantFundedDiscount?: number | null;
+  merchantFundedDiscountState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  discountFundingState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+  platformFees?: number | null;
+  platformFeesState?: 'KNOWN' | 'UNKNOWN' | 'NOT_APPLICABLE';
+}
+
+export interface OrderDeliverySummary {
+  ownership: OrderDeliveryOwnership;
+  label: string;
+  driverName?: string | null;
+  providerStatus?: string | null;
+  providerStatusLabel?: string | null;
+  riderName?: string | null;
+  riderPhone?: string | null;
+  riderToBusinessEta?: string | null;
+}
+
+export interface OrderProductionSummary {
+  state: 'NOT_SENT' | 'IN_PRODUCTION' | 'READY' | 'UNKNOWN';
+  label: string;
+}
+
+export interface OrderOperationalViewModel {
+  origin: OrderOrigin;
+  provider: string | null;
+  providerOrderNumber?: string | null;
+  /** Tenant-scoped marketplace order identity for an eligible provider action. */
+  marketplaceOrderId?: string | null;
+  displayChannel: string;
+  deliveryOwnership: OrderDeliveryOwnership;
+  fulfillmentMode: FulfillmentType;
+  capabilities: OrderOperationalCapabilities;
+  availableActions: OrderOperationalAction[];
+  marketplaceOperation: OrderMarketplaceOperationSummary;
+  syncState: 'NONE' | 'PENDING' | 'FAILED';
+  financialSummary: OrderFinancialSummary;
+  deliverySummary: OrderDeliverySummary;
+  productionSummary: OrderProductionSummary;
+  primaryAction: OrderOperationalAction | null;
+  secondaryActions: OrderOperationalAction[];
 }
 
 export interface OrderKdsItemDTO {
@@ -460,7 +638,9 @@ export interface CheckoutValidationResult {
   itemsSubtotal: number;
   discountTotal: number;
   deliveryFee: number;
+  normalDeliveryFee?: number;
   estimatedDeliveryMinutes?: number | null;
+  resolvedDeliveryCoordinates?: { lat: number; lng: number };
   total: number;
   couponId: string | null;
   cashbackUsed: number | null;

@@ -8,6 +8,7 @@ describe('SchedulingService', () => {
   let prismaMock: {
     timeSlot: { findMany: jest.Mock };
     schedulingSettings: { upsert: jest.Mock };
+    tenantSettings: { findUnique: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -17,6 +18,9 @@ describe('SchedulingService', () => {
       },
       schedulingSettings: {
         upsert: jest.fn(),
+      },
+      tenantSettings: {
+        findUnique: jest.fn().mockResolvedValue({ timezone: 'America/Sao_Paulo' }),
       },
     };
 

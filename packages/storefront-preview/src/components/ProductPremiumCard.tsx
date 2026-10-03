@@ -1,0 +1,97 @@
+import { ProductCardProps } from './ProductGridCard';
+import { StorefrontButton } from './StorefrontButton';
+import { StorefrontBadge } from './StorefrontBadge';
+import { ImageOff } from 'lucide-react';
+import { cn } from '../cn';
+import { ResilientProductImage } from '../product-image';
+
+export function ProductPremiumCard({
+  product,
+  onClick,
+  currencyFormatter = (v) => `R$ ${v.toFixed(2)}`,
+  showDescription = true,
+  showBadges = true,
+  imageMode = 'cover',
+  fallbackImageUrl,
+}: ProductCardProps) {
+  const hasImage = !!product.imageUrl && imageMode !== 'hidden';
+
+  return (
+    <div 
+      onClick={() => onClick?.(product)}
+      className={cn(
+        'group flex flex-col bg-[var(--storefront-card)] border border-[var(--storefront-border)] rounded-[var(--storefront-radius)] overflow-hidden transition-all hover:shadow-2xl hover:-translate-y-1 cursor-pointer ring-[var(--storefront-primary)] hover:ring-2',
+        !product.isAvailable && 'opacity-60 grayscale'
+      )}
+    >
+      {hasImage ? (
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--storefront-muted)]">
+          <ResilientProductImage
+            src={product.imageUrl!} 
+            fallbackSrc={fallbackImageUrl ?? product.imageUrl!}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            className={cn(
+              'w-full h-full transition-transform duration-700 group-hover:scale-110',
+              imageMode === 'cover' ? 'object-cover' : 'object-contain'
+            )}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          
+          <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
+            {showBadges && product.badges?.map((badge, idx) => {
+              let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+              if (badge.variant === 'danger') badgeVariant = 'secondary';
+              if (badge.variant === 'neutral') badgeVariant = 'outline';
+              return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+            })}
+          </div>
+        </div>
+      ) : imageMode !== 'hidden' ? (
+        <div className="aspect-[4/3] w-full flex items-center justify-center bg-[var(--storefront-muted)] relative">
+          <ImageOff className="w-12 h-12 text-[var(--storefront-muted-foreground)] opacity-50" />
+          
+          <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
+            {showBadges && product.badges?.map((badge, idx) => {
+              let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+              if (badge.variant === 'danger') badgeVariant = 'secondary';
+              if (badge.variant === 'neutral') badgeVariant = 'outline';
+              return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col flex-1 p-6 text-center">
+        <h3 className="text-xl font-black text-[var(--storefront-foreground)] mb-2 group-hover:text-[var(--storefront-primary)] transition-colors">
+          {product.name}
+        </h3>
+
+        {showDescription && product.description && (
+          <p className="text-sm text-[var(--storefront-muted-foreground)] line-clamp-2 mb-6 italic">
+            {product.description}
+          </p>
+        )}
+
+        <div className="mt-auto flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center">
+            {product.compareAtPrice && product.compareAtPrice > product.price && (
+              <span className="text-sm text-[var(--storefront-muted-foreground)] line-through">
+                {currencyFormatter(product.compareAtPrice)}
+              </span>
+            )}
+            {product.pricePrefix ? <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--storefront-muted-foreground)]">{product.pricePrefix}</span> : null}
+            <span className="text-2xl font-black text-[var(--storefront-foreground)]">
+              {currencyFormatter(product.price)}
+            </span>
+          </div>
+
+          <StorefrontButton fullWidth size="lg" disabled={!product.isAvailable}>
+            Adicionar ao Pedido
+          </StorefrontButton>
+        </div>
+      </div>
+    </div>
+  );
+}

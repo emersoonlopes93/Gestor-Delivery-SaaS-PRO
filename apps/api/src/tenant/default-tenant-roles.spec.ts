@@ -1,4 +1,4 @@
-import { TenantDefaultRole } from '@gestor/core';
+import { TENANT_ROLE_PERMISSIONS, TenantDefaultRole } from '@gestor/core';
 import {
   ensureDefaultTenantRoles,
   getTenantRolePolicy,
@@ -14,6 +14,15 @@ describe('default tenant roles', () => {
     });
   });
 
+  it('grants the operational kanban only to the intended default roles', () => {
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.TENANT_OWNER]).toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.TENANT_ADMIN]).toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.MANAGER]).toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.CASHIER]).not.toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.KITCHEN]).not.toContain('orders.use_kanban');
+    expect(TENANT_ROLE_PERMISSIONS[TenantDefaultRole.DELIVERY_OPERATOR]).not.toContain('orders.use_kanban');
+  });
+
   it('creates the default tenant role catalog idempotently', async () => {
     const upsertRole = jest.fn().mockImplementation(({ where, create }) =>
       Promise.resolve({
@@ -24,7 +33,7 @@ describe('default tenant roles', () => {
       }),
     );
     const upsertPermission = jest.fn().mockResolvedValue(undefined);
-    const upsertRolePermission = jest.fn().mockResolvedValue(undefined);
+    const createManyRolePermissions = jest.fn().mockResolvedValue({ count: 1 });
 
     const prisma = {
       tenantPermission: {
@@ -41,7 +50,7 @@ describe('default tenant roles', () => {
         upsert: upsertRole,
       },
       tenantRolePermission: {
-        upsert: upsertRolePermission,
+        createMany: createManyRolePermissions,
       },
     };
 
@@ -58,6 +67,8 @@ describe('default tenant roles', () => {
         },
       }),
     );
-    expect(upsertRolePermission).toHaveBeenCalled();
+    expect(createManyRolePermissions).toHaveBeenCalledWith(expect.objectContaining({
+      skipDuplicates: true,
+    }));
   });
 });

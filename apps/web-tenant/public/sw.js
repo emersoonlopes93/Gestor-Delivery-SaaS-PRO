@@ -1,6 +1,6 @@
-// PedeHub - Service Worker: Audio & Push Notifications
+// PedeHub - Service Worker: Push Notifications
 // This file is placed in /public/sw.js of the web-tenant app
-// Enables background sound playback and push notifications
+// Keeps browser notifications available in background.
 
 self.addEventListener('push', (event) => {
   console.log('[ServiceWorker] Push event received:', event.data);
@@ -29,19 +29,6 @@ self.addEventListener('push', (event) => {
     tag: payload.tag || 'default',
     renotify: !!payload.tag,
   };
-
-  // Play sound if configured
-  if (payload.soundUrl) {
-    try {
-      const audio = new Audio(payload.soundUrl);
-      audio.volume = Math.max(0, Math.min(1, payload.volume || 1.0));
-      audio.play().catch((err) => {
-        console.warn('[ServiceWorker] Failed to play notification sound:', err);
-      });
-    } catch (err) {
-      console.error('[ServiceWorker] Error playing audio:', err);
-    }
-  }
 
   event.waitUntil(self.registration.showNotification(title, options));
 });

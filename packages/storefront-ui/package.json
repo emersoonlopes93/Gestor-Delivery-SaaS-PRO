@@ -12,10 +12,7 @@
     "clean": "pnpm exec rimraf dist"
   },
   "dependencies": {
-    "@gestor/theme": "workspace:*",
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.18.0",
-    "tailwind-merge": "^2.5.4"
+    "@gestor/storefront-preview": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

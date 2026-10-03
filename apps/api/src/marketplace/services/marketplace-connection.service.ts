@@ -1,10 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceConnectionStatus, MarketplaceProvider, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { MarketplaceCredentialService } from './marketplace-credential.service';
+
+type ManualConnectionInput = {
+  externalMerchantId?: string;
+  externalStoreId?: string;
+  displayName?: string;
+  authType?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: string;
+  settingsJson?: Prisma.InputJsonValue;
+};
 
 @Injectable()
 export class MarketplaceConnectionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credentials: MarketplaceCredentialService,
+  ) {}
 
   listTenantConnections(tenantId: string) {
     return this.prisma.marketplaceConnection.findMany({
@@ -20,65 +35,106 @@ export class MarketplaceConnectionService {
     });
   }
 
+  async getTenantConnection(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
+    const connection = await this.prisma.marketplaceConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+    if (!connection) throw new NotFoundException('Marketplace connection not found.');
+    return connection;
+  }
+
   async connectManual(
     tenantId: string,
     provider: MarketplaceProvider,
-    input: {
-      externalMerchantId?: string;
-      externalStoreId?: string;
-      displayName?: string;
-      authType?: string;
-      accessToken?: string;
-      refreshToken?: string;
-      settingsJson?: Prisma.InputJsonValue;
-    },
+    input: ManualConnectionInput,
   ): Promise<MarketplaceConnection> {
+    const identifiers = this.normalizeIdentifiers(provider, input);
+    await this.assertIdentifiersAvailable(provider, identifiers);
     const data = {
       tenantId,
       provider,
       status: MarketplaceConnectionStatus.CONNECTED,
-      externalMerchantId: input.externalMerchantId?.trim() || null,
-      externalStoreId: input.externalStoreId?.trim() || null,
+      ...identifiers,
       displayName: input.displayName?.trim() || null,
       authType: input.authType?.trim() || null,
-      accessTokenEnc: input.accessToken?.trim() || null,
-      refreshTokenEnc: input.refreshToken?.trim() || null,
-      settingsJson: input.settingsJson ?? {
-        autoConfirmOrders: false,
-        importAsStatus: 'pending',
-      },
+      accessTokenEnc: input.accessToken?.trim()
+        ? this.credentials.encrypt(input.accessToken.trim())
+        : null,
+      refreshTokenEnc: input.refreshToken?.trim()
+        ? this.credentials.encrypt(input.refreshToken.trim())
+        : null,
+      tokenExpiresAt: this.parseTokenExpiration(input.tokenExpiresAt),
+      settingsJson: this.sanitizeSettings(input.settingsJson),
     };
 
-    const existing = await this.prisma.marketplaceConnection.findFirst({
-      where: { tenantId, provider },
-    });
-
-    if (existing) {
-      return this.prisma.marketplaceConnection.update({
-        where: { id: existing.id },
-        data,
-      });
+    try {
+      return await this.prisma.marketplaceConnection.create({ data });
+    } catch (error) {
+      this.rethrowUniqueIdentifierViolation(error);
+      throw error;
     }
+  }
 
-    return this.prisma.marketplaceConnection.create({
-      data,
+  async updateManual(
+    tenantId: string,
+    connectionId: string,
+    input: ManualConnectionInput,
+  ): Promise<MarketplaceConnection> {
+    const existing = await this.getTenantConnection(tenantId, connectionId);
+    const identifiers = this.normalizeIdentifiers(existing.provider, {
+      externalMerchantId: input.externalMerchantId ?? existing.externalMerchantId ?? undefined,
+      externalStoreId: input.externalStoreId ?? existing.externalStoreId ?? undefined,
+    });
+    await this.assertIdentifiersAvailable(existing.provider, identifiers, existing.id);
+
+    try {
+      return await this.prisma.marketplaceConnection.update({
+        where: { id: existing.id, tenantId },
+        data: {
+          ...identifiers,
+          status: MarketplaceConnectionStatus.CONNECTED,
+          displayName: input.displayName === undefined ? existing.displayName : input.displayName.trim() || null,
+          authType: input.authType === undefined ? existing.authType : input.authType.trim() || null,
+          accessTokenEnc: input.accessToken?.trim()
+            ? this.credentials.encrypt(input.accessToken.trim())
+            : existing.accessTokenEnc,
+          refreshTokenEnc: input.refreshToken?.trim()
+            ? this.credentials.encrypt(input.refreshToken.trim())
+            : existing.refreshTokenEnc,
+          tokenExpiresAt: input.tokenExpiresAt === undefined
+            ? existing.tokenExpiresAt
+            : this.parseTokenExpiration(input.tokenExpiresAt),
+          settingsJson: input.settingsJson === undefined
+            ? existing.settingsJson ?? undefined
+            : this.sanitizeSettings(input.settingsJson),
+        },
+      });
+    } catch (error) {
+      this.rethrowUniqueIdentifierViolation(error);
+      throw error;
+    }
+  }
+
+  async disconnectById(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
+    const connection = await this.getTenantConnection(tenantId, connectionId);
+    return this.prisma.marketplaceConnection.update({
+      where: { id: connection.id, tenantId },
+      data: {
+        status: MarketplaceConnectionStatus.DISCONNECTED,
+        accessTokenEnc: null,
+        refreshTokenEnc: null,
+        tokenExpiresAt: null,
+      },
     });
   }
 
   async disconnect(tenantId: string, provider: MarketplaceProvider) {
     const connection = await this.prisma.marketplaceConnection.findFirst({
       where: { tenantId, provider },
+      orderBy: [{ createdAt: 'desc' }],
     });
     if (!connection) throw new NotFoundException('Marketplace connection not found.');
-
-    return this.prisma.marketplaceConnection.update({
-      where: { id: connection.id },
-      data: {
-        status: MarketplaceConnectionStatus.DISCONNECTED,
-        accessTokenEnc: null,
-        refreshTokenEnc: null,
-      },
-    });
+    return this.disconnectById(tenantId, connection.id);
   }
 
   async resolveConnection(input: {
@@ -113,10 +169,85 @@ export class MarketplaceConnectionService {
   }
 
   maskConnection(connection: MarketplaceConnection) {
+    const { accessTokenEnc, refreshTokenEnc, ...safeConnection } = connection;
     return {
-      ...connection,
-      accessTokenEnc: connection.accessTokenEnc ? '***' : null,
-      refreshTokenEnc: connection.refreshTokenEnc ? '***' : null,
+      ...safeConnection,
+      hasAccessToken: Boolean(accessTokenEnc),
+      hasRefreshToken: Boolean(refreshTokenEnc),
+    };
+  }
+
+  private normalizeIdentifiers(
+    provider: MarketplaceProvider,
+    input: { externalMerchantId?: string; externalStoreId?: string },
+  ): { externalMerchantId: string | null; externalStoreId: string | null } {
+    const externalMerchantId = input.externalMerchantId?.trim() || null;
+    const externalStoreId = input.externalStoreId?.trim() || null;
+    if (provider === MarketplaceProvider.IFOOD && !externalMerchantId) {
+      throw new BadRequestException('iFood merchantId is required.');
+    }
+    if (provider === MarketplaceProvider.FOOD_99 && (!externalMerchantId || !externalStoreId)) {
+      throw new BadRequestException('99Food merchantId and appShopId are required.');
+    }
+    return { externalMerchantId, externalStoreId };
+  }
+
+  private async assertIdentifiersAvailable(
+    provider: MarketplaceProvider,
+    identifiers: { externalMerchantId: string | null; externalStoreId: string | null },
+    excludeConnectionId?: string,
+  ): Promise<void> {
+    const candidates = [
+      ...(identifiers.externalMerchantId ? [{ externalMerchantId: identifiers.externalMerchantId }] : []),
+      ...(identifiers.externalStoreId ? [{ externalStoreId: identifiers.externalStoreId }] : []),
+    ];
+    if (candidates.length === 0) return;
+    const conflict = await this.prisma.marketplaceConnection.findFirst({
+      where: {
+        provider,
+        OR: candidates,
+        ...(excludeConnectionId ? { id: { not: excludeConnectionId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (conflict) throw new ConflictException('Marketplace merchant or store is already connected.');
+  }
+
+  private parseTokenExpiration(value?: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid marketplace token expiration.');
+    }
+    return parsed;
+  }
+
+  private rethrowUniqueIdentifierViolation(error: unknown): void {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new ConflictException('Marketplace merchant or store is already connected.');
+    }
+  }
+
+  private sanitizeSettings(settings?: Prisma.InputJsonValue): Prisma.InputJsonObject {
+    const record: Record<string, unknown> = typeof settings === 'object' && settings !== null && !Array.isArray(settings)
+      ? Object.fromEntries(Object.entries(settings))
+      : {};
+    const importAsStatus = record.importAsStatus;
+    const pollingFallbackEnabled = record.pollingFallbackEnabled === true;
+    const presenceMode = record.presenceMode ?? 'WEBHOOK';
+    if (presenceMode !== 'WEBHOOK' && presenceMode !== 'POLLING' && presenceMode !== 'DISABLED') {
+      throw new BadRequestException('Marketplace presenceMode must be WEBHOOK, POLLING or DISABLED.');
+    }
+    if (pollingFallbackEnabled !== (presenceMode === 'POLLING')) {
+      throw new BadRequestException('Marketplace polling and presence mode must be enabled or disabled together.');
+    }
+    return {
+      autoConfirmOrders: record.autoConfirmOrders === true,
+      pollingFallbackEnabled,
+      presenceMode,
+      importAsStatus: importAsStatus === 'confirmed' || importAsStatus === 'preparing'
+        ? importAsStatus
+        : 'pending',
     };
   }
 }

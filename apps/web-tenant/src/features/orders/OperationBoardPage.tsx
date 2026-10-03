@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
+import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX, Search, SlidersHorizontal } from 'lucide-react';
+import type { DeliveryRunBuilderDataDTO, OrderBoardItemDTO, OrderChangedEvent, OrderOperationalAction, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
@@ -17,6 +17,18 @@ import { printTicketViaPrimaryBluetooth } from '../../lib/bluetooth';
 import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
+import { resolveKanbanDropAction } from './operational-actions';
+import { matchesBoardFilter, matchesBoardSearch, ORDER_TIME_THRESHOLDS_MINUTES, type BoardFilter } from './order-presenters';
+import { subscribeOrdersRealtimeEvents } from '../../notifications/ordersRealtimeEvents';
+import { OrdersFreshnessStatus } from './components/OrdersFreshnessStatus';
+import { useOrdersRealtimeState } from './hooks/useOrdersRealtimeState';
+import {
+  latestHintForOrder,
+  orderDetailToBoardItem,
+  ORDERS_CONNECTED_RECONCILIATION_MS,
+  ORDERS_DISCONNECTED_RECONCILIATION_MS,
+  reconcileBoardOrder,
+} from './order-reconciliation';
 
 /* ─── Kanban columns spec ───────────────────────────────────── */
 
@@ -59,6 +71,18 @@ const KANBAN_COLUMNS: KanbanColumnSpec[] = [
   },
 ];
 
+const BOARD_FILTERS: { id: BoardFilter; label: string; core?: boolean }[] = [
+  { id: 'all', label: 'Todos', core: true },
+  { id: 'PEDEHUB', label: 'PedeHub', core: true },
+  { id: 'IFOOD', label: 'iFood', core: true },
+  { id: 'FOOD_99', label: '99Food' },
+  { id: 'action', label: 'Aguardando ação', core: true },
+  { id: 'delayed', label: 'Atrasados' },
+  { id: 'sync_failed', label: 'Falha de sincronização' },
+  { id: 'merchant', label: 'Entrega própria' },
+  { id: 'provider', label: 'Entrega marketplace' },
+];
+
 /* ─── Segmented Control ─────────────────────────────────────── */
 
 const SegmentedControl = memo(function SegmentedControl(props: {
@@ -67,15 +91,15 @@ const SegmentedControl = memo(function SegmentedControl(props: {
 }) {
   const { value, onChange } = props;
 
-  const items: { id: BoardViewMode; label: string }[] = [
-    { id: 'compact', label: 'Compacto' },
-    { id: 'standard', label: 'Padrão' },
-    { id: 'focus_production', label: 'Foco Cozinha' },
+  const items: { id: BoardViewMode; label: string; mobileLabel: string }[] = [
+    { id: 'compact', label: 'Compacto', mobileLabel: 'Compacto' },
+    { id: 'standard', label: 'Padrão', mobileLabel: 'Padrão' },
+    { id: 'focus_production', label: 'Foco Cozinha', mobileLabel: 'Cozinha' },
   ];
 
   return (
     <div
-      className="inline-flex items-center p-1 rounded-xl gap-1"
+      className="grid w-full grid-cols-3 items-center gap-1 rounded-xl p-1"
       style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
     >
       {items.map((item) => {
@@ -85,12 +109,12 @@ const SegmentedControl = memo(function SegmentedControl(props: {
             key={item.id}
             type="button"
             onClick={() => onChange(item.id)}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none ${active
+            className={`min-w-0 truncate rounded-lg px-1.5 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none sm:px-3 ${active
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
               }`}
           >
-            {item.label}
+            <span className="sm:hidden">{item.mobileLabel}</span><span className="hidden sm:inline">{item.label}</span>
           </button>
         );
       })}
@@ -108,6 +132,16 @@ export function OperationBoardPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<BoardViewMode>('standard');
   const [activeColumn, setActiveColumn] = useState<KanbanColumnSpec['id']>('entry');
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<BoardFilter>('all');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null);
+  const boardRequestRef = useRef<Promise<void> | null>(null);
+  const driversRequestRef = useRef<Promise<void> | null>(null);
+  const orderReconcileChainsRef = useRef<Map<string, Promise<OrderBoardItemDTO | null>>>(new Map());
+  const deferredHintsRef = useRef<Map<string, OrderChangedEvent>>(new Map());
+  const draggingOrderIdRef = useRef<string | null>(null);
+  const ordersRef = useRef<OrderBoardItemDTO[]>([]);
 
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
@@ -118,6 +152,11 @@ export function OperationBoardPage() {
   const [orderToPrint, setOrderToPrint] = useState<OrderResponseDTO | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<OrderResponseDTO | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const realtime = useOrdersRealtimeState(lastConfirmedAt);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
 
   const handlePrintOrder = async (orderId: string) => {
     setIsPrinting(true);
@@ -189,43 +228,120 @@ export function OperationBoardPage() {
     })
   );
 
-  const fetchBoard = useCallback(async () => {
-    try {
-      const res = await api.get<OrderBoardItemDTO[]>('/orders/operation/board');
-      setOrders(res.data || []);
-      setError(null);
-    } catch (err) {
-      console.error('[OperationBoardPage] Erro ao buscar board:', err);
-      const msg = err instanceof ApiError ? err.message : 'Erro ao carregar quadro de pedidos';
-      setError(msg);
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
+  const fetchBoard = useCallback((): Promise<void> => {
+    if (boardRequestRef.current) return boardRequestRef.current;
+    const request = (async () => {
+      try {
+        const res = await api.get<OrderBoardItemDTO[]>(`/orders/operation/board?refresh=${Date.now()}`);
+        const nextOrders = res.data || [];
+        ordersRef.current = nextOrders;
+        setOrders(nextOrders);
+        setLastConfirmedAt(Date.now());
+        setError(null);
+      } catch (err) {
+        console.error('[OperationBoardPage] Erro ao buscar board:', err);
+        const msg = err instanceof ApiError ? err.message : 'Erro ao carregar quadro de pedidos';
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    })().finally(() => {
+      boardRequestRef.current = null;
+    });
+    boardRequestRef.current = request;
+    return request;
   }, []);
 
-  const fetchDrivers = useCallback(async () => {
-    try {
-      const res = await api.get<DriverDTO[]>('/delivery/drivers');
-      setDrivers(res.data || []);
-    } catch (err) {
-      console.error('[OperationBoardPage] Erro ao buscar entregadores:', err);
-    }
+  const fetchDrivers = useCallback((): Promise<void> => {
+    if (driversRequestRef.current) return driversRequestRef.current;
+    const request = (async () => {
+      try {
+        const res = await api.get<DeliveryRunBuilderDataDTO>('/delivery/runs/builder');
+        setDrivers(res.data?.drivers || []);
+      } catch (err) {
+        console.error('[OperationBoardPage] Erro ao buscar entregadores:', err);
+      }
+    })().finally(() => {
+      driversRequestRef.current = null;
+    });
+    driversRequestRef.current = request;
+    return request;
   }, []);
+
+  const reconcileOrderById = useCallback((
+    orderId: string,
+    cacheKey: string,
+    refreshDrivers = false,
+  ): Promise<OrderBoardItemDTO | null> => {
+    const previous = orderReconcileChainsRef.current.get(orderId) ?? Promise.resolve(null);
+    const request = previous.catch(() => null).then(async () => {
+      try {
+        const response = await api.get<OrderResponseDTO>(`/orders/${orderId}?reconcile=${encodeURIComponent(cacheKey)}`);
+        const item = response.data ? orderDetailToBoardItem(response.data) : null;
+        setOrders((current) => {
+          const reconciled = reconcileBoardOrder(current, orderId, item);
+          ordersRef.current = reconciled;
+          return reconciled;
+        });
+        setLastConfirmedAt(Date.now());
+        setError(null);
+        if (refreshDrivers) await fetchDrivers();
+        return item;
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 404) {
+          setOrders((current) => {
+            const reconciled = reconcileBoardOrder(current, orderId, null);
+            ordersRef.current = reconciled;
+            return reconciled;
+          });
+          setLastConfirmedAt(Date.now());
+          return null;
+        }
+        console.error('[OperationBoardPage] Erro ao reconciliar pedido:', cause);
+        return ordersRef.current.find((order) => order.id === orderId) ?? null;
+      }
+    }).finally(() => {
+      if (orderReconcileChainsRef.current.get(orderId) === request) {
+        orderReconcileChainsRef.current.delete(orderId);
+      }
+    });
+    orderReconcileChainsRef.current.set(orderId, request);
+    return request;
+  }, [fetchDrivers]);
 
   useEffect(() => {
-    fetchBoard();
-    fetchDrivers();
-    const interval = setInterval(() => {
-      fetchBoard();
-      fetchDrivers();
-    }, 15000);
-    return () => clearInterval(interval);
+    void fetchBoard();
+    void fetchDrivers();
   }, [fetchBoard, fetchDrivers]);
+
+  useEffect(() => {
+    const intervalMs = realtime.connectionState === 'connected'
+      ? ORDERS_CONNECTED_RECONCILIATION_MS
+      : ORDERS_DISCONNECTED_RECONCILIATION_MS;
+    const interval = window.setInterval(() => {
+      void Promise.all([fetchBoard(), fetchDrivers()]);
+    }, intervalMs);
+    return () => window.clearInterval(interval);
+  }, [fetchBoard, fetchDrivers, realtime.connectionState]);
+
+  useEffect(() => subscribeOrdersRealtimeEvents((event) => {
+    if (event.type !== 'order.changed') return;
+    if (draggingOrderIdRef.current === event.hint.orderId) {
+      deferredHintsRef.current.set(
+        event.hint.orderId,
+        latestHintForOrder(deferredHintsRef.current.get(event.hint.orderId), event.hint),
+      );
+      return;
+    }
+    void reconcileOrderById(
+      event.hint.orderId,
+      event.hint.eventId,
+      event.hint.reason === 'driver',
+    );
+  }), [reconcileOrderById]);
 
   // Delayed order detection — checks every 60 seconds
   useEffect(() => {
-    const DELAY_THRESHOLD_MIN = 30;
     const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'preparing'];
 
     const check = () => {
@@ -233,7 +349,7 @@ export function OperationBoardPage() {
       for (const order of orders) {
         if (!ACTIVE_STATUSES.includes(order.status as OrderStatus)) continue;
         const elapsedMin = Math.floor((now - new Date(order.createdAt).getTime()) / 60000);
-        if (elapsedMin >= DELAY_THRESHOLD_MIN && !alreadyAlertedDelayed.current.has(order.id)) {
+        if (elapsedMin >= ORDER_TIME_THRESHOLDS_MINUTES.delayed && !alreadyAlertedDelayed.current.has(order.id)) {
           alreadyAlertedDelayed.current.add(order.id);
           toast(`⏰ Pedido #${order.orderNumber} está atrasado (${elapsedMin}m)`, {
             duration: 10000,
@@ -260,13 +376,24 @@ export function OperationBoardPage() {
     return () => clearInterval(interval);
   }, [orders]);
 
-  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
+  const handleOperationalAction = async (orderId: string, action: OrderOperationalAction, driverId?: string) => {
     if (updatingId) return;
+    const order = ordersRef.current.find((candidate) => candidate.id === orderId);
+    if (!order) return;
+    if (!action.enabled) {
+      toast(action.reason ?? 'Ação indisponível para este pedido.', { duration: 4000 });
+      return;
+    }
+    if (action.type === 'OPEN_DETAILS') { setActiveOrderId(orderId); return; }
+    if (action.type === 'PRINT') { await handlePrintOrder(orderId); return; }
+    if (action.type === 'EDIT') { await handleEditOrder(orderId); return; }
 
-    // If delivery and going to out_for_delivery, check if driver is assigned
-    if (newStatus === 'out_for_delivery') {
-      const order = orders.find(o => o.id === orderId);
-      if (order?.fulfillmentType === 'delivery' && !order.deliveryDriverId && !driverId) {
+    if ((action.type === 'DISPATCH' || action.type === 'ASSIGN_DRIVER') && !driverId) {
+      if (order.operational.deliveryOwnership !== 'MERCHANT') {
+        toast(order.operational.deliverySummary.label, { duration: 4000 });
+        return;
+      }
+      if (action.type === 'ASSIGN_DRIVER' || !order.deliveryDriverId) {
         setOrderToDispatch(orderId);
         setIsDriverModalOpen(true);
         return;
@@ -276,23 +403,37 @@ export function OperationBoardPage() {
     setUpdatingId(orderId);
     try {
       if (driverId) {
-        await api.post(`/orders/${orderId}/assign-driver`, { driverId });
-      }
-
-      const body: UpdateOrderStatusDTO = { status: newStatus };
-      const res = await api.patch(`/orders/${orderId}/status`, body);
-      if (res.success) {
-        await fetchBoard();
-        await fetchDrivers();
+        await api.post('/delivery/runs', { driverId, orderIds: [orderId] });
+        await reconcileOrderById(orderId, `driver:${Date.now()}`, true);
         invalidateLogisticsQueries(queryClient);
         setIsDriverModalOpen(false);
         setOrderToDispatch(null);
-        toast.success(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, { duration: 3000 });
+        toast.success('Rota criada; o entregador deve seguir o fluxo de aceite e início.', { duration: 4000 });
+        return;
+      }
+
+      if (!action.targetStatus) return;
+      const body: UpdateOrderStatusDTO = { status: action.targetStatus };
+      const res = await api.patch(`/orders/${orderId}/status`, body);
+      if (res.success) {
+        await reconcileOrderById(orderId, `action:${Date.now()}`, action.targetStatus === 'out_for_delivery');
+        invalidateLogisticsQueries(queryClient);
+        setIsDriverModalOpen(false);
+        setOrderToDispatch(null);
+        toast.success(
+          action.mode === 'PROVIDER_ASYNC'
+            ? `Solicitação enviada. Sincronizando com ${order.operational.displayChannel}.`
+            : `${action.label} concluído.`,
+          { duration: 4000 },
+        );
       }
     } catch (err) {
       console.error('[OperationBoardPage] Erro ao atualizar status:', err);
       const msg = err instanceof ApiError ? err.message : 'Erro ao atualizar pedido';
       toast.error(msg, { duration: 5000 });
+      if (err instanceof ApiError && [400, 404, 409].includes(err.status)) {
+        await reconcileOrderById(orderId, `conflict:${Date.now()}`);
+      }
     } finally {
       setUpdatingId(null);
     }
@@ -300,7 +441,9 @@ export function OperationBoardPage() {
 
   const handleDriverSelect = (driverId: string) => {
     if (orderToDispatch) {
-      handleStatusUpdate(orderToDispatch, 'out_for_delivery', driverId);
+      const order = ordersRef.current.find((candidate) => candidate.id === orderToDispatch);
+      const dispatchAction = order?.operational.availableActions.find((candidate) => candidate.type === 'DISPATCH');
+      if (dispatchAction) handleOperationalAction(orderToDispatch, dispatchAction, driverId);
     }
   };
 
@@ -322,13 +465,18 @@ export function OperationBoardPage() {
     return map;
   }, [orders]);
 
+  const visibleOrders = useMemo(
+    () => orders.filter((order) => matchesBoardSearch(order, search) && matchesBoardFilter(order, activeFilter)),
+    [activeFilter, orders, search],
+  );
+
   const ordersByColumnId = useMemo(() => {
     const out: Record<KanbanColumnSpec['id'], OrderBoardItemDTO[]> = {
       entry: [],
       production: [],
       delivery: [],
     };
-    for (const o of orders) {
+    for (const o of visibleOrders) {
       const s = o.status as OrderStatus;
       if (s === 'pending' || s === 'confirmed') out.entry.push(o);
       else if (s === 'preparing') out.production.push(o);
@@ -340,95 +488,90 @@ export function OperationBoardPage() {
         out.delivery.push(o);
     }
     return out;
-  }, [orders]);
-
-  const getNextAction = (status: OrderStatus, fulfillmentType: string): OrderStatus | null => {
-    if (status === 'pending') return 'confirmed';
-    if (status === 'confirmed') return 'preparing';
-    if (status === 'preparing')
-      return fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
-    if (status === 'ready_for_delivery') return 'out_for_delivery';
-    if (status === 'out_for_delivery' || status === 'ready_for_pickup') return 'completed';
-    return null;
-  };
+  }, [visibleOrders]);
 
   const compact = viewMode === 'compact';
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const order = orders.find(o => o.id === active.id);
-    if (order) setActiveDragOrder(order);
+    if (order) {
+      draggingOrderIdRef.current = order.id;
+      setActiveDragOrder(order);
+    }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragOrder(null);
-
-    if (!over) return;
-
     const orderId = active.id as string;
-    const targetColId = over.id as KanbanColumnSpec['id'];
+    draggingOrderIdRef.current = null;
+    const deferredHint = deferredHintsRef.current.get(orderId);
+    deferredHintsRef.current.delete(orderId);
 
-    const order = orders.find(o => o.id === orderId);
+    if (!over) {
+      if (deferredHint) await reconcileOrderById(orderId, deferredHint.eventId, deferredHint.reason === 'driver');
+      return;
+    }
+
+    const order = await reconcileOrderById(
+      orderId,
+      deferredHint?.eventId ?? `dnd-preflight:${Date.now()}`,
+      deferredHint?.reason === 'driver',
+    );
     if (!order) return;
+    const directColumn = KANBAN_COLUMNS.find((column) => column.id === over.id)?.id;
+    const overOrder = ordersRef.current.find((candidate) => candidate.id === over.id);
+    const targetColumn = directColumn ?? KANBAN_COLUMNS.find((column) =>
+      overOrder && column.statuses.includes(overOrder.status),
+    )?.id;
+    if (!targetColumn) return;
 
-    // Discover the mapped status for the target column
-    let newStatus: OrderStatus | null = null;
-    if (targetColId === 'entry') newStatus = 'confirmed';
-    else if (targetColId === 'production') {
-      if (order.status === 'pending') {
-        alert('O pedido está pendente! Por favor, confirme-o primeiro antes de enviar para a produção.');
-        return;
-      }
-      newStatus = 'preparing';
+    const resolution = resolveKanbanDropAction(order, targetColumn);
+    if (!resolution.action) {
+      toast(resolution.message ?? 'Movimento indisponível.', { duration: 4000 });
+      return;
     }
-    else if (targetColId === 'delivery') {
-      // Fix: delivery orders should go to ready_for_delivery to await dispatch, not out_for_delivery immediately
-      newStatus = order.fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
-    }
-
-    if (newStatus && newStatus !== order.status) {
-      handleStatusUpdate(orderId, newStatus);
-    }
+    await handleOperationalAction(orderId, resolution.action);
   };
 
   return (
-    <div className="p-4 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
+    <div className="box-border flex min-h-[100dvh] w-full max-w-[1600px] flex-col gap-4 overflow-hidden bg-background p-4 pt-[calc(68px+var(--safe-area-top))] [@media(max-height:650px)]:gap-2 [@media(max-height:650px)]:p-3 [@media(max-height:650px)]:pt-3 [@media(min-height:651px)_and_(max-height:800px)]:gap-2 [@media(min-height:651px)_and_(max-height:800px)]:p-4 [@media(min-height:651px)_and_(max-height:800px)]:pt-4 md:h-[calc(100dvh-64px)] md:min-h-0 md:p-6 md:pt-6 mx-auto">
       {/* ── Toolbar / Header Premium ── */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
-        <div className="flex items-center justify-between sm:block">
+      <header className="sticky top-[calc(52px+var(--safe-area-top))] z-20 -mx-4 flex shrink-0 flex-col gap-3 border-b border-border bg-background px-4 pb-4 [@media(max-height:650px)]:gap-2 [@media(max-height:650px)]:pb-2 [@media(min-height:651px)_and_(max-height:800px)]:gap-2 [@media(min-height:651px)_and_(max-height:800px)]:pb-2 md:static md:z-auto md:mx-0 md:flex-row md:items-start md:justify-between md:bg-transparent md:px-0">
+        <div className="min-w-0">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
-              <span className="w-2.5 h-6 rounded-md bg-primary block" />
               <span>Painel de Operações</span>
             </h1>
-            <p className="text-[11px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">
-              Sincronização Ativa (15s)
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground [@media(max-height:800px)]:hidden md:text-xs">
+              {orders.length} ativos · {orders.filter((order) => order.operational.primaryAction).length} aguardando ação
             </p>
+            <div className="[@media(max-height:800px)]:hidden">
+              <OrdersFreshnessStatus
+                connectionState={realtime.connectionState}
+                isStale={realtime.isStale}
+                lastConfirmedAt={lastConfirmedAt}
+                now={realtime.now}
+              />
+            </div>
           </div>
-          <button
-            onClick={fetchBoard}
-            disabled={loading}
-            className="sm:hidden btn-icon w-9 h-9 bg-muted border border-border rounded-xl flex items-center justify-center active:scale-95 transition-all"
-            title="Atualizar agora"
-            type="button"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-          <div className="shrink-0">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_40px_40px] items-center gap-2 md:w-[380px] md:shrink-0">
+          <div className="min-w-0">
             <SegmentedControl value={viewMode} onChange={setViewMode} />
           </div>
 
           <button
             onClick={enableAudio}
-            className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${isAudioEnabled
+            className={`h-10 w-10 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${isAudioEnabled
               ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
               : 'bg-card text-muted-foreground border-border hover:bg-muted'
               }`}
             title={isAudioEnabled ? 'Sons Ativados' : 'Ativar Sons (Clique aqui)'}
+            aria-label={isAudioEnabled ? 'Sons de novos pedidos ativados' : 'Ativar sons de novos pedidos'}
+            type="button"
           >
             {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
@@ -436,8 +579,9 @@ export function OperationBoardPage() {
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="hidden sm:flex w-10 h-10 rounded-xl bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm shrink-0"
+            className="flex h-10 w-10 rounded-xl bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm"
             title="Atualizar agora"
+            aria-label="Atualizar quadro agora"
             type="button"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -445,16 +589,38 @@ export function OperationBoardPage() {
         </div>
       </header>
 
-      {/* ── Mobile Tabs Selector ── */}
-      <div className="md:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl mb-4 shrink-0">
+      <section aria-label="Busca e filtros do quadro" className="shrink-0 space-y-3 rounded-2xl border border-border bg-card p-3 shadow-sm [@media(max-height:650px)]:space-y-2 [@media(max-height:650px)]:p-2 [@media(min-height:651px)_and_(max-height:800px)]:space-y-2 [@media(min-height:651px)_and_(max-height:800px)]:p-2">
+        <div className="relative">
+          <label htmlFor="orders-board-search" className="sr-only">Buscar pedido por número, cliente, telefone ou motoboy</label>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input id="orders-board-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar número, cliente, telefone ou motoboy" className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary [@media(max-height:650px)]:h-9" />
+        </div>
+        <div className="flex flex-wrap gap-2 md:flex-nowrap md:overflow-x-auto md:pb-0.5" role="group" aria-label="Filtros rápidos">
+          {BOARD_FILTERS.map((filter) => (
+            <button key={filter.id} type="button" onClick={() => setActiveFilter(filter.id)} className={`${!filter.core && !showMoreFilters ? 'hidden sm:inline-flex' : 'inline-flex'} min-h-9 shrink-0 items-center rounded-lg border px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [@media(max-height:650px)]:min-h-8 ${activeFilter === filter.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`} aria-pressed={activeFilter === filter.id}>
+              {filter.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => setShowMoreFilters((value) => !value)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:hidden" aria-expanded={showMoreFilters}>
+            <SlidersHorizontal className="h-3.5 w-3.5" /> Mais filtros
+          </button>
+        </div>
+      </section>
+
+      {/* ── Mobile and tablet Tabs Selector ── */}
+      <div role="tablist" aria-label="Colunas do quadro" className="xl:hidden flex items-center gap-1.5 rounded-xl bg-muted p-1 shrink-0 [@media(max-height:650px)]:gap-1 [@media(max-height:650px)]:p-0.5 [@media(min-height:651px)_and_(max-height:800px)]:gap-1 [@media(min-height:651px)_and_(max-height:800px)]:p-0.5">
         {KANBAN_COLUMNS.map((col) => {
           const isActive = activeColumn === col.id;
           const count = ordersByColumnId[col.id]?.length || 0;
           return (
             <button
               key={col.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`orders-column-${col.id}`}
               onClick={() => setActiveColumn(col.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${isActive
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 transition-all duration-200 [@media(max-height:650px)]:gap-1 [@media(max-height:650px)]:py-1 [@media(min-height:651px)_and_(max-height:800px)]:gap-1 [@media(min-height:651px)_and_(max-height:800px)]:py-1 ${isActive
                 ? 'bg-background shadow-sm text-foreground'
                 : 'text-muted-foreground'
                 }`}
@@ -476,11 +642,11 @@ export function OperationBoardPage() {
 
       {/* ── Erro ── */}
       {error && (
-        <div className="alert-danger rounded-2xl p-4 mb-4 flex items-start gap-3">
-          <span className="text-lg leading-none">⚠</span>
+        <div role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-amber-800 dark:text-amber-300">
+          <span className="text-lg leading-none" aria-hidden="true">⚠</span>
           <div className="flex-1">
-            <h3 className="text-sm font-black mb-1">Erro ao carregar quadro de pedidos</h3>
-            <p className="text-sm opacity-80">{error}</p>
+            <h3 className="text-sm font-black mb-1">Atualização temporariamente indisponível</h3>
+            <p className="text-xs opacity-80">Os últimos pedidos válidos continuam visíveis. {error}</p>
             <button
               onClick={fetchBoard}
               className="mt-2 text-xs font-black underline opacity-80 hover:opacity-100"
@@ -508,10 +674,15 @@ export function OperationBoardPage() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        {!error && (
-          <div className="grow min-h-0 flex flex-col">
+        {(orders.length > 0 || !loading) && (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {visibleOrders.length === 0 && (search.trim() || activeFilter !== 'all') ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">
+                Nenhum pedido corresponde aos filtros
+              </div>
+            ) : (
             <div
-              className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 overflow-x-auto no-scrollbar`}
+              className="flex min-h-0 flex-1 flex-row items-stretch gap-4 overflow-x-auto no-scrollbar"
             >
               {KANBAN_COLUMNS.map((column) => {
                 const colOrders = ordersByColumnId[column.id] ?? [];
@@ -527,8 +698,10 @@ export function OperationBoardPage() {
                 return (
                   <div
                     key={column.id}
-                    className={`h-full min-h-0 flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
-                      } w-full md:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]`}
+                    id={`orders-column-${column.id}`}
+                    role="tabpanel"
+                    className={`h-full min-h-0 flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden xl:flex'
+                      } w-full xl:w-[calc(33.333%-11px)]`}
                   >
                     <KanbanColumn
                       column={column}
@@ -536,19 +709,18 @@ export function OperationBoardPage() {
                       compact={compact}
                       updatingId={updatingId}
                       elapsedMinById={elapsedMinById}
-                      onAdvance={handleStatusUpdate}
+                      onAction={handleOperationalAction}
                       onClickCard={setActiveOrderId}
-                      onPrint={handlePrintOrder}
-                      onEdit={handleEditOrder}
-                      getNextAction={getNextAction}
                       fmt={fmt}
                       getElapsedMin={getElapsedMin}
                       viewMode={viewMode}
+                      isActive={activeColumn === column.id}
                     />
                   </div>
                 );
               })}
             </div>
+            )}
           </div>
         )}
         <DragOverlay>
@@ -557,13 +729,10 @@ export function OperationBoardPage() {
               order={activeDragOrder}
               compact={compact}
               updating={false}
-              onAdvance={handleStatusUpdate}
+              onAction={handleOperationalAction}
               onClick={() => { }}
-              onPrint={() => { }}
-              onEdit={() => { }}
-              nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
-              totalLabel={fmt(activeDragOrder.total)}
+              formattedValue={fmt(activeDragOrder.operational.financialSummary.operationalValue)}
             />
           ) : null}
         </DragOverlay>
@@ -583,7 +752,9 @@ export function OperationBoardPage() {
       <OrderDrawer
         orderId={activeOrderId}
         onClose={() => setActiveOrderId(null)}
-        onUpdated={fetchBoard}
+        onUpdated={() => {
+          if (activeOrderId) void reconcileOrderById(activeOrderId, `drawer:${Date.now()}`, true);
+        }}
       />
 
       {orderToEdit && (
@@ -592,7 +763,7 @@ export function OperationBoardPage() {
           onClose={() => setOrderToEdit(null)}
           onSaved={() => {
             setOrderToEdit(null);
-            fetchBoard();
+            void reconcileOrderById(orderToEdit.id, `edit:${Date.now()}`);
           }}
         />
       )}

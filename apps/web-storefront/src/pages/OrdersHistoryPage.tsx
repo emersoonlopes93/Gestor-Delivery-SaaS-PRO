@@ -10,7 +10,7 @@ import {
   RefreshCcw,
   ShoppingBag,
 } from 'lucide-react';
-import { api } from '../lib/api-client';
+import { api, logoutCustomerSession, switchCustomerTenant } from '../lib/api-client';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCartStore } from '../store/use-cart-store';
 import { useToast } from '../components/Toast';
@@ -50,16 +50,16 @@ type OrderItemSnapshotV2 = {
 
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { isLoggedIn, logout, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
+  const { isLoggedIn, tenantSlug: customerTenantSlug } = useCustomerStore();
   const { tenantSlug: cartTenantSlug, setTenantSlug: setCartTenantSlug, addItem, clearCart } = useCartStore();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!tenantSlug) return;
-    setTenantSlug(tenantSlug);
+    void switchCustomerTenant(tenantSlug);
     setCartTenantSlug(tenantSlug);
-  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
+  }, [tenantSlug, setCartTenantSlug]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['order-history', tenantSlug],
@@ -303,7 +303,7 @@ export function OrdersHistoryPage() {
             <h1 className="text-2xl font-black text-gray-900">MEUS PEDIDOS</h1>
             <button
               onClick={() => {
-                logout();
+                void logoutCustomerSession();
                 navigate(`/${tenantSlug}`);
               }}
               className="text-sm font-bold text-red-500"

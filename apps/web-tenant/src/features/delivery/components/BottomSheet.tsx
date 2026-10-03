@@ -25,7 +25,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 }) => {
   const getMaxHeight = useCallback(() => {
     if (typeof maxHeight === 'string' && maxHeight.endsWith('vh')) {
-      return (window.innerHeight * parseInt(maxHeight, 10)) / 100;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      return (viewportHeight * parseInt(maxHeight, 10)) / 100;
     }
     return Number(maxHeight) || 500;
   }, [maxHeight]);
@@ -93,21 +94,21 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   return (
     <div
       ref={sheetRef}
-      className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[1000] flex flex-col"
+      className="safe-sheet lg:hidden fixed bottom-0 left-0 right-0 bg-card text-card-foreground border border-border rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[1000] flex flex-col"
       style={{
         height: currentHeight,
         transition: 'height 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
       }}
     >
       <div
-        className="cursor-grab active:cursor-grabbing p-4 flex flex-col items-center gap-2 border-b border-gray-100 dark:border-gray-800"
+        className="cursor-grab active:cursor-grabbing p-4 flex flex-col items-center gap-2 border-b border-border"
         onTouchStart={handleTouchStart}
         onClick={() => {
           setState((prev) => prev === 'collapsed' ? 'peeking' : prev === 'peeking' ? 'expanded' : 'collapsed');
         }}
       >
-        <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
-        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+        <div className="w-12 h-1.5 bg-muted-foreground/40 rounded-full" />
+        <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
           {state === 'collapsed' ? 'Arraste para abrir' : state === 'peeking' ? 'Arraste para expandir' : 'Arraste para recolher'}
         </div>
       </div>

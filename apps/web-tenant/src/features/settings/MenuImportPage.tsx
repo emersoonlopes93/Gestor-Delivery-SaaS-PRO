@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChefHat,
@@ -14,6 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
+import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ type PagePhase = 'idle' | 'confirm' | 'importing' | 'success' | 'error';
 
 export function MenuImportPage() {
   const navigate = useNavigate();
+  const { capabilities, isLoading: capabilitiesLoading } = useTenantCapabilities();
+  const baseMenuImportEnabled = capabilities?.actions?.['baseMenu.import']?.enabled === true;
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [recommended, setRecommended] = useState<TemplateSummary | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateSummary | null>(null);
@@ -52,10 +55,15 @@ export function MenuImportPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [animatedCount, setAnimatedCount] = useState({ categories: 0, products: 0, images: 0 });
+  const importInFlightRef = useRef(false);
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    if (baseMenuImportEnabled) {
+      void loadTemplates();
+    } else if (capabilities) {
+      setLoading(false);
+    }
+  }, [baseMenuImportEnabled, capabilities]);
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -80,7 +88,8 @@ export function MenuImportPage() {
   };
 
   const handleConfirmImport = async () => {
-    if (!selectedTemplate) return;
+    if (!selectedTemplate || importInFlightRef.current) return;
+    importInFlightRef.current = true;
     setPhase('importing');
 
     try {
@@ -97,6 +106,7 @@ export function MenuImportPage() {
         setPhase('error');
       }
     } catch {
+      importInFlightRef.current = false;
       setPhase('error');
     }
   };
@@ -121,6 +131,7 @@ export function MenuImportPage() {
   };
 
   const handleReset = () => {
+    importInFlightRef.current = false;
     setPhase('idle');
     setSelectedTemplate(null);
     setImportResult(null);
@@ -128,6 +139,21 @@ export function MenuImportPage() {
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+
+  if (capabilitiesLoading) {
+    return <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-indigo-500" /></div>;
+  }
+
+  if (!baseMenuImportEnabled) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-12 text-center">
+        <ChefHat className="w-10 h-10 mx-auto text-slate-400" />
+        <h1 className="mt-4 text-xl font-black text-slate-900 dark:text-white">Cardapio base indisponivel</h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Cadastre seus produtos manualmente para comecar com um cardapio vazio.</p>
+        <button type="button" onClick={() => navigate('/catalog/products')} className="mt-6 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white">Ir para produtos</button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">

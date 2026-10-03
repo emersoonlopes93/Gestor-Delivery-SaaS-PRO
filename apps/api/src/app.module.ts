@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -36,6 +37,7 @@ import { UploadModule } from './upload/upload.module';
 import { CustomerAuthModule } from './auth/customer-auth.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { FinanceModule } from './finance/finance.module';
+import { FinancialProjectionModule } from './financial-projection/financial-projection.module';
 import { PlanGatingGuard } from './common/guards/plan-gating.guard';
 import { FeatureControlModule } from './feature-control/feature-control.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -176,6 +178,16 @@ if (process.env.REDIS_ENABLED === 'false') {
   logRedisState('warn', 'redis_localhost', '[REDIS] localhost_configured - not_production_ready');
 }
 
+const enableBullmq =
+  process.env.REDIS_ENABLED !== 'false' &&
+  process.env.BULLMQ_ENABLED === 'true';
+
+if (enableBullmq) {
+  logRedisState('log', 'bullmq_enabled', '[BULLMQ] global_connection_enabled');
+} else {
+  logRedisState('warn', 'bullmq_disabled', '[BULLMQ] disabled - workers_will_not_start');
+}
+
 @Module({
   controllers: [AppController],
   imports: [
@@ -205,24 +217,16 @@ if (process.env.REDIS_ENABLED === 'false') {
       },
     ]),
 
-    ...(process.env.REDIS_ENABLED !== 'false' && (process.env.BULLMQ_ENABLED === 'true' || process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true')
+    // BullMQ — conexão global Redis para todas as filas
+    // Deve vir antes de qualquer BullModule.registerQueue()
+    ...(enableBullmq
       ? [
           BullModule.forRoot({
             connection: getBullmqRedisConnectionOptions(),
-            defaultJobOptions: {
-              removeOnComplete: 1000,
-              removeOnFail: 5000,
-              attempts: 3,
-              backoff: {
-                type: 'exponential',
-                delay: 5000,
-              },
-            },
           }),
         ]
       : []),
 
-    // Cache (Redis com fallback local in-memory se falhar ou estiver sem credenciais)
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
@@ -315,6 +319,7 @@ if (process.env.REDIS_ENABLED === 'false') {
     // Management (Phase 3)
     PurchasingModule,
     FinanceModule,
+    FinancialProjectionModule,
 
     // Customer Auth (B2C)
     CustomerAuthModule,

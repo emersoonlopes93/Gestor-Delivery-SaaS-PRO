@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api-client';
 import { CalendarClock, Plus, Trash2, Save, Loader2, Play } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { isSupportedSchedulingWindow } from './scheduling-window-validation';
 
 interface TenantSchedulingSettings {
   id: string;
@@ -51,6 +52,7 @@ export function SchedulingSettingsPage() {
   const [windows, setWindows] = useState<Partial<TenantSchedulingWindow>[]>([]);
   const [savingWindows, setSavingWindows] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchData();
@@ -58,6 +60,7 @@ export function SchedulingSettingsPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [resSettings, resWindows] = await Promise.all([
         api.get<TenantSchedulingSettings>('/scheduling/settings'),
@@ -73,6 +76,7 @@ export function SchedulingSettingsPage() {
       }
     } catch (error) {
       console.error('Erro ao buscar dados de agendamento', error);
+      setLoadError(getErrorMessage(error, 'Não foi possível carregar as configurações de agendamento.'));
     } finally {
       setLoading(false);
     }
@@ -107,6 +111,10 @@ export function SchedulingSettingsPage() {
       alert('Preencha os horarios corretamente.');
       return;
     }
+    if (!isSupportedSchedulingWindow(w.startTime, w.endTime)) {
+      alert('O horário final deve ser posterior ao horário inicial. Janelas que cruzam meia-noite não são suportadas.');
+      return;
+    }
 
     setSavingWindows(true);
     try {
@@ -138,6 +146,7 @@ export function SchedulingSettingsPage() {
   const handleDeleteWindow = async (index: number) => {
     const w = windows[index];
     if (w.id) {
+      if (!window.confirm('Excluir esta janela de agendamento? Os slots futuros serão atualizados.')) return;
       try {
         await api.delete(`/scheduling/windows/${w.id}`);
       } catch (error) {
@@ -191,6 +200,15 @@ export function SchedulingSettingsPage() {
         description="Configure como os clientes podem agendar pedidos na sua loja."
       />
 
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          {loadError}
+          <button type="button" onClick={() => void fetchData()} className="ml-3 font-bold underline">
+            Tentar novamente
+          </button>
+        </div>
+      ) : null}
+
       <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.enabled ? 'border-primary/30 bg-primary/5' : 'border-border'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
@@ -217,6 +235,12 @@ export function SchedulingSettingsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
           <h3 className="text-lg font-bold">Regras Gerais</h3>
+
+          <div className="rounded-xl border border-border bg-muted/30 p-3">
+            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Timezone da loja</p>
+            <p className="mt-1 font-mono text-sm text-foreground">{settings.timezone || 'America/Sao_Paulo'}</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">A validação e a exibição dos slots usam este timezone.</p>
+          </div>
 
           <div>
             <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Antecedencia Minima (Minutos)</label>

@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
+import { resolveMediaMaxSizeBytes } from '../config/environment-aliases';
 
 export interface CreateMediaAssetInput {
   tenantId: string | null;
@@ -47,11 +48,10 @@ export class UploadService {
       throw new BadRequestException('Upload tenant exige tenantId.');
     }
 
-    const maxSizeBytes =
-      this.config.get<number>('MEDIA_MAX_SIZE_BYTES') ||
-      (this.config.get<number>('MEDIA_MAX_FILE_SIZE_MB')
-        ? this.config.get<number>('MEDIA_MAX_FILE_SIZE_MB', 10) * 1024 * 1024
-        : 10 * 1024 * 1024);
+    const maxSizeBytes = resolveMediaMaxSizeBytes({
+      MEDIA_MAX_SIZE_BYTES: this.config.get<string>('MEDIA_MAX_SIZE_BYTES'),
+      MEDIA_MAX_FILE_SIZE_MB: this.config.get<string>('MEDIA_MAX_FILE_SIZE_MB'),
+    });
     if (file.size > maxSizeBytes || file.buffer.length > maxSizeBytes) {
       throw new BadRequestException('O arquivo excede o limite maximo de tamanho permitido.');
     }

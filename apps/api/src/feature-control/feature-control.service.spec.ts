@@ -1,7 +1,7 @@
-// @ts-nocheck
 /// <reference types="jest" />
 /// <reference types="node" />
 import { BadRequestException } from '@nestjs/common';
+import { FEATURE_PRESET_BY_KEY } from '@gestor/core';
 import { FeatureControlService } from './feature-control.service';
 
 type GlobalSettingOverride = {
@@ -182,8 +182,49 @@ describe('FeatureControlService', () => {
       rbacService as never,
     );
 
-    return { service, prisma };
+    return { service, prisma, rbacService };
   };
+
+  it('publishes the canonical initial go-live branch creation policy', () => {
+    const { service } = makeService();
+
+    expect(service.getTenantActionCapability('branches.create')).toEqual({
+      enabled: false,
+      reason: 'release_disabled',
+      source: 'initial_go_live_release_policy',
+      code: 'BRANCH_CREATION_TEMPORARILY_DISABLED',
+      message: 'A criação de novas filiais está temporariamente indisponível.',
+    });
+  });
+
+  it('publishes base menu import as disabled by the initial go-live policy', () => {
+    const { service } = makeService();
+
+    expect(service.getTenantActionCapability('baseMenu.import')).toEqual({
+      enabled: false,
+      reason: 'release_disabled',
+      source: 'initial_go_live_release_policy',
+      code: 'BASE_MENU_IMPORT_DISABLED',
+      message: 'A importacao de cardapio base esta temporariamente indisponivel.',
+    });
+  });
+
+  it('reactivates the same baseMenu.import contract through server configuration', () => {
+    const previous = process.env.BASE_MENU_IMPORT_ENABLED;
+    process.env.BASE_MENU_IMPORT_ENABLED = 'true';
+    try {
+      const { service } = makeService();
+      expect(service.getTenantActionCapability('baseMenu.import')).toEqual(expect.objectContaining({
+        enabled: true,
+        reason: 'enabled',
+        source: 'BASE_MENU_IMPORT_ENABLED',
+        code: 'BASE_MENU_IMPORT_DISABLED',
+      }));
+    } finally {
+      if (previous === undefined) delete process.env.BASE_MENU_IMPORT_ENABLED;
+      else process.env.BASE_MENU_IMPORT_ENABLED = previous;
+    }
+  });
 
   it('returns essential for mandatory core features', async () => {
     const { service } = makeService();
@@ -212,6 +253,31 @@ describe('FeatureControlService', () => {
       globalStatus: 'enabled',
       updatedAt: null,
       updatedBy: null,
+    });
+  });
+
+  it('keeps the tenant access inventory independent from the SaaS admin role', async () => {
+    const { service } = makeService({
+      includedModules: ['crm'],
+      permissions: [],
+    });
+
+    const catalog = await service.getTenantFeatureCatalog('tenant-1');
+    const crmEnterprise = catalog.features.find((item) => item.featureKey === 'crm_enterprise');
+
+    expect(crmEnterprise).toMatchObject({
+      effectiveEnabled: true,
+      reason: 'global_beta',
+      requiredPermission: ['crm.read'],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'crm_enterprise',
+      userId: 'tenant-user-without-crm-read',
+    })).resolves.toMatchObject({
+      enabled: false,
+      reason: 'missing_permission',
     });
   });
 
@@ -304,6 +370,132 @@ describe('FeatureControlService', () => {
       reason: 'global_disabled',
       source: 'feature_global_setting',
     });
+  });
+
+  it('keeps Order Manager V2 off until the tenant is explicitly opted in', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'tenant_opt_in_required',
+      source: 'feature_catalog',
+    });
+  });
+
+  it('keeps Order Manager V2 off for an explicit tenant disable', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'disabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'tenant_disabled',
+      source: 'tenant_feature_override',
+    });
+  });
+
+  it('allows Order Manager V2 only after explicit tenant enablement and canonical gates', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: true,
+      reason: 'tenant_enabled_override',
+      source: 'tenant_feature_override',
+    });
+  });
+
+  it('builds tenant capabilities with the authenticated user permissions', async () => {
+    const { service, rbacService } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    const capabilities = await service.getTenantCapabilities('tenant-1', 'authorized-user');
+
+    expect(rbacService.getUserPermissions).toHaveBeenCalledWith('authorized-user');
+    expect(capabilities.features.order_manager_v2).toEqual({
+      enabled: true,
+      reason: 'tenant_enabled_override',
+      source: 'tenant_feature_override',
+    });
+  });
+
+  it('reports missing_permission only for an opted-in Orders user without kanban access', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'restricted-user',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'missing_permission',
+      source: 'rbac',
+    });
+  });
+
+  it('keeps a global Order Manager V2 kill switch above tenant enablement', async () => {
+    const { service } = makeService({
+      includedModules: ['orders'],
+      permissions: ['orders.use_kanban'],
+      globalSettings: [{ featureKey: 'order_manager_v2', status: 'disabled' }],
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toEqual({
+      enabled: false,
+      reason: 'global_disabled',
+      source: 'feature_global_setting',
+    });
+  });
+
+  it('does not let Order Manager V2 opt-in bypass module or RBAC eligibility', async () => {
+    const { service } = makeService({
+      tenantOverrides: [{ featureKey: 'order_manager_v2', mode: 'enabled' }],
+    });
+
+    await expect(service.resolveTenantFeature({
+      tenantId: 'tenant-1',
+      featureKey: 'order_manager_v2',
+      userId: 'user-1',
+    })).resolves.toMatchObject({
+      enabled: false,
+      reason: 'plan_not_allowed',
+    });
+  });
+
+  it('keeps Order Manager V2 out of generic feature-enabling presets', () => {
+    expect(FEATURE_PRESET_BY_KEY.interno_teste.enabledFeatures).not.toContain('order_manager_v2');
+    expect(FEATURE_PRESET_BY_KEY.full_platform.enabledFeatures).not.toContain('order_manager_v2');
   });
 
   it('returns env_disabled when the env fallback explicitly disables the feature', async () => {

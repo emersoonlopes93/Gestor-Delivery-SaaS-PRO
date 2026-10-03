@@ -175,7 +175,7 @@ export function Step4Payments({ onNext, onPrev, onMarkValid }: Step4Props) {
               onClick={() => setAcceptChange(!acceptChange)}
               className={`relative w-11 h-6 rounded-full transition-all cursor-pointer ${acceptChange ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}
             >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${acceptChange ? 'left-5' : 'left-0.5'}`} />
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-primary-foreground shadow transition-all ${acceptChange ? 'left-5' : 'left-0.5'}`} />
             </div>
             <div>
               <div className="font-black text-sm text-amber-800 dark:text-amber-200">Aceitar solicitação de troco</div>

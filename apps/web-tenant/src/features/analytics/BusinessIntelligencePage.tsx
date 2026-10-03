@@ -2,6 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BadgeCheck, Bot, DollarSign, Flame, Package, TrendingUp } from 'lucide-react';
 import { api } from '../../lib/api-client';
+import {
+  chartAxisColor,
+  chartGridColor,
+  chartTooltipContentStyle,
+  chartTooltipCursor,
+  chartTooltipItemStyle,
+  chartTooltipLabelStyle,
+} from '../../components/charts/chart-theme';
 
 type BiPayload = {
   dashboard: {
@@ -125,10 +133,16 @@ export function BusinessIntelligencePage() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={productChart}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} height={70} />
-                <YAxis tickFormatter={(v) => money.format(Number(v)).replace('R$', '')} />
-                <Tooltip formatter={(v) => money.format(Number(v))} />
+                <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 11 }} interval={0} angle={-20} height={70} />
+                <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor }} tickFormatter={(v) => money.format(Number(v)).replace('R$', '')} />
+                <Tooltip
+                  contentStyle={chartTooltipContentStyle}
+                  cursor={chartTooltipCursor}
+                  itemStyle={chartTooltipItemStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  formatter={(v) => money.format(Number(v))}
+                />
                 <Bar dataKey="receita" fill="var(--primary)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="lucro" fill="var(--status-success)" radius={[4, 4, 0, 0]} />
               </BarChart>
