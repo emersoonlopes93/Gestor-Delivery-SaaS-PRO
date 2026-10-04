@@ -59,6 +59,24 @@ export class Food99TokenService {
     });
   }
 
+  async persistBoundShopToken(connection: MarketplaceConnection, token: string, expiresAt: Date): Promise<void> {
+    if (!token.trim() || Number.isNaN(expiresAt.getTime())) {
+      throw new Food99ApiError('99Food returned an invalid shop auth token.', false, 502, 'INVALID_AUTH_TOKEN_RESPONSE');
+    }
+    this.cache.set(connection.id, { token, expiresAt });
+    await this.prisma.marketplaceConnection.updateMany({
+      where: { id: connection.id, tenantId: connection.tenantId },
+      data: {
+        status: MarketplaceConnectionStatus.CONNECTED,
+        accessTokenEnc: this.credentials.encrypt(token),
+        refreshTokenEnc: null,
+        tokenExpiresAt: expiresAt,
+        authType: 'food99_shop_auth_token',
+      },
+    });
+    this.logger.log({ message: 'food99_shop_bind_token_ready', provider: 'FOOD_99', tenantId: connection.tenantId, connectionId: connection.id, expiresAt });
+  }
+
   private async getOrRefreshExpiredToken(connection: MarketplaceConnection): Promise<string> {
     let payload: StandardResponse;
     try {
@@ -83,18 +101,7 @@ export class Food99TokenService {
     const expiration = this.toExpiration(data?.token_expiration_time);
     if (!token || !expiration) throw new Food99ApiError('99Food returned an invalid shop auth token.', false, 502, 'INVALID_AUTH_TOKEN_RESPONSE');
 
-    this.cache.set(connection.id, { token, expiresAt: expiration });
-    await this.prisma.marketplaceConnection.updateMany({
-      where: { id: connection.id, tenantId: connection.tenantId },
-      data: {
-        status: MarketplaceConnectionStatus.CONNECTED,
-        accessTokenEnc: this.credentials.encrypt(token),
-        refreshTokenEnc: null,
-        tokenExpiresAt: expiration,
-        authType: 'food99_shop_auth_token',
-      },
-    });
-    this.logger.log({ message: 'food99_shop_auth_token_ready', provider: 'FOOD_99', tenantId: connection.tenantId, connectionId: connection.id, expiresAt: expiration });
+    await this.persistBoundShopToken(connection, token, expiration);
     return token;
   }
 

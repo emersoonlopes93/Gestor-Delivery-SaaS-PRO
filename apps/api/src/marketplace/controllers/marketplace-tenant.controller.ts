@@ -82,7 +82,23 @@ export class MarketplaceTenantController {
     const connectionId = body.connectionId?.trim();
     if (!connectionId) throw new BadRequestException('99Food connection is required to verify authorization.');
     const result = await this.food99SelfService.verify(req.user.tenantId, connectionId);
-    return { authorized: result.authorized, connection: this.connectionService.maskConnection(result.connection) };
+    return {
+      ...result,
+      connection: this.connectionService.maskConnection(result.connection),
+    };
+  }
+
+  @Post('99food/self-service/bind')
+  @RequirePermissions('settings.manage')
+  async bindFood99SelfServiceAuthorization(@Req() req: TenantRequest, @Body() body: { connectionId?: string; shopId?: string }) {
+    const connectionId = body.connectionId?.trim();
+    const shopId = body.shopId?.trim();
+    if (!connectionId || !shopId) throw new BadRequestException('99Food connection and shop are required to complete authorization.');
+    const result = await this.food99SelfService.bind(req.user.tenantId, connectionId, shopId);
+    return {
+      ...result,
+      connection: this.connectionService.maskConnection(result.connection),
+    };
   }
 
   @Get('connections')

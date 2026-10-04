@@ -25,6 +25,7 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import {
   useConnectMarketplaceManual,
+  useBindFood99SelfServiceAuthorization,
   useDisconnectMarketplace,
   useMarketplaceCatalogMappingCandidates,
   useMarketplaceConnections,
@@ -212,6 +213,9 @@ export function IntegrationsPage() {
     useState(false);
   const [showFood99ManualFallback, setShowFood99ManualFallback] =
     useState(false);
+  const [food99Candidates, setFood99Candidates] = useState<
+    Array<{ shopId: string; shopName: string }>
+  >([]);
   const [catalogMappingForm, setCatalogMappingForm] = useState({
     connectionId: "",
     externalItemId: "",
@@ -261,6 +265,7 @@ export function IntegrationsPage() {
   const reprocessOrder = useReprocessMarketplaceOrder();
   const startFood99Authorization = useStartFood99SelfServiceAuthorization();
   const verifyFood99Authorization = useVerifyFood99SelfServiceAuthorization();
+  const bindFood99Authorization = useBindFood99SelfServiceAuthorization();
   const saveProductAssociation = useUpsertMarketplaceCatalogMapping();
   const visibleConnections = useMemo(
     () =>
@@ -298,6 +303,7 @@ export function IntegrationsPage() {
     });
     setFood99ConnectionId(connectionId);
     setFood99AuthorizationStarted(false);
+    setFood99Candidates([]);
     setShowFood99ManualFallback(false);
     setOverlay(provider === "99food" ? "food99connect" : "connect");
   };
@@ -322,9 +328,25 @@ export function IntegrationsPage() {
         connectionId: food99ConnectionId,
       });
       if (!result.authorized) {
-        toast.error(
-          "A autorização ainda não foi confirmada. Volte à 99Food e tente verificar novamente.",
-        );
+        setFood99Candidates(result.candidates);
+        return;
+      }
+      toast.success("99Food conectada.");
+      setOverlay(null);
+      await refresh();
+    } catch (error) {
+      toast.error(food99VerificationErrorMessage(error));
+    }
+  };
+  const handleBindFood99Shop = async (shopId: string) => {
+    if (!food99ConnectionId) return;
+    try {
+      const result = await bindFood99Authorization.mutateAsync({
+        connectionId: food99ConnectionId,
+        shopId,
+      });
+      if (!result.authorized) {
+        setFood99Candidates(result.candidates);
         return;
       }
       toast.success("99Food conectada.");
@@ -592,6 +614,26 @@ export function IntegrationsPage() {
               </button>
             </div>
           )}
+          {food99Candidates.length > 0 ? (
+            <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/5 p-4" aria-label="Selecione o estabelecimento autorizado">
+              <div>
+                <p className="font-bold text-foreground">Selecione o estabelecimento autorizado</p>
+                <p className="mt-1 text-sm text-muted-foreground">Encontramos mais de uma loja. Escolha a loja que você autorizou na 99Food.</p>
+              </div>
+              {food99Candidates.map((shop) => (
+                <button
+                  key={shop.shopId}
+                  type="button"
+                  onClick={() => void handleBindFood99Shop(shop.shopId)}
+                  disabled={bindFood99Authorization.isPending}
+                  className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+                >
+                  <span>{shop.shopName}</span>
+                  <ChevronRight className="h-4 w-4 text-primary" />
+                </button>
+              ))}
+            </section>
+          ) : null}
           <div className="border-t border-border pt-4">
             <button
               type="button"

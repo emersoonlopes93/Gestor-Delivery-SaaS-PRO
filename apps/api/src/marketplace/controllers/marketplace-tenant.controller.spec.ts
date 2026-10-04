@@ -13,7 +13,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connectManual: jest.fn(),
       maskConnection: jest.fn((value: unknown) => value),
     };
-    const food99SelfService = { start: jest.fn(), verify: jest.fn() };
+    const food99SelfService = { start: jest.fn(), verify: jest.fn(), bind: jest.fn() };
     const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
     const providerRegistry = { parseProvider: jest.fn().mockReturnValue(MarketplaceProvider.IFOOD) };
     const controller = new MarketplaceTenantController(
@@ -92,6 +92,14 @@ describe('MarketplaceTenantController connection tenancy', () => {
     const handler = MarketplaceTenantController.prototype.verifyFood99SelfServiceAuthorization;
     expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('99food/self-service/verify');
     expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
+  });
+
+  it('binds only the selected shop through the tenant-scoped self-service flow', async () => {
+    const { controller, food99SelfService, request } = makeController();
+    food99SelfService.bind.mockResolvedValue({ authorized: true, connection: { id: 'connection-99', status: 'CONNECTED' } });
+
+    await expect(controller.bindFood99SelfServiceAuthorization(request, { connectionId: 'connection-99', shopId: '5764687916991317793' })).resolves.toMatchObject({ authorized: true });
+    expect(food99SelfService.bind).toHaveBeenCalledWith('tenant-1', 'connection-99', '5764687916991317793');
   });
 
   it('blocks direct iFood administration when the tenant lacks ifood_marketplace', async () => {

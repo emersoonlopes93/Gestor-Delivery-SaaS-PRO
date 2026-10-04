@@ -9,6 +9,7 @@ import { food99VerificationErrorMessage } from './food99-verification-message';
 import {
   useBillingPreview,
   useConnectMarketplaceManual,
+  useBindFood99SelfServiceAuthorization,
   useDisconnectMarketplace,
   useMarketplaceConnections,
   useMarketplaceEvents,
@@ -33,6 +34,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../marketplace/hooks', () => ({
   useBillingPreview: vi.fn(),
   useConnectMarketplaceManual: vi.fn(),
+  useBindFood99SelfServiceAuthorization: vi.fn(),
   useDisconnectMarketplace: vi.fn(),
   useMarketplaceConnections: vi.fn(),
   useMarketplaceEvents: vi.fn(),
@@ -101,6 +103,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useMarketplaceEvents).mockReturnValue({ data: [], isLoading: false, isError: false, error: null, refetch } as never);
     vi.mocked(useBillingPreview).mockReturnValue({ data: null } as never);
     vi.mocked(useConnectMarketplaceManual).mockReturnValue(mutation() as never);
+    vi.mocked(useBindFood99SelfServiceAuthorization).mockReturnValue(mutation() as never);
     vi.mocked(useDisconnectMarketplace).mockReturnValue(mutation() as never);
     vi.mocked(useReconnectMarketplace).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceEvent).mockReturnValue(mutation() as never);
@@ -227,6 +230,35 @@ describe('IntegrationsPage multi-iFood connections', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Conectar 99Food' })).toBeNull());
     expect(verify.mutateAsync).toHaveBeenCalledWith({ connectionId: 'food99-connection-1' });
+  });
+
+  it('shows candidates instead of auto-selecting a 99Food shop', async () => {
+    const user = userEvent.setup();
+    const start = mutation();
+    const verify = mutation();
+    const bind = mutation();
+    start.mutateAsync.mockResolvedValue({ authorizationUrl: 'https://99food.example/authorize', connection: food99Connection });
+    verify.mutateAsync.mockResolvedValue({ authorized: false, state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED', connection: food99Connection, candidates: [{ shopId: 'shop-a', shopName: 'Loja A' }, { shopId: 'shop-b', shopName: 'Loja B' }] });
+    vi.mocked(useStartFood99SelfServiceAuthorization).mockReturnValue(start as never);
+    vi.mocked(useVerifyFood99SelfServiceAuthorization).mockReturnValue(verify as never);
+    vi.mocked(useBindFood99SelfServiceAuthorization).mockReturnValue(bind as never);
+    vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Autorizar na 99Food' }));
+    await user.click(screen.getByRole('button', { name: 'Verificar autorização' }));
+
+    expect(await screen.findByRole('button', { name: 'Loja A' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Loja B' })).toBeTruthy();
+    expect(bind.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps guided actions as non-submit buttons', async () => {
+    const user = userEvent.setup();
+    render(<IntegrationsPage />);
+    await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
+    expect(screen.getByRole('button', { name: 'Autorizar na 99Food' }).getAttribute('type')).toBe('button');
   });
 
   it('only reveals the manual 99Food support fields after the fallback is expanded', async () => {

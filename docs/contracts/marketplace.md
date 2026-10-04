@@ -339,15 +339,19 @@ O token operacional por loja usa `GET /v1/auth/authtoken/get` com `app_id`, `app
 
 O ciclo de token segue a semântica documentada do provider: `10101` vira `AUTH_TOKEN_NOT_AVAILABLE` e não dispara refresh cego; `10102` vira `AUTH_TOKEN_EXPIRED`, permite uma chamada a `GET /v1/auth/authtoken/refresh` e exige aguardar a janela de `get` (30 segundos) antes de uma nova consulta; `10103`, `14105`, `14106`, `10001` e `10002` são convertidos, respectivamente, em `TOKEN_REFRESH_FAILED`, `APP_ID_INVALID`, `APP_SECRET_INVALID`, `PROVIDER_SYSTEM_ERROR` e `PROVIDER_PARAMETER_ERROR`. Logs guardam somente correlação, operação, código e `app_shop_id` mascarado. O estado `CONNECTED` é persistido apenas após leitura bem-sucedida de um token de loja, e a API financeira é bloqueada enquanto a conexão não estiver conectada.
 
-Os nomes de `v3/auth/authorization/getAuthorizedShops`, `v3/auth/authorization/shopBind` e `v1/shop/shop/list` são conhecidos, mas seus corpos e envelopes oficiais não estão disponíveis neste repositório. Portanto, o PedeHub não implementa descoberta, bind ou consulta de loja com payload especulativo; essa etapa permanece `CONTRACT_DETAIL_MISSING` até a documentação oficial completa ser anexada.
+O fluxo V3 de descoberta e vínculo usa a base dedicada
+`MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL` (padrão
+`https://openapi.99food.com`). `POST /v3/auth/authorization/getAuthorizedShops`
+retorna `shop_id`, `shop_name`, `bound_flag` e `app_shop_id`. Com exatamente uma
+loja não vinculada, o backend consulta novamente a lista e chama
+`POST /v3/auth/authorization/shopBind`; com duas ou mais, exige seleção
+explícita e nunca escolhe a primeira. A seleção do browser contém apenas
+`connectionId` e `shopId`; o backend revalida tenant, app shop e elegibilidade.
 
-The later provider guidance supplies the V3 authorized-shop request and essential
-shop fields, so discovery is implemented through the dedicated
-`MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL` (default
-`https://openapi.99food.com`). It never binds a discovered shop. The provider
-has not documented how `shop_infos` is represented in the MD5 signature for
-`shopBind`; therefore `SHOP_BIND_SIGNATURE_ARRAY_CONTRACT=MISSING` and bind
-remains fail-closed.
+O assinador MD5 ordena chaves ASCII, omite valores vazios e representa arrays ou
+objetos como o literal `Array`: `shop_infos=Array`. Um `success_list` do bind só
+conclui quando contém `auth_token` não vazio e `token_expiration_time` válido;
+o token é criptografado, a conexão vira `CONNECTED` e não há `get` imediato.
 
 ### 99Food production-app and bind readiness (2026-10-04)
 
@@ -362,11 +366,8 @@ base URLs must not be combined.
 The available official material defines the `POST /v1/shop/shop/list` request
 (`app_id`, `timestamp`, `sign`, `page_no`, `page_size`) but not its response
 container or pagination fields. `SHOP_LIST_REQUEST_SCHEMA=FOUND` and
-`SHOP_LIST_RESPONSE_SCHEMA=MISSING`. The available material likewise leaves
-`getAuthorizedShops` and `shopBind` request/response schemas missing. There is
-no shared 99Food request signer in this codebase: the existing MD5 primitive
-protects webhook verification only and must not be repurposed without a complete
-provider request-signature contract. No bound-store lookup or bind call is made.
+`SHOP_LIST_RESPONSE_SCHEMA=MISSING`; that limitation does not apply to the
+separately documented self-service `getAuthorizedShops` and `shopBind` flow.
 
 `MARKETPLACE_CREDENTIALS_KEY_VERSION` selects the AES-GCM key version embedded
 in persisted `enc:v2` credentials and supports prior-key decryption during a
@@ -385,9 +386,8 @@ Production readiness checklist (code evidence only):
   fields, delivery variants, order confirmation and webhook acknowledgement;
 - implemented diagnostics: tenant/connection correlation and sanitized provider
   request IDs when supplied by the token API;
-- `CONTRACT_DETAIL_MISSING`: proving a shop bind through `shop/list`,
-  `getAuthorizedShops` or `shopBind` until their complete response contracts are
-  supplied by 99Food.
+- `LIVE_PROVIDER_PENDING`: proving the self-service bind in a provider-approved
+  application/store environment; automated tests do not call the provider.
 
 `authorizationpage/getUrl` starts the authorization-page flow, but its documented
 request/response alone does not prove whether it binds a shop automatically.
@@ -403,4 +403,4 @@ O polling é opt-in por ambiente e por conexão. Cada loja recebe job e token in
 
 Pedidos usam `marketplace_99food`, preservam itens, opções, taxas, descontos, total, pagamento, troco, endereço e timestamps do snapshot. Somente `MERCHANT` permite entregador, rota e auto-dispatch internos. O lifecycle outbound expõe confirmar e pronto; entregue é permitido somente para `MERCHANT`. Cancelamento permanece indisponível porque o Swagger lista `reason_id` numérico mas não fornece rótulos oficiais, e despacho/aceite/recusa de cancelamento não são enviados para endpoints Open Delivery legados.
 
-Variáveis: `MARKETPLACE_99FOOD_APP_ID`, `MARKETPLACE_99FOOD_CLIENT_SECRET`, `MARKETPLACE_99FOOD_API_BASE_URL`, `MARKETPLACE_99FOOD_FINANCE_API_BASE_URL`, `MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS`, `MARKETPLACE_99FOOD_ENABLED`, `MARKETPLACE_99FOOD_POLLING_ENABLED`, `MARKETPLACE_99FOOD_POLLING_INTERVAL_MS`, `MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS` e `MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN`. Habilitar polling exige Redis e BullMQ. Sem credenciais Sandbox, testes reais de OAuth, webhook, polling, pedido e lifecycle permanecem obrigatoriamente pendentes; a feature não pode ser declarada homologada. O contrato financeiro separado está em [Conciliação financeira 99Food](./99food-financial-reconciliation.md).
+Variáveis: `MARKETPLACE_99FOOD_APP_ID`, `MARKETPLACE_99FOOD_CLIENT_SECRET`, `MARKETPLACE_99FOOD_API_BASE_URL`, `MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL`, `MARKETPLACE_99FOOD_FINANCE_API_BASE_URL`, `MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS`, `MARKETPLACE_99FOOD_ENABLED`, `MARKETPLACE_99FOOD_POLLING_ENABLED`, `MARKETPLACE_99FOOD_POLLING_INTERVAL_MS`, `MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS` e `MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN`. Habilitar polling exige Redis e BullMQ. Sem credenciais Sandbox, testes reais de OAuth, webhook, polling, pedido e lifecycle permanecem obrigatoriamente pendentes; a feature não pode ser declarada homologada. O contrato financeiro separado está em [Conciliação financeira 99Food](./99food-financial-reconciliation.md).

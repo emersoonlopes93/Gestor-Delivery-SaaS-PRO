@@ -5,11 +5,11 @@ import { Food99SelfServiceConnectionService } from './food99-self-service-connec
 
 describe('Food99SelfServiceConnectionService', () => {
   const makeService = () => {
-    const prisma = { marketplaceConnection: { create: jest.fn() } };
+    const prisma = { marketplaceConnection: { create: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
     const connections = { getTenantConnection: jest.fn() };
     const food99Client = { getAuthorizationUrl: jest.fn() };
-    const tokens = { getAccessToken: jest.fn() };
-    const authorization = { getAuthorizedShops: jest.fn() };
+    const tokens = { getAccessToken: jest.fn(), persistBoundShopToken: jest.fn() };
+    const authorization = { getAuthorizedShops: jest.fn(), bindShop: jest.fn() };
     authorization.getAuthorizedShops.mockResolvedValue([]);
     return {
       prisma,
@@ -40,7 +40,44 @@ describe('Food99SelfServiceConnectionService', () => {
     connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
     tokens.getAccessToken.mockRejectedValue(new Food99ApiError('missing', false, 200, 'AUTH_TOKEN_NOT_AVAILABLE'));
     authorization.getAuthorizedShops.mockResolvedValue([{ shopId: 'a', shopName: 'A', boundFlag: 0 }, { shopId: 'b', shopName: 'B', boundFlag: 0 }]);
-    await expect(service.verify('tenant-a', 'connection-99')).rejects.toMatchObject({ response: expect.objectContaining({ error: 'AUTHORIZED_SHOP_SELECTION_REQUIRED' }) });
+    await expect(service.verify('tenant-a', 'connection-99')).resolves.toMatchObject({ authorized: false, state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED', candidates: [{ shopId: 'a', shopName: 'A' }, { shopId: 'b', shopName: 'B' }] });
+    expect(authorization.bindShop).not.toHaveBeenCalled();
+  });
+
+  it('binds the single revalidated shop exactly once and persists its returned token', async () => {
+    const { service, connections, tokens, authorization, prisma } = makeService();
+    const pending = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' };
+    const connected = { ...pending, status: MarketplaceConnectionStatus.CONNECTED, externalMerchantId: 'shop-a' };
+    connections.getTenantConnection.mockResolvedValueOnce(pending).mockResolvedValueOnce(connected);
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('missing', false, 200, 'AUTH_TOKEN_NOT_AVAILABLE'));
+    authorization.getAuthorizedShops.mockResolvedValue([{ shopId: 'shop-a', shopName: 'A', boundFlag: 0 }]);
+    authorization.bindShop.mockResolvedValue({ shopId: 'shop-a', shopName: 'A', authToken: 'token-a', tokenExpiresAt: new Date('2030-01-01T00:00:00.000Z') });
+
+    await expect(service.verify('tenant-a', 'connection-99')).resolves.toEqual({ authorized: true, connection: connected });
+    expect(authorization.bindShop).toHaveBeenCalledWith('connection-99', 'shop-a');
+    expect(tokens.persistBoundShopToken).toHaveBeenCalledWith(pending, 'token-a', expect.any(Date));
+    expect(prisma.marketplaceConnection.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'connection-99', tenantId: 'tenant-a' } }));
+  });
+
+  it('revalidates a selected shop before binding and never binds a shop from another response', async () => {
+    const { service, connections, authorization } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
+    authorization.getAuthorizedShops.mockResolvedValue([{ shopId: 'shop-b', shopName: 'B', boundFlag: 0 }]);
+
+    await expect(service.bind('tenant-a', 'connection-99', 'shop-a')).rejects.toMatchObject({ response: expect.objectContaining({ error: 'AUTHORIZED_SHOP_NOT_FOUND' }) });
+    expect(authorization.bindShop).not.toHaveBeenCalled();
+  });
+
+  it('coalesces concurrent verification attempts so shopBind runs once', async () => {
+    const { service, connections, tokens, authorization } = makeService();
+    const pending = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' };
+    connections.getTenantConnection.mockResolvedValue(pending);
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('missing', false, 200, 'AUTH_TOKEN_NOT_AVAILABLE'));
+    authorization.getAuthorizedShops.mockResolvedValue([{ shopId: 'shop-a', shopName: 'A', boundFlag: 0 }]);
+    authorization.bindShop.mockResolvedValue({ shopId: 'shop-a', shopName: 'A', authToken: 'token-a', tokenExpiresAt: new Date('2030-01-01T00:00:00.000Z') });
+
+    await Promise.all([service.verify('tenant-a', 'connection-99'), service.verify('tenant-a', 'connection-99')]);
+    expect(authorization.bindShop).toHaveBeenCalledTimes(1);
   });
 
   it('reuses the existing 99Food connection identity for reauthorization', async () => {
