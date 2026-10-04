@@ -30,6 +30,7 @@ describe('Food99TokenService', () => {
 
     await expect(service.getAccessToken(connection)).resolves.toBe('token-value');
     const requestedUrl = new URL(String((global.fetch as jest.Mock).mock.calls[0][0]));
+    expect(requestedUrl.origin).toBe('https://food99.test');
     expect(requestedUrl.pathname).toBe('/v1/auth/authtoken/get');
     expect(requestedUrl.searchParams.get('app_id')).toBe('5764607523034234881');
     expect(requestedUrl.searchParams.get('app_shop_id')).toBe('5764607523034234882');

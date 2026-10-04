@@ -54,4 +54,18 @@ describe('MarketplaceCredentialService', () => {
     expect(rotated).toMatch(/^enc:v2:current:/);
     expect(rotating.decrypt(rotated)).toBe('sensitive-token');
   });
+
+  it('keeps 99Food application credentials independent from encryption-key versioning', () => {
+    const configured = new MarketplaceCredentialService(new ConfigService({
+      MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: key,
+      MARKETPLACE_CREDENTIALS_KEY_VERSION: 'rotated-key',
+      MARKETPLACE_99FOOD_APP_ID: 'app-id',
+      MARKETPLACE_99FOOD_CLIENT_SECRET: 'app-secret',
+    }));
+
+    expect(configured.getFood99AppCredentials()).toEqual({
+      appId: 'app-id',
+      clientSecret: 'app-secret',
+    });
+  });
 });

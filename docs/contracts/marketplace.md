@@ -341,6 +341,52 @@ O ciclo de token segue a semântica documentada do provider: `10101` vira `AUTH_
 
 Os nomes de `v3/auth/authorization/getAuthorizedShops`, `v3/auth/authorization/shopBind` e `v1/shop/shop/list` são conhecidos, mas seus corpos e envelopes oficiais não estão disponíveis neste repositório. Portanto, o PedeHub não implementa descoberta, bind ou consulta de loja com payload especulativo; essa etapa permanece `CONTRACT_DETAIL_MISSING` até a documentação oficial completa ser anexada.
 
+### 99Food production-app and bind readiness (2026-10-04)
+
+Operational APIs use `MARKETPLACE_99FOOD_API_BASE_URL`, whose safe default is
+`https://openapi.didi-food.com`: authorization page, shop-token `get` and
+`refresh`, native order actions and the documented store-list endpoint all belong
+to this host. Financial APIs deliberately use the separate
+`MARKETPLACE_99FOOD_FINANCE_API_BASE_URL`, defaulting to
+`https://openapi.99food.com`, for `signIn`, Bill Detail and Bill Week. These
+base URLs must not be combined.
+
+The available official material defines the `POST /v1/shop/shop/list` request
+(`app_id`, `timestamp`, `sign`, `page_no`, `page_size`) but not its response
+container or pagination fields. `SHOP_LIST_REQUEST_SCHEMA=FOUND` and
+`SHOP_LIST_RESPONSE_SCHEMA=MISSING`. The available material likewise leaves
+`getAuthorizedShops` and `shopBind` request/response schemas missing. There is
+no shared 99Food request signer in this codebase: the existing MD5 primitive
+protects webhook verification only and must not be repurposed without a complete
+provider request-signature contract. No bound-store lookup or bind call is made.
+
+`MARKETPLACE_CREDENTIALS_KEY_VERSION` selects the AES-GCM key version embedded
+in persisted `enc:v2` credentials and supports prior-key decryption during a
+rotation. It does not change `MARKETPLACE_99FOOD_APP_ID` or
+`MARKETPLACE_99FOOD_CLIENT_SECRET`, which are read directly from environment
+configuration for provider requests. A provider response `10101` therefore does
+not support the hypothesis that this key-version setting changed the submitted
+app credentials; documented `14105` and `14106` remain the provider's distinct
+invalid-app and invalid-secret outcomes.
+
+Production readiness checklist (code evidence only):
+
+- `EXTERNAL_STATE`: application created, production access and provider approval;
+- implemented and tested: shop-token get/expiry refresh lifecycle, `orderNew`
+  webhook ingestion, exact 64-bit IDs, `order_id` plus `order_index`, cash
+  fields, delivery variants, order confirmation and webhook acknowledgement;
+- implemented diagnostics: tenant/connection correlation and sanitized provider
+  request IDs when supplied by the token API;
+- `CONTRACT_DETAIL_MISSING`: proving a shop bind through `shop/list`,
+  `getAuthorizedShops` or `shopBind` until their complete response contracts are
+  supplied by 99Food.
+
+`authorizationpage/getUrl` starts the authorization-page flow, but its documented
+request/response alone does not prove whether it binds a shop automatically.
+Likewise, `10101` proves only that the provider did not supply a shop token at
+that time; it does not distinguish an absent bind, a pending first token, or an
+external production-app restriction.
+
 O callback 99Food valida `didi-header-sign` como o digest MD5 hexadecimal de 32 caracteres dos bytes exatos do corpo bruto concatenados diretamente ao App Secret (`MD5(raw POST body + app_secret)`). Não há ordenação de JSON, timestamp, nonce, path ou query na mensagem assinada. A comparação usa buffers e `timingSafeEqual`; assinatura ausente, malformada ou incorreta falha fechada. O App Secret vem de `MARKETPLACE_99FOOD_CLIENT_SECRET`, sem valor registrado em logs.
 
 O protocolo 99Food recomendado envia um objeto por callback: `app_id`, `app_shop_id`, `type`, `timestamp` e `data`. Para pedidos, `data.order_id` identifica o pedido; `orderNew` também pode fornecer o ID interno da loja em `data.order_info.shop.shop_id`. `app_shop_id` é o identificador da loja no sistema do parceiro e resolve `MarketplaceConnection.externalStoreId`; o ID interno, quando presente, alimenta `externalMerchantId`. Como o contrato não fornece `eventId`, o adapter deriva uma chave determinística com SHA-256 somente desses identificadores técnicos, tipo e timestamp. IDs long oficiais são preservados como strings a partir do corpo bruto assinado, evitando perda de precisão do `JSON.parse` nativo. A resposta atual é `204` somente depois que a inbox aceita o evento. O callback é apenas um sinal: a importação busca o snapshot autoritativo pelo `order_id`.

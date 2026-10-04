@@ -93,6 +93,7 @@ describe('Food99HttpClientService native V1 actions', () => {
     } as never, tokens as never);
 
     await expect(service.getAuthorizationUrl('correlation-1', 'shop-1')).resolves.toBe('https://auth.99food.test/start');
+    expect(String((global.fetch as jest.Mock).mock.calls[0][0])).toBe('https://food99.test/v1/auth/authorizationpage/getUrl');
     const request = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
     expect(String(request.body)).toContain('"app_id":5764607584567296012');
     expect(String(request.body)).not.toContain('"app_id":"5764607584567296012"');

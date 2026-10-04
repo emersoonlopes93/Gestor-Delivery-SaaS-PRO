@@ -2738,3 +2738,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - The guided verifier keeps its `POST /api/v1/marketplaces/99food/self-service/verify` contract. A `GET` request is unsupported and is not added merely to hide a 404.
 - Shop token verification now calls documented `get` first. `10101` is actionable absence and never triggers refresh; `10102` is the sole refresh path, which then returns a retry-after result so a second `get` cannot violate the 30-second window. Provider errors are semantic, sanitized and tenant-safe.
 - Provider request/response schemas for authorized shops, bind and shop-list endpoints are absent from the available official material. Discovery and binding are intentionally not implemented (`CONTRACT_DETAIL_MISSING`); no provider, remote database, deployment, schema or migration action occurred.
+
+## 99Food production-app / bind readiness audit (2026-10-04)
+
+- Continued PR #128 on `fix/99food-authorization-lifecycle`. The real base remains `5e0a2a2b7d6965da2d8f24593b9f936ee10fc9f5`; no new branch, schema, migration, provider call, remote database operation or deployment was used.
+- Operational 99Food calls use the `openapi.didi-food.com` configuration path; Financial sign-in, Bill Detail and Bill Week use the distinct `openapi.99food.com` configuration path. Credential-key versioning selects encryption keys for stored `enc:v2` data only and cannot rewrite application credentials sent to 99Food.
+- The official `shop/list` request schema is now documented, but its response list/page schema is still absent. `getAuthorizedShops` and `shopBind` remain without complete schemas. No speculative signer, parser, lookup or bind was added. Provider production approval is an external Developer Portal state.
