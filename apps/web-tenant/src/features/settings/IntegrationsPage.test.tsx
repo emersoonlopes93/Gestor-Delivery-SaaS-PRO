@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IntegrationsPage } from './IntegrationsPage';
+import { ApiError } from '../../lib/api-client';
+import { food99VerificationErrorMessage } from './food99-verification-message';
 import {
   useBillingPreview,
   useConnectMarketplaceManual,
@@ -62,6 +64,15 @@ describe('IntegrationsPage multi-iFood connections', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it('uses actionable messages for documented 99Food authorization states', () => {
+    expect(food99VerificationErrorMessage(new ApiError(409, 'missing token', 'AUTH_TOKEN_NOT_AVAILABLE')))
+      .toContain('ainda não disponibilizou');
+    expect(food99VerificationErrorMessage(new ApiError(409, 'wait', 'AUTH_TOKEN_REFRESHED_WAIT_RETRY')))
+      .toContain('Aguarde 30 segundos');
+    expect(food99VerificationErrorMessage(new ApiError(503, 'invalid app', 'APP_ID_INVALID')))
+      .toContain('informações para suporte');
   });
   beforeEach(() => {
     ifoodEnabled = true;

@@ -1,4 +1,5 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException, RequestMethod } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { MarketplaceProvider } from '@prisma/client';
 import { MarketplaceTenantController } from './marketplace-tenant.controller';
 
@@ -85,6 +86,12 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connection: { id: 'connection-99', status: 'CONNECTED' },
     });
     expect(food99SelfService.verify).toHaveBeenCalledWith('tenant-1', 'connection-99');
+  });
+
+  it('declares verify as POST, so GET is not a supported client contract', () => {
+    const handler = MarketplaceTenantController.prototype.verifyFood99SelfServiceAuthorization;
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('99food/self-service/verify');
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
   });
 
   it('blocks direct iFood administration when the tenant lacks ifood_marketplace', async () => {

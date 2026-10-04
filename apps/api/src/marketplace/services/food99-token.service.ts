@@ -5,14 +5,17 @@ import { PrismaService } from '../../database/prisma.service';
 import { Food99ApiError } from '../providers/food99-api.error';
 import { MarketplaceCredentialService } from './marketplace-credential.service';
 
-type StandardResponse = { errno?: unknown; errmsg?: unknown; data?: unknown };
+type StandardResponse = { errno?: unknown; errmsg?: unknown; data?: unknown; request_id?: unknown };
 type CachedToken = { token: string; expiresAt: Date };
+
+const AUTH_TOKEN_REQUEST_INTERVAL_MS = 30_000;
 
 @Injectable()
 export class Food99TokenService {
   private readonly logger = new Logger(Food99TokenService.name);
   private readonly refreshes = new Map<string, Promise<string>>();
   private readonly cache = new Map<string, CachedToken>();
+  private readonly nextGetAt = new Map<string, number>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -20,18 +23,29 @@ export class Food99TokenService {
     private readonly credentials: MarketplaceCredentialService,
   ) {}
 
-  async getAccessToken(connection: MarketplaceConnection, forceRefresh = false): Promise<string> {
+  async getAccessToken(connection: MarketplaceConnection, bypassCache = false): Promise<string> {
     const usableUntil = Date.now() + 60_000;
     const cached = this.cache.get(connection.id);
-    if (!forceRefresh && cached && cached.expiresAt.getTime() > usableUntil) return cached.token;
-    if (!forceRefresh && connection.accessTokenEnc && connection.tokenExpiresAt?.getTime() > usableUntil) {
+    if (!bypassCache && cached && cached.expiresAt.getTime() > usableUntil) return cached.token;
+    if (!bypassCache && connection.accessTokenEnc && connection.tokenExpiresAt?.getTime() > usableUntil) {
       const token = this.credentials.decrypt(connection.accessTokenEnc);
       this.cache.set(connection.id, { token, expiresAt: connection.tokenExpiresAt });
       return token;
     }
+    const retryAt = this.nextGetAt.get(connection.id);
+    if (retryAt && retryAt > Date.now()) {
+      throw new Food99ApiError(
+        '99Food refreshed the shop token. Wait before verifying again.',
+        false,
+        409,
+        'AUTH_TOKEN_REFRESHED_WAIT_RETRY',
+        retryAt - Date.now(),
+      );
+    }
+    this.nextGetAt.delete(connection.id);
     const running = this.refreshes.get(connection.id);
     if (running) return running;
-    const refresh = this.refreshAndGet(connection, forceRefresh).finally(() => this.refreshes.delete(connection.id));
+    const refresh = this.getOrRefreshExpiredToken(connection).finally(() => this.refreshes.delete(connection.id));
     this.refreshes.set(connection.id, refresh);
     return refresh;
   }
@@ -45,9 +59,25 @@ export class Food99TokenService {
     });
   }
 
-  private async refreshAndGet(connection: MarketplaceConnection, forceRefresh: boolean): Promise<string> {
-    if (forceRefresh) await this.callAuth(connection, '/v1/auth/authtoken/refresh');
-    const payload = await this.callAuth(connection, '/v1/auth/authtoken/get');
+  private async getOrRefreshExpiredToken(connection: MarketplaceConnection): Promise<string> {
+    let payload: StandardResponse;
+    try {
+      payload = await this.callAuth(connection, '/v1/auth/authtoken/get');
+    } catch (error) {
+      if (!(error instanceof Food99ApiError) || error.providerCode !== 'AUTH_TOKEN_EXPIRED') throw error;
+
+      await this.callAuth(connection, '/v1/auth/authtoken/refresh');
+      const retryAt = Date.now() + AUTH_TOKEN_REQUEST_INTERVAL_MS;
+      this.nextGetAt.set(connection.id, retryAt);
+      throw new Food99ApiError(
+        '99Food refreshed the shop token. Wait before verifying again.',
+        false,
+        409,
+        'AUTH_TOKEN_REFRESHED_WAIT_RETRY',
+        AUTH_TOKEN_REQUEST_INTERVAL_MS,
+      );
+    }
+
     const data = this.asRecord(payload.data);
     const token = typeof data?.auth_token === 'string' ? data.auth_token : null;
     const expiration = this.toExpiration(data?.token_expiration_time);
@@ -64,7 +94,7 @@ export class Food99TokenService {
         authType: 'food99_shop_auth_token',
       },
     });
-    this.logger.log({ message: 'food99_shop_auth_token_refreshed', provider: 'FOOD_99', tenantId: connection.tenantId, connectionId: connection.id, expiresAt: expiration });
+    this.logger.log({ message: 'food99_shop_auth_token_ready', provider: 'FOOD_99', tenantId: connection.tenantId, connectionId: connection.id, expiresAt: expiration });
     return token;
   }
 
@@ -84,8 +114,22 @@ export class Food99TokenService {
     }
     const payload = await this.readJson(response);
     if (!response.ok || payload.errno !== 0) {
-      await this.markAuthenticationFailed(connection);
-      throw new Food99ApiError('99Food shop authentication failed.', response.status === 429 || response.status >= 500, response.status, this.providerCode(payload));
+      const providerCode = this.providerCode(payload);
+      if (providerCode === 'AUTH_TOKEN_NOT_AVAILABLE' || providerCode === 'AUTH_TOKEN_EXPIRED') {
+        await this.markAuthenticationFailed(connection);
+      }
+      this.logger.warn({
+        message: 'food99_shop_auth_rejected',
+        tenantId: connection.tenantId,
+        connectionId: connection.id,
+        operation: path.endsWith('/refresh') ? 'refresh_auth_token' : 'get_auth_token',
+        endpoint: path,
+        providerErrno: this.providerErrno(payload),
+        providerRequestId: this.providerRequestId(payload),
+        appShopId: this.maskAppShopId(appShopId),
+        providerCode,
+      });
+      throw new Food99ApiError('99Food shop authentication failed.', this.isRetryable(response.status, providerCode), response.status, providerCode);
     }
     return payload;
   }
@@ -95,7 +139,30 @@ export class Food99TokenService {
     if (typeof value === 'string' && /^\d+$/.test(value)) return this.toExpiration(Number(value));
     return null;
   }
-  private providerCode(payload: StandardResponse): string | undefined { return typeof payload.errmsg === 'string' ? payload.errmsg : undefined; }
+  private providerCode(payload: StandardResponse): string | undefined {
+    switch (this.providerErrno(payload)) {
+      case 10001: return 'PROVIDER_SYSTEM_ERROR';
+      case 10002: return 'PROVIDER_PARAMETER_ERROR';
+      case 10101: return 'AUTH_TOKEN_NOT_AVAILABLE';
+      case 10102: return 'AUTH_TOKEN_EXPIRED';
+      case 10103: return 'TOKEN_REFRESH_FAILED';
+      case 14105: return 'APP_ID_INVALID';
+      case 14106: return 'APP_SECRET_INVALID';
+      default: return undefined;
+    }
+  }
+  private providerErrno(payload: StandardResponse): number | null {
+    return typeof payload.errno === 'number' && Number.isInteger(payload.errno) ? payload.errno : null;
+  }
+  private providerRequestId(payload: StandardResponse): string | undefined {
+    return typeof payload.request_id === 'string' && payload.request_id.trim() ? payload.request_id : undefined;
+  }
+  private isRetryable(httpStatus: number, providerCode?: string): boolean {
+    return httpStatus === 429 || httpStatus >= 500 || providerCode === 'PROVIDER_SYSTEM_ERROR';
+  }
+  private maskAppShopId(value: string): string {
+    return value.length <= 6 ? '***' : `${value.slice(0, 3)}***${value.slice(-3)}`;
+  }
   private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_API_BASE_URL')?.trim() || 'https://openapi.didi-food.com').replace(/\/$/, ''); }
   private timeoutMs(): number { return Number(this.config.get<string>('MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS') || 10_000); }
   private async readJson(response: Response): Promise<StandardResponse> { try { return await response.json() as StandardResponse; } catch { return {}; } }

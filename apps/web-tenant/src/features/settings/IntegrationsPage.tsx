@@ -43,6 +43,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useTenantCapabilities } from "../../hooks/useTenantCapabilities";
 import { api } from "../../lib/api-client";
+import { food99VerificationErrorMessage } from "./food99-verification-message";
 
 type Provider = "ifood" | "99food";
 type Overlay =
@@ -329,10 +330,8 @@ export function IntegrationsPage() {
       toast.success("99Food conectada.");
       setOverlay(null);
       await refresh();
-    } catch {
-      toast.error(
-        "Ainda não conseguimos confirmar a autorização. Tente novamente em instantes.",
-      );
+    } catch (error) {
+      toast.error(food99VerificationErrorMessage(error));
     }
   };
   const handleManualConnect = async () => {

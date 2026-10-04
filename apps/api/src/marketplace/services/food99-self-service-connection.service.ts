@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceConnectionStatus, MarketplaceProvider } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
@@ -33,24 +33,13 @@ export class Food99SelfServiceConnectionService {
   async verify(tenantId: string, connectionId: string): Promise<{ authorized: true; connection: MarketplaceConnection }> {
     const connection = await this.getFood99Connection(tenantId, connectionId);
     try {
-      // A new self-service connection deliberately has no locally persisted
-      // shop token. 99Food documents refresh -> get only when no usable token
-      // exists, so a verified connection is never refreshed just because the
-      // user reopens this flow.
-      // Food99TokenService coalesces concurrent attempts per connection.
-      await this.tokens.getAccessToken(connection, this.needsTokenRefresh(connection));
+      // The documented auth-token API distinguishes no token (10101) from an
+      // expired token (10102). Food99TokenService performs the safe sequence
+      // and coalesces concurrent attempts per connection.
+      await this.tokens.getAccessToken(connection);
     } catch (error) {
       if (error instanceof Food99ApiError) {
-        if (error.retryable) {
-          throw new ServiceUnavailableException({
-            error: 'PROVIDER_UNAVAILABLE',
-            message: 'A 99Food não pôde confirmar a autorização agora. Tente novamente em instantes.',
-          });
-        }
-        throw new ConflictException({
-          error: 'AUTHORIZATION_NOT_READY',
-          message: 'A 99Food ainda não confirmou a autorização desta loja. Volte à 99Food e tente verificar novamente.',
-        });
+        throw this.toVerificationException(error);
       }
       throw error;
     }
@@ -90,10 +79,46 @@ export class Food99SelfServiceConnectionService {
     return appShopId;
   }
 
-  private needsTokenRefresh(connection: MarketplaceConnection): boolean {
-    const usableUntil = Date.now() + 60_000;
-    return !connection.accessTokenEnc
-      || !connection.tokenExpiresAt
-      || connection.tokenExpiresAt.getTime() <= usableUntil;
+  private toVerificationException(error: Food99ApiError): Error {
+    switch (error.providerCode) {
+      case 'AUTH_TOKEN_NOT_AVAILABLE':
+        return new ConflictException({
+          error: 'AUTH_TOKEN_NOT_AVAILABLE',
+          message: 'A 99Food ainda não disponibilizou o token desta loja. Conclua a autorização na 99Food e verifique novamente.',
+        });
+      case 'AUTH_TOKEN_REFRESHED_WAIT_RETRY':
+        return new ConflictException({
+          error: 'AUTH_TOKEN_REFRESHED_WAIT_RETRY',
+          message: 'A 99Food atualizou o token da loja. Aguarde 30 segundos e verifique novamente.',
+        });
+      case 'APP_ID_INVALID':
+      case 'APP_SECRET_INVALID':
+        return new ServiceUnavailableException({
+          error: error.providerCode,
+          message: 'A configuração da integração 99Food requer atenção do suporte. Nenhum pedido ou repasse foi alterado.',
+        });
+      case 'TOKEN_REFRESH_FAILED':
+      case 'PROVIDER_SYSTEM_ERROR':
+        return new ServiceUnavailableException({
+          error: error.providerCode,
+          message: 'A 99Food não pôde confirmar a autorização agora. Tente novamente em instantes.',
+        });
+      case 'PROVIDER_PARAMETER_ERROR':
+        return new BadGatewayException({
+          error: error.providerCode,
+          message: 'A 99Food recusou os dados enviados para verificar a loja. Confira a conexão e fale com o suporte se persistir.',
+        });
+      default:
+        if (error.retryable) {
+          return new ServiceUnavailableException({
+            error: 'PROVIDER_UNAVAILABLE',
+            message: 'A 99Food não pôde confirmar a autorização agora. Tente novamente em instantes.',
+          });
+        }
+        return new ConflictException({
+          error: 'AUTHORIZATION_NOT_READY',
+          message: 'A 99Food ainda não confirmou a autorização desta loja. Volte à 99Food e tente verificar novamente.',
+        });
+    }
   }
 }

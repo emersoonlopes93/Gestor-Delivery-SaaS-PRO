@@ -65,21 +65,7 @@ describe('Food99SelfServiceConnectionService', () => {
     connections.getTenantConnection.mockResolvedValueOnce(pending).mockResolvedValueOnce(connected);
 
     await expect(service.verify('tenant-a', 'connection-99')).resolves.toEqual({ authorized: true, connection: connected });
-    expect(tokens.getAccessToken).toHaveBeenCalledWith(pending, true);
-  });
-
-  it('does not refresh a still-usable token when a verified connection is checked again', async () => {
-    const { service, connections, tokens } = makeService();
-    const connected = {
-      id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99,
-      externalStoreId: 'connection-99', accessTokenEnc: 'encrypted',
-      tokenExpiresAt: new Date(Date.now() + 120_000), status: MarketplaceConnectionStatus.CONNECTED,
-    };
-    connections.getTenantConnection.mockResolvedValue(connected);
-
-    await service.verify('tenant-a', 'connection-99');
-
-    expect(tokens.getAccessToken).toHaveBeenCalledWith(connected, false);
+    expect(tokens.getAccessToken).toHaveBeenCalledWith(pending);
   });
 
   it('keeps an unconfirmed authorization actionable instead of surfacing a generic server error', async () => {
@@ -96,5 +82,19 @@ describe('Food99SelfServiceConnectionService', () => {
     tokens.getAccessToken.mockRejectedValue(new Food99ApiError('99Food authentication unavailable.', true));
 
     await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it.each([
+    ['AUTH_TOKEN_NOT_AVAILABLE', ConflictException],
+    ['AUTH_TOKEN_REFRESHED_WAIT_RETRY', ConflictException],
+    ['APP_ID_INVALID', ServiceUnavailableException],
+    ['APP_SECRET_INVALID', ServiceUnavailableException],
+    ['TOKEN_REFRESH_FAILED', ServiceUnavailableException],
+  ])('maps %s to an actionable semantic verification response', async (providerCode, exception) => {
+    const { service, connections, tokens } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('99Food shop authentication failed.', false, 200, providerCode));
+
+    await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(exception);
   });
 });
