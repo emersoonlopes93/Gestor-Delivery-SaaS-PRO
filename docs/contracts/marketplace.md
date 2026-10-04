@@ -341,6 +341,14 @@ O ciclo de token segue a semântica documentada do provider: `10101` vira `AUTH_
 
 Os nomes de `v3/auth/authorization/getAuthorizedShops`, `v3/auth/authorization/shopBind` e `v1/shop/shop/list` são conhecidos, mas seus corpos e envelopes oficiais não estão disponíveis neste repositório. Portanto, o PedeHub não implementa descoberta, bind ou consulta de loja com payload especulativo; essa etapa permanece `CONTRACT_DETAIL_MISSING` até a documentação oficial completa ser anexada.
 
+The later provider guidance supplies the V3 authorized-shop request and essential
+shop fields, so discovery is implemented through the dedicated
+`MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL` (default
+`https://openapi.99food.com`). It never binds a discovered shop. The provider
+has not documented how `shop_infos` is represented in the MD5 signature for
+`shopBind`; therefore `SHOP_BIND_SIGNATURE_ARRAY_CONTRACT=MISSING` and bind
+remains fail-closed.
+
 ### 99Food production-app and bind readiness (2026-10-04)
 
 Operational APIs use `MARKETPLACE_99FOOD_API_BASE_URL`, whose safe default is
