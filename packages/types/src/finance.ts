@@ -128,6 +128,7 @@ export interface Food99ReconciliationConnectionDTO {
   id: string;
   displayName: string | null;
   appShopId: string | null;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'TOKEN_EXPIRED' | 'ERROR' | 'PAUSED';
   settlementFinancialAccountId: string | null;
 }
 

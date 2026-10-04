@@ -24,6 +24,10 @@ O body envia `acceptor_code=app_shop_id`, datas `YYYYMMDD`, `page_no` e `page_si
 
 Falhas reais de autenticação, autorização, negócio, provider, conteúdo inválido ou conteúdo inesperado não viram coleção vazia nem valor de R$ 0,00. A sincronização não pressupõe WhiteList financeira.
 
+Antes da consulta financeira, a loja precisa estar com a autorização operacional 99Food confirmada (`CONNECTED`). Uma conexão pendente não chama a Financial API: a API devolve `AUTHORIZATION_NOT_READY` e a interface orienta o gestor a concluir a verificação em **Canais de venda**. Isso não muda o token financeiro, que permanece separado.
+
+Na verificação self-service, uma conexão sem token operacional utilizável segue o fluxo oficial `refresh` e depois `get`, uma vez por tentativa. Reaberturas com token ainda utilizável não provocam refresh. Falhas transitórias são `PROVIDER_UNAVAILABLE`; uma resposta não transitória que não confirme a loja permanece `AUTHORIZATION_NOT_READY`, sem expor credenciais ou detalhes internos.
+
 IDs e timestamps de identidade (`orderId`, `dayPaymentId`, `weekPaymentId`, `shopId`, `businessTs`) são strings lossless desde o texto HTTP. O adapter protege também IDs numéricos dentro de `dayPaymentIDList` antes do `JSON.parse`. Valores monetários são strings inteiras no adapter e `BigInt` em centavos no banco; o sinal recebido é preservado.
 
 ## Persistência e idempotência

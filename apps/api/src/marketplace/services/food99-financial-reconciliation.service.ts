@@ -9,6 +9,7 @@ import {
 import {
   FinancialStatus,
   FinancialTransactionType,
+  MarketplaceConnectionStatus,
   MarketplaceProvider,
   MarketplaceSettlementStatus,
   Prisma,
@@ -104,6 +105,12 @@ export class Food99FinancialReconciliationService {
       },
     });
     if (!connection) throw new NotFoundException('Integracao 99Food nao encontrada.');
+    if (connection.status !== MarketplaceConnectionStatus.CONNECTED) {
+      throw new ConflictException({
+        error: 'AUTHORIZATION_NOT_READY',
+        message: 'Confirme a autorização da loja 99Food em Canais de venda antes de sincronizar os repasses.',
+      });
+    }
 
     const windows = splitFood99FinancialBackfill(input.startDate, input.endDate);
     const result: Food99FinancialSyncResultDTO = {
@@ -280,6 +287,7 @@ export class Food99FinancialReconciliationService {
           id: true,
           displayName: true,
           externalStoreId: true,
+          status: true,
           settlementFinancialAccountId: true,
         },
         orderBy: { createdAt: 'asc' },
@@ -312,6 +320,7 @@ export class Food99FinancialReconciliationService {
         id: connection.id,
         displayName: connection.displayName,
         appShopId: connection.externalStoreId,
+        status: connection.status,
         settlementFinancialAccountId: connection.settlementFinancialAccountId,
       })),
       settlements: await Promise.all(settlements.map((settlement) => (

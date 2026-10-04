@@ -32,6 +32,13 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(panel).toContain('caught.status === 401 || caught.status === 403');
   });
 
+  it('keeps financial sync unavailable until the operational authorization is confirmed', () => {
+    expect(panel).toContain("selectedConnection?.status === 'CONNECTED'");
+    expect(panel).toContain('Confirme a autorização da loja antes de sincronizar.');
+    expect(panel).toContain('Nenhuma consulta financeira será feita enquanto a conexão não estiver pronta.');
+    expect(panel).toContain('!authorizationReady');
+  });
+
   it('keeps settlement amount aggregate and Bill composition visibly distinct', () => {
     expect(panel).toContain('withdrawAmountCents');
     expect(panel).toContain('linkedSettlementAmountCents');

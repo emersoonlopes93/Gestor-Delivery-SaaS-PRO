@@ -1,5 +1,6 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { MarketplaceConnectionStatus, MarketplaceProvider } from '@prisma/client';
+import { Food99ApiError } from '../providers/food99-api.error';
 import { Food99SelfServiceConnectionService } from './food99-self-service-connection.service';
 
 describe('Food99SelfServiceConnectionService', () => {
@@ -59,11 +60,41 @@ describe('Food99SelfServiceConnectionService', () => {
 
   it('verifies authorization through the operational token and reloads the canonical connection', async () => {
     const { service, connections, tokens } = makeService();
-    const pending = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' };
+    const pending = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99', accessTokenEnc: null, tokenExpiresAt: null };
     const connected = { ...pending, status: MarketplaceConnectionStatus.CONNECTED };
     connections.getTenantConnection.mockResolvedValueOnce(pending).mockResolvedValueOnce(connected);
 
     await expect(service.verify('tenant-a', 'connection-99')).resolves.toEqual({ authorized: true, connection: connected });
-    expect(tokens.getAccessToken).toHaveBeenCalledWith(pending);
+    expect(tokens.getAccessToken).toHaveBeenCalledWith(pending, true);
+  });
+
+  it('does not refresh a still-usable token when a verified connection is checked again', async () => {
+    const { service, connections, tokens } = makeService();
+    const connected = {
+      id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99,
+      externalStoreId: 'connection-99', accessTokenEnc: 'encrypted',
+      tokenExpiresAt: new Date(Date.now() + 120_000), status: MarketplaceConnectionStatus.CONNECTED,
+    };
+    connections.getTenantConnection.mockResolvedValue(connected);
+
+    await service.verify('tenant-a', 'connection-99');
+
+    expect(tokens.getAccessToken).toHaveBeenCalledWith(connected, false);
+  });
+
+  it('keeps an unconfirmed authorization actionable instead of surfacing a generic server error', async () => {
+    const { service, connections, tokens } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('99Food shop authentication failed.', false, 200));
+
+    await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('reports a transient 99Food authorization outage without claiming the shop rejected it', async () => {
+    const { service, connections, tokens } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('99Food authentication unavailable.', true));
+
+    await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

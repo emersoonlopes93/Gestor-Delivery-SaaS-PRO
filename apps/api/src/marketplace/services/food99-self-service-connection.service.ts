@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { MarketplaceConnection, MarketplaceConnectionStatus, MarketplaceProvider } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
+import { Food99ApiError } from '../providers/food99-api.error';
 import { Food99HttpClientService } from './food99-http-client.service';
 import { Food99TokenService } from './food99-token.service';
 import { MarketplaceConnectionService } from './marketplace-connection.service';
@@ -31,7 +32,28 @@ export class Food99SelfServiceConnectionService {
 
   async verify(tenantId: string, connectionId: string): Promise<{ authorized: true; connection: MarketplaceConnection }> {
     const connection = await this.getFood99Connection(tenantId, connectionId);
-    await this.tokens.getAccessToken(connection);
+    try {
+      // A new self-service connection deliberately has no locally persisted
+      // shop token. 99Food documents refresh -> get only when no usable token
+      // exists, so a verified connection is never refreshed just because the
+      // user reopens this flow.
+      // Food99TokenService coalesces concurrent attempts per connection.
+      await this.tokens.getAccessToken(connection, this.needsTokenRefresh(connection));
+    } catch (error) {
+      if (error instanceof Food99ApiError) {
+        if (error.retryable) {
+          throw new ServiceUnavailableException({
+            error: 'PROVIDER_UNAVAILABLE',
+            message: 'A 99Food não pôde confirmar a autorização agora. Tente novamente em instantes.',
+          });
+        }
+        throw new ConflictException({
+          error: 'AUTHORIZATION_NOT_READY',
+          message: 'A 99Food ainda não confirmou a autorização desta loja. Volte à 99Food e tente verificar novamente.',
+        });
+      }
+      throw error;
+    }
     const refreshed = await this.connections.getTenantConnection(tenantId, connection.id);
     return { authorized: true, connection: refreshed };
   }
@@ -66,5 +88,12 @@ export class Food99SelfServiceConnectionService {
       throw new BadRequestException('99Food connection does not have a stable authorization identity.');
     }
     return appShopId;
+  }
+
+  private needsTokenRefresh(connection: MarketplaceConnection): boolean {
+    const usableUntil = Date.now() + 60_000;
+    return !connection.accessTokenEnc
+      || !connection.tokenExpiresAt
+      || connection.tokenExpiresAt.getTime() <= usableUntil;
   }
 }

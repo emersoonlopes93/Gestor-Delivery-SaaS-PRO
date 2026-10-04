@@ -1,6 +1,7 @@
 import {
   FinancialStatus,
   FinancialTransactionType,
+  MarketplaceConnectionStatus,
   MarketplaceProvider,
   MarketplaceSettlementStatus,
   Prisma,
@@ -55,6 +56,7 @@ describe('Food99FinancialReconciliationService', () => {
           tenantId: 'tenant-1',
           provider: MarketplaceProvider.FOOD_99,
           externalStoreId: '5764608924570091908',
+          status: MarketplaceConnectionStatus.CONNECTED,
         }),
         findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -79,6 +81,20 @@ describe('Food99FinancialReconciliationService', () => {
     const service = new Food99FinancialReconciliationService(prisma as never, client as never);
     return { service, prisma, client, tx };
   }
+
+  it('does not call the financial provider before the 99Food shop authorization is confirmed', async () => {
+    const { service, prisma, client } = setup();
+    prisma.marketplaceConnection.findFirst.mockResolvedValue({
+      id: 'connection-1', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99,
+      externalStoreId: '5764608924570091908', status: MarketplaceConnectionStatus.DISCONNECTED,
+    });
+
+    await expect(service.sync('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-1')).rejects.toMatchObject({ status: 409 });
+    expect(client.fetchBillEntries).not.toHaveBeenCalled();
+    expect(client.fetchSettlements).not.toHaveBeenCalled();
+  });
 
   it.each([1, 2, 3, 4, 5, 8, 9])('ingests orderType %s without changing provider money signs', async (orderType) => {
     const settlementAmount = orderType === 2 || orderType === 3 || orderType === 4 || orderType === 8 ? '-1000' : '5000';

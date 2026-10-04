@@ -2724,3 +2724,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Settlement passou a ser único por tenant/provider/conexão/weekPaymentId. A migration é aditiva para campos e substitui somente a constraint de identidade, cuja forma anterior já impedia colisões históricas.
 - Order Details com status nativo 600 chega à transição canônica de conclusão; cash 99Food usa `shop_paid_money` para entrega da plataforma e `customer_need_paying_money` para entrega própria. `payConfirm` é explícito, protegido por elegibilidade/idempotência e não cria lançamento financeiro.
 - ACK de webhook permanece deliberadamente inalterado (`204`), pois esta entrega não reabre seu contrato específico. Nenhuma chamada real à 99Food, banco remoto, deploy ou merge foi executado.
+
+## 99Food authorization recovery and financial precondition (2026-10-03)
+
+- Branch `fix/99food-auth-verification-recovery`, based on `origin/main-copy` / `6a0af7732d15eb963c61457f5af97951be4a5aeb`.
+- The self-service verifier now requests the documented one-time shop-token `refresh -> get` only when the persisted operational token is absent or unusable. Concurrent requests remain coalesced by `Food99TokenService`; a valid persisted token is reused without a refresh. A non-transient unconfirmed authorization becomes `409 AUTHORIZATION_NOT_READY`, while a transient provider outage becomes `503 PROVIDER_UNAVAILABLE`; secrets and provider payloads are not returned.
+- 99Food financial sync now rejects a non-`CONNECTED` shop before calling the Financial API, with `409 AUTHORIZATION_NOT_READY`. The reconciliation read model includes only the connection status needed by the Finance UI to disable Sync and link the manager to Canais de venda. Financial sign-in, parser, settlement posting, account selection, schema and migrations remain unchanged.
+- Local provider/DB calls were not made. Focused API tests cover refresh selection, repeat verification, semantic errors and no financial-client call for a pending shop; the finance-panel contract test covers the disabled Sync path. Full gate/CI results must be recorded with the final branch commit.
