@@ -9,12 +9,14 @@ describe('Food99SelfServiceConnectionService', () => {
     const connections = { getTenantConnection: jest.fn() };
     const food99Client = { getAuthorizationUrl: jest.fn() };
     const tokens = { getAccessToken: jest.fn() };
+    const authorization = { getAuthorizedShops: jest.fn() };
     return {
       prisma,
       connections,
       food99Client,
       tokens,
-      service: new Food99SelfServiceConnectionService(prisma as never, connections as never, food99Client as never, tokens as never),
+      authorization,
+      service: new Food99SelfServiceConnectionService(prisma as never, connections as never, food99Client as never, tokens as never, authorization as never),
     };
   };
 
@@ -30,6 +32,14 @@ describe('Food99SelfServiceConnectionService', () => {
     expect(started.connection.status).toBe(MarketplaceConnectionStatus.DISCONNECTED);
     expect(started.connection.externalMerchantId).toBeUndefined();
     expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String), started.connection.id);
+  });
+
+  it('never selects the first authorized shop when multiple unbound shops are returned', async () => {
+    const { service, connections, tokens, authorization } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('missing', false, 200, 'AUTH_TOKEN_NOT_AVAILABLE'));
+    authorization.getAuthorizedShops.mockResolvedValue([{ shopId: 'a', shopName: 'A', boundFlag: 0 }, { shopId: 'b', shopName: 'B', boundFlag: 0 }]);
+    await expect(service.verify('tenant-a', 'connection-99')).rejects.toMatchObject({ response: expect.objectContaining({ error: 'AUTHORIZED_SHOP_SELECTION_REQUIRED' }) });
   });
 
   it('reuses the existing 99Food connection identity for reauthorization', async () => {

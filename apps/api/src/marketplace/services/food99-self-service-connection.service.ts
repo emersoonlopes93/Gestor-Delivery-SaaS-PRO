@@ -6,6 +6,7 @@ import { Food99ApiError } from '../providers/food99-api.error';
 import { Food99HttpClientService } from './food99-http-client.service';
 import { Food99TokenService } from './food99-token.service';
 import { MarketplaceConnectionService } from './marketplace-connection.service';
+import { Food99AuthorizationClient } from './food99-authorization-client.service';
 
 type StartedAuthorization = {
   connection: MarketplaceConnection;
@@ -19,6 +20,7 @@ export class Food99SelfServiceConnectionService {
     private readonly connections: MarketplaceConnectionService,
     private readonly food99Client: Food99HttpClientService,
     private readonly tokens: Food99TokenService,
+    private readonly authorization: Food99AuthorizationClient,
   ) {}
 
   async start(tenantId: string, connectionId?: string): Promise<StartedAuthorization> {
@@ -39,12 +41,23 @@ export class Food99SelfServiceConnectionService {
       await this.tokens.getAccessToken(connection);
     } catch (error) {
       if (error instanceof Food99ApiError) {
+        if (error.providerCode === 'AUTH_TOKEN_NOT_AVAILABLE') await this.requireConfirmedBind(connection);
         throw this.toVerificationException(error);
       }
       throw error;
     }
     const refreshed = await this.connections.getTenantConnection(tenantId, connection.id);
     return { authorized: true, connection: refreshed };
+  }
+
+  private async requireConfirmedBind(connection: MarketplaceConnection): Promise<never> {
+    const shops = await this.authorization.getAuthorizedShops();
+    const ownBound = shops.find((shop) => shop.boundFlag === 1 && shop.appShopId === this.appShopId(connection));
+    if (ownBound) throw new ConflictException({ error: 'SHOP_BIND_NOT_CONFIRMED', message: 'A 99Food confirmou o estabelecimento, mas ainda não disponibilizou o token. Tente novamente em instantes.' });
+    const unbound = shops.filter((shop) => shop.boundFlag === 0);
+    if (unbound.length === 0) throw new ConflictException({ error: 'AUTHORIZED_SHOP_NOT_FOUND', message: 'Nenhum estabelecimento autorizado está disponível para concluir a conexão.' });
+    if (unbound.length > 1) throw new ConflictException({ error: 'AUTHORIZED_SHOP_SELECTION_REQUIRED', message: 'Encontramos mais de um estabelecimento autorizado. A seleção segura ainda precisa da confirmação de vínculo da 99Food.' });
+    throw new ConflictException({ error: 'SHOP_BIND_NOT_CONFIRMED', message: 'Encontramos seu estabelecimento autorizado. A confirmação automática do vínculo ainda aguarda o contrato oficial da 99Food.' });
   }
 
   private async getFood99Connection(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {

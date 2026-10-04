@@ -27,6 +27,7 @@ import { MarketplacePollingService } from './services/marketplace-polling.servic
 import { Food99HttpClientService } from './services/food99-http-client.service';
 import { Food99TokenService } from './services/food99-token.service';
 import { Food99SelfServiceConnectionService } from './services/food99-self-service-connection.service';
+import { Food99AuthorizationClient } from './services/food99-authorization-client.service';
 import { Food99PollingService } from './services/food99-polling.service';
 import { Food99FinancialController } from './controllers/food99-financial.controller';
 import { Food99FinancialClientService } from './services/food99-financial-client.service';
@@ -75,6 +76,7 @@ const enableMarketplaceQueue =
     IfoodHttpClientService,
     Food99TokenService,
     Food99SelfServiceConnectionService,
+    Food99AuthorizationClient,
     Food99HttpClientService,
     MarketplaceProviderRegistryService,
     MarketplaceConnectionService,
