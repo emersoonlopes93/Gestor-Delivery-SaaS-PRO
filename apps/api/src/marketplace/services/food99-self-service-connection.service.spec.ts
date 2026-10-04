@@ -10,6 +10,7 @@ describe('Food99SelfServiceConnectionService', () => {
     const food99Client = { getAuthorizationUrl: jest.fn() };
     const tokens = { getAccessToken: jest.fn() };
     const authorization = { getAuthorizedShops: jest.fn() };
+    authorization.getAuthorizedShops.mockResolvedValue([]);
     return {
       prisma,
       connections,
