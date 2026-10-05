@@ -58,17 +58,23 @@ export class Food99Provider implements MarketplaceProviderAdapter {
     const timestamp = this.readIdentifier(payload, ['timestamp']);
     const externalOrderId = this.readIdentifier(data, ['order_id']);
     const externalMerchantId = this.readIdentifier(shop, ['shop_id']);
-    const eventId = appId && appShopId && eventType && timestamp && externalOrderId
+    const authorizationAppShopIds = this.readIdentifiers(data?.appShopIDList);
+    const bindStatus = this.readString(data, ['bindStatus']);
+    const authorizationCallback = !externalOrderId && Boolean(bindStatus) && authorizationAppShopIds.length > 0;
+    const callbackStoreId = authorizationAppShopIds.length === 1 ? authorizationAppShopIds[0] : null;
+    const externalStoreId = appShopId ?? callbackStoreId;
+    const topic = authorizationCallback ? 'authorizationBindStatus' : eventType;
+    const eventId = appId && externalStoreId && topic && timestamp && (externalOrderId || authorizationCallback)
       ? `food99:${createHash('sha256')
-        .update(JSON.stringify([appId, appShopId, eventType, timestamp, externalOrderId]))
+        .update(JSON.stringify([appId, externalStoreId, topic, timestamp, externalOrderId ?? bindStatus]))
         .digest('hex')}`
       : null;
     return {
       provider: MarketplaceProvider.FOOD_99,
       eventId,
-      topic: eventType,
+      topic,
       externalMerchantId,
-      externalStoreId: appShopId,
+      externalStoreId,
       externalOrderId,
       eventCreatedAt: this.unixTimestamp(timestamp),
       eventSequence: null,
@@ -656,6 +662,16 @@ export class Food99Provider implements MarketplaceProviderAdapter {
       if (typeof value === 'number' && Number.isSafeInteger(value)) return String(value);
     }
     return null;
+  }
+
+  private readIdentifiers(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    const identifiers = value.flatMap((entry) => {
+      if (typeof entry === 'string' && entry.trim()) return [entry.trim()];
+      if (typeof entry === 'number' && Number.isSafeInteger(entry)) return [String(entry)];
+      return [];
+    });
+    return [...new Set(identifiers)];
   }
 
   private unixTimestamp(value: string | null): Date | null {

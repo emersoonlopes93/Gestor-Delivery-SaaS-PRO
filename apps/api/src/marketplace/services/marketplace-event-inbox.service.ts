@@ -54,7 +54,12 @@ export class MarketplaceEventInboxService {
       body: input.body,
     });
 
+    const food99AuthorizationCallback = input.provider === MarketplaceProvider.FOOD_99
+      && parsed.topic === 'authorizationBindStatus'
+      && !parsed.externalOrderId;
+
     if (input.provider === MarketplaceProvider.FOOD_99
+      && !food99AuthorizationCallback
       && (!parsed.eventId || !parsed.externalOrderId || !parsed.externalStoreId || !parsed.topic)) {
       this.logger.warn({
         message: 'food99_webhook_payload_unmapped',
@@ -79,13 +84,21 @@ export class MarketplaceEventInboxService {
       externalStoreId: parsed.externalStoreId,
     });
 
+    if (food99AuthorizationCallback) {
+      this.logger.log({
+        message: 'food99_authorization_callback_received',
+        connectionResolved: Boolean(connection),
+        hasStableAppShopId: Boolean(parsed.externalStoreId),
+      });
+    }
+
     return this.persistParsedEvent({
       parsed,
       payloadHash,
       headers: input.headers,
       channel: MarketplaceEventChannel.WEBHOOK,
       connection,
-      process: true,
+      process: !food99AuthorizationCallback,
     });
   }
 

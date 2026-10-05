@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { Food99ApiError } from '../providers/food99-api.error';
@@ -9,6 +9,7 @@ export type Food99ShopBindResult = { shopId: string; shopName: string | null; au
 
 @Injectable()
 export class Food99AuthorizationClient {
+  private readonly logger = new Logger(Food99AuthorizationClient.name);
   constructor(private readonly config: ConfigService, private readonly credentials: MarketplaceCredentialService) {}
 
   async getAuthorizedShops(): Promise<Food99AuthorizedShop[]> {
@@ -26,8 +27,26 @@ export class Food99AuthorizationClient {
     } catch (error) { throw new Food99ApiError(`99Food authorization discovery unavailable: ${error instanceof Error ? error.message : 'network error'}`, true); }
     const payload = await this.read(response);
     const data = this.record(payload?.data);
-    const shops = data?.shops;
-    if (!response.ok || payload?.errno !== 0 || !Array.isArray(shops)) throw new Food99ApiError('99Food authorized-shop response is invalid.', response.status >= 500 || response.status === 429, response.status, 'PROVIDER_AUTHORIZATION_UNAVAILABLE');
+    const nestedData = this.record(data?.data);
+    const shops = Array.isArray(data?.shops)
+      ? data.shops
+      : Array.isArray(nestedData?.shops)
+        ? nestedData.shops
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : null;
+    if (!response.ok || !this.success(payload?.errno) || !shops) {
+      this.logger.warn({
+        message: 'food99_authorized_shops_response_unrecognized',
+        httpStatus: response.status,
+        errno: this.errorNumber(payload?.errno),
+        rootKeys: payload ? Object.keys(payload).sort() : null,
+        dataKeys: data ? Object.keys(data).sort() : null,
+        nestedDataKeys: nestedData ? Object.keys(nestedData).sort() : null,
+        dataType: Array.isArray(payload?.data) ? 'array' : typeof payload?.data,
+      });
+      throw new Food99ApiError('99Food authorized-shop response is invalid.', response.status >= 500 || response.status === 429, response.status, 'PROVIDER_AUTHORIZATION_UNAVAILABLE');
+    }
     return shops.map((value) => this.shop(value));
   }
 
@@ -49,7 +68,7 @@ export class Food99AuthorizationClient {
     const payload = await this.read(response);
     const data = this.record(payload?.data);
     const successList = data?.success_list;
-    if (!response.ok || payload?.errno !== 0 || !Array.isArray(successList)) {
+    if (!response.ok || !this.success(payload?.errno) || !Array.isArray(successList)) {
       throw new Food99ApiError('99Food shop bind was not confirmed.', response.status >= 500 || response.status === 429, response.status, 'SHOP_BIND_FAILED');
     }
     const result = successList.map((value) => this.boundShop(value)).find((value) => value.shopId === shopId);
@@ -97,6 +116,10 @@ export class Food99AuthorizationClient {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   private empty(value: unknown): boolean { return value === undefined || value === null || value === ''; }
+  private success(value: unknown): boolean { return value === 0 || value === '0'; }
+  private errorNumber(value: unknown): number | string | null {
+    return typeof value === 'number' || typeof value === 'string' ? value : null;
+  }
   private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, ''); }
   private async read(response: Response): Promise<Record<string, unknown> | null> {
     try {

@@ -111,6 +111,31 @@ describe('MarketplaceEventInboxService', () => {
     });
   });
 
+  it('persists a 99Food bind-status callback without sending it to order ingestion', async () => {
+    provider.parseWebhookEvent.mockResolvedValueOnce({
+      provider: MarketplaceProvider.FOOD_99,
+      eventId: 'food99:bind-status-1',
+      topic: 'authorizationBindStatus',
+      externalMerchantId: null,
+      externalStoreId: 'connection-99',
+      externalOrderId: null,
+      rawPayload: { data: { appShopIDList: ['connection-99'], bindStatus: 'SUCCESS' } },
+    });
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce(null);
+    prisma.marketplaceEventInbox.create.mockResolvedValueOnce({ id: 'inbox-bind' });
+    const service = new MarketplaceEventInboxService(
+      prisma as never, registry as never, connectionService as never, ingestionService as never, undefined,
+    );
+
+    await expect(service.receiveWebhook({
+      provider: MarketplaceProvider.FOOD_99, headers: {}, rawBody: Buffer.from('{}'), body: {},
+    })).resolves.toEqual({ accepted: true, duplicate: false, inboxId: 'inbox-bind' });
+    expect(prisma.marketplaceEventInbox.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MarketplaceEventStatus.IGNORED, externalOrderId: null }),
+    }));
+    expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
+  });
+
   it('does not duplicate an already persisted webhook event', async () => {
     prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce({ id: 'inbox-1' });
 

@@ -19,6 +19,11 @@ export function food99VerificationErrorMessage(error: unknown): string {
       return "A 99Food não respondeu à confirmação agora. Tente novamente em instantes.";
     case "PROVIDER_PARAMETER_ERROR":
       return "A 99Food não aceitou os dados desta confirmação. Consulte as informações para suporte.";
+    case "PROVIDER_AUTHORIZATION_UNAVAILABLE":
+    case "INVALID_AUTHORIZED_SHOP_RESPONSE":
+      return "A 99Food respondeu, mas não foi possível identificar a loja autorizada. Tente novamente em instantes ou consulte o suporte.";
+    case "SHOP_ALREADY_BOUND":
+      return "Esta loja já está vinculada a outra identificação. Consulte o suporte da 99Food para continuar.";
     case "AUTHORIZED_SHOP_SELECTION_REQUIRED":
       return "Encontramos mais de um estabelecimento autorizado. A confirmação segura do vínculo ainda depende da 99Food.";
     case "SHOP_BIND_NOT_CONFIRMED":

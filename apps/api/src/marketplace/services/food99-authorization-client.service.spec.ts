@@ -35,4 +35,11 @@ describe('Food99AuthorizationClient', () => {
 
     await expect(service.getAuthorizedShops()).resolves.toEqual([{ shopId: '5764687916991317793', shopName: 'Loja', boundFlag: 0, appShopId: null }]);
   });
+
+  it('accepts a strict documented nested data envelope without accepting invalid shop records', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":"0","data":{"data":{"shops":[{"shop_id":5764687916991317793,"shop_name":"Loja","bound_flag":0}]}}}', { status: 200 }));
+    const service = new Food99AuthorizationClient({ get: jest.fn() } as never, { getFood99AppCredentials: jest.fn().mockReturnValue({ appId: '3458764610605350993', clientSecret: 'secret' }) } as never);
+
+    await expect(service.getAuthorizedShops()).resolves.toEqual([{ shopId: '5764687916991317793', shopName: 'Loja', boundFlag: 0, appShopId: null }]);
+  });
 });

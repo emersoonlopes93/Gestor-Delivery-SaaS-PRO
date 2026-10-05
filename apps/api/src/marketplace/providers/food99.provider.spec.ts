@@ -119,6 +119,19 @@ describe('Food99Provider', () => {
     });
   });
 
+  it('classifies a signed bind-status callback without turning it into an order', async () => {
+    const rawBody = Buffer.from('{"app_id":5764607772295955723,"timestamp":1768815260,"type":"authorization","data":{"appShopIDList":["connection-99"],"bindStatus":"SUCCESS"}}');
+    const parsed = await provider.parseWebhookEvent({ headers: {}, rawBody, body: {} });
+
+    expect(parsed).toMatchObject({
+      eventId: expect.stringMatching(/^food99:[a-f0-9]{64}$/),
+      topic: 'authorizationBindStatus',
+      externalStoreId: 'connection-99',
+      externalOrderId: null,
+      externalMerchantId: null,
+    });
+  });
+
   it('keeps the existing Open Delivery polling event parser unchanged', async () => {
     await expect(provider.parsePollingEvent({
       eventId: 'poll-event-1',
