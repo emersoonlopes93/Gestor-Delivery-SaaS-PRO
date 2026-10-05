@@ -51,6 +51,33 @@ describe('Food99HttpClientService native V1 actions', () => {
     await expect(service.confirmOrder(connection, '5764656197621845665', 'correlation-1')).rejects.toThrow(message);
   });
 
+  it('obtains a fresh shop token and retries a native action once after errno 10100', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 10100, errmsg: 'get auth token failed' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 0, data: true }), { status: 200 }));
+    const { service, tokens, connection } = makeService();
+    tokens.getAccessToken.mockResolvedValueOnce('stale-shop-token').mockResolvedValueOnce('fresh-shop-token');
+
+    await expect(service.confirmOrder(connection, '5764656197621845665', 'correlation-1'))
+      .resolves.toEqual({ accepted: true, httpStatus: 200 });
+
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(1, connection);
+    expect(tokens.getAccessToken).toHaveBeenNthCalledWith(2, connection, true);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(String(((global.fetch as jest.Mock).mock.calls[1][1] as RequestInit).body)).toContain('fresh-shop-token');
+  });
+
+  it('does not retry a native business rejection other than errno 10100', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 12013, errmsg: 'rejected' }), { status: 200 }));
+    const { service, tokens, connection } = makeService();
+
+    await expect(service.confirmOrder(connection, '5764656197621845665', 'correlation-1'))
+      .rejects.toThrow('99Food native request failed.');
+
+    expect(tokens.getAccessToken).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('marks ready with the Swagger GET endpoint and exact decimal query id', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: true }), { status: 200 }));
     const { service, connection } = makeService();

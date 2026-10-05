@@ -152,7 +152,35 @@ export class Food99HttpClientService {
     input: { method: 'GET' | 'POST'; path: string; externalOrderId: string; correlationId: string },
   ): Promise<T> {
     this.assertDecimalIdentifier(input.externalOrderId);
-    const token = await this.tokens.getAccessToken(connection);
+    let token = await this.tokens.getAccessToken(connection);
+    let result = await this.executeStandardRequest(connection, token, input);
+
+    // The native V1 contract instructs clients to obtain the shop token again
+    // after errno 10100. This is an authentication rejection, so one retry with
+    // a freshly obtained token is safe; never retry other business rejections.
+    if (result.payload?.errno === 10100) {
+      this.logger.warn({
+        message: 'food99_native_token_revalidation_requested',
+        provider: 'FOOD_99',
+        endpoint: input.path,
+        correlationId: input.correlationId,
+      });
+      token = await this.tokens.getAccessToken(connection, true);
+      result = await this.executeStandardRequest(connection, token, input);
+    }
+
+    if (result.response.status !== 200 || result.payload?.errno !== 0) {
+      this.logNativeRejection({ endpoint: input.path, correlationId: input.correlationId, httpStatus: result.response.status, payload: result.payload });
+      throw new Food99ApiError('99Food native request failed.', result.response.status === 429 || result.response.status >= 500, result.response.status, typeof result.payload?.errno === 'number' ? String(result.payload.errno) : typeof result.payload?.errmsg === 'string' ? result.payload.errmsg : undefined);
+    }
+    return result.payload?.data as T;
+  }
+
+  private async executeStandardRequest(
+    connection: MarketplaceConnection,
+    token: string,
+    input: { method: 'GET' | 'POST'; path: string; externalOrderId: string; correlationId: string },
+  ): Promise<{ response: Response; payload: Record<string, unknown> | null }> {
     const url = new URL(`${this.baseUrl()}${input.path}`);
     if (input.method === 'GET') {
       url.searchParams.set('auth_token', token);
@@ -161,11 +189,7 @@ export class Food99HttpClientService {
     const body = input.method === 'POST' ? this.losslessOrderBody(token, input.externalOrderId) : undefined;
     const response = await this.executeNative(connection, url, input.method, body, input);
     const payload = this.asRecord(await this.readNativeUnknown(response));
-    if (response.status !== 200 || payload?.errno !== 0) {
-      this.logNativeRejection({ endpoint: input.path, correlationId: input.correlationId, httpStatus: response.status, payload });
-      throw new Food99ApiError('99Food native request failed.', response.status === 429 || response.status >= 500, response.status, typeof payload?.errno === 'number' ? String(payload.errno) : typeof payload?.errmsg === 'string' ? payload.errmsg : undefined);
-    }
-    return payload?.data as T;
+    return { response, payload };
   }
 
   private losslessOrderBody(authToken: string, orderId: string): string {

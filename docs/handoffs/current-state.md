@@ -1,3 +1,9 @@
+## 99Food native authorization recovery (2026-10-05)
+
+- Native V1 order actions now honor the documented `errno=10100` recovery path: they obtain the per-shop token again with a cache bypass and retry the rejected request once. The retry is limited to this authentication code; provider business errors are not replayed.
+- The existing token service remains authoritative for `authtoken/get`, `authtoken/refresh`, the documented two-minute refresh interval, encrypted persistence and connection status. No token, customer data or raw provider payload is logged.
+- Validation: focused `Food99HttpClientService` 15/15 and `Food99TokenService` 8/8 passed, plus `git diff --check`. No provider call, database mutation, deploy or merge was performed. Pending: API build and required CI on the final PR SHA.
+
 ## Storefront C2.5E.3 - preco e semantica de selecao (2026-09-28)
 
 - O Storefront agora deriva o preco exibido "A partir de" somente de itens `replace` ativos, efetivamente disponiveis e ligados ao eixo `primary`; o payload publico ja filtra grupos/itens arquivados e resolve o override de preco por produto antes dessa exibicao. Sem candidato elegivel, o preco-base continua sendo mostrado.
