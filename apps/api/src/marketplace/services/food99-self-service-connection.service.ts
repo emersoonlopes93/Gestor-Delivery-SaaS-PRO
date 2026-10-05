@@ -56,7 +56,14 @@ export class Food99SelfServiceConnectionService {
       await this.tokens.getAccessToken(connection);
     } catch (error) {
       if (error instanceof Food99ApiError) {
-        if (error.providerCode === 'AUTH_TOKEN_NOT_AVAILABLE') return this.discoverAndBind(connection);
+        if (error.providerCode === 'AUTH_TOKEN_NOT_AVAILABLE') {
+          try {
+            return await this.discoverAndBind(connection);
+          } catch (discoveryError) {
+            if (discoveryError instanceof Food99ApiError) throw this.toVerificationException(discoveryError);
+            throw discoveryError;
+          }
+        }
         throw this.toVerificationException(error);
       }
       throw error;
@@ -176,6 +183,8 @@ export class Food99SelfServiceConnectionService {
         });
       case 'SHOP_BIND_FAILED':
       case 'INVALID_SHOP_BIND_RESPONSE':
+      case 'INVALID_AUTHORIZED_SHOP_RESPONSE':
+      case 'PROVIDER_AUTHORIZATION_UNAVAILABLE':
         return new BadGatewayException({
           error: error.providerCode,
           message: 'A 99Food não confirmou o vínculo desta loja. Nenhum pedido ou repasse foi alterado.',

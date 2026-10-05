@@ -28,4 +28,11 @@ describe('Food99AuthorizationClient', () => {
     const sign = JSON.parse(body).sign as string;
     expect(sign).toBe(createHash('md5').update(`app_id=3458764610605350993&shop_infos=Array&timestamp=${JSON.parse(body).timestamp}secret`, 'utf8').digest('hex'));
   });
+
+  it('preserves a numeric 64-bit shop_id from the provider response before parsing JSON', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":0,"data":{"shops":[{"shop_id":5764687916991317793,"shop_name":"Loja","bound_flag":0}]}}', { status: 200 }));
+    const service = new Food99AuthorizationClient({ get: jest.fn() } as never, { getFood99AppCredentials: jest.fn().mockReturnValue({ appId: '3458764610605350993', clientSecret: 'secret' }) } as never);
+
+    await expect(service.getAuthorizedShops()).resolves.toEqual([{ shopId: '5764687916991317793', shopName: 'Loja', boundFlag: 0, appShopId: null }]);
+  });
 });

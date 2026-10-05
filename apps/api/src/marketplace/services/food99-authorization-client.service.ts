@@ -98,6 +98,15 @@ export class Food99AuthorizationClient {
   }
   private empty(value: unknown): boolean { return value === undefined || value === null || value === ''; }
   private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, ''); }
-  private async read(response: Response): Promise<Record<string, unknown> | null> { try { return this.record(await response.json()); } catch { return null; } }
+  private async read(response: Response): Promise<Record<string, unknown> | null> {
+    try {
+      const raw = await response.text();
+      if (!raw.trim()) return null;
+      // 99Food documents shop_id as a numeric 64-bit identifier. Preserve its
+      // decimal source before JSON.parse so it is never rounded by JavaScript.
+      const losslessShopIds = raw.replace(/("shop_id"\s*:\s*)(-?\d{16,})(?=\s*[,}])/g, '$1"$2"');
+      return this.record(JSON.parse(losslessShopIds) as unknown);
+    } catch { return null; }
+  }
   private record(value: unknown): Record<string, unknown> | null { return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 }
