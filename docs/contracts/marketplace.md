@@ -337,7 +337,7 @@ As ações nativas usam exclusivamente `https://openapi.didi-food.com` (ou `MARK
 
 O token operacional por loja usa `GET /v1/auth/authtoken/get` com `app_id`, `app_secret` e o `app_shop_id` persistido como `MarketplaceConnection.externalStoreId`. A verificação interna do tenant é exclusivamente `POST /api/v1/marketplaces/99food/self-service/verify`; não existe rota `GET` equivalente. O token retornado em `data.auth_token` permanece criptografado na conexão. A URL de autorização usa `POST /v1/auth/authorizationpage/getUrl` com `app_id` e `app_shop_id`. App ID e Client Secret são configurações de ambiente e nunca retornam pela API.
 
-O ciclo de token segue a semântica documentada do provider: `10101` vira `AUTH_TOKEN_NOT_AVAILABLE` e não dispara refresh cego; `10102` vira `AUTH_TOKEN_EXPIRED`, permite uma chamada a `GET /v1/auth/authtoken/refresh` e exige aguardar a janela de `get` (30 segundos) antes de uma nova consulta; `10103`, `14105`, `14106`, `10001` e `10002` são convertidos, respectivamente, em `TOKEN_REFRESH_FAILED`, `APP_ID_INVALID`, `APP_SECRET_INVALID`, `PROVIDER_SYSTEM_ERROR` e `PROVIDER_PARAMETER_ERROR`. Logs guardam somente correlação, operação, código e `app_shop_id` mascarado. O estado `CONNECTED` é persistido apenas após leitura bem-sucedida de um token de loja, e a API financeira é bloqueada enquanto a conexão não estiver conectada.
+O ciclo de token segue a semântica documentada do provider: `10101` vira `AUTH_TOKEN_NOT_AVAILABLE` e não dispara refresh cego; `10102` vira `AUTH_TOKEN_EXPIRED`, permite uma chamada a `GET /v1/auth/authtoken/refresh` e exige aguardar dois minutos antes de uma nova consulta de `get`; `10103`, `14105`, `14106`, `10001` e `10002` são convertidos, respectivamente, em `TOKEN_REFRESH_FAILED`, `APP_ID_INVALID`, `APP_SECRET_INVALID`, `PROVIDER_SYSTEM_ERROR` e `PROVIDER_PARAMETER_ERROR`. Logs guardam somente correlação, operação, código e `app_shop_id` mascarado. O estado `CONNECTED` é persistido apenas após leitura bem-sucedida de um token de loja, e a API financeira é bloqueada enquanto a conexão não estiver conectada.
 
 O fluxo V3 de descoberta e vínculo usa a base dedicada
 `MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL` (padrão
@@ -352,6 +352,8 @@ O assinador MD5 ordena chaves ASCII, omite valores vazios e representa arrays ou
 objetos como o literal `Array`: `shop_infos=Array`. Um `success_list` do bind só
 conclui quando contém `auth_token` não vazio e `token_expiration_time` válido;
 o token é criptografado, a conexão vira `CONNECTED` e não há `get` imediato.
+
+The Swagger-compatible `getUrl` parser accepts the documented string in `data` and the deployed compatibility wrapper `data.url`. A successful self-service bind persists encrypted token, expiry, provider `shop_id`, display name, and `CONNECTED` in one tenant-scoped update.
 
 ### 99Food production-app and bind readiness (2026-10-04)
 

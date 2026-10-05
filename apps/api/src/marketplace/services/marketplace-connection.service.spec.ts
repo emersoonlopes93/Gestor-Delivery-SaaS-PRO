@@ -124,6 +124,21 @@ describe('MarketplaceConnectionService multi-merchant foundation', () => {
     expect(prisma.marketplaceConnection.create).not.toHaveBeenCalled();
   });
 
+  it('keeps a 99Food manual entry disconnected until its token is verified', async () => {
+    const { service, prisma } = makeService();
+    prisma.marketplaceConnection.findFirst.mockResolvedValue(null);
+    prisma.marketplaceConnection.create.mockResolvedValue({ id: 'connection-99' });
+
+    await service.connectManual('tenant-1', MarketplaceProvider.FOOD_99, {
+      externalMerchantId: '5764687916991317793',
+      externalStoreId: 'pedehub-store-1',
+    });
+
+    expect(prisma.marketplaceConnection.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MarketplaceConnectionStatus.DISCONNECTED }),
+    }));
+  });
+
   it('never returns encrypted credential material to controllers', () => {
     const { service } = makeService();
     const result = service.maskConnection(existingConnection('connection-a', 'tenant-1', 'merchant-a') as never);

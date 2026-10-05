@@ -51,7 +51,7 @@ describe('Food99TokenService', () => {
     await expect(Promise.all([
       service.getAccessToken(connection),
       service.getAccessToken(connection),
-    ])).rejects.toMatchObject({ providerCode: 'AUTH_TOKEN_REFRESHED_WAIT_RETRY', retryAfterMs: 30_000 });
+    ])).rejects.toMatchObject({ providerCode: 'AUTH_TOKEN_REFRESHED_WAIT_RETRY', retryAfterMs: 120_000 });
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(new URL(String((global.fetch as jest.Mock).mock.calls[0][0])).pathname).toBe('/v1/auth/authtoken/get');
     expect(new URL(String((global.fetch as jest.Mock).mock.calls[1][0])).pathname).toBe('/v1/auth/authtoken/refresh');
@@ -59,7 +59,7 @@ describe('Food99TokenService', () => {
     await expect(service.getAccessToken(connection)).rejects.toMatchObject({ providerCode: 'AUTH_TOKEN_REFRESHED_WAIT_RETRY' });
     expect(global.fetch).toHaveBeenCalledTimes(2);
 
-    jest.spyOn(Date, 'now').mockReturnValue(now + 30_000);
+    jest.spyOn(Date, 'now').mockReturnValue(now + 120_000);
     (global.fetch as jest.Mock).mockResolvedValueOnce(new Response(JSON.stringify({
       errno: 0,
       data: { auth_token: 'token-next', token_expiration_time: 1_900_000_000 },

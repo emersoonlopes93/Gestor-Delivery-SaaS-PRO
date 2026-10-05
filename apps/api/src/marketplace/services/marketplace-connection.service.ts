@@ -53,7 +53,11 @@ export class MarketplaceConnectionService {
     const data = {
       tenantId,
       provider,
-      status: MarketplaceConnectionStatus.CONNECTED,
+      // A 99Food manual entry only supplies identifiers. It must be validated
+      // against `authtoken/get` before it can be presented as connected.
+      status: provider === MarketplaceProvider.FOOD_99 && !input.accessToken?.trim()
+        ? MarketplaceConnectionStatus.DISCONNECTED
+        : MarketplaceConnectionStatus.CONNECTED,
       ...identifiers,
       displayName: input.displayName?.trim() || null,
       authType: input.authType?.trim() || null,
@@ -92,7 +96,11 @@ export class MarketplaceConnectionService {
         where: { id: existing.id, tenantId },
         data: {
           ...identifiers,
-          status: MarketplaceConnectionStatus.CONNECTED,
+          status: existing.provider === MarketplaceProvider.FOOD_99
+            && !input.accessToken?.trim()
+            && !existing.accessTokenEnc
+            ? MarketplaceConnectionStatus.DISCONNECTED
+            : MarketplaceConnectionStatus.CONNECTED,
           displayName: input.displayName === undefined ? existing.displayName : input.displayName.trim() || null,
           authType: input.authType === undefined ? existing.authType : input.authType.trim() || null,
           accessTokenEnc: input.accessToken?.trim()

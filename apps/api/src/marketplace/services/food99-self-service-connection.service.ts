@@ -43,6 +43,18 @@ export class Food99SelfServiceConnectionService {
     return this.runExclusive(connection, () => this.verifyConnection(connection));
   }
 
+  /** Validates a support-configured app_shop_id without discovering or binding a shop. */
+  async verifyExistingToken(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
+    const connection = await this.getFood99Connection(tenantId, connectionId);
+    try {
+      await this.tokens.getAccessToken(connection);
+    } catch (error) {
+      if (error instanceof Food99ApiError) throw this.toVerificationException(error);
+      throw error;
+    }
+    return this.connections.getTenantConnection(tenantId, connectionId);
+  }
+
   async bind(tenantId: string, connectionId: string, shopId: string): Promise<Food99SelfServiceVerification> {
     const connection = await this.getFood99Connection(tenantId, connectionId);
     return this.runExclusive(connection, () => this.bindSelectedShop(connection, shopId));
@@ -100,10 +112,9 @@ export class Food99SelfServiceConnectionService {
     try {
       const bound = await this.authorization.bindShop(this.appShopId(connection), selected.shopId);
       if (bound.shopId !== selected.shopId) throw new Food99ApiError('99Food shop bind returned a different shop.', false, 502, 'INVALID_SHOP_BIND_RESPONSE');
-      await this.tokens.persistBoundShopToken(connection, bound.authToken, bound.tokenExpiresAt);
-      await this.prisma.marketplaceConnection.updateMany({
-        where: { id: connection.id, tenantId: connection.tenantId },
-        data: { externalMerchantId: bound.shopId, displayName: bound.shopName ?? selected.shopName },
+      await this.tokens.persistBoundShopToken(connection, bound.authToken, bound.tokenExpiresAt, {
+        externalMerchantId: bound.shopId,
+        displayName: bound.shopName ?? selected.shopName,
       });
     } catch (error) {
       if (error instanceof Food99ApiError) throw this.toVerificationException(error);

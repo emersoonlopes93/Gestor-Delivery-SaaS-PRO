@@ -72,7 +72,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
     expect(food99VerificationErrorMessage(new ApiError(409, 'missing token', 'AUTH_TOKEN_NOT_AVAILABLE')))
       .toContain('ainda não disponibilizou');
     expect(food99VerificationErrorMessage(new ApiError(409, 'wait', 'AUTH_TOKEN_REFRESHED_WAIT_RETRY')))
-      .toContain('Aguarde 30 segundos');
+      .toContain('Aguarde 2 minutos');
     expect(food99VerificationErrorMessage(new ApiError(503, 'invalid app', 'APP_ID_INVALID')))
       .toContain('informações para suporte');
   });
@@ -181,8 +181,8 @@ describe('IntegrationsPage multi-iFood connections', () => {
 
     expect(screen.getByRole('dialog', { name: 'Conectar 99Food' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Autorizar na 99Food' })).toBeTruthy();
-    expect(screen.queryByLabelText('Código da empresa')).toBeNull();
-    expect(screen.queryByLabelText('Código da loja')).toBeNull();
+    expect(screen.queryByLabelText('ID da loja na 99Food (shop_id)')).toBeNull();
+    expect(screen.queryByLabelText('Código de vínculo (app_shop_id)')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Autorizar na 99Food' }));
     await screen.findByText('Aguardando autorização');
@@ -266,10 +266,10 @@ describe('IntegrationsPage multi-iFood connections', () => {
     render(<IntegrationsPage />);
     await user.click(screen.getAllByRole('button', { name: 'Conectar loja' })[0]);
 
-    expect(screen.queryByLabelText('Código da empresa')).toBeNull();
+    expect(screen.queryByLabelText('ID da loja na 99Food (shop_id)')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Conexão manual para suporte' }));
-    expect(screen.getByLabelText('Código da empresa')).toBeTruthy();
-    expect(screen.getByLabelText('Código da loja')).toBeTruthy();
+    expect(screen.getByLabelText('ID da loja na 99Food (shop_id)')).toBeTruthy();
+    expect(screen.getByLabelText('Código de vínculo (app_shop_id)')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Conectar com ajuda do suporte' })).toBeTruthy();
   });
 });

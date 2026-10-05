@@ -45,7 +45,7 @@ describe('Food99SelfServiceConnectionService', () => {
   });
 
   it('binds the single revalidated shop exactly once and persists its returned token', async () => {
-    const { service, connections, tokens, authorization, prisma } = makeService();
+    const { service, connections, tokens, authorization } = makeService();
     const pending = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' };
     const connected = { ...pending, status: MarketplaceConnectionStatus.CONNECTED, externalMerchantId: 'shop-a' };
     connections.getTenantConnection.mockResolvedValueOnce(pending).mockResolvedValueOnce(connected);
@@ -55,8 +55,22 @@ describe('Food99SelfServiceConnectionService', () => {
 
     await expect(service.verify('tenant-a', 'connection-99')).resolves.toEqual({ authorized: true, connection: connected });
     expect(authorization.bindShop).toHaveBeenCalledWith('connection-99', 'shop-a');
-    expect(tokens.persistBoundShopToken).toHaveBeenCalledWith(pending, 'token-a', expect.any(Date));
-    expect(prisma.marketplaceConnection.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'connection-99', tenantId: 'tenant-a' } }));
+    expect(tokens.persistBoundShopToken).toHaveBeenCalledWith(pending, 'token-a', expect.any(Date), {
+      externalMerchantId: 'shop-a',
+      displayName: 'A',
+    });
+  });
+
+  it('validates a manual app_shop_id without discovering or binding a shop', async () => {
+    const { service, connections, tokens, authorization } = makeService();
+    const connection = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'manual-app-shop' };
+    const connected = { ...connection, status: MarketplaceConnectionStatus.CONNECTED };
+    connections.getTenantConnection.mockResolvedValueOnce(connection).mockResolvedValueOnce(connected);
+    tokens.getAccessToken.mockResolvedValue('token-a');
+
+    await expect(service.verifyExistingToken('tenant-a', 'connection-99')).resolves.toEqual(connected);
+    expect(authorization.getAuthorizedShops).not.toHaveBeenCalled();
+    expect(authorization.bindShop).not.toHaveBeenCalled();
   });
 
   it('revalidates a selected shop before binding and never binds a shop from another response', async () => {

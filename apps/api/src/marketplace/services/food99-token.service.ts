@@ -8,7 +8,9 @@ import { MarketplaceCredentialService } from './marketplace-credential.service';
 type StandardResponse = { errno?: unknown; errmsg?: unknown; data?: unknown; request_id?: unknown };
 type CachedToken = { token: string; expiresAt: Date };
 
-const AUTH_TOKEN_REQUEST_INTERVAL_MS = 30_000;
+// The official refresh documentation specifies a two-minute generation
+// cooldown. Calling `get` earlier can return another provider rejection.
+const AUTH_TOKEN_REQUEST_INTERVAL_MS = 120_000;
 
 @Injectable()
 export class Food99TokenService {
@@ -59,7 +61,12 @@ export class Food99TokenService {
     });
   }
 
-  async persistBoundShopToken(connection: MarketplaceConnection, token: string, expiresAt: Date): Promise<void> {
+  async persistBoundShopToken(
+    connection: MarketplaceConnection,
+    token: string,
+    expiresAt: Date,
+    binding?: { externalMerchantId: string; displayName: string | null },
+  ): Promise<void> {
     if (!token.trim() || Number.isNaN(expiresAt.getTime())) {
       throw new Food99ApiError('99Food returned an invalid shop auth token.', false, 502, 'INVALID_AUTH_TOKEN_RESPONSE');
     }
@@ -72,6 +79,12 @@ export class Food99TokenService {
         refreshTokenEnc: null,
         tokenExpiresAt: expiresAt,
         authType: 'food99_shop_auth_token',
+        ...(binding
+          ? {
+            externalMerchantId: binding.externalMerchantId,
+            displayName: binding.displayName,
+          }
+          : {}),
       },
     });
     this.logger.log({ message: 'food99_shop_bind_token_ready', provider: 'FOOD_99', tenantId: connection.tenantId, connectionId: connection.id, expiresAt });

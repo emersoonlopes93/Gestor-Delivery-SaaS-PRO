@@ -9,7 +9,7 @@ export function food99VerificationErrorMessage(error: unknown): string {
     case "AUTH_TOKEN_NOT_AVAILABLE":
       return "A 99Food ainda não disponibilizou a autorização desta loja. Conclua a autorização na 99Food e tente novamente.";
     case "AUTH_TOKEN_REFRESHED_WAIT_RETRY":
-      return "A 99Food atualizou a autorização. Aguarde 30 segundos e verifique novamente.";
+      return "A 99Food atualizou a autorização. Aguarde 2 minutos e verifique novamente.";
     case "APP_ID_INVALID":
     case "APP_SECRET_INVALID":
       return "A configuração da 99Food precisa de atenção. Consulte as informações para suporte.";

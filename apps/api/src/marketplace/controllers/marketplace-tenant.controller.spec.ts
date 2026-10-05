@@ -13,7 +13,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connectManual: jest.fn(),
       maskConnection: jest.fn((value: unknown) => value),
     };
-    const food99SelfService = { start: jest.fn(), verify: jest.fn(), bind: jest.fn() };
+    const food99SelfService = { start: jest.fn(), verify: jest.fn(), bind: jest.fn(), verifyExistingToken: jest.fn() };
     const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
     const providerRegistry = { parseProvider: jest.fn().mockReturnValue(MarketplaceProvider.IFOOD) };
     const controller = new MarketplaceTenantController(
@@ -112,13 +112,27 @@ describe('MarketplaceTenantController connection tenancy', () => {
   });
 
   it('keeps 99Food administration independent from ifood_marketplace', async () => {
-    const { controller, connectionService, featureControl, providerRegistry, request } = makeController();
+    const { controller, connectionService, food99SelfService, featureControl, providerRegistry, request } = makeController();
     featureControl.resolveTenantFeature.mockResolvedValue({ enabled: false });
     providerRegistry.parseProvider.mockReturnValue(MarketplaceProvider.FOOD_99);
     connectionService.connectManual.mockResolvedValue({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99 });
+    food99SelfService.verifyExistingToken.mockResolvedValue({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99, status: 'CONNECTED' });
 
     await expect(controller.connectManual(request, '99food', { externalMerchantId: 'merchant-99', externalStoreId: 'shop-99' }))
-      .resolves.toEqual({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99 });
+      .resolves.toMatchObject({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99, status: 'CONNECTED' });
     expect(connectionService.connectManual).toHaveBeenCalledWith('tenant-1', MarketplaceProvider.FOOD_99, expect.any(Object));
+    expect(food99SelfService.verifyExistingToken).toHaveBeenCalledWith('tenant-1', 'food99-a');
+  });
+
+  it('does not reconnect a 99Food connection manually without verifying its shop token', async () => {
+    const { controller, connectionService, food99SelfService, request } = makeController();
+    const existing = { id: 'food99-a', provider: MarketplaceProvider.FOOD_99 };
+    connectionService.getTenantConnection.mockResolvedValue(existing);
+    connectionService.updateManual.mockResolvedValue(existing);
+    food99SelfService.verifyExistingToken.mockResolvedValue({ ...existing, status: 'CONNECTED' });
+
+    await expect(controller.reconnectConnection(request, 'food99-a', {}))
+      .resolves.toMatchObject({ id: 'food99-a', status: 'CONNECTED' });
+    expect(food99SelfService.verifyExistingToken).toHaveBeenCalledWith('tenant-1', 'food99-a');
   });
 });

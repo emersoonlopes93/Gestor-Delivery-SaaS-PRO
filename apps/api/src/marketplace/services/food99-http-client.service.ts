@@ -87,7 +87,13 @@ export class Food99HttpClientService {
     const payload = await this.readUnknown(response);
     const record = this.asRecord(payload);
     const data = this.asRecord(record?.data);
-    const url = typeof data?.url === 'string' ? data.url : null;
+    // Swagger documents `data` as the URL string. Some deployed provider
+    // responses wrap it in `{ url }`, so retain that compatible shape too.
+    const url = typeof record?.data === 'string'
+      ? record.data
+      : typeof data?.url === 'string'
+        ? data.url
+        : null;
     if (response.status !== 200 || record?.errno !== 0 || !url) {
       this.logNativeRejection({ endpoint: '/v1/auth/authorizationpage/getUrl', correlationId, httpStatus: response.status, payload: record });
       throw new Food99ApiError('99Food authorization page request failed.', response.status === 429 || response.status >= 500, response.status, typeof record?.errmsg === 'string' ? record.errmsg : undefined);

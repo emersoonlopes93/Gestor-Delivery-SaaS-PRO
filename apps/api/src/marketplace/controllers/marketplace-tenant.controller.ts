@@ -158,6 +158,10 @@ export class MarketplaceTenantController {
     const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
     await this.assertProviderAccess(req.user.tenantId, existing.provider);
     const connection = await this.connectionService.updateManual(req.user.tenantId, connectionId, body);
+    if (existing.provider === MarketplaceProvider.FOOD_99) {
+      const verified = await this.food99SelfService.verifyExistingToken(req.user.tenantId, connection.id);
+      return this.connectionService.maskConnection(verified);
+    }
     return this.connectionService.maskConnection(connection);
   }
 
@@ -210,6 +214,10 @@ export class MarketplaceTenantController {
       ...body,
       settingsJson: (body.settingsJson ?? undefined) as Prisma.InputJsonValue | undefined,
     });
+    if (provider === MarketplaceProvider.FOOD_99) {
+      const verified = await this.food99SelfService.verifyExistingToken(req.user.tenantId, connection.id);
+      return this.connectionService.maskConnection(verified);
+    }
     return this.connectionService.maskConnection(connection);
   }
 

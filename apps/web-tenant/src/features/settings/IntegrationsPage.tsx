@@ -373,7 +373,7 @@ export function IntegrationsPage() {
         displayName:
           manualForm.displayName.trim() || providerName(manualProvider),
         authType:
-          manualProvider === "99food" ? "oauth2_client_credentials" : "manual",
+          manualProvider === "99food" ? "food99_manual_pending" : "manual",
         settingsJson: {
           autoConfirmOrders: false,
           pollingFallbackEnabled: manualProvider === "99food",
@@ -387,8 +387,12 @@ export function IntegrationsPage() {
       queryClient.invalidateQueries({
         queryKey: ["marketplace-billing-preview"],
       });
-    } catch {
-      toast.error("Não foi possível conectar a loja. Tente novamente.");
+    } catch (error) {
+      toast.error(
+        manualProvider === "99food"
+          ? food99VerificationErrorMessage(error)
+          : "Não foi possível conectar a loja. Tente novamente.",
+      );
     }
   };
   const handleDisconnect = async (id: string) => {
@@ -653,7 +657,7 @@ export function IntegrationsPage() {
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="space-y-1.5 text-sm font-bold text-foreground">
-                    <span>Código da empresa</span>
+                    <span>ID da loja na 99Food (shop_id)</span>
                     <input
                       className="input-premium"
                       value={manualForm.externalMerchantId}
@@ -663,11 +667,11 @@ export function IntegrationsPage() {
                           externalMerchantId: event.target.value,
                         }))
                       }
-                      placeholder="Informe o código"
+                      placeholder="Informado pela 99Food"
                     />
                   </label>
                   <label className="space-y-1.5 text-sm font-bold text-foreground">
-                    <span>Código da loja</span>
+                    <span>Código de vínculo (app_shop_id)</span>
                     <input
                       className="input-premium"
                       value={manualForm.externalStoreId}
@@ -677,7 +681,7 @@ export function IntegrationsPage() {
                           externalStoreId: event.target.value,
                         }))
                       }
-                      placeholder="Informe o código da loja"
+                      placeholder="Identificador usado pelo seu sistema"
                     />
                   </label>
                 </div>

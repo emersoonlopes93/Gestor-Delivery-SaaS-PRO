@@ -82,8 +82,8 @@ describe('Food99HttpClientService native V1 actions', () => {
       .resolves.toEqual({ order_id: '5764656197621845665', order_items: [] });
   });
 
-  it('posts app_id as a decimal literal when requesting the native authorization URL', async () => {
-    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: { url: 'https://auth.99food.test/start' } }), { status: 200 }));
+  it('accepts the Swagger string response when requesting the native authorization URL', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: 'https://auth.99food.test/start' }), { status: 200 }));
     const tokens = { getAccessToken: jest.fn() };
     const service = new Food99HttpClientService({
       get: jest.fn((key: string) => ({
@@ -97,5 +97,18 @@ describe('Food99HttpClientService native V1 actions', () => {
     const request = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
     expect(String(request.body)).toContain('"app_id":5764607584567296012');
     expect(String(request.body)).not.toContain('"app_id":"5764607584567296012"');
+  });
+
+  it('retains compatibility with a deployed authorization URL wrapper', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: { url: 'https://auth.99food.test/start' } }), { status: 200 }));
+    const tokens = { getAccessToken: jest.fn() };
+    const service = new Food99HttpClientService({
+      get: jest.fn((key: string) => ({
+        MARKETPLACE_99FOOD_API_BASE_URL: 'https://food99.test',
+        MARKETPLACE_99FOOD_APP_ID: '5764607584567296012',
+      })[key]),
+    } as never, tokens as never);
+
+    await expect(service.getAuthorizationUrl('correlation-1', 'shop-1')).resolves.toBe('https://auth.99food.test/start');
   });
 });
