@@ -182,6 +182,7 @@ export class Food99SelfServiceConnectionService {
           message: 'A configuração da integração 99Food requer atenção do suporte. Nenhum pedido ou repasse foi alterado.',
         });
       case 'TOKEN_REFRESH_FAILED':
+      case 'AUTH_TOKEN_GET_FAILED':
       case 'PROVIDER_SYSTEM_ERROR':
         return new ServiceUnavailableException({
           error: error.providerCode,

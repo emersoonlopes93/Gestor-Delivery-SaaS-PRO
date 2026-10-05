@@ -8,9 +8,9 @@ import { MarketplaceCredentialService } from './marketplace-credential.service';
 type StandardResponse = { errno?: unknown; errmsg?: unknown; data?: unknown; request_id?: unknown };
 type CachedToken = { token: string; expiresAt: Date };
 
-// The official refresh documentation specifies a two-minute generation
-// cooldown. Calling `get` earlier can return another provider rejection.
-const AUTH_TOKEN_REQUEST_INTERVAL_MS = 120_000;
+// The provider limits `authtoken/get` to one request per shop every 30 seconds.
+// After a refresh, defer the next get so the follow-up does not violate it.
+const AUTH_TOKEN_REQUEST_INTERVAL_MS = 30_000;
 
 @Injectable()
 export class Food99TokenService {
@@ -163,6 +163,7 @@ export class Food99TokenService {
     switch (this.providerErrno(payload)) {
       case 10001: return 'PROVIDER_SYSTEM_ERROR';
       case 10002: return 'PROVIDER_PARAMETER_ERROR';
+      case 10100: return 'AUTH_TOKEN_GET_FAILED';
       case 10101: return 'AUTH_TOKEN_NOT_AVAILABLE';
       case 10102: return 'AUTH_TOKEN_EXPIRED';
       case 10103: return 'TOKEN_REFRESH_FAILED';
