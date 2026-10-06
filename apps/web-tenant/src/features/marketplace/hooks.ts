@@ -276,7 +276,7 @@ export type Food99SelfServiceVerificationDTO = {
 } | {
   authorized: false;
   state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED';
-  candidates: Array<{ shopId: string; shopName: string }>;
+  candidates: Array<{ shopId: string; shopName: string | null }>;
   connection: MarketplaceConnectionDTO;
 };
 

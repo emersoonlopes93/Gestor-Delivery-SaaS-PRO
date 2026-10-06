@@ -632,7 +632,7 @@ export function IntegrationsPage() {
                   disabled={bindFood99Authorization.isPending}
                   className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
                 >
-                  <span>{shop.shopName}</span>
+                  <span>{shop.shopName || "Estabelecimento autorizado"}</span>
                   <ChevronRight className="h-4 w-4 text-primary" />
                 </button>
               ))}

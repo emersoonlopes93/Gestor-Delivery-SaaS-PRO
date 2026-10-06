@@ -68,7 +68,7 @@ export class Food99HttpClientService {
     return { accepted: true, httpStatus: response.status };
   }
 
-  async getAuthorizationUrl(correlationId: string, appShopId: string): Promise<string> {
+  async getAuthorizationUrl(correlationId: string): Promise<string> {
     const baseUrl = this.baseUrl();
     const appId = this.config.get<string>('MARKETPLACE_99FOOD_APP_ID')?.trim();
     if (!appId) throw new Food99ApiError('99Food application ID is not configured.', false, 503, 'APP_ID_REQUIRED');
@@ -77,7 +77,7 @@ export class Food99HttpClientService {
       response = await fetch(`${baseUrl}/v1/auth/authorizationpage/getUrl`, {
         method: 'POST',
         headers: { accept: 'application/json', 'content-type': 'application/json', 'x-correlation-id': correlationId },
-        body: this.losslessAuthorizationBody(appId, appShopId),
+        body: this.losslessAuthorizationBody(appId),
         signal: AbortSignal.timeout(this.timeoutMs()),
       });
     } catch (error) {
@@ -197,9 +197,9 @@ export class Food99HttpClientService {
     return `{"auth_token":${JSON.stringify(authToken)},"order_id":${orderId}}`;
   }
 
-  private losslessAuthorizationBody(appId: string, appShopId: string): string {
+  private losslessAuthorizationBody(appId: string): string {
     this.assertDecimalIdentifier(appId);
-    return `{"app_id":${appId},"app_shop_id":${JSON.stringify(appShopId)}}`;
+    return `{"app_id":${appId}}`;
   }
 
   private logNativeRejection(input: { endpoint: string; correlationId: string; httpStatus: number; payload: Record<string, unknown> | null }): void {
@@ -341,7 +341,7 @@ export class Food99HttpClientService {
   }
 
   private baseUrl(): string {
-    return (this.config.get<string>('MARKETPLACE_99FOOD_API_BASE_URL')?.trim() || 'https://openapi.didi-food.com').replace(/\/$/, '');
+    return (this.config.get<string>('MARKETPLACE_99FOOD_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, '');
   }
 
   private timeoutMs(): number {

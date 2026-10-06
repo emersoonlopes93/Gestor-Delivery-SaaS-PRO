@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 import { Food99ApiError } from '../providers/food99-api.error';
 import { MarketplaceCredentialService } from './marketplace-credential.service';
 
-export type Food99AuthorizedShop = { shopId: string; shopName: string; boundFlag: 0 | 1; appShopId: string | null };
+export type Food99AuthorizedShop = { shopId: string; shopName: string | null; boundFlag: 0 | 1 | null; appShopId: string | null };
 export type Food99ShopBindResult = { shopId: string; shopName: string | null; authToken: string; tokenExpiresAt: Date };
 
 @Injectable()
@@ -15,7 +15,7 @@ export class Food99AuthorizationClient {
   async getAuthorizedShops(): Promise<Food99AuthorizedShop[]> {
     const { appId, clientSecret } = this.credentials.getFood99AppCredentials();
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const parameters = { app_id: appId, page_no: '1', page_size: '30', timestamp };
+    const parameters = { app_id: appId, timestamp };
     const sign = this.sign(parameters, clientSecret);
     let response: Response;
     try {
@@ -78,10 +78,10 @@ export class Food99AuthorizationClient {
 
   private shop(value: unknown): Food99AuthorizedShop {
     const row = this.record(value); const shopId = this.identifier(row?.shop_id);
-    const shopName = typeof row?.shop_name === 'string' ? row.shop_name.trim() : '';
+    const shopName = typeof row?.shop_name === 'string' && row.shop_name.trim() ? row.shop_name.trim() : null;
     const boundFlag = row?.bound_flag === 0 || row?.bound_flag === 1 ? row.bound_flag : null;
     const appShopId = typeof row?.app_shop_id === 'string' && row.app_shop_id.trim() ? row.app_shop_id : null;
-    if (!shopId || !shopName || boundFlag === null) throw new Food99ApiError('99Food authorized-shop record is invalid.', false, 502, 'INVALID_AUTHORIZED_SHOP_RESPONSE');
+    if (!shopId) throw new Food99ApiError('99Food authorized-shop record is invalid.', false, 502, 'INVALID_AUTHORIZED_SHOP_RESPONSE');
     return { shopId, shopName, boundFlag, appShopId };
   }
   private boundShop(value: unknown): Food99ShopBindResult {
@@ -102,7 +102,7 @@ export class Food99AuthorizationClient {
     return createHash('md5').update(`${serialized}${secret}`, 'utf8').digest('hex');
   }
   private discoveryBody(appId: string, timestamp: string, sign: string): string {
-    return `{"app_id":${this.jsonIdentifier(appId)},"page_no":1,"page_size":30,"timestamp":${timestamp},"sign":${JSON.stringify(sign)}}`;
+    return `{"app_id":${this.jsonIdentifier(appId)},"timestamp":${timestamp},"sign":${JSON.stringify(sign)}}`;
   }
   private bindBody(appId: string, timestamp: string, sign: string, shopId: string, appShopId: string): string {
     return `{"app_id":${this.jsonIdentifier(appId)},"timestamp":${timestamp},"sign":${JSON.stringify(sign)},"shop_infos":[{"shop_id":${this.jsonIdentifier(shopId)},"app_shop_id":${JSON.stringify(appShopId)}}]}`;

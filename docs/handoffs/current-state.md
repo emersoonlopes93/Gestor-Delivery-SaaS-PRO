@@ -4,6 +4,13 @@
 - The existing token service remains authoritative for `authtoken/get`, `authtoken/refresh`, the documented 30-second `get` rate limit, encrypted persistence and connection status. No token, customer data or raw provider payload is logged.
 - Validation: focused `Food99HttpClientService` 15/15 and `Food99TokenService` 8/8 passed, plus `git diff --check`. No provider call, database mutation, deploy or merge was performed. Pending: API build and required CI on the final PR SHA.
 
+## 99Food documentation-first connection closure (2026-10-06)
+
+- The provider-supplied integration guide is the functional source of truth. Operational defaults now use `https://openapi.99food.com`; prior `openapi.didi-food.com` guidance is recorded as legacy and requires no runtime fallback.
+- Self-service `getUrl` now carries only its documented `app_id`. Discovery accepts the minimum signed contract (`app_id`, `timestamp`, `sign`) and a candidate with only a lossless `shop_id`; optional legacy fields cannot block binding. The connection UUID stays stable as the PedeHub-owned `app_shop_id` and is sent only to `shopBind`.
+- The manual support form remains a separate POST flow with explicit identifiers. Empty 99Food manual reconnect payloads are rejected instead of being confused with self-service. No database schema, migration, live provider call, remote DB operation or deployment was performed.
+- `shop/list` response parsing/recovery remains contract-pending because the supplied current guide documents its request but not its response envelope. Webhook acknowledgement is an explicitly separate follow-up required by the provider guide.
+
 ## Storefront C2.5E.3 - preco e semantica de selecao (2026-09-28)
 
 - O Storefront agora deriva o preco exibido "A partir de" somente de itens `replace` ativos, efetivamente disponiveis e ligados ao eixo `primary`; o payload publico ja filtra grupos/itens arquivados e resolve o override de preco por produto antes dessa exibicao. Sem candidato elegivel, o preco-base continua sendo mostrado.

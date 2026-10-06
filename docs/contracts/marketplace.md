@@ -8,6 +8,18 @@ verified_against: feat/multi-ifood-foundation-v1
 
 # Contrato de Marketplace — iFood
 
+# 99Food documentation-first connection contract (2026-10-06)
+
+The current functional authority is the provider-supplied `99Food - Roteiro de Integracao.pdf`. Its operational base URL is `https://openapi.99food.com`; `openapi.didi-food.com` is legacy-only and must not be the default for authorization, shop token, order, or store calls. The financial host remains separately configured.
+
+Self-service starts `POST /v1/auth/authorizationpage/getUrl` with the documented current link input (`app_id` only). The PedeHub-owned, immutable `MarketplaceConnection.id` is persisted as `app_shop_id` but is used only in `shopBind`, never requested from the merchant during normal authorization.
+
+Discovery uses `POST /v3/auth/authorization/getAuthorizedShops` with the minimum signed body `app_id`, `timestamp`, and `sign`. `shop_id` is the only mandatory candidate field; `shop_name`, `bound_flag`, and `app_shop_id` are compatibility metadata and are not required to accept an authorized unbound shop. Decimal IDs remain lossless strings end-to-end. One candidate can be bound automatically; multiple candidates require a tenant-scoped choice and are re-read before `shopBind`. `shop_infos` signs as `Array`.
+
+The manual support flow remains independent. It requires explicit support input; an empty manual reconnect cannot serve as a self-service fallback. `CONNECTED` requires successful bind plus encrypted operational token persistence. `shop/list` is documented as a bound-store diagnostic endpoint, but its response envelope is not present in the supplied current guide, so automatic confirmation/recovery through it remains `CONTRACT_LIVE_PENDING` rather than guessed.
+
+`FOLLOW_UP_REQUIRED_WEBHOOK_ACK=YES`: the supplied guide requires an `errno`/`errmsg` JSON acknowledgement. This is intentionally tracked separately from the connection closure.
+
 ## 1. Status real
 
 | Capacidade | Estado |

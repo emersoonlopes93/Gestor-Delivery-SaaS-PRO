@@ -184,7 +184,7 @@ export class Food99TokenService {
   private maskAppShopId(value: string): string {
     return value.length <= 6 ? '***' : `${value.slice(0, 3)}***${value.slice(-3)}`;
   }
-  private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_API_BASE_URL')?.trim() || 'https://openapi.didi-food.com').replace(/\/$/, ''); }
+  private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, ''); }
   private timeoutMs(): number { return Number(this.config.get<string>('MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS') || 10_000); }
   private async readJson(response: Response): Promise<StandardResponse> { try { return await response.json() as StandardResponse; } catch { return {}; } }
   private asRecord(value: unknown): Record<string, unknown> | null { return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null; }

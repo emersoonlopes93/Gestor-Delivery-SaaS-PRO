@@ -124,15 +124,14 @@ describe('MarketplaceTenantController connection tenancy', () => {
     expect(food99SelfService.verifyExistingToken).toHaveBeenCalledWith('tenant-1', 'food99-a');
   });
 
-  it('does not reconnect a 99Food connection manually without verifying its shop token', async () => {
+  it('rejects an empty 99Food manual reconnect payload instead of treating it as self-service', async () => {
     const { controller, connectionService, food99SelfService, request } = makeController();
     const existing = { id: 'food99-a', provider: MarketplaceProvider.FOOD_99 };
     connectionService.getTenantConnection.mockResolvedValue(existing);
-    connectionService.updateManual.mockResolvedValue(existing);
-    food99SelfService.verifyExistingToken.mockResolvedValue({ ...existing, status: 'CONNECTED' });
 
     await expect(controller.reconnectConnection(request, 'food99-a', {}))
-      .resolves.toMatchObject({ id: 'food99-a', status: 'CONNECTED' });
-    expect(food99SelfService.verifyExistingToken).toHaveBeenCalledWith('tenant-1', 'food99-a');
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(connectionService.updateManual).not.toHaveBeenCalled();
+    expect(food99SelfService.verifyExistingToken).not.toHaveBeenCalled();
   });
 });

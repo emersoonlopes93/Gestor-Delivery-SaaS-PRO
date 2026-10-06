@@ -157,6 +157,12 @@ export class MarketplaceTenantController {
   ) {
     const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
     await this.assertProviderAccess(req.user.tenantId, existing.provider);
+    if (existing.provider === MarketplaceProvider.FOOD_99
+      && !body.accessToken?.trim()
+      && !body.refreshToken?.trim()
+      && !body.tokenExpiresAt?.trim()) {
+      throw new BadRequestException('99Food manual reconnection requires an explicit support payload. Use the authorization flow for self-service connections.');
+    }
     const connection = await this.connectionService.updateManual(req.user.tenantId, connectionId, body);
     if (existing.provider === MarketplaceProvider.FOOD_99) {
       const verified = await this.food99SelfService.verifyExistingToken(req.user.tenantId, connection.id);

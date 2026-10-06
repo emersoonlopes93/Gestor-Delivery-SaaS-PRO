@@ -13,7 +13,7 @@ type StartedAuthorization = {
   authorizationUrl: string;
 };
 
-type AuthorizedShopCandidate = { shopId: string; shopName: string };
+type AuthorizedShopCandidate = { shopId: string; shopName: string | null };
 export type Food99SelfServiceVerification =
   | { authorized: true; connection: MarketplaceConnection }
   | { authorized: false; connection: MarketplaceConnection; state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED'; candidates: AuthorizedShopCandidate[] };
@@ -34,7 +34,7 @@ export class Food99SelfServiceConnectionService {
       ? await this.getFood99Connection(tenantId, connectionId)
       : await this.createPendingConnection(tenantId);
 
-    const authorizationUrl = await this.food99Client.getAuthorizationUrl(randomUUID(), this.appShopId(connection));
+    const authorizationUrl = await this.food99Client.getAuthorizationUrl(randomUUID());
     return { connection, authorizationUrl };
   }
 
@@ -88,7 +88,9 @@ export class Food99SelfServiceConnectionService {
     const shops = await this.authorization.getAuthorizedShops();
     const ownBound = shops.find((shop) => shop.boundFlag === 1 && shop.appShopId === this.appShopId(connection));
     if (ownBound) throw new ConflictException({ error: 'SHOP_BIND_NOT_CONFIRMED', message: 'A 99Food confirmou o estabelecimento, mas ainda não disponibilizou o token. Tente novamente em instantes.' });
-    const unbound = shops.filter((shop) => shop.boundFlag === 0);
+    // The current official discovery contract is an unbound-shop list. Older
+    // payloads may include bound_flag; its absence must not reject a valid row.
+    const unbound = shops.filter((shop) => shop.boundFlag !== 1);
     if (unbound.length === 1) return this.bindSelectedShop(connection, unbound[0].shopId, true);
     if (unbound.length > 1) return { authorized: false, connection, state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED', candidates: unbound.map(({ shopId, shopName }) => ({ shopId, shopName })) };
     if (shops.some((shop) => shop.boundFlag === 1 && shop.appShopId !== this.appShopId(connection))) {
@@ -101,7 +103,7 @@ export class Food99SelfServiceConnectionService {
     const shops = await this.authorization.getAuthorizedShops();
     const selected = shops.find((shop) => shop.shopId === requestedShopId);
     if (!selected) throw new ConflictException({ error: 'AUTHORIZED_SHOP_NOT_FOUND', message: 'O estabelecimento selecionado não está mais autorizado. Atualize e tente novamente.' });
-    const unbound = shops.filter((shop) => shop.boundFlag === 0);
+    const unbound = shops.filter((shop) => shop.boundFlag !== 1);
     if (automatic && (unbound.length !== 1 || unbound[0].shopId !== selected.shopId)) {
       return { authorized: false, connection, state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED', candidates: unbound.map(({ shopId, shopName }) => ({ shopId, shopName })) };
     }

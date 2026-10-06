@@ -32,7 +32,7 @@ describe('Food99SelfServiceConnectionService', () => {
     expect(started.connection.provider).toBe(MarketplaceProvider.FOOD_99);
     expect(started.connection.status).toBe(MarketplaceConnectionStatus.DISCONNECTED);
     expect(started.connection.externalMerchantId).toBeUndefined();
-    expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String), started.connection.id);
+    expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('never selects the first authorized shop when multiple unbound shops are returned', async () => {
@@ -59,6 +59,19 @@ describe('Food99SelfServiceConnectionService', () => {
       externalMerchantId: 'shop-a',
       displayName: 'A',
     });
+  });
+
+  it('binds a single documented-minimum candidate without legacy binding fields', async () => {
+    const { service, connections, tokens, authorization } = makeService();
+    const pending = { id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' };
+    const connected = { ...pending, status: MarketplaceConnectionStatus.CONNECTED, externalMerchantId: '1152921645439779073' };
+    connections.getTenantConnection.mockResolvedValueOnce(pending).mockResolvedValueOnce(connected);
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('missing', false, 200, 'AUTH_TOKEN_NOT_AVAILABLE'));
+    authorization.getAuthorizedShops.mockResolvedValue([{ shopId: '1152921645439779073', shopName: null, boundFlag: null, appShopId: null }]);
+    authorization.bindShop.mockResolvedValue({ shopId: '1152921645439779073', shopName: null, authToken: 'token-a', tokenExpiresAt: new Date('2030-01-01T00:00:00.000Z') });
+
+    await expect(service.verify('tenant-a', 'connection-99')).resolves.toEqual({ authorized: true, connection: connected });
+    expect(authorization.bindShop).toHaveBeenCalledWith('connection-99', '1152921645439779073');
   });
 
   it('validates a manual app_shop_id without discovering or binding a shop', async () => {
@@ -102,7 +115,7 @@ describe('Food99SelfServiceConnectionService', () => {
 
     await expect(service.start('tenant-a', 'connection-99')).resolves.toMatchObject({ connection: existing });
     expect(prisma.marketplaceConnection.create).not.toHaveBeenCalled();
-    expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String), 'connection-99');
+    expect(food99Client.getAuthorizationUrl).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('does not reveal or reuse another tenant connection during reauthorization', async () => {
