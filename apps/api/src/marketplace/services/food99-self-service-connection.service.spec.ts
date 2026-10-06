@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { MarketplaceConnectionStatus, MarketplaceProvider } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
 import { Food99SelfServiceConnectionService } from './food99-self-service-connection.service';
@@ -171,5 +171,13 @@ describe('Food99SelfServiceConnectionService', () => {
     tokens.getAccessToken.mockRejectedValue(new Food99ApiError('99Food shop authentication failed.', false, 200, providerCode));
 
     await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(exception);
+  });
+
+  it('reports a provider business rejection separately from an unavailable authorization response', async () => {
+    const { service, connections, tokens } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('provider rejected discovery', false, 200, 'PROVIDER_AUTHORIZATION_REJECTED'));
+
+    await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(BadGatewayException);
   });
 });

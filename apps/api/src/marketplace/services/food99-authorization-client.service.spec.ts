@@ -51,6 +51,13 @@ describe('Food99AuthorizationClient', () => {
     await expect(service.getAuthorizedShops()).resolves.toEqual([{ shopId: '1152921645439779073', shopName: null, boundFlag: null, appShopId: null }]);
   });
 
+  it('classifies a nonzero provider errno as a business rejection, not an unknown response format', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":10005,"errmsg":"provider rejected request","requestId":"provider-request-1","data":{}}', { status: 200 }));
+    const service = new Food99AuthorizationClient({ get: jest.fn() } as never, { getFood99AppCredentials: jest.fn().mockReturnValue({ appId: '3458764610605350993', clientSecret: 'secret' }) } as never);
+
+    await expect(service.getAuthorizedShops()).rejects.toMatchObject({ providerCode: 'PROVIDER_AUTHORIZATION_REJECTED', retryable: false, httpStatus: 200 });
+  });
+
   it('preserves neighboring 64-bit shop identifiers through discovery and bind', async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(new Response('{"errno":0,"data":{"shops":[{"shop_id":1152921645439779073},{"shop_id":1152921645439779074}]}}', { status: 200 }))

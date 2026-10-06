@@ -75,6 +75,8 @@ describe('IntegrationsPage multi-iFood connections', () => {
       .toContain('Aguarde 2 minutos');
     expect(food99VerificationErrorMessage(new ApiError(503, 'invalid app', 'APP_ID_INVALID')))
       .toContain('informações para suporte');
+    expect(food99VerificationErrorMessage(new ApiError(502, 'provider rejected', 'PROVIDER_AUTHORIZATION_REJECTED')))
+      .toContain('recusou a consulta');
   });
   beforeEach(() => {
     ifoodEnabled = true;

@@ -35,7 +35,7 @@ export class Food99AuthorizationClient {
         : Array.isArray(payload?.data)
           ? payload.data
           : null;
-    if (!response.ok || !this.success(payload?.errno) || !shops) {
+    if (!response.ok) {
       this.logger.warn({
         message: 'food99_authorized_shops_response_unrecognized',
         httpStatus: response.status,
@@ -46,6 +46,30 @@ export class Food99AuthorizationClient {
         dataType: Array.isArray(payload?.data) ? 'array' : typeof payload?.data,
       });
       throw new Food99ApiError('99Food authorized-shop response is invalid.', response.status >= 500 || response.status === 429, response.status, 'PROVIDER_AUTHORIZATION_UNAVAILABLE');
+    }
+    if (!this.success(payload?.errno)) {
+      this.logger.warn({
+        message: 'food99_authorized_shops_provider_rejected',
+        httpStatus: response.status,
+        providerErrno: this.errorNumber(payload?.errno),
+        providerRequestId: this.providerRequestId(payload?.requestId),
+        hasProviderMessage: typeof payload?.errmsg === 'string' && payload.errmsg.trim().length > 0,
+        rootKeys: payload ? Object.keys(payload).sort() : null,
+        dataKeys: data ? Object.keys(data).sort() : null,
+      });
+      throw new Food99ApiError('99Food rejected the authorized-shop query.', false, response.status, 'PROVIDER_AUTHORIZATION_REJECTED');
+    }
+    if (!shops) {
+      this.logger.warn({
+        message: 'food99_authorized_shops_response_unrecognized',
+        httpStatus: response.status,
+        errno: this.errorNumber(payload?.errno),
+        rootKeys: payload ? Object.keys(payload).sort() : null,
+        dataKeys: data ? Object.keys(data).sort() : null,
+        nestedDataKeys: nestedData ? Object.keys(nestedData).sort() : null,
+        dataType: Array.isArray(payload?.data) ? 'array' : typeof payload?.data,
+      });
+      throw new Food99ApiError('99Food authorized-shop response is invalid.', false, response.status, 'PROVIDER_AUTHORIZATION_UNAVAILABLE');
     }
     return shops.map((value) => this.shop(value));
   }
@@ -119,6 +143,9 @@ export class Food99AuthorizationClient {
   private success(value: unknown): boolean { return value === 0 || value === '0'; }
   private errorNumber(value: unknown): number | string | null {
     return typeof value === 'number' || typeof value === 'string' ? value : null;
+  }
+  private providerRequestId(value: unknown): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
   }
   private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, ''); }
   private async read(response: Response): Promise<Record<string, unknown> | null> {

@@ -195,6 +195,11 @@ export class Food99SelfServiceConnectionService {
           error: error.providerCode,
           message: 'A 99Food recusou os dados enviados para verificar a loja. Confira a conexão e fale com o suporte se persistir.',
         });
+      case 'PROVIDER_AUTHORIZATION_REJECTED':
+        return new BadGatewayException({
+          error: error.providerCode,
+          message: 'A 99Food recusou a consulta das lojas autorizadas. Conclua a autorização novamente ou consulte o suporte da 99Food.',
+        });
       case 'SHOP_BIND_FAILED':
       case 'INVALID_SHOP_BIND_RESPONSE':
       case 'INVALID_AUTHORIZED_SHOP_RESPONSE':
