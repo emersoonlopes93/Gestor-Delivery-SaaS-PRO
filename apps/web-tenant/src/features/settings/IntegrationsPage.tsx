@@ -214,7 +214,7 @@ export function IntegrationsPage() {
   const [showFood99ManualFallback, setShowFood99ManualFallback] =
     useState(false);
   const [food99Candidates, setFood99Candidates] = useState<
-    Array<{ shopId: string; shopName: string }>
+    Array<{ shopId: string; shopName: string | null }>
   >([]);
   const [catalogMappingForm, setCatalogMappingForm] = useState({
     connectionId: "",
