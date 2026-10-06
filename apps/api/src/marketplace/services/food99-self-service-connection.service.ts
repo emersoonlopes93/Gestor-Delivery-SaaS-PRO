@@ -29,10 +29,12 @@ export class Food99SelfServiceConnectionService {
     private readonly authorization: Food99AuthorizationClient,
   ) {}
 
-  async start(tenantId: string, connectionId?: string): Promise<StartedAuthorization> {
+  async start(tenantId: string, connectionId?: string, createNew = false): Promise<StartedAuthorization> {
     const connection = connectionId
       ? await this.getFood99Connection(tenantId, connectionId)
-      : await this.createPendingConnection(tenantId);
+      : createNew
+        ? await this.createPendingConnection(tenantId)
+        : await this.findOrCreatePendingConnection(tenantId);
 
     const authorizationUrl = await this.food99Client.getAuthorizationUrl(randomUUID());
     return { connection, authorizationUrl };
@@ -61,6 +63,14 @@ export class Food99SelfServiceConnectionService {
   }
 
   private async verifyConnection(connection: MarketplaceConnection): Promise<Food99SelfServiceVerification> {
+    if (this.isPendingSelfService(connection)) {
+      try {
+        return await this.discoverAndBind(connection);
+      } catch (error) {
+        if (error instanceof Food99ApiError) throw this.toVerificationException(error);
+        throw error;
+      }
+    }
     try {
       // The documented auth-token API distinguishes no token (10101) from an
       // expired token (10102). Food99TokenService performs the safe sequence
@@ -157,6 +167,29 @@ export class Food99SelfServiceConnectionService {
     });
   }
 
+  private async findOrCreatePendingConnection(tenantId: string): Promise<MarketplaceConnection> {
+    const existing = await this.prisma.marketplaceConnection.findFirst({
+      where: {
+        tenantId,
+        provider: MarketplaceProvider.FOOD_99,
+        authType: 'food99_self_service_pending',
+        externalMerchantId: null,
+        accessTokenEnc: null,
+        refreshTokenEnc: null,
+        status: { in: [MarketplaceConnectionStatus.DISCONNECTED, MarketplaceConnectionStatus.ERROR] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return existing ?? this.createPendingConnection(tenantId);
+  }
+
+  private isPendingSelfService(connection: MarketplaceConnection): boolean {
+    return connection.authType === 'food99_self_service_pending'
+      && !connection.externalMerchantId
+      && !connection.accessTokenEnc
+      && !connection.refreshTokenEnc;
+  }
+
   private appShopId(connection: MarketplaceConnection): string {
     const appShopId = connection.externalStoreId?.trim();
     if (!appShopId) {
@@ -198,7 +231,7 @@ export class Food99SelfServiceConnectionService {
       case 'PROVIDER_AUTHORIZATION_REJECTED':
         return new BadGatewayException({
           error: error.providerCode,
-          message: 'A 99Food recusou a consulta das lojas autorizadas. Conclua a autorização novamente ou consulte o suporte da 99Food.',
+          message: 'A 99Food não concluiu a consulta dos estabelecimentos autorizados. As informações técnicas foram registradas para diagnóstico. Tente novamente mais tarde ou consulte o suporte.',
         });
       case 'SHOP_BIND_FAILED':
       case 'INVALID_SHOP_BIND_RESPONSE':

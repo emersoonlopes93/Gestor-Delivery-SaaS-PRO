@@ -27,6 +27,7 @@ describe('marketplace mutation HTTP methods', () => {
     const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toMatch(/\/api\/v1\/marketplaces\/99food\/self-service\/verify$/);
     expect(request.method).toBe('POST');
+    expect(fetchMock.mock.calls.some(([calledUrl, calledRequest]) => String(calledUrl).includes('/self-service/verify') && (calledRequest as RequestInit).method === 'GET')).toBe(false);
   });
 
   it('sends manual reconnect as POST, never a browser GET', async () => {
@@ -59,7 +60,7 @@ describe('marketplace mutation HTTP methods', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { result } = renderHook(() => useStartFood99SelfServiceAuthorization(), { wrapper });
 
-    result.current.mutate({ connectionId: 'connection-99' });
+    result.current.mutate({ connectionId: 'connection-99', createNew: false });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toMatch(/\/api\/v1\/marketplaces\/99food\/self-service\/authorization$/);

@@ -11,6 +11,7 @@ describe('MarketplaceConnectionService multi-merchant foundation', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
+        delete: jest.fn(),
       },
     };
     const credentials = { encrypt: jest.fn((value: string) => `encrypted:${value}`) };
@@ -137,6 +138,52 @@ describe('MarketplaceConnectionService multi-merchant foundation', () => {
     expect(prisma.marketplaceConnection.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: MarketplaceConnectionStatus.DISCONNECTED }),
     }));
+  });
+
+  it('removes only an unbound, never-used 99Food self-service attempt', async () => {
+    const { service, prisma } = makeService();
+    const pending = {
+      id: 'pending-99', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99,
+      status: MarketplaceConnectionStatus.DISCONNECTED, authType: 'food99_self_service_pending',
+      externalMerchantId: null, accessTokenEnc: null, refreshTokenEnc: null,
+    };
+    prisma.marketplaceConnection.findFirst.mockResolvedValue(pending);
+    prisma.marketplaceConnection.findUnique.mockResolvedValue({
+      _count: { events: 0, orders: 0, operations: 0, billEntries: 0, settlements: 0, catalogMappings: 0 },
+    });
+
+    await service.removeUnboundPendingFood99SelfService('tenant-1', 'pending-99');
+
+    expect(prisma.marketplaceConnection.delete).toHaveBeenCalledWith({ where: { id: 'pending-99' } });
+  });
+
+  it('does not blindly remove a connected or bound 99Food connection', async () => {
+    const { service, prisma } = makeService();
+    prisma.marketplaceConnection.findFirst.mockResolvedValue({
+      id: 'bound-99', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99,
+      status: MarketplaceConnectionStatus.CONNECTED, authType: 'food99_self_service_pending',
+      externalMerchantId: '5764687916991317793', accessTokenEnc: 'encrypted:token', refreshTokenEnc: null,
+    });
+
+    await expect(service.removeUnboundPendingFood99SelfService('tenant-1', 'bound-99'))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.marketplaceConnection.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not remove a pending attempt once it has operational records', async () => {
+    const { service, prisma } = makeService();
+    prisma.marketplaceConnection.findFirst.mockResolvedValue({
+      id: 'pending-with-order', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99,
+      status: MarketplaceConnectionStatus.ERROR, authType: 'food99_self_service_pending',
+      externalMerchantId: null, accessTokenEnc: null, refreshTokenEnc: null,
+    });
+    prisma.marketplaceConnection.findUnique.mockResolvedValue({
+      _count: { events: 0, orders: 1, operations: 0, billEntries: 0, settlements: 0, catalogMappings: 0 },
+    });
+
+    await expect(service.removeUnboundPendingFood99SelfService('tenant-1', 'pending-with-order'))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.marketplaceConnection.delete).not.toHaveBeenCalled();
   });
 
   it('never returns encrypted credential material to controllers', () => {

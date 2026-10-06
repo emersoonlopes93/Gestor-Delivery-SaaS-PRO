@@ -54,6 +54,7 @@ export class Food99AuthorizationClient {
         providerErrno: this.errorNumber(payload?.errno),
         providerRequestId: this.providerRequestId(payload?.requestId),
         hasProviderMessage: typeof payload?.errmsg === 'string' && payload.errmsg.trim().length > 0,
+        providerErrmsg: this.sanitizeProviderMessage(payload?.errmsg),
         rootKeys: payload ? Object.keys(payload).sort() : null,
         dataKeys: data ? Object.keys(data).sort() : null,
       });
@@ -146,6 +147,14 @@ export class Food99AuthorizationClient {
   }
   private providerRequestId(value: unknown): string | null {
     return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+  private sanitizeProviderMessage(value: unknown): string | null {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    return value.trim()
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\b\S+@\S+\b/g, '[redacted-email]')
+      .replace(/\b(?:Bearer\s+)?[A-Za-z0-9_-]{24,}\b/g, '[redacted-token]')
+      .slice(0, 180);
   }
   private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, ''); }
   private async read(response: Response): Promise<Record<string, unknown> | null> {

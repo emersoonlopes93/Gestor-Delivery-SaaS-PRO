@@ -23,6 +23,7 @@ import {
   useMarketplaceCatalogMappings,
   useMarketplaceCatalogMappingCandidates,
   useUpsertMarketplaceCatalogMapping,
+  useRemoveMarketplaceConnection,
 } from '../marketplace/hooks';
 
 let ifoodEnabled = true;
@@ -48,6 +49,7 @@ vi.mock('../marketplace/hooks', () => ({
   useMarketplaceCatalogMappings: vi.fn(),
   useMarketplaceCatalogMappingCandidates: vi.fn(),
   useUpsertMarketplaceCatalogMapping: vi.fn(),
+  useRemoveMarketplaceConnection: vi.fn(),
 }));
 vi.mock('../../hooks/useTenantCapabilities', () => ({
   useTenantCapabilities: () => ({ isFeatureEnabled: (featureKey: string) => featureKey !== 'ifood_marketplace' || ifoodEnabled }),
@@ -76,7 +78,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
     expect(food99VerificationErrorMessage(new ApiError(503, 'invalid app', 'APP_ID_INVALID')))
       .toContain('informações para suporte');
     expect(food99VerificationErrorMessage(new ApiError(502, 'provider rejected', 'PROVIDER_AUTHORIZATION_REJECTED')))
-      .toContain('recusou a consulta');
+      .toContain('concluiu');
   });
   beforeEach(() => {
     ifoodEnabled = true;
@@ -115,6 +117,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useMarketplaceCatalogMappings).mockReturnValue({ data: [], isLoading: false } as never);
     vi.mocked(useMarketplaceCatalogMappingCandidates).mockReturnValue({ data: [], isLoading: false } as never);
     vi.mocked(useUpsertMarketplaceCatalogMapping).mockReturnValue(mutation() as never);
+    vi.mocked(useRemoveMarketplaceConnection).mockReturnValue(mutation() as never);
   });
 
   it('renders the simple channel journey without exposing technical identifiers', () => {
@@ -188,7 +191,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
 
     await user.click(screen.getByRole('button', { name: 'Autorizar na 99Food' }));
     await screen.findByText('Aguardando autorização');
-    expect(start.mutateAsync).toHaveBeenCalledWith({ connectionId: undefined });
+    expect(start.mutateAsync).toHaveBeenCalledWith({ connectionId: undefined, createNew: false });
     expect(open).toHaveBeenCalledWith('https://99food.example/authorize', '_blank', 'noopener,noreferrer');
     expect(screen.getByRole('button', { name: 'Verificar autorização' })).toBeTruthy();
     open.mockRestore();
@@ -212,6 +215,44 @@ describe('IntegrationsPage multi-iFood connections', () => {
 
     await waitFor(() => expect(verify.mutateAsync).toHaveBeenCalledWith({ connectionId: 'food99-connection-1' }));
     expect(screen.getByRole('button', { name: 'Verificar autorização' })).toBeTruthy();
+  });
+
+  it('routes a pending self-service retry to verification, never to manual reconnect', async () => {
+    const user = userEvent.setup();
+    const verify = mutation();
+    const reconnect = mutation();
+    verify.mutateAsync.mockRejectedValue(new Error('temporary provider failure'));
+    vi.mocked(useVerifyFood99SelfServiceAuthorization).mockReturnValue(verify as never);
+    vi.mocked(useReconnectMarketplace).mockReturnValue(reconnect as never);
+    vi.mocked(useMarketplaceConnections).mockReturnValue({
+      data: [{ ...food99Connection, authType: 'food99_self_service_pending' }],
+      isLoading: false, isError: false, error: null, refetch,
+    } as never);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getByRole('button', { name: /Lojas conectadas/ }));
+    await user.click(screen.getAllByRole('button', { name: /Verificar autoriza/ })[0]);
+
+    await waitFor(() => expect(verify.mutateAsync).toHaveBeenCalledWith({ connectionId: 'food99-connection-1' }));
+    expect(reconnect.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('removes an abandoned pending self-service attempt without opening the manual flow', async () => {
+    const user = userEvent.setup();
+    const remove = mutation();
+    remove.mutateAsync.mockResolvedValue({ removed: true });
+    vi.mocked(useRemoveMarketplaceConnection).mockReturnValue(remove as never);
+    vi.mocked(useMarketplaceConnections).mockReturnValue({
+      data: [{ ...food99Connection, authType: 'food99_self_service_pending' }],
+      isLoading: false, isError: false, error: null, refetch,
+    } as never);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getByRole('button', { name: /Lojas conectadas/ }));
+    await user.click(screen.getByRole('button', { name: /Remover tentativa/ }));
+
+    await waitFor(() => expect(remove.mutateAsync).toHaveBeenCalledWith('food99-connection-1'));
+    expect(screen.queryByRole('dialog', { name: 'Conectar 99Food' })).toBeNull();
   });
 
   it('completes the guided 99Food connection only after token verification succeeds', async () => {

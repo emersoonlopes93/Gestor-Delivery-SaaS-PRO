@@ -10,6 +10,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       getTenantConnection: jest.fn(),
       updateManual: jest.fn(),
       disconnectById: jest.fn(),
+      removeUnboundPendingFood99SelfService: jest.fn(),
       connectManual: jest.fn(),
       maskConnection: jest.fn((value: unknown) => value),
     };
@@ -73,7 +74,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       authorizationUrl: 'https://auth.99food.test/start',
       connection: { id: 'connection-99' },
     });
-    expect(food99SelfService.start).toHaveBeenCalledWith('tenant-1', undefined);
+    expect(food99SelfService.start).toHaveBeenCalledWith('tenant-1', undefined, false);
     expect(connectionService.maskConnection).toHaveBeenCalledWith({ id: 'connection-99' });
   });
 
@@ -86,6 +87,24 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connection: { id: 'connection-99', status: 'CONNECTED' },
     });
     expect(food99SelfService.verify).toHaveBeenCalledWith('tenant-1', 'connection-99');
+  });
+
+  it('forwards the explicit add-another-store choice without changing normal retries', async () => {
+    const { controller, food99SelfService, request } = makeController();
+    food99SelfService.start.mockResolvedValue({ connection: { id: 'connection-99' }, authorizationUrl: 'https://auth.99food.test/start' });
+
+    await controller.startFood99SelfServiceAuthorization(request, { createNew: true });
+
+    expect(food99SelfService.start).toHaveBeenCalledWith('tenant-1', undefined, true);
+  });
+
+  it('removes only a tenant-owned pending 99Food self-service attempt', async () => {
+    const { controller, connectionService, request } = makeController();
+    connectionService.getTenantConnection.mockResolvedValue({ id: 'pending-99', provider: MarketplaceProvider.FOOD_99 });
+
+    await expect(controller.removeConnection(request, 'pending-99')).resolves.toEqual({ removed: true });
+    expect(connectionService.removeUnboundPendingFood99SelfService).toHaveBeenCalledWith('tenant-1', 'pending-99');
+    expect(connectionService.disconnectById).not.toHaveBeenCalled();
   });
 
   it('declares verify as POST, so GET is not a supported client contract', () => {

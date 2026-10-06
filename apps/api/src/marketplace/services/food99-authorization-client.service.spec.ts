@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Food99AuthorizationClient } from './food99-authorization-client.service';
 import { createHash } from 'crypto';
 
@@ -52,10 +53,18 @@ describe('Food99AuthorizationClient', () => {
   });
 
   it('classifies a nonzero provider errno as a business rejection, not an unknown response format', async () => {
-    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":10005,"errmsg":"provider rejected request","requestId":"provider-request-1","data":{}}', { status: 200 }));
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":10005,"errmsg":"Contact ops@example.com with Bearer abcdefghijklmnopqrstuvwxyz","requestId":"provider-request-1","data":{}}', { status: 200 }));
     const service = new Food99AuthorizationClient({ get: jest.fn() } as never, { getFood99AppCredentials: jest.fn().mockReturnValue({ appId: '3458764610605350993', clientSecret: 'secret' }) } as never);
 
     await expect(service.getAuthorizedShops()).rejects.toMatchObject({ providerCode: 'PROVIDER_AUTHORIZATION_REJECTED', retryable: false, httpStatus: 200 });
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
+      providerErrno: 10005,
+      providerRequestId: 'provider-request-1',
+      providerErrmsg: expect.stringContaining('[redacted-email]'),
+    }));
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ providerErrmsg: expect.stringContaining('[redacted-token]') }));
+    warn.mockRestore();
   });
 
   it('preserves neighboring 64-bit shop identifiers through discovery and bind', async () => {

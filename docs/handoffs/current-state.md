@@ -11,6 +11,14 @@
 - The manual support form remains a separate POST flow with explicit identifiers. Empty 99Food manual reconnect payloads are rejected instead of being confused with self-service. No database schema, migration, live provider call, remote DB operation or deployment was performed.
 - `shop/list` response parsing/recovery remains contract-pending because the supplied current guide documents its request but not its response envelope. Webhook acknowledgement is an explicitly separate follow-up required by the provider guide.
 
+## 99Food connection management and retry closure (2026-10-06)
+
+- A pending self-service 99Food attempt is now reused for the same tenant by default; only the explicit "Adicionar 99Food" action creates another independent attempt. Its persisted connection identity remains the stable PedeHub-owned `app_shop_id` across authorization, retry and verification.
+- Retry of that pending flow now uses `POST /marketplaces/99food/self-service/verify` and discovery first. It does not call the manual reconnect endpoint. Manual support remains an explicit form that requires its technical payload.
+- A tenant can remove only a never-bound pending self-service attempt that has no credentials or operational/financial/catalog records. No remote unbind is called. Connected/bound 99Food connections are blocked from this local removal path.
+- The `getAuthorizedShops` HTTP 200 / `errno=10005` condition is preserved as a provider business rejection, with sanitized provider message and provider request ID in diagnostics. The supplied official material does not map `10005`, so its meaning remains `UNDOCUMENTED_IN_AVAILABLE_CONTRACT`.
+- No Prisma schema/migration, provider call, remote database operation, deployment or merge was performed. Focused API and web routing/component tests cover pending reuse, discovery-first retry, protected removal, POST verify/no manual fallback, 64-bit identifiers, and sanitized diagnostics. Required full gates and CI remain pending on the final branch SHA.
+
 ## Storefront C2.5E.3 - preco e semantica de selecao (2026-09-28)
 
 - O Storefront agora deriva o preco exibido "A partir de" somente de itens `replace` ativos, efetivamente disponiveis e ligados ao eixo `primary`; o payload publico ja filtra grupos/itens arquivados e resolve o override de preco por produto antes dessa exibicao. Sem candidato elegivel, o preco-base continua sendo mostrado.

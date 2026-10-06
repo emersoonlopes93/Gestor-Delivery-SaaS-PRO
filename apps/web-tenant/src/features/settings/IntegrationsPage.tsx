@@ -32,6 +32,7 @@ import {
   useMarketplaceEvents,
   useMarketplaceOrders,
   useMarketplaceStatus,
+  useRemoveMarketplaceConnection,
   useReconnectMarketplace,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
@@ -211,6 +212,7 @@ export function IntegrationsPage() {
   >();
   const [food99AuthorizationStarted, setFood99AuthorizationStarted] =
     useState(false);
+  const [food99CreateNew, setFood99CreateNew] = useState(false);
   const [showFood99ManualFallback, setShowFood99ManualFallback] =
     useState(false);
   const [food99Candidates, setFood99Candidates] = useState<
@@ -260,6 +262,7 @@ export function IntegrationsPage() {
   const connectIfood = useConnectMarketplaceManual("ifood");
   const connectFood99 = useConnectMarketplaceManual("99food");
   const disconnect = useDisconnectMarketplace();
+  const removeConnection = useRemoveMarketplaceConnection();
   const reconnect = useReconnectMarketplace();
   const reprocessEvent = useReprocessMarketplaceEvent();
   const reprocessOrder = useReprocessMarketplaceOrder();
@@ -294,7 +297,7 @@ export function IntegrationsPage() {
       refetchOrders(),
       refetchEvents(),
     ]);
-  const openConnect = (provider: Provider, connectionId?: string) => {
+  const openConnect = (provider: Provider, connectionId?: string, createNew = false) => {
     setManualProvider(provider);
     setManualForm({
       externalMerchantId: "",
@@ -302,6 +305,7 @@ export function IntegrationsPage() {
       displayName: providerName(provider),
     });
     setFood99ConnectionId(connectionId);
+    setFood99CreateNew(provider === "99food" && createNew);
     setFood99AuthorizationStarted(false);
     setFood99Candidates([]);
     setShowFood99ManualFallback(false);
@@ -311,6 +315,7 @@ export function IntegrationsPage() {
     try {
       const result = await startFood99Authorization.mutateAsync({
         connectionId: food99ConnectionId,
+        createNew: food99CreateNew,
       });
       setFood99ConnectionId(result.connection.id);
       setFood99AuthorizationStarted(true);
@@ -321,14 +326,16 @@ export function IntegrationsPage() {
       );
     }
   };
-  const handleVerifyFood99Authorization = async () => {
-    if (!food99ConnectionId) return;
+  const handleVerifyFood99Authorization = async (connectionId = food99ConnectionId) => {
+    if (!connectionId) return;
     try {
       const result = await verifyFood99Authorization.mutateAsync({
-        connectionId: food99ConnectionId,
+        connectionId,
       });
       if (!result.authorized) {
+        setFood99ConnectionId(connectionId);
         setFood99Candidates(result.candidates);
+        setOverlay("food99connect");
         return;
       }
       toast.success("99Food conectada.");
@@ -404,6 +411,15 @@ export function IntegrationsPage() {
       toast.error("Não foi possível desconectar. Tente novamente.");
     }
   };
+  const handleRemovePendingFood99Attempt = async (id: string) => {
+    try {
+      await removeConnection.mutateAsync(id);
+      toast.success("Tentativa removida.");
+      await refresh();
+    } catch {
+      toast.error("Não foi possível remover esta tentativa agora.");
+    }
+  };
   const handleReconnect = async (id: string) => {
     try {
       await reconnect.mutateAsync(id);
@@ -447,10 +463,14 @@ export function IntegrationsPage() {
     const connection = firstConnection(provider);
     const state = connectionState(connection?.status);
     const canManage = Boolean(connection && state.variant === "success");
+    const isPendingFood99 = provider === "99food" && connection?.authType === "food99_self_service_pending" && !connection.externalMerchantId && !connection.hasAccessToken;
+    const statusLabel = isPendingFood99 ? "Aguardando autorizaÃ§Ã£o" : state.label;
     const primaryLabel = !connection
       ? "Conectar loja"
       : canManage
         ? "Gerenciar"
+        : isPendingFood99
+          ? "Verificar autorização"
         : reconnect.isPending
           ? "Tentando novamente..."
           : "Tentar novamente";
@@ -464,6 +484,10 @@ export function IntegrationsPage() {
         return;
       }
       if (provider === "99food") {
+        if (isPendingFood99) {
+          void handleVerifyFood99Authorization(connection.id);
+          return;
+        }
         openConnect("99food", connection.id);
         return;
       }
@@ -492,7 +516,7 @@ export function IntegrationsPage() {
             <Badge variant={state.variant} size="sm">
               {loadingStatus && provider === "ifood"
                 ? "Verificando"
-                : state.label}
+                : statusLabel}
             </Badge>
           </div>
           <p className="text-sm leading-6 text-muted-foreground">
@@ -505,7 +529,7 @@ export function IntegrationsPage() {
         </div>
         <button
           type="button"
-          disabled={reconnect.isPending && !canManage}
+          disabled={(provider === "ifood" && reconnect.isPending) || (provider === "99food" && verifyFood99Authorization.isPending)}
           onClick={onPrimaryAction}
           className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground transition hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
         >
@@ -1013,7 +1037,7 @@ export function IntegrationsPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => openConnect("99food")}
+                  onClick={() => openConnect("99food", undefined, true)}
                   className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   Adicionar 99Food
@@ -1040,6 +1064,11 @@ export function IntegrationsPage() {
             ) : (
               visibleConnections.map((connection) => {
                 const state = connectionState(connection.status);
+                const pendingFood99 = connection.provider === "99food" && connection.authType === "food99_self_service_pending" && !connection.externalMerchantId && !connection.hasAccessToken;
+                const statusLabel = pendingFood99 ? "Aguardando autorizaÃ§Ã£o" : state.label;
+                const title = connection.provider === "99food"
+                  ? connection.displayName || (pendingFood99 ? "99Food — configuração pendente" : "99Food")
+                  : connection.displayName || providerName(connection.provider as Provider);
                 return (
                   <article
                     key={connection.id}
@@ -1048,14 +1077,14 @@ export function IntegrationsPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-bold text-foreground">
-                          {connection.displayName || connection.provider}
+                          {title}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
                           {providerName(connection.provider as Provider)}
                         </p>
                       </div>
                       <Badge variant={state.variant} size="sm">
-                        {state.label}
+                        {statusLabel}
                       </Badge>
                     </div>
                     <div className="mt-4 flex justify-end gap-2">
@@ -1069,12 +1098,33 @@ export function IntegrationsPage() {
                           <Unplug className="h-4 w-4" />
                           Desconectar
                         </button>
+                      ) : pendingFood99 ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void handleVerifyFood99Authorization(connection.id)}
+                            disabled={verifyFood99Authorization.isPending}
+                            className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Verificar autorização
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRemovePendingFood99Attempt(connection.id)}
+                            disabled={removeConnection.isPending}
+                            className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-bold text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            Remover tentativa
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
                           onClick={() => {
                             if (connection.provider === "99food") {
-                              openConnect("99food", connection.id);
+                              openConnect("99food");
+                              setShowFood99ManualFallback(true);
                               return;
                             }
                             void handleReconnect(connection.id);
@@ -1083,7 +1133,7 @@ export function IntegrationsPage() {
                           className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary"
                         >
                           <RefreshCw className="h-4 w-4" />
-                          Tentar novamente
+                          {connection.provider === "99food" ? "Corrigir conexÃ£o manual" : "Tentar novamente"}
                         </button>
                       )}
                     </div>

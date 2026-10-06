@@ -157,6 +157,20 @@ export function useDisconnectMarketplace() {
   });
 }
 
+export function useRemoveMarketplaceConnection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (connectionId: string) => {
+      const res = await api.delete<{ removed: true }>(`/marketplaces/connections/${connectionId}`);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+    },
+  });
+}
+
 export function useReconnectMarketplace() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -283,7 +297,7 @@ export type Food99SelfServiceVerificationDTO = {
 export function useStartFood99SelfServiceAuthorization() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { connectionId?: string }) => {
+    mutationFn: async (input: { connectionId?: string; createNew?: boolean }) => {
       const res = await api.post<Food99SelfServiceAuthorizationDTO>('/marketplaces/99food/self-service/authorization', input);
       return res.data;
     },

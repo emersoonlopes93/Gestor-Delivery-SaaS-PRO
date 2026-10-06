@@ -68,8 +68,8 @@ export class MarketplaceTenantController {
 
   @Post('99food/self-service/authorization')
   @RequirePermissions('settings.manage')
-  async startFood99SelfServiceAuthorization(@Req() req: TenantRequest, @Body() body: { connectionId?: string }) {
-    const started = await this.food99SelfService.start(req.user.tenantId, body.connectionId?.trim() || undefined);
+  async startFood99SelfServiceAuthorization(@Req() req: TenantRequest, @Body() body: { connectionId?: string; createNew?: boolean }) {
+    const started = await this.food99SelfService.start(req.user.tenantId, body.connectionId?.trim() || undefined, body.createNew === true);
     return {
       authorizationUrl: started.authorizationUrl,
       connection: this.connectionService.maskConnection(started.connection),
@@ -185,6 +185,10 @@ export class MarketplaceTenantController {
   async removeConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
     const existing = await this.connectionService.getTenantConnection(req.user.tenantId, connectionId);
     await this.assertProviderAccess(req.user.tenantId, existing.provider);
+    if (existing.provider === MarketplaceProvider.FOOD_99) {
+      await this.connectionService.removeUnboundPendingFood99SelfService(req.user.tenantId, connectionId);
+      return { removed: true };
+    }
     const connection = await this.connectionService.disconnectById(req.user.tenantId, connectionId);
     return this.connectionService.maskConnection(connection);
   }

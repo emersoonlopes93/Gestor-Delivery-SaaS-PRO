@@ -136,6 +136,33 @@ export class MarketplaceConnectionService {
     });
   }
 
+  async removeUnboundPendingFood99SelfService(tenantId: string, connectionId: string): Promise<void> {
+    const connection = await this.getTenantConnection(tenantId, connectionId);
+    const isPending = connection.provider === MarketplaceProvider.FOOD_99
+      && connection.authType === 'food99_self_service_pending'
+      && connection.status !== MarketplaceConnectionStatus.CONNECTED
+      && !connection.externalMerchantId
+      && !connection.accessTokenEnc
+      && !connection.refreshTokenEnc;
+    if (!isPending) {
+      throw new ConflictException('Only an unbound pending 99Food self-service attempt can be removed.');
+    }
+    const counts = await this.prisma.marketplaceConnection.findUnique({
+      where: { id: connection.id },
+      select: { _count: { select: { events: true, orders: true, operations: true, billEntries: true, settlements: true, catalogMappings: true } } },
+    });
+    const linkedRecords = counts?._count.events
+      || counts?._count.orders
+      || counts?._count.operations
+      || counts?._count.billEntries
+      || counts?._count.settlements
+      || counts?._count.catalogMappings;
+    if (linkedRecords) {
+      throw new ConflictException('This 99Food connection has operational records and cannot be removed as a pending attempt.');
+    }
+    await this.prisma.marketplaceConnection.delete({ where: { id: connection.id } });
+  }
+
   async disconnect(tenantId: string, provider: MarketplaceProvider) {
     const connection = await this.prisma.marketplaceConnection.findFirst({
       where: { tenantId, provider },
