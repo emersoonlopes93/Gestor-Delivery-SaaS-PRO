@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, NotFoundException, RequestMethod } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { MarketplaceProvider } from '@prisma/client';
 import { MarketplaceTenantController } from './marketplace-tenant.controller';
