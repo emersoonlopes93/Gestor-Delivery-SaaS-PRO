@@ -75,6 +75,7 @@ describe('Food99SelfServiceConnectionService', () => {
     authorization.bindShop.mockResolvedValue({ shopId: 'shop-a', shopName: 'A', authToken: 'token-a', tokenExpiresAt: new Date('2030-01-01T00:00:00.000Z') });
 
     await expect(service.verify('tenant-a', 'connection-99')).resolves.toEqual({ authorized: true, connection: connected });
+    expect(authorization.getAuthorizedShops).toHaveBeenCalledTimes(1);
     expect(authorization.bindShop).toHaveBeenCalledWith('connection-99', 'shop-a');
     expect(tokens.persistBoundShopToken).toHaveBeenCalledWith(pending, 'token-a', expect.any(Date), {
       externalMerchantId: 'shop-a',
@@ -216,5 +217,13 @@ describe('Food99SelfServiceConnectionService', () => {
     tokens.getAccessToken.mockRejectedValue(new Food99ApiError('provider rejected discovery', false, 200, 'PROVIDER_AUTHORIZATION_REJECTED'));
 
     await expect(service.verify('tenant-a', 'connection-99')).rejects.toBeInstanceOf(BadGatewayException);
+  });
+
+  it('presents a temporary provider rate limit without asking the tenant to reauthorize', async () => {
+    const { service, connections, authorization } = makeService();
+    connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99', authType: 'food99_self_service_pending', externalMerchantId: null, accessTokenEnc: null, refreshTokenEnc: null });
+    authorization.getAuthorizedShops.mockRejectedValue(new Food99ApiError('rate limited', true, 200, 'PROVIDER_RATE_LIMITED', 1000));
+
+    await expect(service.verify('tenant-a', 'connection-99')).rejects.toMatchObject({ response: expect.objectContaining({ error: 'PROVIDER_RATE_LIMITED' }) });
   });
 });

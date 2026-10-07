@@ -484,11 +484,7 @@ export function IntegrationsPage() {
         return;
       }
       if (provider === "99food") {
-        if (isPendingFood99) {
-          void handleVerifyFood99Authorization(connection.id);
-          return;
-        }
-        openConnect("99food", connection.id);
+        void handleVerifyFood99Authorization(connection.id);
         return;
       }
       void handleReconnect(connection.id);
@@ -1098,7 +1094,7 @@ export function IntegrationsPage() {
                           <Unplug className="h-4 w-4" />
                           Desconectar
                         </button>
-                      ) : pendingFood99 ? (
+                      ) : connection.provider === "99food" ? (
                         <>
                           <button
                             type="button"
@@ -1122,11 +1118,6 @@ export function IntegrationsPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (connection.provider === "99food") {
-                              openConnect("99food");
-                              setShowFood99ManualFallback(true);
-                              return;
-                            }
                             void handleReconnect(connection.id);
                           }}
                           disabled={connection.provider === "ifood" && reconnect.isPending}

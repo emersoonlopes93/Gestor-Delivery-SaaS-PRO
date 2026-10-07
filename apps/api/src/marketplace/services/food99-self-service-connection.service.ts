@@ -6,7 +6,7 @@ import { Food99ApiError } from '../providers/food99-api.error';
 import { Food99HttpClientService } from './food99-http-client.service';
 import { Food99TokenService } from './food99-token.service';
 import { MarketplaceConnectionService } from './marketplace-connection.service';
-import { Food99AuthorizationClient } from './food99-authorization-client.service';
+import { Food99AuthorizationClient, Food99AuthorizedShop } from './food99-authorization-client.service';
 
 type StartedAuthorization = {
   connection: MarketplaceConnection;
@@ -101,7 +101,7 @@ export class Food99SelfServiceConnectionService {
     // The current official discovery contract is an unbound-shop list. Older
     // payloads may include bound_flag; its absence must not reject a valid row.
     const unbound = shops.filter((shop) => shop.boundFlag !== 1);
-    if (unbound.length === 1) return this.bindSelectedShop(connection, unbound[0].shopId, true);
+    if (unbound.length === 1) return this.bindSelectedShop(connection, unbound[0].shopId, true, shops);
     if (unbound.length > 1) return { authorized: false, connection, state: 'AUTHORIZED_SHOP_SELECTION_REQUIRED', candidates: unbound.map(({ shopId, shopName }) => ({ shopId, shopName })) };
     if (shops.some((shop) => shop.boundFlag === 1 && shop.appShopId !== this.appShopId(connection))) {
       throw new ConflictException({ error: 'SHOP_ALREADY_BOUND', message: 'Este estabelecimento já está vinculado a outra identificação. Peça ajuda ao suporte da 99Food antes de continuar.' });
@@ -109,8 +109,8 @@ export class Food99SelfServiceConnectionService {
     throw new ConflictException({ error: 'AUTHORIZED_SHOP_NOT_FOUND', message: 'Nenhum estabelecimento autorizado está disponível para concluir a conexão.' });
   }
 
-  private async bindSelectedShop(connection: MarketplaceConnection, requestedShopId: string, automatic = false): Promise<Food99SelfServiceVerification> {
-    const shops = await this.authorization.getAuthorizedShops();
+  private async bindSelectedShop(connection: MarketplaceConnection, requestedShopId: string, automatic = false, discoveredShops?: Food99AuthorizedShop[]): Promise<Food99SelfServiceVerification> {
+    const shops = discoveredShops ?? await this.authorization.getAuthorizedShops();
     const selected = shops.find((shop) => shop.shopId === requestedShopId);
     if (!selected) throw new ConflictException({ error: 'AUTHORIZED_SHOP_NOT_FOUND', message: 'O estabelecimento selecionado não está mais autorizado. Atualize e tente novamente.' });
     const unbound = shops.filter((shop) => shop.boundFlag !== 1);
@@ -232,6 +232,11 @@ export class Food99SelfServiceConnectionService {
         return new BadGatewayException({
           error: error.providerCode,
           message: 'A 99Food não concluiu a consulta dos estabelecimentos autorizados. As informações técnicas foram registradas para diagnóstico. Tente novamente mais tarde ou consulte o suporte.',
+        });
+      case 'PROVIDER_RATE_LIMITED':
+        return new ServiceUnavailableException({
+          error: error.providerCode,
+          message: 'A 99Food está limitando temporariamente as consultas desta integração. Aguarde alguns segundos e tente novamente.',
         });
       case 'SHOP_BIND_FAILED':
       case 'INVALID_SHOP_BIND_RESPONSE':

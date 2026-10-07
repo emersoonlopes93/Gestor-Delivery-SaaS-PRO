@@ -10,6 +10,7 @@ export type Food99ShopBindResult = { shopId: string; shopName: string | null; au
 @Injectable()
 export class Food99AuthorizationClient {
   private readonly logger = new Logger(Food99AuthorizationClient.name);
+  private static readonly nextRequestAt = new Map<string, number>();
   constructor(private readonly config: ConfigService, private readonly credentials: MarketplaceCredentialService) {}
 
   async getAuthorizedShops(): Promise<Food99AuthorizedShop[]> {
@@ -17,6 +18,7 @@ export class Food99AuthorizationClient {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const parameters = { app_id: appId, timestamp };
     const sign = this.sign(parameters, clientSecret);
+    await this.waitForProviderWindow(appId, 'getAuthorizedShops', 1_000);
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl()}/v3/auth/authorization/getAuthorizedShops`, {
@@ -58,7 +60,10 @@ export class Food99AuthorizationClient {
         rootKeys: payload ? Object.keys(payload).sort() : null,
         dataKeys: data ? Object.keys(data).sort() : null,
       });
-      throw new Food99ApiError('99Food rejected the authorized-shop query.', false, response.status, 'PROVIDER_AUTHORIZATION_REJECTED');
+      const providerCode = this.isRateLimited(payload?.errno, payload?.errmsg)
+        ? 'PROVIDER_RATE_LIMITED'
+        : 'PROVIDER_AUTHORIZATION_REJECTED';
+      throw new Food99ApiError('99Food rejected the authorized-shop query.', providerCode === 'PROVIDER_RATE_LIMITED', response.status, providerCode, providerCode === 'PROVIDER_RATE_LIMITED' ? 1_000 : undefined);
     }
     if (!shops) {
       this.logger.warn({
@@ -80,6 +85,7 @@ export class Food99AuthorizationClient {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const parameters: Record<string, unknown> = { app_id: appId, shop_infos: [{ shop_id: shopId, app_shop_id: appShopId }], timestamp };
     const sign = this.sign(parameters, clientSecret);
+    await this.waitForProviderWindow(appId, 'shopBind', 1_000);
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl()}/v3/auth/authorization/shopBind`, {
@@ -156,6 +162,23 @@ export class Food99AuthorizationClient {
       .replace(/\b(?:Bearer\s+)?[A-Za-z0-9_-]{24,}\b/g, '[redacted-token]')
       .slice(0, 180);
   }
+  private isRateLimited(errno: unknown, message: unknown): boolean {
+    return (errno === 10005 || errno === '10005')
+      && typeof message === 'string'
+      && /calling\s+frequency|window\s*:|\blimit\s*:/i.test(message);
+  }
+  private async waitForProviderWindow(appId: string, endpoint: string, intervalMs: number): Promise<void> {
+    const key = `99food:${appId}:${endpoint}`;
+    const now = Date.now();
+    const next = Food99AuthorizationClient.nextRequestAt.get(key) ?? now;
+    const waitMs = Math.max(0, next - now);
+    Food99AuthorizationClient.nextRequestAt.set(key, Math.max(now, next) + intervalMs);
+    if (waitMs > 0) {
+      this.logger.debug({ message: 'food99_provider_rate_limit_wait', operation: endpoint, appId: this.maskAppId(appId), waitMs });
+      await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+  private maskAppId(value: string): string { return value.length <= 6 ? '***' : `${value.slice(0, 3)}***${value.slice(-3)}`; }
   private baseUrl(): string { return (this.config.get<string>('MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL')?.trim() || 'https://openapi.99food.com').replace(/\/$/, ''); }
   private async read(response: Response): Promise<Record<string, unknown> | null> {
     try {

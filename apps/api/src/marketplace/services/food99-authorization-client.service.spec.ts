@@ -4,7 +4,10 @@ import { createHash } from 'crypto';
 
 describe('Food99AuthorizationClient', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+    (Food99AuthorizationClient as unknown as { nextRequestAt: Map<string, number> }).nextRequestAt.clear();
+  });
   it('uses the dedicated V3 authorization host and signs scalar discovery fields', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: { shops: [{ shop_id: 'shop-1', shop_name: 'Loja', bound_flag: 0 }] } }), { status: 200 }));
     const service = new Food99AuthorizationClient({ get: jest.fn((key: string) => key === 'MARKETPLACE_99FOOD_AUTHORIZATION_API_BASE_URL' ? 'https://authorization.99food.test' : undefined) } as never, { getFood99AppCredentials: jest.fn().mockReturnValue({ appId: 'app-1', clientSecret: 'secret' }) } as never);
@@ -65,6 +68,13 @@ describe('Food99AuthorizationClient', () => {
     }));
     expect(warn).toHaveBeenCalledWith(expect.objectContaining({ providerErrmsg: expect.stringContaining('[redacted-token]') }));
     warn.mockRestore();
+  });
+
+  it('maps the documented frequency response to a semantic rate-limit error', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{"errno":10005,"errmsg":"The calling frequency exceeds the setting: window: 1s, limit: 1","requestId":"provider-request-rate","data":{}}', { status: 200 }));
+    const service = new Food99AuthorizationClient({ get: jest.fn() } as never, { getFood99AppCredentials: jest.fn().mockReturnValue({ appId: 'rate-test-app', clientSecret: 'secret' }) } as never);
+
+    await expect(service.getAuthorizedShops()).rejects.toMatchObject({ providerCode: 'PROVIDER_RATE_LIMITED', retryable: true, retryAfterMs: 1000 });
   });
 
   it('preserves neighboring 64-bit shop identifiers through discovery and bind', async () => {
