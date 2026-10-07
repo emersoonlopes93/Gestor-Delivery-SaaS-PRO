@@ -2069,7 +2069,8 @@ model MarketplaceSettlement {
   weekPaymentId          String                      @map("week_payment_id") @db.VarChar(120)
   withdrawAmount         BigInt                      @map("withdraw_amount")
   withdrawDate           DateTime                    @map("withdraw_date")
-  liability              BigInt                      @default(0)
+  liability              BigInt?
+  liabilityParty         String?                     @map("liability_party") @db.VarChar(160)
   shopId                 String                      @map("shop_id") @db.VarChar(120)
   settleStartDate        DateTime                    @map("settle_start_date")
   settleEndDate          DateTime                    @map("settle_end_date")

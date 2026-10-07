@@ -66,7 +66,7 @@ type ParsedSettlement = {
   weekPaymentId: string;
   withdrawAmount: bigint;
   withdrawDate: Date;
-  liability: bigint;
+  liabilityParty: string;
   shopId: string;
   settleStartDate: Date;
   settleEndDate: Date;
@@ -537,7 +537,7 @@ export class Food99FinancialReconciliationService {
       weekPaymentId: settlement.weekPaymentId,
       withdrawAmountCents: settlement.withdrawAmount.toString(),
       withdrawDate: settlement.withdrawDate.toISOString(),
-      liabilityCents: settlement.liability.toString(),
+      liability: settlement.liabilityParty,
       shopId: settlement.shopId,
       settleStartDate: settlement.settleStartDate.toISOString(),
       settleEndDate: settlement.settleEndDate.toISOString(),
@@ -608,7 +608,7 @@ function parseSettlement(record: Food99FinancialRecord): ParsedSettlement {
     weekPaymentId: requiredLosslessString(record, 'weekPaymentId'),
     withdrawAmount: requiredCents(record, 'withdrawAmount'),
     withdrawDate: requiredProviderDate(record.withdrawDate, 'withdrawDate'),
-    liability: requiredCents(record, 'liability'),
+    liabilityParty: requiredText(record, 'liability'),
     shopId: requiredLosslessString(record, 'shopId'),
     settleStartDate: requiredProviderDate(record.settleStartDate, 'settleStartDate'),
     settleEndDate: requiredProviderDate(record.settleEndDate, 'settleEndDate'),
@@ -627,7 +627,7 @@ function settlementFacts(parsed: ParsedSettlement) {
     weekPaymentId: parsed.weekPaymentId,
     withdrawAmount: parsed.withdrawAmount,
     withdrawDate: parsed.withdrawDate,
-    liability: parsed.liability,
+    liabilityParty: parsed.liabilityParty,
     shopId: parsed.shopId,
     settleStartDate: parsed.settleStartDate,
     settleEndDate: parsed.settleEndDate,

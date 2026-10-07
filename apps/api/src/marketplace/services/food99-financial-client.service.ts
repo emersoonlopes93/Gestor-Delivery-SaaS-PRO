@@ -45,7 +45,6 @@ const FINANCIAL_MONEY_FIELDS = [
   'shopActivityOutcome',
   'shopActivitySubsidy',
   'withdrawAmount',
-  'liability',
 ] as const;
 
 const DAY_MS = 86_400_000;

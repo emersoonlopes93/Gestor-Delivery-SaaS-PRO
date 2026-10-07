@@ -25,7 +25,7 @@ const baseSettlement = {
   weekPaymentId: '9223372036854775001',
   withdrawDate: '20260912',
   withdrawAmount: '4000',
-  liability: '0',
+  liability: 'Nourishflow',
   shopId: '5764608924570091908',
   settleStartDate: '20260901',
   settleEndDate: '20260907',
@@ -158,6 +158,7 @@ describe('Food99FinancialReconciliationService', () => {
         weekPaymentId: baseSettlement.weekPaymentId,
         withdrawAmount: 4000n,
         withdrawDate: new Date('2026-09-12T00:00:00.000Z'),
+        liabilityParty: 'Nourishflow',
         shopId: baseSettlement.shopId,
         currency: 'BRL',
         payeeCnpj: '12345678000199',
@@ -170,6 +171,8 @@ describe('Food99FinancialReconciliationService', () => {
         ] },
       }),
     });
+    const persistedSettlement = tx.marketplaceSettlement.create.mock.calls[0][0].data as Record<string, unknown>;
+    expect(persistedSettlement).not.toHaveProperty('liability');
     expect(result.settlementsReceived).toBe(2);
     expect(result.settlementsCreated).toBe(1);
   });
@@ -182,6 +185,24 @@ describe('Food99FinancialReconciliationService', () => {
     expect(tx.marketplaceSettlement.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ withdrawAmount: -500n }),
     });
+  });
+
+  it('rejects a missing liability party instead of substituting a cents value', async () => {
+    const { service, tx } = setup({ settlements: [{ ...baseSettlement, liability: undefined }] });
+    await expect(service.sync('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-1')).rejects.toThrow('99Food field liability is required.');
+    expect(tx.marketplaceSettlement.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps a numeric-looking provider liability as text, never as cents', async () => {
+    const { service, tx } = setup({ settlements: [{ ...baseSettlement, liability: '500' }] });
+    await service.sync('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-1');
+    const persistedSettlement = tx.marketplaceSettlement.create.mock.calls[0][0].data as Record<string, unknown>;
+    expect(persistedSettlement).toMatchObject({ liabilityParty: '500' });
+    expect(persistedSettlement).not.toHaveProperty('liability');
   });
 
   it('treats an already persisted identical settlement as idempotent', async () => {
@@ -348,7 +369,7 @@ function settlementView(withdrawAmount: bigint) {
     weekPaymentId: baseSettlement.weekPaymentId,
     withdrawAmount,
     withdrawDate: new Date('2026-09-12T00:00:00.000Z'),
-    liability: 0n,
+    liabilityParty: 'Nourishflow',
     shopId: baseSettlement.shopId,
     settleStartDate: new Date('2026-09-01T00:00:00.000Z'),
     settleEndDate: new Date('2026-09-07T00:00:00.000Z'),

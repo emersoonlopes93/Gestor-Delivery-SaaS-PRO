@@ -105,7 +105,7 @@ export interface Food99SettlementDTO {
   weekPaymentId: string;
   withdrawAmountCents: string;
   withdrawDate: string;
-  liabilityCents: string;
+  liability: string | null;
   shopId: string;
   settleStartDate: string;
   settleEndDate: string;

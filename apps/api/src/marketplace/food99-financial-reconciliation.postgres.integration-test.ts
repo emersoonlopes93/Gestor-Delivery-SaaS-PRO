@@ -64,6 +64,7 @@ describe('99Food financial reconciliation PostgreSQL constraints and concurrency
         weekPaymentId: `week-${label}-${suffix}`,
         withdrawAmount,
         withdrawDate: new Date('2026-09-12T00:00:00.000Z'),
+        liabilityParty: 'Nourishflow',
         shopId: '5764608924570091908',
         settleStartDate: new Date('2026-09-01T00:00:00.000Z'),
         settleEndDate: new Date('2026-09-07T00:00:00.000Z'),
@@ -160,6 +161,32 @@ describe('99Food financial reconciliation PostgreSQL constraints and concurrency
         currency: 'BRL',
       },
     })).resolves.toBeDefined();
+  });
+
+  it('stores the provider liability party without fabricating a legacy cents value', async () => {
+    const fixture = await fixtures('liability-party');
+    const settlement = await createSettlement(fixture, 'liability-party', 4000n);
+
+    expect(settlement.liabilityParty).toBe('Nourishflow');
+    expect(settlement.liability).toBeNull();
+
+    const historical = await prisma.marketplaceSettlement.create({
+      data: {
+        tenantId: fixture.tenant.id,
+        provider: 'FOOD_99',
+        connectionId: fixture.connection.id,
+        weekPaymentId: `legacy-liability-${suffix}`,
+        withdrawAmount: 3000n,
+        withdrawDate: new Date('2026-09-13T00:00:00.000Z'),
+        liability: 500n,
+        shopId: '5764608924570091908',
+        settleStartDate: new Date('2026-09-08T00:00:00.000Z'),
+        settleEndDate: new Date('2026-09-14T00:00:00.000Z'),
+        currency: 'BRL',
+      },
+    });
+    expect(historical.liability).toBe(500n);
+    expect(historical.liabilityParty).toBeNull();
   });
 
   it('posts concurrent requests exactly once and preserves large IDs', async () => {
