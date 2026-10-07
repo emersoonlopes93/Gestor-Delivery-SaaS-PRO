@@ -5,6 +5,7 @@ import { type PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   useConnectMarketplaceManual,
+  useMarketplaceConnections,
   useReconnectMarketplace,
   useStartFood99SelfServiceAuthorization,
   useVerifyFood99SelfServiceAuthorization,
@@ -28,6 +29,14 @@ describe('marketplace mutation HTTP methods', () => {
     expect(url).toMatch(/\/api\/v1\/marketplaces\/99food\/self-service\/verify$/);
     expect(request.method).toBe('POST');
     expect(fetchMock.mock.calls.some(([calledUrl, calledRequest]) => String(calledUrl).includes('/self-service/verify') && (calledRequest as RequestInit).method === 'GET')).toBe(false);
+  });
+
+  it('normalizes the backend FOOD_99 enum before the connected-stores card uses it', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [{ id: 'connection-99', provider: 'FOOD_99', status: 'CONNECTED' }] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useMarketplaceConnections(), { wrapper });
+
+    await waitFor(() => expect(result.current.data).toEqual([expect.objectContaining({ provider: '99food' })]));
   });
 
   it('sends manual reconnect as POST, never a browser GET', async () => {

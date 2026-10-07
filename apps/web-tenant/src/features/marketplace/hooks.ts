@@ -54,6 +54,18 @@ export type MarketplaceOrderDTO = {
 
 export type MarketplaceStatusDTO = MarketplaceConnectionDTO | null;
 
+type MarketplaceConnectionApiDTO = Omit<MarketplaceConnectionDTO, 'provider'> & { provider: string };
+
+function normalizeMarketplaceProvider(provider: string): MarketplaceProvider {
+  if (provider === 'IFOOD' || provider === 'ifood') return 'ifood';
+  if (provider === 'FOOD_99' || provider === '99food') return '99food';
+  throw new Error('Unsupported marketplace provider.');
+}
+
+function normalizeMarketplaceConnection(connection: MarketplaceConnectionApiDTO): MarketplaceConnectionDTO {
+  return { ...connection, provider: normalizeMarketplaceProvider(connection.provider) };
+}
+
 export type MarketplaceCatalogMappingDTO = {
   id: string;
   connectionId: string;
@@ -110,8 +122,8 @@ export function useMarketplaceConnections() {
   return useQuery({
     queryKey: ['marketplace-connections'],
     queryFn: async () => {
-      const res = await api.get<MarketplaceConnectionDTO[]>('/marketplaces/connections');
-      return res.data ?? [];
+      const res = await api.get<MarketplaceConnectionApiDTO[]>('/marketplaces/connections');
+      return (res.data ?? []).map(normalizeMarketplaceConnection);
     },
   });
 }
@@ -120,8 +132,8 @@ export function useMarketplaceStatus(provider: MarketplaceProvider = 'ifood', en
   return useQuery({
     queryKey: ['marketplace-status', provider],
     queryFn: async () => {
-      const res = await api.get<MarketplaceStatusDTO>(`/marketplaces/${provider}/status`);
-      return res.data ?? null;
+      const res = await api.get<MarketplaceConnectionApiDTO | null>(`/marketplaces/${provider}/status`);
+      return res.data ? normalizeMarketplaceConnection(res.data) : null;
     },
     enabled,
   });
