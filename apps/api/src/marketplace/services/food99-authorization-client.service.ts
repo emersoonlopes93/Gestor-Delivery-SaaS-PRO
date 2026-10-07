@@ -13,6 +13,10 @@ export class Food99AuthorizationClient {
   private static readonly nextRequestAt = new Map<string, number>();
   constructor(private readonly config: ConfigService, private readonly credentials: MarketplaceCredentialService) {}
 
+  static clearRateLimitStateForTests(): void {
+    Food99AuthorizationClient.nextRequestAt.clear();
+  }
+
   async getAuthorizedShops(): Promise<Food99AuthorizedShop[]> {
     const { appId, clientSecret } = this.credentials.getFood99AppCredentials();
     const timestamp = Math.floor(Date.now() / 1000).toString();

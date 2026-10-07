@@ -6,7 +6,7 @@ describe('Food99AuthorizationClient', () => {
   const originalFetch = global.fetch;
   afterEach(() => {
     global.fetch = originalFetch;
-    (Food99AuthorizationClient as unknown as { nextRequestAt: Map<string, number> }).nextRequestAt.clear();
+    Food99AuthorizationClient.clearRateLimitStateForTests();
   });
   it('uses the dedicated V3 authorization host and signs scalar discovery fields', async () => {
     global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ errno: 0, data: { shops: [{ shop_id: 'shop-1', shop_name: 'Loja', bound_flag: 0 }] } }), { status: 200 }));
