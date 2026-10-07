@@ -125,6 +125,17 @@ describe('MarketplaceConnectionService multi-merchant foundation', () => {
     expect(prisma.marketplaceConnection.create).not.toHaveBeenCalled();
   });
 
+  it('blocks local 99Food disconnect while remote unbind is unavailable', async () => {
+    const { service, prisma } = makeService();
+    prisma.marketplaceConnection.findFirst.mockResolvedValue({
+      ...existingConnection('connection-99', 'tenant-1', 'shop-99'),
+      provider: MarketplaceProvider.FOOD_99,
+    });
+
+    await expect(service.disconnectById('tenant-1', 'connection-99')).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.marketplaceConnection.update).not.toHaveBeenCalled();
+  });
+
   it('keeps a 99Food manual entry disconnected until its token is verified', async () => {
     const { service, prisma } = makeService();
     prisma.marketplaceConnection.findFirst.mockResolvedValue(null);

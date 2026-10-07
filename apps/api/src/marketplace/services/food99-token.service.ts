@@ -8,16 +8,11 @@ import { MarketplaceCredentialService } from './marketplace-credential.service';
 type StandardResponse = { errno?: unknown; errmsg?: unknown; data?: unknown; request_id?: unknown };
 type CachedToken = { token: string; expiresAt: Date };
 
-// The provider limits `authtoken/get` to one request per shop every 30 seconds.
-// After a refresh, defer the next get so the follow-up does not violate it.
-const AUTH_TOKEN_REQUEST_INTERVAL_MS = 30_000;
-
 @Injectable()
 export class Food99TokenService {
   private readonly logger = new Logger(Food99TokenService.name);
   private readonly refreshes = new Map<string, Promise<string>>();
   private readonly cache = new Map<string, CachedToken>();
-  private readonly nextGetAt = new Map<string, number>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,17 +29,6 @@ export class Food99TokenService {
       this.cache.set(connection.id, { token, expiresAt: connection.tokenExpiresAt });
       return token;
     }
-    const retryAt = this.nextGetAt.get(connection.id);
-    if (retryAt && retryAt > Date.now()) {
-      throw new Food99ApiError(
-        '99Food refreshed the shop token. Wait before verifying again.',
-        false,
-        409,
-        'AUTH_TOKEN_REFRESHED_WAIT_RETRY',
-        retryAt - Date.now(),
-      );
-    }
-    this.nextGetAt.delete(connection.id);
     const running = this.refreshes.get(connection.id);
     if (running) return running;
     const refresh = this.getOrRefreshExpiredToken(connection).finally(() => this.refreshes.delete(connection.id));
@@ -98,15 +82,7 @@ export class Food99TokenService {
       if (!(error instanceof Food99ApiError) || error.providerCode !== 'AUTH_TOKEN_EXPIRED') throw error;
 
       await this.callAuth(connection, '/v1/auth/authtoken/refresh');
-      const retryAt = Date.now() + AUTH_TOKEN_REQUEST_INTERVAL_MS;
-      this.nextGetAt.set(connection.id, retryAt);
-      throw new Food99ApiError(
-        '99Food refreshed the shop token. Wait before verifying again.',
-        false,
-        409,
-        'AUTH_TOKEN_REFRESHED_WAIT_RETRY',
-        AUTH_TOKEN_REQUEST_INTERVAL_MS,
-      );
+      payload = await this.callAuth(connection, '/v1/auth/authtoken/get');
     }
 
     const data = this.asRecord(payload.data);

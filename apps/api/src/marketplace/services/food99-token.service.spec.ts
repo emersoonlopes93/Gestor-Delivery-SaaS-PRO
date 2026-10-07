@@ -40,32 +40,21 @@ describe('Food99TokenService', () => {
     }));
   });
 
-  it('refreshes only an explicitly expired provider token and coalesces concurrent verification', async () => {
-    const now = 1_700_000_000_000;
-    jest.spyOn(Date, 'now').mockReturnValue(now);
+  it('refreshes an explicitly expired provider token then gets and persists its replacement once', async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 10102, request_id: 'provider-request-1' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 0, data: {} }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 0, data: {} }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errno: 0, data: { auth_token: 'token-next', token_expiration_time: 1_900_000_000 } }), { status: 200 }));
     const { service, connection } = makeService();
 
     await expect(Promise.all([
       service.getAccessToken(connection),
       service.getAccessToken(connection),
-    ])).rejects.toMatchObject({ providerCode: 'AUTH_TOKEN_REFRESHED_WAIT_RETRY', retryAfterMs: 30_000 });
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    ])).resolves.toEqual(['token-next', 'token-next']);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
     expect(new URL(String((global.fetch as jest.Mock).mock.calls[0][0])).pathname).toBe('/v1/auth/authtoken/get');
     expect(new URL(String((global.fetch as jest.Mock).mock.calls[1][0])).pathname).toBe('/v1/auth/authtoken/refresh');
-
-    await expect(service.getAccessToken(connection)).rejects.toMatchObject({ providerCode: 'AUTH_TOKEN_REFRESHED_WAIT_RETRY' });
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-
-    jest.spyOn(Date, 'now').mockReturnValue(now + 30_000);
-    (global.fetch as jest.Mock).mockResolvedValueOnce(new Response(JSON.stringify({
-      errno: 0,
-      data: { auth_token: 'token-next', token_expiration_time: 1_900_000_000 },
-    }), { status: 200 }));
-    await expect(service.getAccessToken(connection)).resolves.toBe('token-next');
-    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect(new URL(String((global.fetch as jest.Mock).mock.calls[2][0])).pathname).toBe('/v1/auth/authtoken/get');
   });
 
   it('does not blindly refresh when a shop has no auth token yet', async () => {

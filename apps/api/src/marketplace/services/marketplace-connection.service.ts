@@ -125,6 +125,9 @@ export class MarketplaceConnectionService {
 
   async disconnectById(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
     const connection = await this.getTenantConnection(tenantId, connectionId);
+    if (connection.provider === MarketplaceProvider.FOOD_99) {
+      throw new ConflictException('99Food disconnection is unavailable until the remote unbind contract is complete.');
+    }
     return this.prisma.marketplaceConnection.update({
       where: { id: connection.id, tenantId },
       data: {
