@@ -1124,7 +1124,7 @@ export function IntegrationsPage() {
                           className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary"
                         >
                           <RefreshCw className="h-4 w-4" />
-                          {connection.provider === "99food" ? "Corrigir conexÃ£o manual" : "Tentar novamente"}
+                          Tentar novamente
                         </button>
                       )}
                     </div>
