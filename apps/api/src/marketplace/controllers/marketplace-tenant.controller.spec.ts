@@ -14,7 +14,7 @@ describe('MarketplaceTenantController connection tenancy', () => {
       connectManual: jest.fn(),
       maskConnection: jest.fn((value: unknown) => value),
     };
-    const food99SelfService = { start: jest.fn(), verify: jest.fn(), bind: jest.fn(), verifyExistingToken: jest.fn() };
+    const food99SelfService = { start: jest.fn(), verify: jest.fn(), bind: jest.fn(), verifyExistingToken: jest.fn(), reconnectHistorical: jest.fn() };
     const featureControl = { resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }) };
     const providerRegistry = { parseProvider: jest.fn().mockReturnValue(MarketplaceProvider.IFOOD) };
     const controller = new MarketplaceTenantController(
@@ -152,5 +152,14 @@ describe('MarketplaceTenantController connection tenancy', () => {
       .rejects.toBeInstanceOf(BadRequestException);
     expect(connectionService.updateManual).not.toHaveBeenCalled();
     expect(food99SelfService.verifyExistingToken).not.toHaveBeenCalled();
+  });
+
+  it('uses the dedicated tenant-scoped endpoint for historical 99Food reconnect', async () => {
+    const { controller, food99SelfService, request } = makeController();
+    food99SelfService.reconnectHistorical.mockResolvedValue({ id: 'food99-a', provider: MarketplaceProvider.FOOD_99, status: 'CONNECTED' });
+
+    await expect(controller.reconnectHistoricalFood99Connection(request, 'food99-a'))
+      .resolves.toMatchObject({ id: 'food99-a', status: 'CONNECTED' });
+    expect(food99SelfService.reconnectHistorical).toHaveBeenCalledWith('tenant-1', 'food99-a');
   });
 });

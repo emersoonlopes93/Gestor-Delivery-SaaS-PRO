@@ -57,6 +57,30 @@ export class Food99SelfServiceConnectionService {
     return this.connections.getTenantConnection(tenantId, connectionId);
   }
 
+  /** Restores a previously bound 99Food connection without restarting onboarding. */
+  async reconnectHistorical(tenantId: string, connectionId: string): Promise<MarketplaceConnection> {
+    const connection = await this.getFood99Connection(tenantId, connectionId);
+    if (!this.isHistoricalReconnectEligible(connection)) {
+      throw new ConflictException({
+        error: 'HISTORICAL_BIND_PROOF_INSUFFICIENT',
+        message: 'Esta conexao nao possui informacoes suficientes para uma reconexao segura.',
+      });
+    }
+    try {
+      await this.tokens.getAccessToken(connection);
+    } catch (error) {
+      if (error instanceof Food99ApiError && error.providerCode === 'AUTH_TOKEN_NOT_AVAILABLE') {
+        throw new ConflictException({
+          error: 'RECONNECT_REQUIRES_ATTENTION',
+          message: 'Nao foi possivel restaurar esta conexao automaticamente. O vinculo existente precisa ser verificado antes de continuar.',
+        });
+      }
+      if (error instanceof Food99ApiError) throw this.toVerificationException(error);
+      throw error;
+    }
+    return this.connections.getTenantConnection(tenantId, connectionId);
+  }
+
   async bind(tenantId: string, connectionId: string, shopId: string): Promise<Food99SelfServiceVerification> {
     const connection = await this.getFood99Connection(tenantId, connectionId);
     return this.runExclusive(connection, () => this.bindSelectedShop(connection, shopId));
@@ -188,6 +212,13 @@ export class Food99SelfServiceConnectionService {
       && !connection.externalMerchantId
       && !connection.accessTokenEnc
       && !connection.refreshTokenEnc;
+  }
+
+  private isHistoricalReconnectEligible(connection: MarketplaceConnection): boolean {
+    return connection.status !== MarketplaceConnectionStatus.CONNECTED
+      && connection.authType === 'food99_shop_auth_token'
+      && Boolean(connection.externalMerchantId?.trim())
+      && Boolean(connection.externalStoreId?.trim());
   }
 
   private appShopId(connection: MarketplaceConnection): string {

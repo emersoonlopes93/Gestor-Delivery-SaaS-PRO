@@ -124,6 +124,40 @@ describe('Food99SelfServiceConnectionService', () => {
     expect(authorization.bindShop).not.toHaveBeenCalled();
   });
 
+  it('reconnects a historical bound connection with its existing identity only', async () => {
+    const { service, connections, tokens, authorization, food99Client, prisma } = makeService();
+    const historical = {
+      id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99,
+      status: MarketplaceConnectionStatus.DISCONNECTED, authType: 'food99_shop_auth_token',
+      externalMerchantId: '5764687916991317793', externalStoreId: 'connection-99',
+    };
+    const reconnected = { ...historical, status: MarketplaceConnectionStatus.CONNECTED };
+    connections.getTenantConnection.mockResolvedValueOnce(historical).mockResolvedValueOnce(reconnected);
+    tokens.getAccessToken.mockResolvedValue('token-a');
+
+    await expect(service.reconnectHistorical('tenant-a', 'connection-99')).resolves.toEqual(reconnected);
+    expect(tokens.getAccessToken).toHaveBeenCalledWith(historical);
+    expect(authorization.getAuthorizedShops).not.toHaveBeenCalled();
+    expect(authorization.bindShop).not.toHaveBeenCalled();
+    expect(food99Client.getAuthorizationUrl).not.toHaveBeenCalled();
+    expect(prisma.marketplaceConnection.create).not.toHaveBeenCalled();
+  });
+
+  it('does not restart onboarding when a historical connection has no provider token', async () => {
+    const { service, connections, tokens, authorization } = makeService();
+    const historical = {
+      id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99,
+      status: MarketplaceConnectionStatus.DISCONNECTED, authType: 'food99_shop_auth_token',
+      externalMerchantId: '5764687916991317793', externalStoreId: 'connection-99',
+    };
+    connections.getTenantConnection.mockResolvedValue(historical);
+    tokens.getAccessToken.mockRejectedValue(new Food99ApiError('missing', false, 200, 'AUTH_TOKEN_NOT_AVAILABLE'));
+
+    await expect(service.reconnectHistorical('tenant-a', 'connection-99')).rejects.toMatchObject({ response: expect.objectContaining({ error: 'RECONNECT_REQUIRES_ATTENTION' }) });
+    expect(authorization.getAuthorizedShops).not.toHaveBeenCalled();
+    expect(authorization.bindShop).not.toHaveBeenCalled();
+  });
+
   it('revalidates a selected shop before binding and never binds a shop from another response', async () => {
     const { service, connections, authorization } = makeService();
     connections.getTenantConnection.mockResolvedValue({ id: 'connection-99', tenantId: 'tenant-a', provider: MarketplaceProvider.FOOD_99, externalStoreId: 'connection-99' });

@@ -16,6 +16,7 @@ import {
   useMarketplaceOrders,
   useMarketplaceStatus,
   useReconnectMarketplace,
+  useReconnectHistoricalFood99,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
   useStartFood99SelfServiceAuthorization,
@@ -42,6 +43,7 @@ vi.mock('../marketplace/hooks', () => ({
   useMarketplaceOrders: vi.fn(),
   useMarketplaceStatus: vi.fn(),
   useReconnectMarketplace: vi.fn(),
+  useReconnectHistoricalFood99: vi.fn(),
   useReprocessMarketplaceEvent: vi.fn(),
   useReprocessMarketplaceOrder: vi.fn(),
   useStartFood99SelfServiceAuthorization: vi.fn(),
@@ -110,6 +112,7 @@ describe('IntegrationsPage multi-iFood connections', () => {
     vi.mocked(useBindFood99SelfServiceAuthorization).mockReturnValue(mutation() as never);
     vi.mocked(useDisconnectMarketplace).mockReturnValue(mutation() as never);
     vi.mocked(useReconnectMarketplace).mockReturnValue(mutation() as never);
+    vi.mocked(useReconnectHistoricalFood99).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceEvent).mockReturnValue(mutation() as never);
     vi.mocked(useReprocessMarketplaceOrder).mockReturnValue(mutation() as never);
     vi.mocked(useStartFood99SelfServiceAuthorization).mockReturnValue(mutation() as never);
@@ -235,6 +238,30 @@ describe('IntegrationsPage multi-iFood connections', () => {
 
     await waitFor(() => expect(verify.mutateAsync).toHaveBeenCalledWith({ connectionId: 'food99-connection-1' }));
     expect(reconnect.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('routes a proven historical 99Food connection to reconnect without restarting authorization', async () => {
+    const user = userEvent.setup();
+    const reconnectHistorical = mutation();
+    reconnectHistorical.mutateAsync.mockResolvedValue({ ...food99Connection, status: 'CONNECTED' });
+    const verify = mutation();
+    vi.mocked(useReconnectHistoricalFood99).mockReturnValue(reconnectHistorical as never);
+    vi.mocked(useVerifyFood99SelfServiceAuthorization).mockReturnValue(verify as never);
+    vi.mocked(useMarketplaceConnections).mockReturnValue({
+      data: [{
+        ...food99Connection,
+        externalMerchantId: '5764687916991317793', externalStoreId: 'connection-99',
+        authType: 'food99_shop_auth_token',
+      }],
+      isLoading: false, isError: false, error: null, refetch,
+    } as never);
+
+    render(<IntegrationsPage />);
+    await user.click(screen.getByRole('button', { name: /Lojas conectadas/ }));
+    await user.click(screen.getByRole('button', { name: 'Reconectar' }));
+
+    await waitFor(() => expect(reconnectHistorical.mutateAsync).toHaveBeenCalledWith('food99-connection-1'));
+    expect(verify.mutateAsync).not.toHaveBeenCalled();
   });
 
   it('removes an abandoned pending self-service attempt without opening the manual flow', async () => {

@@ -308,6 +308,20 @@ export function useStartFood99SelfServiceAuthorization() {
   });
 }
 
+export function useReconnectHistoricalFood99() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (connectionId: string) => {
+      const res = await api.post<MarketplaceConnectionDTO>(`/marketplaces/connections/${connectionId}/reconnect`);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] });
+    },
+  });
+}
+
 export function useVerifyFood99SelfServiceAuthorization() {
   const queryClient = useQueryClient();
   return useMutation({

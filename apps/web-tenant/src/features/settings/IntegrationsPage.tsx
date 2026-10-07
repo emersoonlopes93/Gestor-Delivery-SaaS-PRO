@@ -34,6 +34,7 @@ import {
   useMarketplaceStatus,
   useRemoveMarketplaceConnection,
   useReconnectMarketplace,
+  useReconnectHistoricalFood99,
   useReprocessMarketplaceEvent,
   useReprocessMarketplaceOrder,
   useStartFood99SelfServiceAuthorization,
@@ -264,6 +265,7 @@ export function IntegrationsPage() {
   const disconnect = useDisconnectMarketplace();
   const removeConnection = useRemoveMarketplaceConnection();
   const reconnect = useReconnectMarketplace();
+  const reconnectHistoricalFood99 = useReconnectHistoricalFood99();
   const reprocessEvent = useReprocessMarketplaceEvent();
   const reprocessOrder = useReprocessMarketplaceOrder();
   const startFood99Authorization = useStartFood99SelfServiceAuthorization();
@@ -427,6 +429,15 @@ export function IntegrationsPage() {
       await refresh();
     } catch {
       toast.error("Não foi possível reconectar. Tente novamente.");
+    }
+  };
+  const handleReconnectHistoricalFood99 = async (id: string) => {
+    try {
+      await reconnectHistoricalFood99.mutateAsync(id);
+      toast.success("99Food reconectada.");
+      await refresh();
+    } catch (error) {
+      toast.error(food99VerificationErrorMessage(error));
     }
   };
   const handleSaveAssociation = async () => {
@@ -1061,6 +1072,7 @@ export function IntegrationsPage() {
               visibleConnections.map((connection) => {
                 const state = connectionState(connection.status);
                 const pendingFood99 = connection.provider === "99food" && connection.authType === "food99_self_service_pending" && !connection.externalMerchantId && !connection.hasAccessToken;
+                const historicalFood99 = connection.provider === "99food" && connection.authType === "food99_shop_auth_token" && Boolean(connection.externalMerchantId) && Boolean(connection.externalStoreId) && connection.status !== "CONNECTED";
                 const statusLabel = pendingFood99 ? "Aguardando autorizaÃ§Ã£o" : state.label;
                 const title = connection.provider === "99food"
                   ? connection.displayName || (pendingFood99 ? "99Food — configuração pendente" : "99Food")
@@ -1084,7 +1096,7 @@ export function IntegrationsPage() {
                       </Badge>
                     </div>
                     <div className="mt-4 flex justify-end gap-2">
-                      {state.variant === "success" ? (
+                      {state.variant === "success" && connection.provider !== "99food" ? (
                         <button
                           type="button"
                           onClick={() => handleDisconnect(connection.id)}
@@ -1093,6 +1105,16 @@ export function IntegrationsPage() {
                         >
                           <Unplug className="h-4 w-4" />
                           Desconectar
+                        </button>
+                      ) : historicalFood99 ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleReconnectHistoricalFood99(connection.id)}
+                          disabled={reconnectHistoricalFood99.isPending}
+                          className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Reconectar
                         </button>
                       ) : connection.provider === "99food" ? (
                         <>

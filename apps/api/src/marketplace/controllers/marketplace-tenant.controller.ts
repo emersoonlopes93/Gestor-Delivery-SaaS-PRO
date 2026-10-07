@@ -171,6 +171,13 @@ export class MarketplaceTenantController {
     return this.connectionService.maskConnection(connection);
   }
 
+  @Post('connections/:connectionId/reconnect')
+  @RequirePermissions('settings.manage')
+  async reconnectHistoricalFood99Connection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
+    const connection = await this.food99SelfService.reconnectHistorical(req.user.tenantId, connectionId);
+    return this.connectionService.maskConnection(connection);
+  }
+
   @Post('connections/:connectionId/disconnect')
   @RequirePermissions('settings.manage')
   async disconnectConnection(@Req() req: TenantRequest, @Param('connectionId') connectionId: string) {
