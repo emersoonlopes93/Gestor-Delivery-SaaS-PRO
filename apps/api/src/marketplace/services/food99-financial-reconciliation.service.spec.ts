@@ -6,11 +6,6 @@ import {
   MarketplaceSettlementStatus,
   Prisma,
 } from '@prisma/client';
-import { Logger } from '@nestjs/common';
-import {
-  FOOD99_SETTLEMENT_RAW_SHAPE,
-  Food99FinancialRecord,
-} from './food99-financial-client.service';
 import { Food99FinancialReconciliationService } from './food99-financial-reconciliation.service';
 
 const baseBill = {
@@ -29,12 +24,14 @@ const baseBill = {
 const baseSettlement = {
   weekPaymentId: '9223372036854775001',
   withdrawDate: '20260912',
-  withdrawAmount: '4000',
+  withdrawAmount: 4000,
   liability: 'Nourishflow',
   shopId: '5764608924570091908',
   settleStartDate: '20260901',
   settleEndDate: '20260907',
   currency: 'BRL',
+  cnpjWithdrawAmount: 4000,
+  cercAmount: 0,
   dayPaymentIDList: ['1945389697417496990', '1945389697417496991'],
 };
 
@@ -148,7 +145,7 @@ describe('Food99FinancialReconciliationService', () => {
   });
 
   it('persists one structured settlement with signed cents, CNPJ/CERC and multiple dayPaymentIds', async () => {
-    const settlement = { ...baseSettlement, payeeCnpj: '12345678000199', payerCNpj: '99887766000100', cnpjWithdrawAmount: '4100', cercAmount: '-100' };
+    const settlement = { ...baseSettlement, payeeCnpj: '12345678000199', payerCNpj: '99887766000100', cnpjWithdrawAmount: 4100, cercAmount: -100 };
     const { service, tx } = setup({ settlements: [settlement, settlement] });
     const result = await service.sync('tenant-1', {
       connectionId: 'connection-1',
@@ -183,7 +180,7 @@ describe('Food99FinancialReconciliationService', () => {
   });
 
   it('preserves a negative settlement amount during ingestion', async () => {
-    const { service, tx } = setup({ settlements: [{ ...baseSettlement, withdrawAmount: '-500' }] });
+    const { service, tx } = setup({ settlements: [{ ...baseSettlement, withdrawAmount: -500 }] });
     await service.sync('tenant-1', {
       connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
     }, 'correlation-1');
@@ -210,41 +207,15 @@ describe('Food99FinancialReconciliationService', () => {
     expect(persistedSettlement).not.toHaveProperty('liability');
   });
 
-  it('logs a sanitized settlement money mismatch while preserving strict validation', async () => {
-    const settlement: Food99FinancialRecord = {
-      ...baseSettlement,
-      cnpjWithdrawAmount: '12345678000199.5',
-      authorization: 'token-that-must-not-appear',
-    };
-    settlement[FOOD99_SETTLEMENT_RAW_SHAPE] = {
-      withdrawAmount: { rawType: 'number', rawValue: '4000', numberIsInteger: true },
-      cnpjWithdrawAmount: { rawType: 'string', rawValue: '"12345678000199.5"', numberIsInteger: null },
-      cercAmount: { rawType: 'null', rawValue: null, numberIsInteger: null },
-    };
-    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    const { service, tx } = setup({ settlements: [settlement] });
-
+  it.each([
+    ['withdrawAmount', { withdrawAmount: '144842' }],
+    ['cnpjWithdrawAmount', { cnpjWithdrawAmount: '144842' }],
+    ['cercAmount', { cercAmount: '0' }],
+  ])('attributes an invalid settlement money field to %s', async (field, override) => {
+    const { service, tx } = setup({ settlements: [{ ...baseSettlement, ...override }] });
     await expect(service.sync('tenant-1', {
       connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
-    }, 'correlation-1')).rejects.toThrow('99Food money field cnpjWithdrawAmount must be integer cents.');
-
-    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
-      message: '99food_settlement_contract_mismatch',
-      provider: '99Food',
-      endpoint: 'getShopBillWeek',
-      field: 'cnpjWithdrawAmount',
-      weekPaymentId: '***5001',
-      requestId: 'correlation-1',
-      fields: expect.objectContaining({
-        cnpjWithdrawAmount: expect.objectContaining({
-          postParse: expect.objectContaining({ type: 'string' }),
-          preValidation: expect.objectContaining({ type: 'string' }),
-        }),
-      }),
-    }));
-    const serializedLog = JSON.stringify(warn.mock.calls[0][0]);
-    expect(serializedLog).not.toContain('token-that-must-not-appear');
-    expect(serializedLog).not.toContain('12345678000199');
+    }, 'correlation-1')).rejects.toThrow(`99Food money field ${field} must be integer cents.`);
     expect(tx.marketplaceSettlement.create).not.toHaveBeenCalled();
   });
 
@@ -267,7 +238,7 @@ describe('Food99FinancialReconciliationService', () => {
   });
 
   it('marks provider drift after posting without mutating financial facts', async () => {
-    const changed = { ...baseSettlement, withdrawAmount: '4100' };
+    const changed = { ...baseSettlement, withdrawAmount: 4100 };
     const { service, tx } = setup({ settlements: [changed] });
     tx.marketplaceSettlement.findUnique.mockResolvedValue({
       id: 'settlement-1',

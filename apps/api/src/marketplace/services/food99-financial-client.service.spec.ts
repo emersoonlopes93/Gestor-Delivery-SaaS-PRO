@@ -2,7 +2,6 @@ import { MarketplaceProvider } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
 import {
   Food99FinancialClientService,
-  getFood99SettlementRawShape,
   parseFood99FinancialJson,
   splitFood99FinancialBackfill,
   validateFood99FinancialRange,
@@ -107,28 +106,20 @@ describe('Food99FinancialClientService', () => {
     expect(JSON.parse(String((global.fetch as jest.Mock).mock.calls[1][1].body)).page_no).toBe(2);
   });
 
-  it('captures raw settlement money shapes without changing parsed values', async () => {
-    global.fetch = jest.fn().mockResolvedValue(new Response(
-      '{"errno":0,"data":{"data":[{"weekPaymentId":9223372036854775001,"withdrawAmount":4000,"cnpjWithdrawAmount":12.5,"cercAmount":null}],"total_page":1}}',
-      { status: 200 },
-    ));
-    const { service, connection } = makeService();
-    const rows = await service.fetchSettlements(
-      connection,
-      { startDate: '2026-09-01', endDate: '2026-09-12' },
-      'correlation-1',
+  it('keeps settlement money as integer numbers while preserving large identifiers losslessly', () => {
+    const parsed = parseFood99FinancialJson(
+      '{"weekPaymentId":9223372036854775001,"shopId":5764608924570091908,'
+      + '"dayPaymentIDList":[1945389697417496990],"withdrawAmount":144842,'
+      + '"cnpjWithdrawAmount":144842,"cercAmount":0}',
     );
 
-    expect(rows[0]).toMatchObject({
+    expect(parsed).toEqual({
       weekPaymentId: '9223372036854775001',
-      withdrawAmount: '4000',
-      cnpjWithdrawAmount: 12.5,
-      cercAmount: null,
-    });
-    expect(getFood99SettlementRawShape(rows[0])).toEqual({
-      withdrawAmount: { rawType: 'number', rawValue: '4000', numberIsInteger: true },
-      cnpjWithdrawAmount: { rawType: 'number', rawValue: '12.5', numberIsInteger: false },
-      cercAmount: { rawType: 'null', rawValue: null, numberIsInteger: null },
+      shopId: '5764608924570091908',
+      dayPaymentIDList: ['1945389697417496990'],
+      withdrawAmount: 144842,
+      cnpjWithdrawAmount: 144842,
+      cercAmount: 0,
     });
   });
 
