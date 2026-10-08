@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { MarketplaceProvider } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
 import {
@@ -104,6 +105,44 @@ describe('Food99FinancialClientService', () => {
     )).resolves.toEqual([{ weekPaymentId: '9007199254740993' }]);
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String((global.fetch as jest.Mock).mock.calls[1][1].body)).page_no).toBe(2);
+  });
+
+  it('logs only sanitized pagination and Bill Data freshness metadata', async () => {
+    const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"errno":0,"data":{"data":[{"orderId":5764690163401820946,"businessTs":1760054400000,"settlementAmount":1234}],"total_page":1}}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+
+    await expect(service.fetchBillEntries(
+      connection,
+      { startDate: '2026-10-08', endDate: '2026-10-08' },
+      'correlation-1',
+    )).resolves.toHaveLength(1);
+
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'food99_financial_page_received',
+      endpoint: 'bill_detail',
+      correlationId: 'correlation-1',
+      connectionId: 'conn…on-1',
+      startDate: '20261008',
+      endDate: '20261008',
+      pageNo: 1,
+      totalPages: 1,
+      recordCount: 1,
+      providerOldestBusinessAt: '2025-10-10T00:00:00.000Z',
+      providerNewestBusinessAt: '2025-10-10T00:00:00.000Z',
+    }));
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'food99_financial_fetch_completed',
+      paginationComplete: true,
+      totalRecordsReceived: 1,
+    }));
+    const output = JSON.stringify([...debug.mock.calls, ...log.mock.calls]);
+    expect(output).not.toContain('shop-token');
+    expect(output).not.toContain('5764690163401820946');
   });
 
   it('keeps settlement money as integer numbers while preserving large identifiers losslessly', () => {

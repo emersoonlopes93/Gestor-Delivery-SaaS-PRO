@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketplaceConnection } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
@@ -48,6 +48,11 @@ const FINANCIAL_MONEY_FIELDS = [
 ] as const;
 
 const DAY_MS = 86_400_000;
+
+type FinancialFreshness = {
+  oldestBusinessAt: string | null;
+  newestBusinessAt: string | null;
+};
 
 export function parseFood99FinancialJson(raw: string): unknown {
   const fields = [...FINANCIAL_IDENTIFIER_FIELDS, ...FINANCIAL_MONEY_FIELDS]
@@ -115,6 +120,8 @@ export function splitFood99FinancialBackfill(
 
 @Injectable()
 export class Food99FinancialClientService {
+  private readonly logger = new Logger(Food99FinancialClientService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly tokens: Food99FinancialTokenService,
@@ -173,6 +180,7 @@ export class Food99FinancialClientService {
 
     let token = await this.tokens.getAccessToken();
     const all: Food99FinancialRecord[] = [];
+    let freshness: FinancialFreshness = { oldestBusinessAt: null, newestBusinessAt: null };
     let pageNo = 1;
     let totalPages = 1;
     do {
@@ -205,10 +213,37 @@ export class Food99FinancialClientService {
       const data = this.asRecord(payload?.data);
       const rows = this.readRows(data);
       totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
+      freshness = mergeFreshness(freshness, summarizeBusinessFreshness(rows));
+      this.logger.debug({
+        message: 'food99_financial_page_received',
+        endpoint: financialEndpointName(path),
+        correlationId,
+        connectionId: maskIdentifier(connection.id),
+        startDate: body.start_date,
+        endDate: body.end_date,
+        pageNo,
+        totalPages,
+        recordCount: rows.length,
+        providerOldestBusinessAt: freshness.oldestBusinessAt,
+        providerNewestBusinessAt: freshness.newestBusinessAt,
+      });
       all.push(...rows);
       if (rows.length === 0) break;
       pageNo += 1;
     } while (pageNo <= totalPages);
+    this.logger.log({
+      message: 'food99_financial_fetch_completed',
+      endpoint: financialEndpointName(path),
+      correlationId,
+      connectionId: maskIdentifier(connection.id),
+      startDate: formatCompactDate(start),
+      endDate: formatCompactDate(end),
+      pageSize: 200,
+      paginationComplete: true,
+      totalRecordsReceived: all.length,
+      providerOldestBusinessAt: freshness.oldestBusinessAt,
+      providerNewestBusinessAt: freshness.newestBusinessAt,
+    });
     return all;
   }
 
@@ -356,4 +391,52 @@ function formatIsoDate(value: Date): string {
 
 function formatCompactDate(value: Date): string {
   return formatIsoDate(value).replace(/-/g, '');
+}
+
+function financialEndpointName(path: string): 'bill_detail' | 'settlements' {
+  return path.endsWith('/getShopBillDetail') ? 'bill_detail' : 'settlements';
+}
+
+function maskIdentifier(value: string): string {
+  return value.length <= 4 ? '****' : `${value.slice(0, 4)}…${value.slice(-4)}`;
+}
+
+function summarizeBusinessFreshness(records: Food99FinancialRecord[]): FinancialFreshness {
+  let oldest: Date | null = null;
+  let newest: Date | null = null;
+  for (const record of records) {
+    const businessAt = financialBusinessDate(record);
+    if (!businessAt) continue;
+    if (!oldest || businessAt.getTime() < oldest.getTime()) oldest = businessAt;
+    if (!newest || businessAt.getTime() > newest.getTime()) newest = businessAt;
+  }
+  return {
+    oldestBusinessAt: oldest?.toISOString() ?? null,
+    newestBusinessAt: newest?.toISOString() ?? null,
+  };
+}
+
+function mergeFreshness(current: FinancialFreshness, next: FinancialFreshness): FinancialFreshness {
+  const dates = [current.oldestBusinessAt, current.newestBusinessAt, next.oldestBusinessAt, next.newestBusinessAt]
+    .flatMap((value) => value ? [new Date(value)] : [])
+    .filter((value) => !Number.isNaN(value.getTime()));
+  if (dates.length === 0) return { oldestBusinessAt: null, newestBusinessAt: null };
+  const milliseconds = dates.map((value) => value.getTime());
+  return {
+    oldestBusinessAt: new Date(Math.min(...milliseconds)).toISOString(),
+    newestBusinessAt: new Date(Math.max(...milliseconds)).toISOString(),
+  };
+}
+
+function financialBusinessDate(record: Food99FinancialRecord): Date | null {
+  const candidate = record.businessDateTime ?? record.businessTs;
+  if (typeof candidate !== 'string' || !candidate.trim()) return null;
+  if (/^\d+$/.test(candidate)) {
+    const milliseconds = Number(candidate);
+    if (!Number.isSafeInteger(milliseconds)) return null;
+    const date = new Date(milliseconds);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(candidate);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
