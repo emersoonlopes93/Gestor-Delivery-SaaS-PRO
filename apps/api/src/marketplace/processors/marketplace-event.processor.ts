@@ -10,6 +10,8 @@ import { MarketplacePollingService } from '../services/marketplace-polling.servi
 import type { MarketplacePollingJob } from '../services/marketplace-polling.service';
 import { Food99PollingService, type Food99PollingJob } from '../services/food99-polling.service';
 import { Food99ApiError } from '../providers/food99-api.error';
+import { Food99FinancialAutoSyncService, type Food99FinancialAutoSyncJob } from '../services/food99-financial-auto-sync.service';
+import { FOOD99_FINANCIAL_AUTO_SYNC_CONNECTION_JOB, FOOD99_FINANCIAL_AUTO_SYNC_SCAN_JOB } from '../marketplace.constants';
 
 export function marketplaceBackoffStrategy(attemptsMade: number, type?: string, error?: Error): number {
   const exponentialDelay = 5000 * (2 ** Math.max(0, attemptsMade - 1));
@@ -33,6 +35,7 @@ export class MarketplaceEventProcessor extends WorkerHost {
     private readonly reconciliationService: MarketplaceReconciliationService,
     private readonly pollingService: MarketplacePollingService,
     private readonly food99PollingService: Food99PollingService,
+    private readonly food99FinancialAutoSync: Food99FinancialAutoSyncService,
   ) {
     super();
   }
@@ -60,6 +63,14 @@ export class MarketplaceEventProcessor extends WorkerHost {
 
     if (job.name === 'food99-poll-connection') {
       return this.food99PollingService.runConnection(job.data as Food99PollingJob);
+    }
+
+    if (job.name === FOOD99_FINANCIAL_AUTO_SYNC_SCAN_JOB) {
+      return this.food99FinancialAutoSync.scheduleEligibleConnections();
+    }
+
+    if (job.name === FOOD99_FINANCIAL_AUTO_SYNC_CONNECTION_JOB) {
+      return this.food99FinancialAutoSync.runConnection(job.data as Food99FinancialAutoSyncJob);
     }
 
     const data = job.data as { eventInboxId: string; tenantId?: string | null };

@@ -28,6 +28,7 @@ import {
   Food99FinancialRecord,
   splitFood99FinancialBackfill,
 } from './food99-financial-client.service';
+import { Food99FinancialSyncLockService } from './food99-financial-sync-lock.service';
 
 type ParsedBillEntry = {
   orderId: string;
@@ -84,9 +85,34 @@ export class Food99FinancialReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly client: Food99FinancialClientService,
+    private readonly connectionLock?: Food99FinancialSyncLockService,
   ) {}
 
   async sync(
+    tenantId: string,
+    input: { connectionId: string; startDate: string; endDate: string },
+    correlationId: string,
+  ): Promise<Food99FinancialSyncResultDTO> {
+    const result = await this.runWithConnectionLock(tenantId, input.connectionId, () => this.syncCanonical(tenantId, input, correlationId));
+    if (!result.acquired || !result.value) throw new ConflictException('A sincronizacao financeira desta loja ja esta em andamento.');
+    return result.value;
+  }
+
+  async syncAutomatically(
+    tenantId: string,
+    input: { connectionId: string; startDate: string; endDate: string },
+    correlationId: string,
+  ): Promise<Food99FinancialSyncResultDTO | null> {
+    const result = await this.runWithConnectionLock(tenantId, input.connectionId, () => this.syncCanonical(tenantId, input, correlationId));
+    return result.acquired ? result.value ?? null : null;
+  }
+
+  private async runWithConnectionLock<T>(tenantId: string, connectionId: string, action: () => Promise<T>) {
+    if (!this.connectionLock) return { acquired: true, value: await action() };
+    return this.connectionLock.tryRun(tenantId, connectionId, action);
+  }
+
+  private async syncCanonical(
     tenantId: string,
     input: { connectionId: string; startDate: string; endDate: string },
     correlationId: string,
