@@ -379,6 +379,8 @@ export interface OrderResponseDTO {
   // Scheduling
   scheduledFor?: string | null;
   isScheduled?: boolean | null;
+  /** Official 99Food Bill Data aggregate in cents; null until Bill Data is available. */
+  expectedNetAmountCents: number | null;
   operational?: OrderOperationalViewModel;
 }
 

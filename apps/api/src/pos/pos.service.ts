@@ -911,6 +911,7 @@ export class PosService {
         note: t.note,
         createdAt: t.createdAt.toISOString(),
       })),
+      expectedNetAmountCents: null,
       createdAt: order.createdAt.toISOString(),
       updatedAt: order.updatedAt.toISOString(),
     };

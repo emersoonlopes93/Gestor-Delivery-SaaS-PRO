@@ -53,7 +53,9 @@ describe('99Food financial reconciliation UI contract', () => {
     expect(legacyPayment).toContain('Venda dos produtos');
     expect(legacyPayment).toContain('Total pago pelo cliente');
     expect(legacyPayment).toContain('Valor a cobrar');
-    expect(legacyPayment).toContain('Ganho estimado da loja');
+    expect(legacyPayment).toContain('Valor líquido previsto');
+    expect(legacyPayment).not.toContain('Ganho estimado da loja');
+    expect(legacyPayment).not.toContain('Repasse liquidado');
     expect(v2Details).toContain('OrderPaymentSection');
     expect(v2Details).not.toContain('merchantEstimatedReceivable =');
     expect(v2Details).not.toContain('withdrawAmount');

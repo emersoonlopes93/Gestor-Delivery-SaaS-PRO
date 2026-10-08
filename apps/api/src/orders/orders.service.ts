@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { evaluateOwnFleetEligibility } from '../delivery/own-fleet-eligibility';
-import { OrderStatus, Prisma, DineInTable, Order as PrismaOrder, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { MarketplaceProvider, OrderStatus, Prisma, DineInTable, Order as PrismaOrder, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
@@ -1009,6 +1009,8 @@ export class OrdersService {
           select: {
             id: true,
             provider: true,
+            connectionId: true,
+            externalOrderId: true,
             externalDisplayId: true,
             statusExternal: true,
             deliveryOwnership: true,
@@ -1026,7 +1028,44 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    return this.mapOrderResponse(order);
+    const expectedNetAmountCents = await this.getExpectedNetAmountCents(
+      tenantId,
+      order.marketplaceOrders,
+    );
+
+    return this.mapOrderResponse(order, expectedNetAmountCents);
+  }
+
+  /**
+   * The order detail only reads already-synchronized Bill Data. It never calls
+   * the provider and uses the exact connection-scoped external order identity.
+   */
+  private async getExpectedNetAmountCents(
+    tenantId: string,
+    marketplaceOrders: Array<{
+      provider: string;
+      connectionId: string;
+      externalOrderId: string;
+    }>,
+  ): Promise<number | null> {
+    const food99Order = marketplaceOrders.find((entry) => entry.provider === MarketplaceProvider.FOOD_99);
+    if (!food99Order) return null;
+
+    const aggregate = await this.prisma.marketplaceBillEntry.aggregate({
+      where: {
+        tenantId,
+        provider: MarketplaceProvider.FOOD_99,
+        connectionId: food99Order.connectionId,
+        orderId: food99Order.externalOrderId,
+        orderType: { not: 5 },
+      },
+      _sum: { settlementAmount: true },
+    });
+    const amount = aggregate._sum.settlementAmount;
+    if (amount === null) return null;
+
+    const cents = Number(amount);
+    return Number.isSafeInteger(cents) ? cents : null;
   }
 
   async getPublicOrderSummary(identifier: string, token?: string): Promise<OrderResponseDTO> {
@@ -1200,6 +1239,8 @@ export class OrdersService {
     marketplaceOrders?: Array<{
       provider: string;
       id?: string;
+      connectionId?: string;
+      externalOrderId?: string;
       externalDisplayId?: string | null;
       statusExternal?: string | null;
       deliveryOwnership: string;
@@ -1207,7 +1248,7 @@ export class OrdersService {
       normalizedPayload?: Prisma.JsonValue | null;
       operations: Array<{ operation: string; status: string }>;
     }>;
-  }): OrderResponseDTO {
+  }, expectedNetAmountCents: number | null = null): OrderResponseDTO {
     const fulfillmentType = this.mapFulfillmentType(order.fulfillmentType);
     const marketplaceOrder = order.marketplaceOrders?.[0];
     return {
@@ -1230,6 +1271,7 @@ export class OrdersService {
       changeFor: order.changeFor ? Number(order.changeFor) : null,
       scheduledFor: order.scheduledFor ? order.scheduledFor.toISOString() : null,
       isScheduled: order.isScheduled ?? false,
+      expectedNetAmountCents,
       ...(order.marketplaceOrders ? {
         operational: getOrderOperationalViewModel({
           status: order.status as OrderStatus,

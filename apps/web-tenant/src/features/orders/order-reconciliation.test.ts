@@ -22,6 +22,7 @@ function detail(overrides: Partial<OrderResponseDTO> = {}): OrderResponseDTO {
   return {
     id: 'order-1', orderNumber: '101', status: 'pending', fulfillmentType: 'delivery', customerName: 'Ana', customerPhone: '11999990000',
     itemsSubtotal: 38, discountTotal: 0, deliveryFee: 4, serviceFee: 0, total: 42, sourceChannel: 'storefront', paymentMethod: 'pix' as OrderResponseDTO['paymentMethod'],
+    expectedNetAmountCents: null,
     items: [{ id: 'item-1', lineType: 'product', productId: 'product-1', comboId: null, quantity: 2, unitPrice: 19, lineTotal: 38, notes: null, snapshotName: 'Pizza', snapshotImage: null, snapshotBasePrice: 19, snapshotExtrasTotal: 0, snapshotComposition: null }],
     timeline: [], createdAt: '2026-09-06T12:00:00.000Z', updatedAt: '2026-09-06T12:00:00.000Z', operational: operational(), ...overrides,
   };

@@ -423,6 +423,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 serviceFee={order.serviceFee}
                 discountTotal={order.discountTotal}
                 total={order.total}
+                expectedNetAmountCents={order.expectedNetAmountCents}
                 financialSummary={order.operational?.financialSummary}
                 paymentMethod={order.paymentMethod}
                 changeFor={order.changeFor}

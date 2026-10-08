@@ -178,7 +178,7 @@ function Summary({ detail, detailState, origin, deliveryLabel, channel }: { deta
     </div>
     <aside className="space-y-6">
       <section className="border border-border p-4"><p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">Logística</p><p className="mt-2 text-sm font-bold text-foreground">{deliveryLabel}</p><ProviderLogisticsFacts detail={detail} channel={channel} /></section>
-      <OrderPaymentSection itemsSubtotal={detail.itemsSubtotal} deliveryFee={detail.deliveryFee} serviceFee={detail.serviceFee} discountTotal={detail.discountTotal} total={detail.total} paymentMethod={detail.paymentMethod} changeFor={detail.changeFor} financialSummary={detail.operational?.financialSummary} />
+      <OrderPaymentSection itemsSubtotal={detail.itemsSubtotal} deliveryFee={detail.deliveryFee} serviceFee={detail.serviceFee} discountTotal={detail.discountTotal} total={detail.total} paymentMethod={detail.paymentMethod} changeFor={detail.changeFor} expectedNetAmountCents={detail.expectedNetAmountCents} financialSummary={detail.operational?.financialSummary} />
     </aside>
   </div>;
 }

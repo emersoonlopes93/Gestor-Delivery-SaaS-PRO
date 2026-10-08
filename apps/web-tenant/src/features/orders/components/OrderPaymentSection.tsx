@@ -12,6 +12,7 @@ interface OrderPaymentSectionProps {
   changeFor?: number | null;
   couponCode?: string | null;
   cashbackUsed?: number | null;
+  expectedNetAmountCents?: number | null;
   financialSummary?: OrderFinancialSummary;
 }
 
@@ -36,6 +37,7 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
   changeFor,
   couponCode,
   cashbackUsed,
+  expectedNetAmountCents,
   financialSummary,
 }: OrderPaymentSectionProps) {
   
@@ -130,18 +132,11 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
                 </p>
               ) : null}
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-muted-foreground">Ganho estimado da loja</span>
+                <span className="font-medium text-muted-foreground">Valor líquido previsto</span>
                 <span className="font-black text-foreground">
-                  {financialValue(
-                    financialSummary.merchantEstimatedReceivableState,
-                    financialSummary.merchantEstimatedReceivable,
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-muted-foreground">Repasse liquidado</span>
-                <span className="font-black text-foreground">
-                  {financialValue(financialSummary.settledReceivableState, financialSummary.settledReceivable)}
+                  {expectedNetAmountCents === null || expectedNetAmountCents === undefined
+                    ? 'A confirmar'
+                    : fmt(expectedNetAmountCents / 100)}
                 </span>
               </div>
             </div>

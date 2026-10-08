@@ -19,7 +19,12 @@ const baseFinancial: OrderFinancialSummary = {
   platformFeesState: 'UNKNOWN',
 };
 
-function render(financialSummary: OrderFinancialSummary, paymentMethod = 'pix', discountTotal = 0): string {
+function render(
+  financialSummary: OrderFinancialSummary,
+  paymentMethod = 'pix',
+  discountTotal = 0,
+  expectedNetAmountCents: number | null = null,
+): string {
   return renderToStaticMarkup(
     <OrderPaymentSection
       itemsSubtotal={50}
@@ -28,6 +33,7 @@ function render(financialSummary: OrderFinancialSummary, paymentMethod = 'pix', 
       discountTotal={discountTotal}
       total={42}
       paymentMethod={paymentMethod}
+      expectedNetAmountCents={expectedNetAmountCents}
       financialSummary={financialSummary}
     />,
   );
@@ -47,7 +53,7 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
       amountToCollect: 0,
       amountToCollectState: 'KNOWN',
       collectionResponsibility: 'MARKETPLACE',
-    }, 'pix', 8);
+    }, 'pix', 8, 5120);
 
     expect(html).toContain('Venda dos produtos');
     expect(html).toContain('50,00');
@@ -55,10 +61,10 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
     expect(html).toContain('Total pago pelo cliente');
     expect(html).toContain('Valor a cobrar');
     expect(html).toContain('Não cobrar na entrega');
-    expect(html).toContain('Ganho estimado da loja');
+    expect(html).toContain('Valor líquido previsto');
     expect(html).toContain('51,20');
-    expect(html).toContain('Repasse liquidado');
-    expect(html).toContain('A confirmar');
+    expect(html).not.toContain('Ganho estimado da loja');
+    expect(html).not.toContain('Repasse liquidado');
     expect(html).toContain('origem não informada');
   });
 
@@ -73,7 +79,7 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
 
     expect(html).toContain('Desconto suportado pela loja');
     expect(html).toContain('6,35');
-    expect(html).toContain('Repasse liquidado');
+    expect(html).toContain('Valor líquido previsto');
     expect(html).toContain('A confirmar');
   });
 
@@ -100,6 +106,20 @@ describe('OrderPaymentSection 99Food financial semantics', () => {
     expect(html).toContain('Valor a cobrar');
     expect(html).toContain('A confirmar');
     expect(html).toContain('Valor a cobrar</span><span class="font-black text-foreground">A confirmar');
+  });
+
+  it('renders a zero Bill Data aggregate as currency rather than confirmation pending', () => {
+    const html = render({
+      ...baseFinancial,
+      paymentState: 'PAID',
+      paymentLabel: 'Pago na 99Food',
+      amountToCollect: 0,
+      amountToCollectState: 'KNOWN',
+    }, 'pix', 0, 0);
+
+    expect(html).toContain('Valor líquido previsto');
+    expect(html).toContain('0,00');
+    expect(html).not.toContain('A confirmar');
   });
 
   it('renders not-applicable financial facts explicitly instead of zero or unknown', () => {

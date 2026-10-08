@@ -23,12 +23,13 @@ describe('99Food order operational contract', () => {
     expect(v2Card).not.toContain("'Sincronizado'");
   });
 
-  it('separates gross, customer payment, estimated gain and settled receivable', () => {
+  it('shows only the official expected net amount on the order detail', () => {
     expect(payment).toContain('Venda dos produtos');
     expect(payment).toContain('Total pago pelo cliente');
     expect(payment).toContain('Valor a cobrar');
-    expect(payment).toContain('Ganho estimado da loja');
-    expect(payment).toContain('Repasse liquidado');
-    expect(payment).toContain('financialValue(financialSummary.settledReceivableState');
+    expect(payment).toContain('Valor líquido previsto');
+    expect(payment).toContain('expectedNetAmountCents / 100');
+    expect(payment).not.toContain('Ganho estimado da loja');
+    expect(payment).not.toContain('Repasse liquidado');
   });
 });

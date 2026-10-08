@@ -16,6 +16,7 @@ function makeOrder(): OrderResponseDTO {
     total: 24,
     sourceChannel: '99food',
     paymentMethod: PaymentMethod.cash,
+    expectedNetAmountCents: null,
     timeline: [],
     createdAt: '2026-09-06T12:00:00.000Z',
     updatedAt: '2026-09-06T12:00:00.000Z',
