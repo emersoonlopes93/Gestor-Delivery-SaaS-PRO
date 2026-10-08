@@ -231,7 +231,7 @@ export class Food99FinancialClientService {
       if (rows.length === 0) break;
       pageNo += 1;
     } while (pageNo <= totalPages);
-    this.logger.log({
+    this.logger.debug({
       message: 'food99_financial_fetch_completed',
       endpoint: financialEndpointName(path),
       correlationId,

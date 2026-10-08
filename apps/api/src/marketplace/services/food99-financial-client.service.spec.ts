@@ -109,7 +109,6 @@ describe('Food99FinancialClientService', () => {
 
   it('logs only sanitized pagination and Bill Data freshness metadata', async () => {
     const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
-    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     global.fetch = jest.fn().mockResolvedValue(new Response(
       '{"errno":0,"data":{"data":[{"orderId":5764690163401820946,"businessTs":1760054400000,"settlementAmount":1234}],"total_page":1}}',
       { status: 200 },
@@ -135,12 +134,12 @@ describe('Food99FinancialClientService', () => {
       providerOldestBusinessAt: '2025-10-10T00:00:00.000Z',
       providerNewestBusinessAt: '2025-10-10T00:00:00.000Z',
     }));
-    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({
       message: 'food99_financial_fetch_completed',
       paginationComplete: true,
       totalRecordsReceived: 1,
     }));
-    const output = JSON.stringify([...debug.mock.calls, ...log.mock.calls]);
+    const output = JSON.stringify(debug.mock.calls);
     expect(output).not.toContain('shop-token');
     expect(output).not.toContain('5764690163401820946');
   });
