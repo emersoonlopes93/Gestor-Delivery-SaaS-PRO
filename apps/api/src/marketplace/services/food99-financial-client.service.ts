@@ -4,7 +4,21 @@ import { MarketplaceConnection } from '@prisma/client';
 import { Food99ApiError } from '../providers/food99-api.error';
 import { Food99FinancialTokenService } from './food99-financial-token.service';
 
-export type Food99FinancialRecord = Record<string, unknown>;
+export type Food99SettlementMoneyField = 'withdrawAmount' | 'cnpjWithdrawAmount' | 'cercAmount';
+
+export type Food99SettlementRawFieldShape = {
+  rawType: 'string' | 'number' | 'null' | 'boolean' | 'object' | 'array' | 'unknown';
+  rawValue: string | null;
+  numberIsInteger: boolean | null;
+};
+
+export type Food99SettlementRawShape = Partial<Record<Food99SettlementMoneyField, Food99SettlementRawFieldShape>>;
+
+export const FOOD99_SETTLEMENT_RAW_SHAPE = Symbol('food99SettlementRawShape');
+
+export type Food99FinancialRecord = Record<string, unknown> & {
+  [FOOD99_SETTLEMENT_RAW_SHAPE]?: Food99SettlementRawShape;
+};
 
 export type Food99FinancialWindow = {
   startDate: string;
@@ -49,6 +63,12 @@ const FINANCIAL_MONEY_FIELDS = [
 
 const DAY_MS = 86_400_000;
 
+const SETTLEMENT_MONEY_FIELDS: readonly Food99SettlementMoneyField[] = [
+  'withdrawAmount',
+  'cnpjWithdrawAmount',
+  'cercAmount',
+];
+
 export function parseFood99FinancialJson(raw: string): unknown {
   const fields = [...FINANCIAL_IDENTIFIER_FIELDS, ...FINANCIAL_MONEY_FIELDS]
     .join('|');
@@ -63,6 +83,10 @@ export function parseFood99FinancialJson(raw: string): unknown {
     ),
   );
   return JSON.parse(listIntegersPreserved) as unknown;
+}
+
+export function getFood99SettlementRawShape(record: Food99FinancialRecord): Food99SettlementRawShape | null {
+  return record[FOOD99_SETTLEMENT_RAW_SHAPE] ?? null;
 }
 
 export function validateFood99FinancialRange(
@@ -198,12 +222,13 @@ export class Food99FinancialClientService {
         );
       }
       const raw = await response.text();
-      const payload = this.asRecord(this.tryParse(raw));
+      const parsed = this.tryParse(raw);
+      const payload = this.asRecord(parsed.payload);
       if (!response.ok || !this.isProviderSuccess(payload)) {
         throw this.toFinancialError(response.status, payload);
       }
       const data = this.asRecord(payload?.data);
-      const rows = this.readRows(data);
+      const rows = this.readRows(data, parsed.settlementRawShapes);
       totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
       all.push(...rows);
       if (rows.length === 0) break;
@@ -239,9 +264,12 @@ export class Food99FinancialClientService {
     }
   }
 
-  private tryParse(raw: string): unknown {
+  private tryParse(raw: string): { payload: unknown; settlementRawShapes: Map<string, Food99SettlementRawShape> } {
     try {
-      return parseFood99FinancialJson(raw);
+      return {
+        payload: parseFood99FinancialJson(raw),
+        settlementRawShapes: collectSettlementRawShapes(raw),
+      };
     } catch {
       throw new Food99ApiError(
         '99Food financial API returned invalid JSON.',
@@ -257,7 +285,10 @@ export class Food99FinancialClientService {
     return typeof payload.errno === 'number' && payload.errno === 0 && payload.data !== undefined;
   }
 
-  private readRows(data: Record<string, unknown> | null): Food99FinancialRecord[] {
+  private readRows(
+    data: Record<string, unknown> | null,
+    settlementRawShapes: Map<string, Food99SettlementRawShape>,
+  ): Food99FinancialRecord[] {
     const candidate = data?.data ?? data?.list ?? data?.records ?? data?.items;
     if (!Array.isArray(candidate)) {
       throw new Food99ApiError(
@@ -276,6 +307,16 @@ export class Food99FinancialClientService {
           502,
           'INVALID_RESPONSE',
         );
+      }
+      const weekPaymentId = record.weekPaymentId;
+      if (typeof weekPaymentId === 'string') {
+        const rawShape = settlementRawShapes.get(weekPaymentId);
+        if (rawShape) {
+          Object.defineProperty(record, FOOD99_SETTLEMENT_RAW_SHAPE, {
+            value: rawShape,
+            enumerable: false,
+          });
+        }
       }
       return record;
     });
@@ -337,6 +378,133 @@ export class Food99FinancialClientService {
   private timeoutMs(): number {
     return Number(this.config.get<string>('MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS') || 10_000);
   }
+}
+
+type RawSettlementObject = {
+  fields: Partial<Record<Food99SettlementMoneyField | 'weekPaymentId', RawJsonScalar>>;
+};
+
+type RawJsonScalar = {
+  type: Food99SettlementRawFieldShape['rawType'];
+  token: string | null;
+};
+
+function collectSettlementRawShapes(raw: string): Map<string, Food99SettlementRawShape> {
+  const results = new Map<string, Food99SettlementRawShape>();
+  const stack: RawSettlementObject[] = [];
+  let index = 0;
+  while (index < raw.length) {
+    const character = raw[index];
+    if (character === '{') {
+      stack.push({ fields: {} });
+      index += 1;
+      continue;
+    }
+    if (character === '}') {
+      const completed = stack.pop();
+      if (completed) addSettlementRawShape(results, completed);
+      index += 1;
+      continue;
+    }
+    if (character !== '"') {
+      index += 1;
+      continue;
+    }
+    const key = readRawJsonString(raw, index);
+    if (!key) break;
+    let cursor = skipWhitespace(raw, key.end);
+    if (raw[cursor] !== ':') {
+      index = key.end;
+      continue;
+    }
+    cursor = skipWhitespace(raw, cursor + 1);
+    const value = readRawJsonScalar(raw, cursor);
+    if (!value) break;
+    const current = stack[stack.length - 1];
+    if (current && isObservedSettlementField(key.value)) {
+      current.fields[key.value] = value.scalar;
+    }
+    index = value.end;
+  }
+  return results;
+}
+
+function addSettlementRawShape(results: Map<string, Food99SettlementRawShape>, object: RawSettlementObject): void {
+  const weekPaymentId = object.fields.weekPaymentId;
+  if (!weekPaymentId?.token) return;
+  const key = rawScalarToString(weekPaymentId);
+  if (!key) return;
+  const shape: Food99SettlementRawShape = {};
+  for (const field of SETTLEMENT_MONEY_FIELDS) {
+    const value = object.fields[field];
+    if (!value) continue;
+    shape[field] = {
+      rawType: value.type,
+      rawValue: value.token,
+      numberIsInteger: value.type === 'number' && value.token !== null ? /^-?\d+$/.test(value.token) : null,
+    };
+  }
+  if (Object.keys(shape).length > 0) results.set(key, shape);
+}
+
+function isObservedSettlementField(value: string): value is Food99SettlementMoneyField | 'weekPaymentId' {
+  return value === 'weekPaymentId' || SETTLEMENT_MONEY_FIELDS.includes(value as Food99SettlementMoneyField);
+}
+
+function readRawJsonString(raw: string, start: number): { value: string; end: number } | null {
+  let index = start + 1;
+  while (index < raw.length) {
+    if (raw[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (raw[index] === '"') {
+      const token = raw.slice(start, index + 1);
+      try {
+        return { value: JSON.parse(token) as string, end: index + 1 };
+      } catch {
+        return null;
+      }
+    }
+    index += 1;
+  }
+  return null;
+}
+
+function readRawJsonScalar(raw: string, start: number): { scalar: RawJsonScalar; end: number } | null {
+  const character = raw[start];
+  if (character === '"') {
+    const parsed = readRawJsonString(raw, start);
+    return parsed ? { scalar: { type: 'string', token: raw.slice(start, parsed.end) }, end: parsed.end } : null;
+  }
+  if (raw.startsWith('null', start)) return { scalar: { type: 'null', token: null }, end: start + 4 };
+  if (raw.startsWith('true', start) || raw.startsWith('false', start)) {
+    const end = raw.startsWith('true', start) ? start + 4 : start + 5;
+    return { scalar: { type: 'boolean', token: raw.slice(start, end) }, end };
+  }
+  if (character === '{') return { scalar: { type: 'object', token: null }, end: start };
+  if (character === '[') return { scalar: { type: 'array', token: null }, end: start };
+  const match = raw.slice(start).match(/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+  if (!match) return { scalar: { type: 'unknown', token: null }, end: start + 1 };
+  return { scalar: { type: 'number', token: match[0] }, end: start + match[0].length };
+}
+
+function rawScalarToString(value: RawJsonScalar): string | null {
+  if (!value.token) return null;
+  if (value.type === 'string') {
+    try {
+      return JSON.parse(value.token) as string;
+    } catch {
+      return null;
+    }
+  }
+  return value.type === 'number' ? value.token : null;
+}
+
+function skipWhitespace(value: string, start: number): number {
+  let index = start;
+  while (index < value.length && /\s/.test(value[index])) index += 1;
+  return index;
 }
 
 function parseIsoDate(value: string): Date {

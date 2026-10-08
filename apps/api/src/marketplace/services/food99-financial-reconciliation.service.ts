@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -26,6 +27,9 @@ import { Food99ApiError } from '../providers/food99-api.error';
 import {
   Food99FinancialClientService,
   Food99FinancialRecord,
+  Food99SettlementMoneyField,
+  Food99SettlementRawFieldShape,
+  getFood99SettlementRawShape,
   splitFood99FinancialBackfill,
 } from './food99-financial-client.service';
 
@@ -79,8 +83,16 @@ type ParsedSettlement = {
   rawPayload: Prisma.InputJsonValue;
 };
 
+class SettlementMoneyFieldValidationError extends BadGatewayException {
+  constructor(readonly field: Food99SettlementMoneyField) {
+    super(`99Food money field ${field} must be integer cents.`);
+  }
+}
+
 @Injectable()
 export class Food99FinancialReconciliationService {
+  private readonly logger = new Logger(Food99FinancialReconciliationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly client: Food99FinancialClientService,
@@ -134,7 +146,7 @@ export class Food99FinancialReconciliationService {
           if (created) result.billEntriesCreated += 1;
         }
         for (const record of deduplicateSettlementRecords(settlementRecords)) {
-          const persisted = await this.upsertSettlement(tenantId, connection.id, record);
+          const persisted = await this.upsertSettlement(tenantId, connection.id, record, correlationId);
           if (persisted.created) result.settlementsCreated += 1;
           if (persisted.updated) result.settlementsUpdated += 1;
           if (persisted.discrepancy) result.discrepanciesDetected += 1;
@@ -388,9 +400,18 @@ export class Food99FinancialReconciliationService {
     tenantId: string,
     connectionId: string,
     record: Food99FinancialRecord,
+    correlationId: string,
     retryOnUniqueConflict = true,
   ): Promise<{ created: boolean; updated: boolean; discrepancy: boolean }> {
-    const parsed = parseSettlement(record);
+    let parsed: ParsedSettlement;
+    try {
+      parsed = parseSettlement(record);
+    } catch (error) {
+      if (error instanceof SettlementMoneyFieldValidationError) {
+        this.logSettlementContractMismatch(record, error.field, correlationId);
+      }
+      throw error;
+    }
     try {
       return await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       const existing = await tx.marketplaceSettlement.findUnique({
@@ -474,7 +495,7 @@ export class Food99FinancialReconciliationService {
       if (retryOnUniqueConflict
         && error instanceof Prisma.PrismaClientKnownRequestError
         && error.code === 'P2002') {
-        return this.upsertSettlement(tenantId, connectionId, record, false);
+        return this.upsertSettlement(tenantId, connectionId, record, correlationId, false);
       }
       throw error;
     }
@@ -556,6 +577,28 @@ export class Food99FinancialReconciliationService {
       hasCompositionDiscrepancy: difference !== 0n,
     };
   }
+
+  private logSettlementContractMismatch(
+    record: Food99FinancialRecord,
+    field: Food99SettlementMoneyField,
+    correlationId: string,
+  ): void {
+    const rawShape = getFood99SettlementRawShape(record);
+    this.logger.warn({
+      message: '99food_settlement_contract_mismatch',
+      provider: '99Food',
+      endpoint: 'getShopBillWeek',
+      field,
+      currency: sanitizeCurrency(record.currency),
+      weekPaymentId: maskFinancialIdentifier(record.weekPaymentId),
+      requestId: correlationId,
+      fields: {
+        withdrawAmount: describeSettlementField(record.withdrawAmount, rawShape?.withdrawAmount),
+        cnpjWithdrawAmount: describeSettlementField(record.cnpjWithdrawAmount, rawShape?.cnpjWithdrawAmount),
+        cercAmount: describeSettlementField(record.cercAmount, rawShape?.cercAmount),
+      },
+    });
+  }
 }
 
 function parseBillEntry(record: Food99FinancialRecord): ParsedBillEntry {
@@ -606,7 +649,7 @@ function parseSettlement(record: Food99FinancialRecord): ParsedSettlement {
   const dayPaymentIds = [...new Set(dayPaymentList.map((value) => losslessValue(value, 'dayPaymentIDList')))];
   return {
     weekPaymentId: requiredLosslessString(record, 'weekPaymentId'),
-    withdrawAmount: requiredCents(record, 'withdrawAmount'),
+    withdrawAmount: requiredSettlementCents(record, 'withdrawAmount'),
     withdrawDate: requiredProviderDate(record.withdrawDate, 'withdrawDate'),
     liabilityParty: requiredText(record, 'liability'),
     shopId: requiredLosslessString(record, 'shopId'),
@@ -615,8 +658,8 @@ function parseSettlement(record: Food99FinancialRecord): ParsedSettlement {
     currency: requiredText(record, 'currency').toUpperCase(),
     payeeCnpj: optionalText(record.payeeCnpj),
     payerCnpj: optionalText(record.payerCnpj) ?? optionalText(record.payerCNpj),
-    cnpjWithdrawAmount: optionalCents(record, 'cnpjWithdrawAmount'),
-    cercAmount: optionalCents(record, 'cercAmount'),
+    cnpjWithdrawAmount: optionalSettlementCents(record, 'cnpjWithdrawAmount'),
+    cercAmount: optionalSettlementCents(record, 'cercAmount'),
     dayPaymentIds,
     rawPayload: record as Prisma.InputJsonValue,
   };
@@ -719,6 +762,73 @@ function optionalCents(record: Food99FinancialRecord, field: string): bigint | n
   const value = record[field];
   if (value === undefined || value === null || value === '') return null;
   return requiredCents(record, field);
+}
+
+function requiredSettlementCents(
+  record: Food99FinancialRecord,
+  field: Food99SettlementMoneyField,
+): bigint {
+  const value = record[field];
+  if (typeof value !== 'string' || !/^-?\d+$/.test(value)) {
+    throw new SettlementMoneyFieldValidationError(field);
+  }
+  return BigInt(value);
+}
+
+function optionalSettlementCents(
+  record: Food99FinancialRecord,
+  field: Exclude<Food99SettlementMoneyField, 'withdrawAmount'>,
+): bigint | null {
+  const value = record[field];
+  if (value === undefined || value === null || value === '') return null;
+  return requiredSettlementCents(record, field);
+}
+
+function describeSettlementField(
+  value: unknown,
+  rawShape: Food99SettlementRawFieldShape | undefined,
+): Record<string, unknown> {
+  return {
+    rawProvider: rawShape ? {
+      type: rawShape.rawType,
+      value: sanitizeFinancialValue(rawShape.rawValue, rawShape.rawType),
+      numberIsInteger: rawShape.numberIsInteger,
+    } : null,
+    postParse: describeRuntimeValue(value),
+    preValidation: describeRuntimeValue(value),
+  };
+}
+
+function describeRuntimeValue(value: unknown): Record<string, unknown> {
+  const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+  return {
+    type,
+    value: sanitizeFinancialValue(value, type),
+    numberIsInteger: typeof value === 'number' ? Number.isInteger(value) : null,
+    nullish: value === null ? 'null' : value === undefined ? 'undefined' : null,
+  };
+}
+
+function sanitizeFinancialValue(value: unknown, type: string): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = type === 'string' && typeof value === 'string'
+    ? value.replace(/^"|"$/g, '')
+    : typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+      : null;
+  if (normalized === null) return `[${type}]`;
+  const digits = normalized.replace(/^-/, '').replace(/\D/g, '');
+  if (digits.length > 8) return `***${digits.slice(-4)}`;
+  return normalized;
+}
+
+function sanitizeCurrency(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z]{3}$/.test(value) ? value.toUpperCase() : null;
+}
+
+function maskFinancialIdentifier(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  return value.length <= 4 ? '***' : `***${value.slice(-4)}`;
 }
 
 function parseOptionalTimestamp(value: string): Date | null {
