@@ -34,6 +34,8 @@ import { Food99FinancialClientService } from './services/food99-financial-client
 import { Food99FinancialTokenService } from './services/food99-financial-token.service';
 import { Food99CashConfirmationService } from './services/food99-cash-confirmation.service';
 import { Food99FinancialReconciliationService } from './services/food99-financial-reconciliation.service';
+import { Food99FinancialAutoSyncService } from './services/food99-financial-auto-sync.service';
+import { Food99FinancialSyncLockService } from './services/food99-financial-sync-lock.service';
 import { MarketplaceCatalogMappingService } from './services/marketplace-catalog-mapping.service';
 import { InventoryModule } from '../inventory/inventory.module';
 
@@ -92,6 +94,8 @@ const enableMarketplaceQueue =
     Food99FinancialTokenService,
     Food99CashConfirmationService,
     Food99FinancialReconciliationService,
+    Food99FinancialSyncLockService,
+    Food99FinancialAutoSyncService,
     MarketplaceCatalogMappingService,
     ...(enableMarketplaceQueue ? [MarketplaceEventProcessor] : []),
   ],

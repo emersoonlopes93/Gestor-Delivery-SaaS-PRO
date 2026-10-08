@@ -26,6 +26,7 @@ import { buildMarketplaceOrderIdempotencyKey } from '../marketplace-idempotency'
 import { MarketplaceCatalogMappingService } from './marketplace-catalog-mapping.service';
 import { TheoreticalStockService } from '../../inventory/theoretical-stock.service';
 import { OrderAlertsService } from '../../orders/alerts/order-alerts.service';
+import { Food99FinancialAutoSyncService } from './food99-financial-auto-sync.service';
 
 @Injectable()
 export class MarketplaceOrderIngestionService {
@@ -43,6 +44,7 @@ export class MarketplaceOrderIngestionService {
     private readonly catalogMappings: MarketplaceCatalogMappingService = {} as MarketplaceCatalogMappingService,
     private readonly theoreticalStockService: TheoreticalStockService = {} as TheoreticalStockService,
     private readonly orderAlertsService: OrderAlertsService = {} as OrderAlertsService,
+    private readonly food99FinancialAutoSync?: Food99FinancialAutoSyncService,
   ) {}
 
   async processInboxEvent(eventInboxId: string) {
@@ -267,6 +269,20 @@ export class MarketplaceOrderIngestionService {
       }
 
       await this.markInboxProcessed(inbox.id);
+      if (catalogResolution.order.provider === MarketplaceProvider.FOOD_99 && internalOrderId) {
+        const autoSync = this.food99FinancialAutoSync?.requestForOrderActivity({
+          tenantId: connection.tenantId,
+          connectionId: connection.id,
+        });
+        void autoSync?.catch((error: unknown) => {
+          this.logger.warn({
+            message: 'food99_financial_auto_sync_enqueue_failed',
+            tenantId: connection.tenantId,
+            connectionId: connection.id,
+            error: error instanceof Error ? error.message.slice(0, 300) : 'unknown_error',
+          });
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown marketplace ingestion error.';
       await this.failInbox(inbox.id, message);

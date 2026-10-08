@@ -70,6 +70,12 @@ const baseEnvSchema = z.object({
   MARKETPLACE_99FOOD_POLLING_INTERVAL_MS: z.coerce.number().int().min(30000).max(300000).default(30000),
   MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS: z.coerce.number().int().min(30000).max(3600000).default(300000),
   MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN: z.coerce.number().int().min(1).max(1000).default(100),
+  MARKETPLACE_99FOOD_FINANCIAL_AUTO_SYNC_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_99FOOD_FINANCIAL_HOT_LOOKBACK_DAYS: z.coerce.number().int().min(1).max(31).default(3),
+  MARKETPLACE_99FOOD_FINANCIAL_HOT_SYNC_CADENCE_MS: z.coerce.number().int().min(300000).max(21600000).default(900000),
+  MARKETPLACE_99FOOD_FINANCIAL_RECONCILIATION_LOOKBACK_DAYS: z.coerce.number().int().min(1).max(31).default(31),
+  MARKETPLACE_99FOOD_FINANCIAL_RECONCILIATION_CADENCE_MS: z.coerce.number().int().min(3600000).max(86400000).default(21600000),
+  MARKETPLACE_99FOOD_FINANCIAL_AUTO_SYNC_CONNECTIONS_PER_SCAN: z.coerce.number().int().min(1).max(1000).default(100),
   MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: z.string().default(''),
   MARKETPLACE_CREDENTIALS_KEY_VERSION: z.string().min(1).default('current'),
   MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY: z.string().default(''),
@@ -222,6 +228,15 @@ export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
       code: z.ZodIssueCode.custom,
       path: ['MARKETPLACE_99FOOD_POLLING_ENABLED'],
       message: 'Polling 99Food exige integracao, Redis e BullMQ habilitados.',
+    });
+  }
+
+  if (data.MARKETPLACE_99FOOD_FINANCIAL_AUTO_SYNC_ENABLED === 'true'
+    && (data.MARKETPLACE_99FOOD_ENABLED !== 'true' || data.BULLMQ_ENABLED !== 'true' || data.REDIS_ENABLED !== 'true')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['MARKETPLACE_99FOOD_FINANCIAL_AUTO_SYNC_ENABLED'],
+      message: 'Auto sync financeiro 99Food exige integracao, Redis e BullMQ habilitados.',
     });
   }
 });
