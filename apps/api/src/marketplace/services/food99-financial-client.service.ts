@@ -17,6 +17,7 @@ const FINANCIAL_IDENTIFIER_FIELDS = [
   'dayPaymentId',
   'weekPaymentId',
   'shopId',
+  'contractorId',
   'acceptor_code',
   'businessTs',
   'businessDateTime',

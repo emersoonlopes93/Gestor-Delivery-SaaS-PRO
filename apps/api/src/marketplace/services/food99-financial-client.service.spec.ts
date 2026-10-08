@@ -108,7 +108,7 @@ describe('Food99FinancialClientService', () => {
 
   it('keeps settlement money as integer numbers while preserving large identifiers losslessly', () => {
     const parsed = parseFood99FinancialJson(
-      '{"weekPaymentId":9223372036854775001,"shopId":5764608924570091908,'
+      '{"weekPaymentId":9223372036854775001,"shopId":5764608924570091908,"contractorId":5764608924570091909,'
       + '"dayPaymentIDList":[1945389697417496990],"withdrawAmount":144842,'
       + '"cnpjWithdrawAmount":144842,"cercAmount":0}',
     );
@@ -116,6 +116,7 @@ describe('Food99FinancialClientService', () => {
     expect(parsed).toEqual({
       weekPaymentId: '9223372036854775001',
       shopId: '5764608924570091908',
+      contractorId: '5764608924570091909',
       dayPaymentIDList: ['1945389697417496990'],
       withdrawAmount: 144842,
       cnpjWithdrawAmount: 144842,
