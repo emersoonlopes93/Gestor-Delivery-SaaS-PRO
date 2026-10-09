@@ -20,9 +20,15 @@ Os endpoints são:
 - `POST https://openapi.99food.com/v3/finance/finance/getShopBillDetail`;
 - `POST https://openapi.99food.com/v3/finance/finance/getShopBillWeek`.
 
-O body envia `acceptor_code=app_shop_id`, datas `YYYYMMDD`, `page_no` e `page_size=200`. Uma requisição cobre no máximo 31 dias; um backfill manual cobre no máximo três meses e é dividido em janelas não sobrepostas. Não há scheduler automático enquanto rate limits oficiais não estiverem disponíveis.
+O body envia `acceptor_code=app_shop_id`, datas `YYYYMMDD`, `page_no` e `page_size=200`. Uma requisição cobre no máximo 31 dias; um backfill manual cobre no máximo três meses e é dividido em janelas não sobrepostas.
+
+Quando `MARKETPLACE_99FOOD_FINANCIAL_AUTO_SYNC_ENABLED=true`, BullMQ agenda uma reconciliação financeira durável por conexão. Exige `MARKETPLACE_99FOOD_ENABLED=true`, `REDIS_ENABLED=true` e `BULLMQ_ENABLED=true`; a validação de ambiente rejeita uma configuração insegura. A atividade de pedido solicita um job coalescido de janela quente sem aguardar o provider. Uma varredura BullMQ recorrente é o fallback de reconciliação. Os padrões são janela quente de três dias coalescida por 15 minutos e reconciliação de 31 dias a cada seis horas; todos são parâmetros limitados e nunca excedem a janela de 31 dias do provider. Essas cadências absorvem o atraso normal de publicação sem gerar uma chamada por pedido.
+
+O endpoint manual `POST /finance/marketplaces/99food/sync` e os jobs automáticos chamam o mesmo serviço canônico. Um lease Redis por tenant e conexão evita que sync manual, janela quente e reconciliação agendada consultem a mesma loja simultaneamente entre instâncias. Job automático ocupado é ignorado até a próxima cadência; chamada manual ocupada recebe conflito, em vez de abrir uma consulta duplicada. BullMQ tenta falhas técnicas três vezes com backoff exponencial iniciado em cinco segundos. Uma resposta válida sem dados novos é sucesso de freshness, não alerta nem inferência de valor zero; a reconciliação recorrente permanece elegível.
 
 Falhas reais de autenticação, autorização, negócio, provider, conteúdo inválido ou conteúdo inesperado não viram coleção vazia nem valor de R$ 0,00. A sincronização não pressupõe WhiteList financeira.
+
+Para uma página financeira sem registros, o envelope documentado continua sendo `data.data=[]`. Como o provider também pode omitir essa lista em intervalo de Settlements sem resultado, o adapter aceita a omissão somente quando `errno=0`, `total_num=0`, `total_page` é `0` ou `1`, `page_no` corresponde à página solicitada e `page_size` é inteiro positivo. Qualquer outro sucesso sem lista permanece `INVALID_RESPONSE`, com metadados de shape sanitizados para diagnóstico; jamais é convertido em lista vazia por heurística.
 
 Antes da consulta financeira, a loja precisa estar com a autorização operacional 99Food confirmada (`CONNECTED`). Uma conexão pendente não chama a Financial API: a API devolve `AUTHORIZATION_NOT_READY` e a interface orienta o gestor a concluir a verificação em **Canais de venda**. Isso não muda o token financeiro, que permanece separado.
 

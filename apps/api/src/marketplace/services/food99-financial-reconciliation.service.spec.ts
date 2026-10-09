@@ -98,6 +98,21 @@ describe('Food99FinancialReconciliationService', () => {
     expect(client.fetchSettlements).not.toHaveBeenCalled();
   });
 
+  it('shares the distributed connection guard with auto sync without corrupting a concurrent manual run', async () => {
+    const { service, client } = setup();
+    const lock = { tryRun: jest.fn().mockResolvedValue({ acquired: false }) };
+    Reflect.set(service, 'connectionLock', lock);
+
+    await expect(service.syncAutomatically('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-auto')).resolves.toBeNull();
+    await expect(service.sync('tenant-1', {
+      connectionId: 'connection-1', startDate: '2026-09-01', endDate: '2026-09-12',
+    }, 'correlation-manual')).rejects.toThrow('ja esta em andamento');
+    expect(lock.tryRun).toHaveBeenCalledTimes(2);
+    expect(client.fetchBillEntries).not.toHaveBeenCalled();
+  });
+
   it.each([1, 2, 3, 4, 5, 8, 9])('ingests orderType %s without changing provider money signs', async (orderType) => {
     const settlementAmount = orderType === 2 || orderType === 3 || orderType === 4 || orderType === 8 ? '-1000' : '5000';
     const { service, prisma } = setup({ bills: [{ ...baseBill, orderType, settlementAmount }] });
