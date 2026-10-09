@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { MarketplaceProvider } from '@prisma/client';
 import { MarketplaceWebhookController } from './marketplace-webhook.controller';
 import { FOOD99_WEBHOOK_SUCCESS_ACK } from '../food99-webhook-ack';
@@ -21,6 +21,7 @@ describe('MarketplaceWebhookController 99Food acknowledgement contract', () => {
   }
 
   it('returns the official body and HTTP 200 after a valid callback is accepted', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     await expect(controller().receiveWebhook('99food', { type: 'orderNew' }, {}, request as never, response as never))
       .resolves.toEqual({ errno: 0, errmsg: 'ok' });
 
@@ -29,6 +30,13 @@ describe('MarketplaceWebhookController 99Food acknowledgement contract', () => {
       provider: MarketplaceProvider.FOOD_99,
       rawBody: request.rawBody,
     }));
+    expect(log).toHaveBeenCalledWith({
+      message: 'food99_webhook_ack_sent',
+      status: HttpStatus.OK,
+      errno: 0,
+      errmsg: 'ok',
+    });
+    log.mockRestore();
   });
 
   it('returns the same official acknowledgement for a valid duplicate', async () => {

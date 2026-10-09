@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Body, Controller, Headers, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { MarketplaceProvider } from '@prisma/client';
 import { Public } from '../../common/decorators';
@@ -10,6 +10,8 @@ import { FOOD99_WEBHOOK_SUCCESS_ACK } from '../food99-webhook-ack';
 
 @Controller('webhooks/marketplaces')
 export class MarketplaceWebhookController {
+  private readonly logger = new Logger(MarketplaceWebhookController.name);
+
   constructor(
     private readonly providerRegistry: MarketplaceProviderRegistryService,
     private readonly inboxService: MarketplaceEventInboxService,
@@ -35,6 +37,12 @@ export class MarketplaceWebhookController {
     });
     if (provider === MarketplaceProvider.FOOD_99) {
       response.status(HttpStatus.OK);
+      this.logger.log({
+        message: 'food99_webhook_ack_sent',
+        status: HttpStatus.OK,
+        errno: FOOD99_WEBHOOK_SUCCESS_ACK.errno,
+        errmsg: FOOD99_WEBHOOK_SUCCESS_ACK.errmsg,
+      });
       return FOOD99_WEBHOOK_SUCCESS_ACK;
     }
     if ('heartbeat' in result) {

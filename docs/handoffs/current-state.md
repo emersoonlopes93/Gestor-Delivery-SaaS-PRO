@@ -2783,3 +2783,5 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - The public 99Food callback route now returns `HTTP 200` with exactly `{ "errno": 0, "errmsg": "ok" }` only after the existing signed inbox path accepts a new event or a confirmed duplicate. The prior `204` acknowledgement was incompatible with the provider guide.
 - Signature validation, tenant/connection resolution, lossless provider IDs, inbox deduplication and failure behavior are unchanged. Invalid signatures or payloads and failures before acceptance do not receive the success acknowledgement.
 - No schema, migration, provider call, remote database action, deployment or merge was performed. Focused webhook/inbox/provider/lifecycle validation and full gates must be recorded on the final branch SHA before promotion.
+
+- Runtime observability adds only `food99_webhook_ack_sent` after an accepted 99Food callback, recording the fixed status and ACK fields without raw payload, signature, credentials, customer data or inbox identifiers. A callback warning about an unmapped payload is not treated as an ACK failure.
