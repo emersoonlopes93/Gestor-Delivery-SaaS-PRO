@@ -6,6 +6,7 @@ import { Public } from '../../common/decorators';
 import { Throttle } from '@nestjs/throttler';
 import { MarketplaceProviderRegistryService } from '../services/marketplace-provider-registry.service';
 import { MarketplaceEventInboxService } from '../services/marketplace-event-inbox.service';
+import { FOOD99_WEBHOOK_SUCCESS_ACK } from '../food99-webhook-ack';
 
 @Controller('webhooks/marketplaces')
 export class MarketplaceWebhookController {
@@ -33,8 +34,8 @@ export class MarketplaceWebhookController {
       body,
     });
     if (provider === MarketplaceProvider.FOOD_99) {
-      response.status(HttpStatus.NO_CONTENT);
-      return undefined;
+      response.status(HttpStatus.OK);
+      return FOOD99_WEBHOOK_SUCCESS_ACK;
     }
     if ('heartbeat' in result) {
       return result.merchantIds === undefined ? undefined : { merchantIds: result.merchantIds };

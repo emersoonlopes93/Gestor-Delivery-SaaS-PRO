@@ -2777,3 +2777,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Focused local validation after these changes: authorization client 4/4, provider 45/45, marketplace inbox 11/11, and tenant integration/UI HTTP-method tests 13/13. No authenticated provider, remote database, deployment, or visual-browser validation was performed; a new deployed authorization callback and actual bind remain required for live proof.
 - Contract remediation from the supplied 99Food Swagger: `getUrl` now accepts the documented `data` URL string as well as the observed `data.url` wrapper. The documented post-refresh cooldown is two minutes, not thirty seconds. A self-service bind now writes its encrypted token, expiry, provider `shop_id`, display name and `CONNECTED` state in one tenant-scoped update.
 - The 99Food manual-support route is no longer a false success path: identifiers are first persisted as disconnected and `authtoken/get` must return a usable token before the response is presented as connected. The support-only UI labels now distinguish the 99Food `shop_id` from the partner `app_shop_id`; no refresh token, scopes, sync timestamp or polling state is fabricated.
+
+## 99Food webhook acknowledgement contract (2026-10-09)
+
+- The public 99Food callback route now returns `HTTP 200` with exactly `{ "errno": 0, "errmsg": "ok" }` only after the existing signed inbox path accepts a new event or a confirmed duplicate. The prior `204` acknowledgement was incompatible with the provider guide.
+- Signature validation, tenant/connection resolution, lossless provider IDs, inbox deduplication and failure behavior are unchanged. Invalid signatures or payloads and failures before acceptance do not receive the success acknowledgement.
+- No schema, migration, provider call, remote database action, deployment or merge was performed. Focused webhook/inbox/provider/lifecycle validation and full gates must be recorded on the final branch SHA before promotion.
