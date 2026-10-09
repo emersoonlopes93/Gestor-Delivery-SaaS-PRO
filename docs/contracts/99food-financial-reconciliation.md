@@ -28,6 +28,8 @@ O endpoint manual `POST /finance/marketplaces/99food/sync` e os jobs automático
 
 Falhas reais de autenticação, autorização, negócio, provider, conteúdo inválido ou conteúdo inesperado não viram coleção vazia nem valor de R$ 0,00. A sincronização não pressupõe WhiteList financeira.
 
+Para uma página financeira sem registros, o envelope documentado continua sendo `data.data=[]`. Como o provider também pode omitir essa lista em intervalo de Settlements sem resultado, o adapter aceita a omissão somente quando `errno=0`, `total_num=0`, `total_page` é `0` ou `1`, `page_no` corresponde à página solicitada e `page_size` é inteiro positivo. Qualquer outro sucesso sem lista permanece `INVALID_RESPONSE`, com metadados de shape sanitizados para diagnóstico; jamais é convertido em lista vazia por heurística.
+
 Antes da consulta financeira, a loja precisa estar com a autorização operacional 99Food confirmada (`CONNECTED`). Uma conexão pendente não chama a Financial API: a API devolve `AUTHORIZATION_NOT_READY` e a interface orienta o gestor a concluir a verificação em **Canais de venda**. Isso não muda o token financeiro, que permanece separado.
 
 Na verificação self-service, uma conexão sem token operacional utilizável segue o fluxo oficial `refresh` e depois `get`, uma vez por tentativa. Reaberturas com token ainda utilizável não provocam refresh. Falhas transitórias são `PROVIDER_UNAVAILABLE`; uma resposta não transitória que não confirme a loja permanece `AUTHORIZATION_NOT_READY`, sem expor credenciais ou detalhes internos.

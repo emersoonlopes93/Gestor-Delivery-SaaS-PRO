@@ -176,6 +176,33 @@ describe('Food99FinancialClientService', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('accepts only an internally consistent zero-count settlement envelope when the provider omits data', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"errno":0,"data":{"total_num":0,"total_page":0,"page_size":200,"page_no":1}}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchSettlements(
+      connection,
+      { startDate: '2026-10-07', endDate: '2026-10-09' },
+      'correlation-1',
+    )).resolves.toEqual([]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a successful envelope that omits the record list without proof that it is empty', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(
+      '{"errno":0,"data":{"total_num":1,"total_page":1,"page_size":200,"page_no":1}}',
+      { status: 200 },
+    ));
+    const { service, connection } = makeService();
+    await expect(service.fetchSettlements(
+      connection,
+      { startDate: '2026-10-07', endDate: '2026-10-09' },
+      'correlation-1',
+    )).rejects.toMatchObject({ providerCode: 'INVALID_RESPONSE' });
+  });
+
   it('refreshes an expired Bearer token once before accepting a financial page', async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce(new Response('{"errno":401}', { status: 401 }))
