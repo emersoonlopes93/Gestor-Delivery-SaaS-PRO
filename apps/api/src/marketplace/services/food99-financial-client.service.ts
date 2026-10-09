@@ -211,7 +211,11 @@ export class Food99FinancialClientService {
         throw this.toFinancialError(response.status, payload);
       }
       const data = this.asRecord(payload?.data);
-      const rows = this.readRows(data);
+      const rows = this.readRows(data, {
+        endpoint: financialEndpointName(path),
+        httpStatus: response.status,
+        currentPage: pageNo,
+      });
       totalPages = this.readTotalPages(data, pageNo, rows.length === 0);
       freshness = mergeFreshness(freshness, summarizeBusinessFreshness(rows));
       this.logger.debug({
@@ -292,9 +296,27 @@ export class Food99FinancialClientService {
     return typeof payload.errno === 'number' && payload.errno === 0 && payload.data !== undefined;
   }
 
-  private readRows(data: Record<string, unknown> | null): Food99FinancialRecord[] {
+  private readRows(
+    data: Record<string, unknown> | null,
+    context: { endpoint: string; httpStatus: number; currentPage: number },
+  ): Food99FinancialRecord[] {
     const candidate = data?.data ?? data?.list ?? data?.records ?? data?.items;
     if (!Array.isArray(candidate)) {
+      if (this.isExplicitEmptyPage(data, context.currentPage)) return [];
+      this.logger.warn({
+        message: 'food99_financial_success_shape_unrecognized',
+        endpoint: context.endpoint,
+        httpStatus: context.httpStatus,
+        rootType: 'object',
+        dataType: data === null ? 'null' : 'object',
+        dataKeys: data ? Object.keys(data).sort() : null,
+        arrayFields: data
+          ? Object.entries(data).filter(([, value]) => Array.isArray(value)).map(([key]) => key).sort()
+          : [],
+        totalNum: typeof data?.total_num === 'number' ? data.total_num : null,
+        totalPage: typeof data?.total_page === 'number' ? data.total_page : null,
+        pageNo: typeof data?.page_no === 'number' ? data.page_no : null,
+      });
       throw new Food99ApiError(
         '99Food financial response does not contain a paged record list.',
         false,
@@ -314,6 +336,21 @@ export class Food99FinancialClientService {
       }
       return record;
     });
+  }
+
+  /**
+   * The provider documentation defines a paged data array but does not define
+   * its omission for an empty settlement range. Only zero-count, internally
+   * consistent pagination metadata is safe to interpret as an empty page.
+   */
+  private isExplicitEmptyPage(data: Record<string, unknown> | null, currentPage: number): boolean {
+    if (!data) return false;
+    return data.total_num === 0
+      && (data.total_page === 0 || data.total_page === 1)
+      && data.page_no === currentPage
+      && typeof data.page_size === 'number'
+      && Number.isInteger(data.page_size)
+      && data.page_size > 0;
   }
 
   private readTotalPages(
