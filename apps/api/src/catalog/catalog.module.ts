@@ -25,9 +25,10 @@ import { AvailabilityService } from './publication/availability.service';
 import { UploadModule } from '../upload/upload.module';
 import { MenuImportService } from './menu-import/menu-import.service';
 import { MenuImportController } from './menu-import/menu-import.controller';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
 
 @Module({
-  imports: [DatabaseModule, RbacModule, forwardRef(() => UploadModule)],
+  imports: [DatabaseModule, RbacModule, FeatureControlModule, forwardRef(() => UploadModule)],
   controllers: [
     CategoriesController,
     ProductsController,

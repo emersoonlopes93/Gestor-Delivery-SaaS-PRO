@@ -1,5 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { StorefrontCacheService } from './services/storefront-cache.service';
+import { FeatureControlService } from '../feature-control/feature-control.service';
+import { normalizeBusinessSegmentForStorefront } from './storefront-business-segment';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { 
@@ -21,6 +24,7 @@ import { MediaLibraryService } from '../upload/media-library.service';
 
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { BusinessIntelligenceService } from '../analytics/business-intelligence.service';
+import { resolveStorefrontShowcase } from './storefront-showcase';
 
 @Injectable()
 export class StorefrontService {
@@ -32,6 +36,7 @@ export class StorefrontService {
     private readonly schedulingService: SchedulingService,
     private readonly biService: BusinessIntelligenceService,
     private readonly storefrontCache: StorefrontCacheService,
+    private readonly featureControlService: FeatureControlService,
   ) {}
 
   private normalizeBrazilWhatsappNumber(raw?: string | null): string | null {
@@ -45,21 +50,47 @@ export class StorefrontService {
     return null;
   }
 
+  async getPublicBranding(): Promise<{ systemName: string; logoUrl: string | null }> {
+    const config = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: {
+        appName: true,
+        platformLogoMedia: { select: { publicUrl: true } },
+      },
+    });
+
+    return {
+      systemName: config?.appName ?? 'PedeHub',
+      logoUrl: config?.platformLogoMedia?.publicUrl ?? null,
+    };
+  }
+
   async getStorefrontPayload(
     slug: string,
     fulfillmentType: 'delivery' | 'pickup' = 'delivery',
+    options?: {
+      tenantId?: string;
+      customization?: Partial<StorefrontCustomizationPayload>;
+      bypassCache?: boolean;
+    },
   ): Promise<StorefrontPayload> {
     const channel: SalesChannel =
       fulfillmentType === 'pickup' ? 'storefront_pickup' : 'storefront_delivery';
 
-    const cachedPayload = await this.storefrontCache.getPayload(slug, fulfillmentType);
-    if (cachedPayload) {
-      return cachedPayload;
+    if (!options?.bypassCache) {
+      const cachedPayload = await this.storefrontCache.getPayload(slug, fulfillmentType);
+      if (cachedPayload) {
+        return cachedPayload;
+      }
     }
 
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
-      where: { slug, status: 'active' }, // only active tenants
+      where: {
+        slug,
+        status: 'active',
+        ...(options?.tenantId ? { id: options.tenantId } : {}),
+      }, // only active tenants; authenticated preview is additionally tenant-scoped
       include: { settings: true, schedulingSettings: true, deliveryCoverageConfig: true },
     });
 
@@ -81,12 +112,14 @@ export class StorefrontService {
           orderBy: { order: 'asc' },
           include: {
 
+            optionItemPrices: true,
             optionGroupLinks: {
+              where: { optionGroup: { isActive: true, deletedAt: null } },
               include: {
                 optionGroup: {
                   include: {
                     items: {
-                      where: { isActive: true },
+                      where: { isActive: true, deletedAt: null },
                       orderBy: { order: 'asc' },
                     },
                   },
@@ -120,7 +153,7 @@ export class StorefrontService {
       include: {
         products: {
           include: {
-
+            optionItemPrices: true;
             optionGroupLinks: {
               include: { optionGroup: { include: { items: true } } };
             };
@@ -228,36 +261,51 @@ export class StorefrontService {
               isAvailable,
               badges: [], // Populated below
 
-              optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
-                id: ol.id,
-                optionGroupId: ol.optionGroupId,
-                order: ol.order,
-                pricingAxis: ol.pricingAxis,
-                overrideName: ol.overrideName,
-                overrideDescription: ol.overrideDescription,
-                overrideIsRequired: ol.overrideIsRequired,
-                overrideMinSelect: ol.overrideMinSelect,
-                overrideMaxSelect: ol.overrideMaxSelect,
-                optionGroup: {
-                  id: ol.optionGroup.id,
-                  name: ol.optionGroup.name,
-                  description: ol.optionGroup.description,
-                  selectionType: ol.optionGroup.selectionType as 'single' | 'multiple' | 'quantity',
-                  isRequired: ol.optionGroup.isRequired,
-                  minSelect: ol.optionGroup.minSelect,
-                  maxSelect: ol.optionGroup.maxSelect,
-                  isActive: ol.optionGroup.isActive,
-                  items: ol.optionGroup.items.map((oi) => ({
-                    id: oi.id,
-                    name: oi.name,
-                    description: oi.description,
-                    isActive: oi.isActive,
-                    allowQuantity: oi.allowQuantity,
-                    priceImpactType: oi.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage',
-                    priceImpactValue: Number(oi.priceImpactValue),
-                  })),
-                },
-              })),
+              optionGroupLinks: (p.optionGroupLinks || []).map((ol) => {
+                const itemOverrideMap = new Map((p.optionItemPrices || []).map((o) => [o.optionItemId, o]));
+                const activeItems = ol.optionGroup.items
+                  .map((oi) => {
+                    const override = itemOverrideMap.get(oi.id);
+                    const effectiveIsActive = oi.deletedAt === null && oi.isActive && (override?.isActive ?? true);
+                    const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
+                    return {
+                      id: oi.id,
+                      name: oi.name,
+                      description: oi.description,
+                      isActive: oi.isActive,
+                      effectiveIsActive,
+                      allowQuantity: oi.allowQuantity,
+                      minQty: oi.minQty,
+                      maxQty: oi.maxQty,
+                      priceImpactType: oi.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage',
+                      priceImpactValue: overridePrice ?? Number(oi.priceImpactValue),
+                    };
+                  })
+                  .filter((oi) => oi.effectiveIsActive !== false);
+
+                return {
+                  id: ol.id,
+                  optionGroupId: ol.optionGroupId,
+                  order: ol.order,
+                  pricingAxis: ol.pricingAxis,
+                  overrideName: ol.overrideName,
+                  overrideDescription: ol.overrideDescription,
+                  overrideIsRequired: ol.overrideIsRequired,
+                  overrideMinSelect: ol.overrideMinSelect,
+                  overrideMaxSelect: ol.overrideMaxSelect,
+                  optionGroup: {
+                    id: ol.optionGroup.id,
+                    name: ol.optionGroup.name,
+                    description: ol.optionGroup.description,
+                    selectionType: ol.optionGroup.selectionType as 'single' | 'multiple' | 'quantity',
+                    isRequired: ol.optionGroup.isRequired,
+                    minSelect: ol.optionGroup.minSelect,
+                    maxSelect: ol.optionGroup.maxSelect,
+                    isActive: ol.optionGroup.isActive,
+                    items: activeItems,
+                  },
+                };
+              }),
               upsellLinks: (p.upsellLinks || []).map((l) => ({
                 id: l.id,
                 upsell: {
@@ -421,21 +469,30 @@ export class StorefrontService {
       tenant.settings?.orderWhatsappNumber || tenant.settings?.businessPhone || null,
     );
 
-    const normalizedTheme = normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson);
+    const normalizedTheme = normalizeStorefrontTheme(
+      options?.customization?.theme ?? tenant.settings?.storefrontThemeJson,
+    );
 
     const deliveryEnabled = Boolean(
       tenant.deliveryCoverageConfig?.isDeliveryEnabled &&
         Number(tenant.deliveryCoverageConfig?.maxRadiusKm ?? 0) > 0,
     );
     const pickupEnabled = Boolean(tenant.settings?.pickupEnabled);
+    const schedulingFeature = await this.featureControlService.resolveTenantFeature({
+      tenantId: tenant.id,
+      featureKey: 'scheduling',
+    });
     const scheduledOrdersEnabled = Boolean(
-      tenant.schedulingSettings?.enabled && tenant.schedulingSettings?.acceptScheduledOrders,
+      schedulingFeature.enabled &&
+        tenant.schedulingSettings?.enabled &&
+        tenant.schedulingSettings?.acceptScheduledOrders,
     );
 
     const tenantInfo = {
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
+      businessSegment: normalizeBusinessSegmentForStorefront(tenant.settings?.businessSegment),
       logo: tenant.settings?.logoUrl || null,
       banner: normalizedTheme.heroImageUrl || null,
       isOpen: storeStatus.isOpen,
@@ -474,10 +531,22 @@ export class StorefrontService {
       scheduling: {
         enabled: scheduledOrdersEnabled,
         allowWhenClosed: Boolean(tenant.schedulingSettings?.allowScheduleWhenClosed),
+        timezone: tenant.settings?.timezone || tenant.schedulingSettings?.timezone || 'America/Sao_Paulo',
+        maximumAdvanceDays: tenant.schedulingSettings?.maximumAdvanceDays ?? 7,
       },
     };
 
-    const bestSellerIds = await this.biService.getStorefrontBestSellers(tenant.id);
+    const layoutSettings = normalizeStorefrontLayout(
+      options?.customization?.layout ?? tenant.settings?.storefrontLayoutJson,
+    );
+    const needsBestSellingRanking = layoutSettings.showcase.enabled
+      && layoutSettings.showcase.mode !== 'manual'
+      && layoutSettings.showcase.automaticStrategy === 'best_selling';
+    const bestSellerIds = await this.biService.getStorefrontBestSellers(
+      tenant.id,
+      30,
+      needsBestSellingRanking ? Math.max(6, layoutSettings.showcase.maxItems) : 6,
+    );
 
     // Build virtual sections
     const virtualSections: StorefrontCategoryPayload[] = [];
@@ -490,6 +559,7 @@ export class StorefrontService {
 
     // 0. Best Sellers (Mais Pedidos)
     const bestSellerProducts = bestSellerIds
+      .slice(0, 6)
       .map(id => uniqueProductsMap.get(id))
       .filter((p): p is StorefrontProductPayload => p !== undefined && p.isAvailable);
 
@@ -555,6 +625,12 @@ export class StorefrontService {
 
     const finalCategories = [...virtualSections, ...categories];
 
+    const showcaseProducts = resolveStorefrontShowcase({
+      settings: layoutSettings.showcase,
+      eligibleProducts: uniqueProductsMap,
+      bestSellingProductIds: bestSellerIds,
+    });
+
     // 4. Global Upsells
     const globalUpsellRows = await this.prisma.upsell.findMany({
       where: {
@@ -598,7 +674,7 @@ export class StorefrontService {
     // 5. Storefront Customization (Fully Normalized & Hardened for Public consumption)
     const customization: StorefrontCustomizationPayload = {
       theme: normalizedTheme,
-      layout: normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson),
+      layout: layoutSettings,
     };
 
     const payload: StorefrontPayload = {
@@ -607,19 +683,51 @@ export class StorefrontService {
       combos,
       upsells: globalUpsells,
       customization,
+      showcase: showcaseProducts.length > 0
+        ? { title: layoutSettings.showcase.title, products: showcaseProducts }
+        : undefined,
     };
 
-    await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
+    if (!options?.bypassCache) {
+      await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
+    }
 
     return payload;
   }
 
+  async getStorefrontPreviewPayload(
+    tenantId: string,
+    customization: StorefrontCustomizationPayload,
+    fulfillmentType: 'delivery' | 'pickup',
+  ): Promise<StorefrontPayload> {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, status: 'active' },
+      select: { slug: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Loja ativa não encontrada para o preview.');
+    }
+
+    return this.getStorefrontPayload(tenant.slug, fulfillmentType, {
+      tenantId,
+      customization,
+      bypassCache: true,
+    });
+  }
+
   async getAvailableSlots(slug: string, date?: Date | string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { slug },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug, status: 'active' },
       select: { id: true, settings: { select: { timezone: true } } },
     });
     if (!tenant) throw new NotFoundException('Store not found');
+
+    const schedulingFeature = await this.featureControlService.resolveTenantFeature({
+      tenantId: tenant.id,
+      featureKey: 'scheduling',
+    });
+    if (!schedulingFeature.enabled) return [];
 
     const timezone = tenant.settings?.timezone || 'America/Sao_Paulo';
     let targetDate: Date;

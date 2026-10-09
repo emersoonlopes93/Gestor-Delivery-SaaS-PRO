@@ -3,18 +3,25 @@ import { useEmployees } from './hooks/useEmployees';
 import { Modal } from '../../../components/Modal';
 import { EmployeeForm } from './components/EmployeeForm';
 import { TenantUser, CreateEmployeeDTO } from '@gestor/types';
+import { usePermissions } from '../../../hooks/use-tenant-auth';
 
 export function EmployeesPage() {
   const { employees, roles, isLoading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
+  const { has, hasAll } = usePermissions();
+  const canCreateEmployees = hasAll(['users.create', 'users.roles']);
+  const canUpdateEmployees = hasAll(['users.update', 'users.roles']);
+  const canDeleteEmployees = has('users.delete');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<TenantUser | null>(null);
 
   const handleOpenModal = (employee?: TenantUser) => {
+    if (employee ? !canUpdateEmployees : !canCreateEmployees) return;
     setEditingEmployee(employee || null);
     setIsModalOpen(true);
   };
 
   const handleSave = async (data: CreateEmployeeDTO) => {
+    if (editingEmployee ? !canUpdateEmployees : !canCreateEmployees) return;
     try {
       if (editingEmployee) {
         await updateEmployee(editingEmployee.id, data);
@@ -29,6 +36,7 @@ export function EmployeesPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDeleteEmployees) return;
     if (!window.confirm('Tem certeza que deseja excluir este funcionário?')) return;
     try {
       await deleteEmployee(id);
@@ -45,12 +53,14 @@ export function EmployeesPage() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Funcionários</h1>
           <p className="text-muted-foreground mt-1">Gerencie sua equipe e suas permissões de acesso.</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
-        >
-          <span>➕</span> Novo Funcionário
-        </button>
+        {canCreateEmployees && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+          >
+            <span>➕</span> Novo Funcionário
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -69,7 +79,9 @@ export function EmployeesPage() {
                 <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-wider">Nome / E-mail</th>
                 <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-wider">Cargos</th>
                 <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                {(canUpdateEmployees || canDeleteEmployees) && (
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -106,29 +118,35 @@ export function EmployeesPage() {
                       {employee.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleOpenModal(employee)}
-                        className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                        title="Editar"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleDelete(employee.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Excluir"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
+                  {(canUpdateEmployees || canDeleteEmployees) && (
+                    <td className="px-6 py-4 text-sm text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {canUpdateEmployees && (
+                          <button
+                            onClick={() => handleOpenModal(employee)}
+                            className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                            title="Editar"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        {canDeleteEmployees && (
+                          <button
+                            onClick={() => handleDelete(employee.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Excluir"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
               {employees.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-gray-400 font-medium italic">
+                  <td colSpan={canUpdateEmployees || canDeleteEmployees ? 4 : 3} className="px-6 py-12 text-center text-gray-400 font-medium italic">
                     Nenhum funcionário cadastrado ainda.
                   </td>
                 </tr>
@@ -144,12 +162,14 @@ export function EmployeesPage() {
         title={editingEmployee ? 'Editar Funcionário' : 'Novo Funcionário'}
         maxWidth="max-w-xl"
       >
-        <EmployeeForm
-          employee={editingEmployee}
-          roles={roles}
-          onSave={handleSave}
-          onCancel={() => setIsModalOpen(false)}
-        />
+        {(editingEmployee ? canUpdateEmployees : canCreateEmployees) && (
+          <EmployeeForm
+            employee={editingEmployee}
+            roles={roles}
+            onSave={handleSave}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        )}
       </Modal>
     </div>
   );

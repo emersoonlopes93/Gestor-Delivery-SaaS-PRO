@@ -3,9 +3,6 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { api } from '../../../lib/api-client';
 import type { ChatSessionListItem, ChatSession, ChatInboxStats, PaginatedChatSessions } from '@gestor/types';
 import { ChatArea } from '../components/ChatArea';
-import { useChatSocket } from '../hooks/useChatSocket';
-import { useTenantAuth } from '../../../hooks/use-tenant-auth';
-import { useHandoffNotification } from '../hooks/useHandoffNotification';
 import { Search, Loader2, Bot, UserCircle, AlertCircle, CheckCircle } from 'lucide-react';
 
 export function InboxPage() {
@@ -16,14 +13,8 @@ export function InboxPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'ai_active' | 'human' | 'closed'>('all');
   const [periodFilter, setPeriodFilter] = useState<'all' | 'today' | 'yesterday' | '7days'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const { user } = useTenantAuth();
 
-  // Enable WebSocket for real-time updates
-  useChatSocket(user?.tenantId);
-
-  // Handoff notifications (sound + toast)
-  useHandoffNotification(true);
+  // WebSocket para atualizacoes em tempo real gerenciado pelo AppLayout (useChatSocket).
 
   const [socketConnected, setSocketConnected] = useState<boolean>(
     typeof window !== 'undefined' ? !!window.__CHAT_SOCKET_CONNECTED : false,
@@ -170,7 +161,7 @@ export function InboxPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col md:flex-row bg-background dark:bg-background overflow-hidden">
+    <div className="h-[calc(100dvh-theme(spacing.16))] flex flex-col md:flex-row bg-background overflow-hidden">
       {/* Sidebar de conversas */}
       <div className={`w-full md:w-80 lg:w-96 border-r border-border bg-card/50 flex flex-col ${selectedSession ? 'hidden md:flex' : 'flex'}`}>
         {/* Header e Filtros */}

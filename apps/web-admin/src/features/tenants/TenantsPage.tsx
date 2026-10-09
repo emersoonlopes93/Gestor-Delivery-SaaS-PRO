@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PaginatedResponse, Tenant } from '@gestor/types';
-import { Bot, CreditCard, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { api } from '../../lib/api-client';
 
 interface TenantListItem extends Tenant {
@@ -54,7 +54,7 @@ export function TenantsPage() {
     }
   };
 
-  const handleCreateBillingV2 = async (tenantId: string) => {
+  const _handleCreateBillingV2 = async (tenantId: string) => {
     try {
       await api.post(`/admin/tenants/${tenantId}/billing-v2-subscription`, {});
       loadTenants();

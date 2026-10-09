@@ -13,6 +13,17 @@ import type {
   ValidatedComboLine,
   CheckoutValidationResult,
 } from '@gestor/types';
+import { resolveEffectiveSelectionRules } from '@gestor/types';
+import {
+  CatalogPricingValidationError,
+  resolveCatalogOptionPricing,
+} from '@gestor/pricing';
+import type {
+  CatalogOptionGroup,
+  CatalogOptionPricingInput,
+  CatalogPricingResult,
+  PriceImpactType,
+} from '@gestor/pricing';
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
@@ -20,9 +31,12 @@ import { AvailabilityService } from '../catalog/publication/availability.service
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
 import { validateCashChangeFor } from './public-checkout-guards.util';
+import { DateTime } from 'luxon';
+import { FeatureControlService } from '../feature-control/feature-control.service';
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
+    optionItemPrices: true;
     optionGroupLinks: { include: { optionGroup: { include: { items: true } } } };
     category: { select: { id: true, templateType: true, templateConfig: true } };
   };
@@ -48,6 +62,7 @@ export class CheckoutValidatorService {
     private readonly availabilityService: AvailabilityService,
     private readonly pizzaEngine: PizzaEngineService,
     private readonly upsellsService: UpsellsService,
+    private readonly featureControlService: FeatureControlService,
   ) {}
 
   async validate(
@@ -75,6 +90,16 @@ export class CheckoutValidatorService {
 
     const tenantId = tenant.id;
 
+    if (options?.scheduledFor || options?.timeSlotId) {
+      const schedulingFeature = await this.featureControlService.resolveTenantFeature({
+        tenantId,
+        featureKey: 'scheduling',
+      });
+      if (!schedulingFeature.enabled) {
+        throw new BadRequestException('Agendamento indisponível para esta loja.');
+      }
+    }
+
     // 1.5 Fetch Store Status Context once for performance and global check
     const [settings, schedulingSettings, operatingHours] = await Promise.all([
       this.prisma.tenantSettings.findUnique({
@@ -93,6 +118,9 @@ export class CheckoutValidatorService {
           enabled: true,
           acceptScheduledOrders: true,
           allowScheduleWhenClosed: true,
+          minimumAdvanceMinutes: true,
+          maximumAdvanceDays: true,
+          timezone: true,
         },
       }),
       this.prisma.tenantOperatingHours.findMany({
@@ -129,15 +157,62 @@ export class CheckoutValidatorService {
     }
 
     // 1.7 Validate Time Slot if provided
-    if (options?.timeSlotId) {
-      const slot = await this.prisma.timeSlot.findUnique({
-        where: { id: options.timeSlotId, tenantId },
+    if (options?.timeSlotId && options.scheduledFor) {
+      if (options.channel !== 'storefront_delivery' && options.channel !== 'storefront_pickup') {
+        throw new BadRequestException('Agendamento disponível apenas para entrega ou retirada.');
+      }
+      if (Number.isNaN(options.scheduledFor.getTime())) {
+        throw new BadRequestException('Data de agendamento inválida.');
+      }
+
+      const slot = await this.prisma.timeSlot.findFirst({
+        where: {
+          id: options.timeSlotId,
+          tenantId,
+          isActive: true,
+          status: 'available',
+        },
       });
-      if (!slot || !slot.isActive) {
+      if (!slot) {
         throw new BadRequestException('Horário agendado não disponível.');
       }
       if (slot.currentOccupancy >= slot.capacity) {
         throw new BadRequestException('Este horário já atingiu o limite de pedidos.');
+      }
+      if (slot.startTime.getTime() !== options.scheduledFor.getTime()) {
+        throw new BadRequestException('O horário enviado não corresponde ao slot selecionado.');
+      }
+
+      const timezone = settings?.timezone || schedulingSettings?.timezone || 'America/Sao_Paulo';
+      if (!DateTime.local().setZone(timezone).isValid) {
+        throw new BadRequestException('Timezone da loja inválido. Contate o estabelecimento.');
+      }
+      const now = DateTime.now();
+      const slotStart = DateTime.fromJSDate(slot.startTime);
+      if (slotStart.diff(now, 'minutes').minutes < (schedulingSettings?.minimumAdvanceMinutes ?? 60)) {
+        throw new BadRequestException('O horário não respeita a antecedência mínima da loja.');
+      }
+      const localSlot = slotStart.setZone(timezone);
+      const maximumAdvanceDays = schedulingSettings?.maximumAdvanceDays ?? 7;
+      if (localSlot.startOf('day') > now.setZone(timezone).startOf('day').plus({ days: maximumAdvanceDays })) {
+        throw new BadRequestException('O horário excede o horizonte máximo de agendamento.');
+      }
+
+      const localTime = localSlot.toFormat('HH:mm');
+      const localEnd = DateTime.fromJSDate(slot.endTime).setZone(timezone);
+      const windows = await this.prisma.schedulingWindow.findMany({
+        where: {
+          tenantId,
+          dayOfWeek: localSlot.weekday % 7,
+          active: true,
+        },
+        select: { startTime: true, endTime: true },
+      });
+      const activeWindow = localEnd.hasSame(localSlot, 'day')
+        && windows.some((window) =>
+          window.startTime <= localTime && window.endTime >= localEnd.toFormat('HH:mm'));
+      if (!activeWindow) {
+        throw new BadRequestException('O horário não pertence mais a uma janela ativa.');
       }
     }
 
@@ -211,9 +286,16 @@ export class CheckoutValidatorService {
     const isDelivery = channel === 'storefront_delivery' || channel === 'whatsapp_ai';
     let deliveryFee = 0;
     let estimatedDeliveryMinutes: number | null = null;
+    let resolvedDeliveryCoordinates: { lat: number; lng: number } | undefined;
 
     if (isDelivery && options?.deliveryAddress) {
-      const hasCoords = Boolean(options.deliveryAddress.lat && options.deliveryAddress.lng);
+      const hasCoords = options.deliveryAddress.lat != null && options.deliveryAddress.lng != null;
+      if (hasCoords) {
+        resolvedDeliveryCoordinates = {
+          lat: options.deliveryAddress.lat!,
+          lng: options.deliveryAddress.lng!,
+        };
+      }
       const hasCoverage = await this.deliveryRateService.hasCoverageConfig(tenantId);
 
       if (hasCoverage) {
@@ -229,6 +311,7 @@ export class CheckoutValidatorService {
           }
           deliveryFee = decision.fee ?? 0;
           estimatedDeliveryMinutes = decision.estimatedDeliveryMinutes ?? null;
+          resolvedDeliveryCoordinates = decision.resolvedCoordinates ?? resolvedDeliveryCoordinates;
         } else {
           // No coords (whatsapp_ai without Google Maps): try rate by neighborhood/fixed
           const rateResult = await this.deliveryRateService.calculateRate({
@@ -238,6 +321,7 @@ export class CheckoutValidatorService {
           });
           deliveryFee = rateResult.fee ?? 0;
           estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
+          resolvedDeliveryCoordinates = rateResult.resolvedCoordinates ?? resolvedDeliveryCoordinates;
         }
       } else if (!hasCoords) {
         // No coverage config and no coords: use zero delivery fee (will be adjusted manually)
@@ -250,6 +334,7 @@ export class CheckoutValidatorService {
         });
         deliveryFee = rateResult.fee ?? 0;
         estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
+        resolvedDeliveryCoordinates = rateResult.resolvedCoordinates ?? resolvedDeliveryCoordinates;
       }
     } else if (isDelivery && channel === 'storefront_delivery' && !options?.deliveryAddress) {
       // storefront_delivery without address is an error
@@ -273,7 +358,8 @@ export class CheckoutValidatorService {
       discountTotal, 
       deliveryFee,
       estimatedDeliveryMinutes,
-      total: finalTotal, 
+      resolvedDeliveryCoordinates,
+      total: finalTotal,
       couponId, 
       cashbackUsed 
     };
@@ -394,12 +480,11 @@ export class CheckoutValidatorService {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
     }
 
-    const hasNewSelections = item.selections && item.selections.length > 0;
-
     // Fetch product with legacy complement groups and/or new option groups
     const product = await this.prisma.product.findFirst({
       where: { id: item.productId, tenantId, deletedAt: null },
       include: {
+        optionItemPrices: true,
         optionGroupLinks: {
           include: {
             optionGroup: {
@@ -466,7 +551,6 @@ export class CheckoutValidatorService {
     let extrasTotal = 0;
     let unitPrice = basePrice;
     let composition = '';
-    let snapshotCatalogV2Json: unknown | undefined;
     let selectionsSnapshot: Array<{
       groupId: string;
       groupName: string;
@@ -486,12 +570,16 @@ export class CheckoutValidatorService {
       }>; 
     }> = [];
 
-    if (hasNewSelections) {
+    // Generic option groups are part of the product contract even when the
+    // client sends no selection. Pizza keeps its existing dedicated flow.
+    if (!isPizzaTemplate && (typedProduct.optionGroupLinks.length > 0 || (item.selections?.length ?? 0) > 0)) {
       const pricing = this.validateAndPriceOptionSelections(
         item.selections || [],
         typedProduct.optionGroupLinks,
         typedProduct.name,
         basePrice,
+        typedProduct.optionItemPrices,
+        effectiveBasePrice,
       );
 
       effectiveBasePrice = pricing.effectiveBasePrice;
@@ -515,7 +603,7 @@ export class CheckoutValidatorService {
         .join(', ')}`;
     }
 
-    snapshotCatalogV2Json = {
+    const snapshotCatalogV2Json = {
       version: 'catalog_v2_snapshot_v1',
       channel,
       lineType: 'product',
@@ -580,6 +668,8 @@ export class CheckoutValidatorService {
     optionGroupLinks: OptionGroupLinkWithData[],
     productName: string,
     basePrice: number,
+    optionItemPrices?: Prisma.ProductOptionItemPriceGetPayload<Record<string, never>>[],
+    upsellAdjustedBasePrice: number = basePrice,
   ): {
     effectiveBasePrice: number;
     unitPrice: number;
@@ -604,17 +694,44 @@ export class CheckoutValidatorService {
       }>;
     }>;
   } {
+    const normalizedSelections = selections.map((selection) => ({
+      ...selection,
+      items: selection.items.filter((item) => {
+        const qty = item.qty ?? 1;
+        if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty < 0) {
+          throw new BadRequestException('Quantidade de opção deve ser um inteiro finito maior ou igual a zero.');
+        }
+        return qty > 0;
+      }),
+    }));
+
+    const selectedGroupIds = new Set<string>();
+    for (const selection of normalizedSelections) {
+      if (selectedGroupIds.has(selection.optionGroupId)) {
+        throw new BadRequestException(`Grupo de opções duplicado para "${productName}".`);
+      }
+      selectedGroupIds.add(selection.optionGroupId);
+
+      const selectedItemIds = new Set<string>();
+      for (const item of selection.items) {
+        if (selectedItemIds.has(item.optionItemId)) {
+          throw new BadRequestException(`Opção duplicada no grupo "${selection.optionGroupId}".`);
+        }
+        selectedItemIds.add(item.optionItemId);
+      }
+    }
+
     // Build lookup of groups available to this product (respect active group)
     const groupLinkMap = new Map<string, OptionGroupLinkWithData>();
     for (const link of optionGroupLinks) {
       const group = link.optionGroup;
-      if (group && group.isActive) {
+      if (group && group.isActive && group.deletedAt === null) {
         groupLinkMap.set(group.id, link);
       }
     }
 
     // Validate extraneous groups early
-    for (const sel of selections) {
+    for (const sel of normalizedSelections) {
       if (!groupLinkMap.has(sel.optionGroupId)) {
         throw new BadRequestException(`Grupo de opções não reconhecido para "${productName}".`);
       }
@@ -623,34 +740,34 @@ export class CheckoutValidatorService {
     // Validate min/max per group (using overrides if present)
     for (const [groupId, link] of groupLinkMap.entries()) {
       const group = link.optionGroup;
-      const selectedGroup = selections.find((s) => s.optionGroupId === groupId);
+      const selectedGroup = normalizedSelections.find((s) => s.optionGroupId === groupId);
       const selectedCount = selectedGroup ? selectedGroup.items.length : 0;
 
-      const minSelect = link.overrideMinSelect ?? group.minSelect;
-      const maxSelect = link.overrideMaxSelect ?? group.maxSelect;
-      const isRequired = link.overrideIsRequired ?? group.isRequired;
+      const rules = resolveEffectiveSelectionRules({
+        selectionType: group.selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        overrideIsRequired: link.overrideIsRequired,
+        overrideMinSelect: link.overrideMinSelect,
+        overrideMaxSelect: link.overrideMaxSelect,
+      });
       const groupName = link.overrideName ?? group.name;
 
-      const effectiveMin = isRequired ? Math.max(1, minSelect) : minSelect;
-
-      if (selectedCount < effectiveMin) {
+      if (selectedCount < rules.effectiveMinSelect) {
         throw new BadRequestException(
-          `Selecione pelo menos ${effectiveMin} opções em "${groupName}" para "${productName}".`,
+          `Selecione pelo menos ${rules.effectiveMinSelect} opções em "${groupName}" para "${productName}".`,
         );
       }
-      if (selectedCount > maxSelect) {
+      if (selectedCount > rules.effectiveMaxSelect) {
         throw new BadRequestException(
-          `Máximo de ${maxSelect} opções em "${groupName}" para "${productName}".`,
+          `Máximo de ${rules.effectiveMaxSelect} opções em "${groupName}" para "${productName}".`,
         );
       }
     }
 
-    // Pricing
-    let effectiveBasePrice = basePrice;
-    let fixedTotal = 0;
-    let percentageTotal = 0;
-
-    let hasReplace = false;
+    // The Checkout validates ownership, availability and effective selection
+    // rules above. The pure pricing package receives only that server-side data.
 
     const compositionParts: string[] = [];
     const selectionsSnapshot: Array<{
@@ -672,17 +789,21 @@ export class CheckoutValidatorService {
       }>;
     }> = [];
 
-    for (const selGroup of selections) {
+    for (const selGroup of normalizedSelections) {
       const link = groupLinkMap.get(selGroup.optionGroupId);
       if (!link) continue;
       const group = link.optionGroup;
       const groupName = link.overrideName ?? group.name;
-      const pricingAxis = link.pricingAxis || 'secondary';
-
       const selectionType = group.selectionType;
-      const isRequired = (link.overrideIsRequired ?? group.isRequired) || false;
-      const minSelect = Number((link.overrideMinSelect ?? group.minSelect) ?? 0);
-      const maxSelect = Number((link.overrideMaxSelect ?? group.maxSelect) ?? 0);
+      const rules = resolveEffectiveSelectionRules({
+        selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        overrideIsRequired: link.overrideIsRequired,
+        overrideMinSelect: link.overrideMinSelect,
+        overrideMaxSelect: link.overrideMaxSelect,
+      });
 
       const groupItems = group.items;
       const chosenNames: string[] = [];
@@ -701,51 +822,43 @@ export class CheckoutValidatorService {
         if (!itemRecord) {
           throw new BadRequestException(`Opção não encontrada no grupo "${groupName}".`);
         }
-        if (!itemRecord.isActive) {
-          throw new BadRequestException(`A opção "${itemRecord.name}" não está disponível.`);
+
+        const override = (optionItemPrices || []).find((o) => o.optionItemId === chosen.optionItemId);
+        const effectiveIsActive = itemRecord.deletedAt === null && itemRecord.isActive && (override?.isActive ?? true);
+        if (!effectiveIsActive) {
+          throw new BadRequestException(`A opção "${itemRecord.name}" não está disponível para o produto "${productName}".`);
         }
 
         const allowQuantity = itemRecord.allowQuantity || false;
         if (allowQuantity) {
           groupAllowQuantity = true;
         }
-        const qty = allowQuantity ? Math.max(1, Number(chosen.qty ?? 1)) : 1;
-
-        const impactType = itemRecord.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage';
-        const impactValue = Number(itemRecord.priceImpactValue);
-
-        let appliedAmount = 0;
-
-        if (impactType === 'replace') {
-          if (pricingAxis !== 'primary') {
-            throw new BadRequestException(
-              `Opção de substituição de preço não permitida fora do eixo principal em "${groupName}".`,
-            );
+        const requestedQty = chosen.qty ?? 1;
+        if (!allowQuantity && requestedQty !== 1) {
+          throw new BadRequestException(`A opção "${itemRecord.name}" não permite quantidade.`);
+        }
+        const qty = allowQuantity ? requestedQty : 1;
+        if (allowQuantity) {
+          const minQty = itemRecord.minQty ?? 1;
+          const maxQty = itemRecord.maxQty;
+          if (qty < minQty || (maxQty !== null && maxQty !== undefined && qty > maxQty)) {
+            throw new BadRequestException(`Quantidade inválida para a opção "${itemRecord.name}".`);
           }
-          if (hasReplace) {
-            throw new BadRequestException(
-              `Mais de uma opção de substituição de preço selecionada para "${productName}".`,
-            );
-          }
-          hasReplace = true;
-          effectiveBasePrice = impactValue;
-          appliedAmount = 0;
-        } else if (impactType === 'fixed') {
-          appliedAmount = impactValue * qty;
-          fixedTotal += appliedAmount;
-        } else if (impactType === 'percentage') {
-          appliedAmount = effectiveBasePrice * (impactValue / 100) * qty;
-          percentageTotal += appliedAmount;
         }
 
-        groupSnapshotItems.push({
+        const impactType = this.toCanonicalPriceImpactType(itemRecord.priceImpactType, itemRecord.id);
+        const overridePrice = override?.price !== null && override?.price !== undefined ? Number(override.price) : null;
+        const impactValue = overridePrice ?? Number(itemRecord.priceImpactValue);
+
+        const snapshotItem = {
           itemId: chosen.optionItemId,
           name: itemRecord.name,
           qty,
           priceImpactType: impactType,
           priceImpactValue: impactValue,
-          appliedAmount,
-        });
+          appliedAmount: 0,
+        };
+        groupSnapshotItems.push(snapshotItem);
 
         chosenNames.push(allowQuantity && qty > 1 ? `${itemRecord.name} x${qty}` : itemRecord.name);
       }
@@ -759,20 +872,142 @@ export class CheckoutValidatorService {
           groupId: selGroup.optionGroupId,
           groupName,
           selectionType,
-          pricingAxis,
-          isRequired,
-          minSelect,
-          maxSelect,
+          pricingAxis: link.pricingAxis || 'secondary',
+          isRequired: rules.effectiveIsRequired,
+          minSelect: rules.effectiveMinSelect,
+          maxSelect: rules.effectiveMaxSelect,
           allowQuantity: groupAllowQuantity,
           items: groupSnapshotItems,
         });
       }
     }
 
-    const unitPrice = effectiveBasePrice + fixedTotal + percentageTotal;
+    const canonicalPricing = this.resolveCanonicalCatalogOptionPricing({
+      basePrice,
+      upsellAdjustedBasePrice,
+      optionGroupLinks: [...groupLinkMap.values()],
+      selections: normalizedSelections.filter((selection) => selection.items.length > 0),
+      optionItemPrices,
+    });
+    const appliedAmounts = new Map<string, number>();
+    for (const entry of [...canonicalPricing.breakdown.fixed, ...canonicalPricing.breakdown.percentages]) {
+      appliedAmounts.set(`${entry.optionGroupId}:${entry.optionItemId}`, entry.totalCents / 100);
+    }
+    for (const selectionSnapshot of selectionsSnapshot) {
+      for (const snapshotItem of selectionSnapshot.items) {
+        snapshotItem.appliedAmount = appliedAmounts.get(`${selectionSnapshot.groupId}:${snapshotItem.itemId}`) ?? 0;
+      }
+    }
+
+    const effectiveBasePrice = canonicalPricing.effectiveBasePriceCents / 100;
+    const unitPrice = canonicalPricing.unitPriceCents / 100;
     const extrasTotal = unitPrice - basePrice;
     const composition = compositionParts.join('; ');
     return { effectiveBasePrice, unitPrice, extrasTotal, composition, selectionsSnapshot };
+  }
+
+  private resolveCanonicalCatalogOptionPricing(input: {
+    basePrice: number;
+    upsellAdjustedBasePrice: number;
+    optionGroupLinks: OptionGroupLinkWithData[];
+    selections: CreateOrderItemSelectionGroupDTO[];
+    optionItemPrices?: Prisma.ProductOptionItemPriceGetPayload<Record<string, never>>[];
+  }): CatalogPricingResult {
+    const pricingInput: CatalogOptionPricingInput = {
+      basePriceCents: this.decimalToCents(input.basePrice, 'Preço base'),
+      upsellDeltaCents: this.decimalToCents(input.upsellAdjustedBasePrice, 'Preço de upsell')
+        - this.decimalToCents(input.basePrice, 'Preço base'),
+      optionGroups: input.optionGroupLinks.map((link): CatalogOptionGroup => {
+        const group = link.optionGroup;
+        const rules = resolveEffectiveSelectionRules({
+          selectionType: group.selectionType,
+          isRequired: group.isRequired,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          overrideIsRequired: link.overrideIsRequired,
+          overrideMinSelect: link.overrideMinSelect,
+          overrideMaxSelect: link.overrideMaxSelect,
+        });
+        return {
+          id: group.id,
+          selectionType: this.toCanonicalSelectionType(group.selectionType, group.id),
+          pricingAxis: link.pricingAxis === 'primary' ? 'primary' : 'secondary',
+          isActive: true,
+          isRequired: rules.effectiveIsRequired,
+          minSelect: rules.effectiveMinSelect,
+          maxSelect: rules.effectiveMaxSelect,
+          items: group.items.map((itemRecord) => {
+            const override = (input.optionItemPrices ?? []).find((price) => price.optionItemId === itemRecord.id);
+            const priceImpactType = this.toCanonicalPriceImpactType(itemRecord.priceImpactType, itemRecord.id);
+            const sourceValue = Number(itemRecord.priceImpactValue);
+            const overrideValue = override?.price === null || override?.price === undefined
+              ? undefined
+              : Number(override.price);
+            return {
+              id: itemRecord.id,
+              isActive: itemRecord.isActive,
+              effectiveIsActive: itemRecord.deletedAt === null && (override?.isActive ?? true),
+              allowQuantity: itemRecord.allowQuantity,
+              minQty: itemRecord.minQty ?? undefined,
+              maxQty: itemRecord.maxQty ?? undefined,
+              priceImpactType,
+              priceImpactValueCents: priceImpactType === 'fixed' || priceImpactType === 'replace'
+                ? this.decimalToCents(sourceValue, `Preço da opção ${itemRecord.id}`)
+                : undefined,
+              priceImpactBasisPoints: priceImpactType === 'percentage'
+                ? this.percentageToBasisPoints(sourceValue, `Percentual da opção ${itemRecord.id}`)
+                : undefined,
+              effectivePriceImpactValueCents: overrideValue !== undefined && (priceImpactType === 'fixed' || priceImpactType === 'replace')
+                ? this.decimalToCents(overrideValue, `Override da opção ${itemRecord.id}`)
+                : undefined,
+              effectivePriceImpactBasisPoints: overrideValue !== undefined && priceImpactType === 'percentage'
+                ? this.percentageToBasisPoints(overrideValue, `Override da opção ${itemRecord.id}`)
+                : undefined,
+            };
+          }),
+        };
+      }),
+      selections: input.selections.map((selection) => ({
+        optionGroupId: selection.optionGroupId,
+        items: selection.items.map((item) => ({
+          optionItemId: item.optionItemId,
+          qty: item.qty ?? 1,
+        })),
+      })),
+    };
+
+    try {
+      return resolveCatalogOptionPricing(pricingInput);
+    } catch (error: unknown) {
+      if (error instanceof CatalogPricingValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private toCanonicalSelectionType(value: string, groupId: string): CatalogOptionGroup['selectionType'] {
+    if (value === 'single' || value === 'multiple' || value === 'quantity') return value;
+    throw new BadRequestException(`Tipo de seleção inválido para o grupo ${groupId}.`);
+  }
+
+  private toCanonicalPriceImpactType(value: string, itemId: string): PriceImpactType {
+    if (value === 'none' || value === 'fixed' || value === 'replace' || value === 'percentage') return value;
+    throw new BadRequestException(`Tipo de preço inválido para a opção ${itemId}.`);
+  }
+
+  private decimalToCents(value: number, label: string): number {
+    if (!Number.isFinite(value)) throw new BadRequestException(`${label} inválido.`);
+    const cents = Math.round(value * 100);
+    if (!Number.isSafeInteger(cents)) throw new BadRequestException(`${label} excede o limite suportado.`);
+    return cents;
+  }
+
+  private percentageToBasisPoints(value: number, label: string): number {
+    if (!Number.isFinite(value)) throw new BadRequestException(`${label} inválido.`);
+    const basisPoints = Math.round(value * 100);
+    if (!Number.isSafeInteger(basisPoints)) throw new BadRequestException(`${label} excede o limite suportado.`);
+    return basisPoints;
   }
 
 

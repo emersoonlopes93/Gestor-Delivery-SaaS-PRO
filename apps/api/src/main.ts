@@ -7,6 +7,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { StructuredLoggerService } from './common/logging/structured-logger.service';
+import { Reflector } from '@nestjs/core';
 import { requestIdMiddleware } from './common/middlewares/request-id.middleware';
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -104,7 +105,7 @@ async function bootstrap() {
   // Global interceptors
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
-    new TransformInterceptor(),
+    new TransformInterceptor(app.get(Reflector)),
   );
 
   await app.listen(port, '0.0.0.0');

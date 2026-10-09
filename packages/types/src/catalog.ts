@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export type CategoryTemplateType = 'none' | 'pizza' | 'combo';
+export type CategoryActiveDay = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
 
 export interface ProductCategory {
   id: string;
@@ -12,11 +13,11 @@ export interface ProductCategory {
   templateType: CategoryTemplateType;
   templateConfig?: Record<string, unknown> | null;
   isActive: boolean;
+  activeDays?: CategoryActiveDay[];
   isFeatured: boolean;
   order: number;
   createdAt: Date | string;
   updatedAt: Date | string;
-  deletedAt?: Date | string | null;
 }
 
 export interface Product {
@@ -35,6 +36,7 @@ export interface Product {
   image?: string | null;
   mediaAssetId?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   isFeatured: boolean;
   isAvailable: boolean;
   sellableOnline: boolean;
@@ -43,7 +45,9 @@ export interface Product {
   order: number;
   createdAt: Date | string;
   updatedAt: Date | string;
-  deletedAt?: Date | string | null;
+  _count?: {
+    optionGroupLinks: number;
+  };
 }
 
 
@@ -57,6 +61,7 @@ export interface CreateCategoryDto {
   description?: string;
   image?: string;
   isActive?: boolean;
+  activeDays?: CategoryActiveDay[];
   isFeatured?: boolean;
   order?: number;
 }
@@ -94,6 +99,55 @@ export type ComboPricingType = 'fixed_price' | 'discount_percent' | 'discount_am
 
 export type OptionSelectionType = 'single' | 'multiple' | 'quantity';
 
+export interface EffectiveSelectionRules {
+  effectiveIsRequired: boolean;
+  effectiveMinSelect: number;
+  effectiveMaxSelect: number;
+}
+
+/**
+ * Resolves the selection contract used by catalog links at runtime.
+ *
+ * Link overrides take precedence over the shared group. The normalisation is
+ * deliberately defensive because historical records predate the validation
+ * currently enforced by the catalog APIs.
+ */
+export function resolveEffectiveSelectionRules(input: {
+  selectionType: OptionSelectionType | string;
+  isRequired?: boolean | null;
+  minSelect?: number | null;
+  maxSelect?: number | null;
+  overrideIsRequired?: boolean | null;
+  overrideMinSelect?: number | null;
+  overrideMaxSelect?: number | null;
+}): EffectiveSelectionRules {
+  const toNonNegativeInteger = (value: number | null | undefined, fallback: number) => {
+    const numeric = Number(value ?? fallback);
+    return Number.isFinite(numeric) ? Math.max(0, Math.floor(numeric)) : fallback;
+  };
+
+  const effectiveIsRequired = input.overrideIsRequired ?? input.isRequired ?? false;
+  const configuredMin = toNonNegativeInteger(input.overrideMinSelect ?? input.minSelect, 0);
+  const configuredMax = toNonNegativeInteger(input.overrideMaxSelect ?? input.maxSelect, 1);
+
+  if (input.selectionType === 'single') {
+    return {
+      effectiveIsRequired,
+      effectiveMinSelect: effectiveIsRequired ? 1 : 0,
+      effectiveMaxSelect: 1,
+    };
+  }
+
+  const effectiveMinSelect = effectiveIsRequired ? Math.max(1, configuredMin) : configuredMin;
+  return {
+    effectiveIsRequired,
+    effectiveMinSelect,
+    // A legacy required record may incorrectly contain max=0. Keep the
+    // runtime contract satisfiable instead of exposing an impossible choice.
+    effectiveMaxSelect: Math.max(effectiveMinSelect, configuredMax),
+  };
+}
+
 export type PriceImpactType = 'none' | 'fixed' | 'replace' | 'percentage';
 
 export type PricingAxis = 'primary' | 'secondary';
@@ -114,10 +168,14 @@ export interface OptionGroup {
   minSelect: number;
   maxSelect: number;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   order: number;
   items?: OptionItem[];
   createdAt: Date | string;
   updatedAt: Date | string;
+  _count?: {
+    optionGroupLinks: number;
+  };
 }
 
 export interface OptionItem {
@@ -128,14 +186,29 @@ export interface OptionItem {
   description?: string | null;
   sku?: string | null;
   isActive: boolean;
+  deletedAt?: Date | string | null;
   order: number;
   priceImpactType: PriceImpactType;
   priceImpactValue: number | string;
   allowQuantity: boolean;
   minQty?: number | null;
   maxQty?: number | null;
+  effectiveIsActive?: boolean;
+  override?: ProductOptionItemOverride | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+}
+
+export interface ProductOptionItemOverride {
+  id: string;
+  tenantId: string;
+  productId: string;
+  optionItemId: string;
+  price?: number | string | null;
+  costPrice?: number | string | null;
+  isActive?: boolean | null;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export interface ProductOptionGroupLink {

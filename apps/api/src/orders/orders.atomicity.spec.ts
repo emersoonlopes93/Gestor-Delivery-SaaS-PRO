@@ -1,0 +1,324 @@
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { PaymentMethod } from '@gestor/types';
+import { OrdersService } from './orders.service';
+
+describe('OrdersService public checkout atomicity', () => {
+  it('propagates stock integrity failure and does not commit order or commercial effects', async () => {
+    let committed = false;
+    const tx = {
+      tenant: { update: jest.fn().mockResolvedValue({ orderSequence: 1 }) },
+      order: { create: jest.fn().mockResolvedValue({
+        id: 'order-1', orderNumber: '#0001', status: 'pending', sourceChannel: 'direct_online', paymentMethod: 'cash',
+      }) },
+      orderItem: { create: jest.fn() },
+      orderTimeline: { create: jest.fn() },
+      orderDeliveryAddress: { create: jest.fn() },
+      dineInTable: { update: jest.fn() },
+      coupon: { update: jest.fn() },
+    };
+    const prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ id: 'tenant-a', slug: 'loja', settings: {} }) },
+      order: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => {
+        const result = await callback(tx);
+        committed = true;
+        return result;
+      }),
+    };
+    const customerService = { syncCustomerOnOrderUpsert: jest.fn().mockResolvedValue({ id: 'customer-1' }) };
+    const checkoutValidator = { validate: jest.fn().mockResolvedValue({
+      tenantId: 'tenant-a',
+      lines: [{
+        lineType: 'product', productId: 'product-1', quantity: 1, unitPrice: 20,
+        lineTotal: 20, name: 'Produto', basePrice: 20, extrasTotal: 0,
+      }],
+      itemsSubtotal: 20,
+      discountTotal: 0,
+      deliveryFee: 0,
+      resolvedDeliveryCoordinates: { lat: -23.56, lng: -46.64 },
+      total: 20,
+      couponId: 'coupon-1',
+      cashbackUsed: 5,
+    }) };
+    const inventoryService = {
+      processOrderDepletionInTransaction: jest.fn().mockRejectedValue(
+        new BadRequestException('Estoque insuficiente'),
+      ),
+    };
+    const cashbackService = { createTransaction: jest.fn() };
+    const service = new OrdersService(
+      prisma as never,
+      checkoutValidator as never,
+      customerService as never,
+      cashbackService as never,
+      {} as never,
+      inventoryService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.createOrder('loja', {
+      idempotencyKey: 'checkout-1',
+      customerName: 'Cliente',
+      customerPhone: '11999999999',
+      customerEmail: 'cliente@example.com',
+      fulfillmentType: 'delivery',
+      sourceChannel: 'direct_online',
+      deliveryAddress: {
+        street: 'Rua Teste',
+        number: '10',
+        neighborhood: 'Centro',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '01001000',
+      },
+      items: [{ lineType: 'product', productId: 'product-1', quantity: 1 }],
+      payment: { method: PaymentMethod.cash },
+      useCashbackAmount: 5,
+      couponCode: 'PROMO',
+    })).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(committed).toBe(false);
+    expect(inventoryService.processOrderDepletionInTransaction).toHaveBeenCalledWith(tx, 'tenant-a', 'order-1');
+    expect(tx.orderDeliveryAddress.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: 'tenant-a', lat: -23.56, lng: -46.64 }),
+    });
+    expect(cashbackService.createTransaction).not.toHaveBeenCalled();
+    expect(tx.coupon.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrdersService cancellation stock reversal atomicity', () => {
+  const makeCancellationHarness = (inventoryFailure?: Error) => {
+    let committed = false;
+    const order = {
+      id: 'order-1', tenantId: 'tenant-a', status: 'pending', total: 20,
+      sourceChannel: 'direct_online', orderNumber: '#0001', fulfillmentType: 'pickup',
+      deliveryDriverId: null, isScheduled: false, publicTrackingToken: null, customerPhone: null,
+    };
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue(order),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      dineInTable: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      orderTimeline: { create: jest.fn() },
+      tenant: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const prisma = {
+      order: { findFirst: jest.fn().mockResolvedValue(order) },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => {
+        const result = await callback(tx);
+        committed = true;
+        return result;
+      }),
+    };
+    const inventoryService = {
+      reverseOrderDepletionInTransaction: jest.fn().mockImplementation(async () => {
+        if (inventoryFailure) throw inventoryFailure;
+      }),
+    };
+    const gateway = { emitOrderCancelled: jest.fn(), emitOrderChanged: jest.fn() };
+    const service = new OrdersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      inventoryService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      gateway as never,
+      {} as never,
+      {} as never,
+      { recordOrderStatusEvent: jest.fn() } as never,
+      { handleInternalStatusChanged: jest.fn().mockResolvedValue({ deferred: false }) } as never,
+      {} as never,
+    );
+    return { service, tx, inventoryService, gateway, get committed() { return committed; } };
+  };
+
+  it('runs own-checkout cancellation and stock reversal through the same transaction', async () => {
+    const harness = makeCancellationHarness();
+
+    await harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' });
+
+    expect(harness.inventoryService.reverseOrderDepletionInTransaction).toHaveBeenCalledWith(
+      harness.tx, 'tenant-a', 'order-1',
+    );
+    expect(harness.committed).toBe(true);
+  });
+
+  it('does not commit the cancelled status when stock reversal fails', async () => {
+    const harness = makeCancellationHarness(new BadRequestException('stock reversal failed'));
+
+    await expect(
+      harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(harness.committed).toBe(false);
+  });
+
+  it('returns a controlled conflict when the canonical status changed before the write', async () => {
+    const harness = makeCancellationHarness();
+    harness.tx.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' }))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(harness.committed).toBe(false);
+  });
+
+  it('keeps a committed transition successful when realtime notification throws', async () => {
+    const harness = makeCancellationHarness();
+    harness.gateway.emitOrderChanged.mockImplementation(() => { throw new Error('socket unavailable'); });
+
+    await expect(harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' })).resolves.toMatchObject({ status: 'cancelled' });
+    expect(harness.committed).toBe(true);
+  });
+
+  it('still emits order.changed when a sibling post-commit notification fails', async () => {
+    const harness = makeCancellationHarness();
+    harness.gateway.emitOrderCancelled.mockImplementation(() => { throw new Error('socket unavailable'); });
+
+    await harness.service.updateOrderStatus('order-1', 'tenant-a', { status: 'cancelled' });
+
+    expect(harness.committed).toBe(true);
+    expect(harness.gateway.emitOrderChanged).toHaveBeenCalledWith('tenant-a', 'order-1', 'cancelled');
+  });
+});
+
+describe('OrdersService transaction-aware status transition primitive', () => {
+  const makePrimitiveHarness = () => {
+    const order = {
+      id: 'order-1', tenantId: 'tenant-a', status: 'pending', orderNumber: '#0001',
+    };
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue(order),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const service = new OrdersService(
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+      {} as never, {} as never, {} as never, {} as never, {} as never,
+    );
+    return { order, service, tx };
+  };
+
+  it('validates and applies a canonical transition using the transaction client CAS write', async () => {
+    const harness = makePrimitiveHarness();
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'pending', targetStatus: 'confirmed',
+    })).resolves.toMatchObject({
+      fromStatus: 'pending', toStatus: 'confirmed', updatedOrder: { status: 'confirmed' },
+    });
+    expect(harness.tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'order-1', tenantId: 'tenant-a', status: 'pending' },
+    }));
+  });
+
+  it('rejects an invalid lifecycle transition before attempting its write', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'confirmed', targetStatus: 'pending',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('allows only the explicit 99Food authoritative policy to reconcile a missed ready event', async () => {
+    const harness = makePrimitiveHarness();
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a',
+      orderId: 'order-1',
+      expectedCurrentStatus: 'pending',
+      targetStatus: 'ready_for_delivery',
+      transitionPolicy: 'food99_authoritative',
+    })).resolves.toMatchObject({ fromStatus: 'pending', toStatus: 'ready_for_delivery' });
+  });
+
+  it('does not allow the 99Food policy to bypass a non-authoritative ready transition', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });
+
+    await expect(harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a',
+      orderId: 'order-1',
+      expectedCurrentStatus: 'confirmed',
+      targetStatus: 'ready_for_delivery',
+      transitionPolicy: 'food99_authoritative',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns ORDER_STATUS_STALE when the expected status is no longer authoritative', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({ ...harness.order, status: 'confirmed' });
+
+    const error = await harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'pending', targetStatus: 'confirmed',
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({ code: 'ORDER_STATUS_STALE' });
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns ORDER_STATUS_STALE when the expected assigned driver changed', async () => {
+    const harness = makePrimitiveHarness();
+    harness.tx.order.findFirst.mockResolvedValueOnce({
+      ...harness.order,
+      deliveryDriverId: 'driver-b',
+    });
+
+    const error = await harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, {
+      tenantId: 'tenant-a',
+      orderId: 'order-1',
+      expectedCurrentStatus: 'pending',
+      targetStatus: 'confirmed',
+      expectedDeliveryDriverId: 'driver-a',
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({ code: 'ORDER_STATUS_STALE' });
+    expect(harness.tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('allows exactly one winner in a stale concurrent transition race', async () => {
+    const harness = makePrimitiveHarness();
+    let persistedStatus = 'pending';
+    harness.tx.order.findFirst.mockImplementation(async () => ({ ...harness.order, status: persistedStatus }));
+    harness.tx.order.updateMany.mockImplementation(async (args: {
+      where: { status: string };
+      data: { status: string };
+    }) => {
+      if (args.where.status !== persistedStatus) return { count: 0 };
+      persistedStatus = args.data.status;
+      return { count: 1 };
+    });
+    const transition = {
+      tenantId: 'tenant-a', orderId: 'order-1', expectedCurrentStatus: 'pending' as const, targetStatus: 'confirmed' as const,
+    };
+
+    const results = await Promise.allSettled([
+      harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, transition),
+      harness.service.applyOrderStatusTransitionInTransaction(harness.tx as never, transition),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(persistedStatus).toBe('confirmed');
+  });
+});

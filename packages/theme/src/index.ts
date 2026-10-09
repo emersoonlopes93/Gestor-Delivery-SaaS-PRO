@@ -23,6 +23,19 @@ export type StorefrontImageMode =
   | 'contain' 
   | 'hidden';
 
+export type StorefrontShowcaseMode = 'manual' | 'automatic' | 'hybrid';
+
+export type StorefrontShowcaseStrategy = 'best_selling' | 'promotions' | 'none';
+
+export type StorefrontShowcaseSettings = {
+  enabled: boolean;
+  title: string;
+  mode: StorefrontShowcaseMode;
+  maxItems: number;
+  manualProductIds: string[];
+  automaticStrategy: StorefrontShowcaseStrategy;
+};
+
 export type StorefrontRadius = 
   | 'sm' 
   | 'md' 
@@ -55,6 +68,7 @@ export type StorefrontLayoutSettings = {
   showProductDescription: boolean;
   showBadges: boolean;
   stickyCart: boolean;
+  showcase: StorefrontShowcaseSettings;
 };
 
 export type StorefrontPresetId = 
@@ -150,6 +164,44 @@ export function getDefaultStorefrontLayoutSettings(): StorefrontLayoutSettings {
     showProductDescription: true,
     showBadges: true,
     stickyCart: true,
+    showcase: {
+      enabled: false,
+      title: 'Destaques da loja',
+      mode: 'manual',
+      maxItems: 8,
+      manualProductIds: [],
+      automaticStrategy: 'none',
+    },
+  };
+}
+
+function normalizeStorefrontShowcase(input: unknown): StorefrontShowcaseSettings {
+  const defaults = getDefaultStorefrontLayoutSettings().showcase;
+  if (!input || typeof input !== 'object') return defaults;
+
+  const value = input as Record<string, unknown>;
+  const validModes: StorefrontShowcaseMode[] = ['manual', 'automatic', 'hybrid'];
+  const validStrategies: StorefrontShowcaseStrategy[] = ['best_selling', 'promotions', 'none'];
+  const title = typeof value.title === 'string' ? value.title.trim().slice(0, 80) : defaults.title;
+  const rawMaxItems = typeof value.maxItems === 'number' && Number.isFinite(value.maxItems)
+    ? Math.trunc(value.maxItems)
+    : defaults.maxItems;
+  const manualProductIds = Array.isArray(value.manualProductIds)
+    ? Array.from(new Set(value.manualProductIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)))
+        .slice(0, 12)
+    : defaults.manualProductIds;
+
+  return {
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : defaults.enabled,
+    title: title || defaults.title,
+    mode: validModes.includes(value.mode as StorefrontShowcaseMode)
+      ? value.mode as StorefrontShowcaseMode
+      : defaults.mode,
+    maxItems: Math.min(12, Math.max(1, rawMaxItems)),
+    manualProductIds,
+    automaticStrategy: validStrategies.includes(value.automaticStrategy as StorefrontShowcaseStrategy)
+      ? value.automaticStrategy as StorefrontShowcaseStrategy
+      : defaults.automaticStrategy,
   };
 }
 
@@ -271,6 +323,7 @@ export function normalizeStorefrontLayout(input: any): StorefrontLayoutSettings 
     showProductDescription: typeof input.showProductDescription === 'boolean' ? input.showProductDescription : defaults.showProductDescription,
     showBadges: typeof input.showBadges === 'boolean' ? input.showBadges : defaults.showBadges,
     stickyCart: typeof input.stickyCart === 'boolean' ? input.stickyCart : defaults.stickyCart,
+    showcase: normalizeStorefrontShowcase(input.showcase),
   };
 }
 

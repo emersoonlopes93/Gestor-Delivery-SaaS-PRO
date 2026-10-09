@@ -6,6 +6,8 @@ import { MovementsTable } from './SubComponents/MovementsTable';
 import { LossesPage } from './SubComponents/LossesPage';
 import { InventoryCountPage } from './SubComponents/InventoryCountPage';
 import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle } from 'lucide-react';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts';
 
@@ -71,64 +73,64 @@ export function InventoryPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto text-left space-y-6">
-      {/* Header Centralizado */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2">
-            <Package className="text-primary-600" /> Hub de Suprimentos
-          </h1>
-          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">Gestão inteligente de insumos e movimentações.</p>
-        </div>
-        <button
+      <PageHeader
+        className="mb-6"
+        title="Estoque"
+        description="Gestão inteligente de insumos e movimentações."
+        icon={Package}
+        action={(
+          <button
           onClick={() => {
             setEditingIngredient(null);
             setIsModalOpen(true);
           }}
-          className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-primary-500/20"
+          className="hidden items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-md shadow-primary-500/20 transition-all hover:bg-primary-700 md:flex"
         >
           <span className="text-lg">+</span> Novo Insumo
-        </button>
-      </div>
+          </button>
+        )}
+      />
 
-      {/* KPI Dashboard */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card-premium p-4 flex flex-col justify-between border-l-4 border-l-primary-500">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor em Estoque</span>
-            <DollarSign size={16} className="text-gray-300" />
+      <button
+        type="button"
+        onClick={() => {
+          setEditingIngredient(null);
+          setIsModalOpen(true);
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-md shadow-primary-500/20 transition-all hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hidden"
+      >
+        <span className="text-lg" aria-hidden>+</span> Novo Insumo
+      </button>
+
+      <ContextualNavigation itemIds={['management.purchases', 'management.suppliers']} />
+
+      <p className="border-l-2 border-primary pl-3 text-sm text-muted-foreground">
+        Fluxo operacional: compre e receba insumos, acompanhe movimentações, registre perdas e confirme na contagem.
+      </p>
+
+      <section aria-label="Resumo atual do estoque" className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+          <div className="flex items-center gap-3 p-4">
+            <span className="rounded-lg bg-primary/10 p-2 text-primary"><DollarSign size={16} aria-hidden /></span>
+            <div><p className="text-xs font-medium text-muted-foreground">Valor em estoque</p><p className="mt-0.5 text-lg font-semibold text-foreground">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.totalValue || 0)}</p></div>
           </div>
-          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.totalValue || 0)}
+          <div className="flex items-center gap-3 p-4">
+            <span className="rounded-lg bg-status-warning/10 p-2 text-status-warning"><AlertTriangle size={16} aria-hidden /></span>
+            <div><p className="text-xs font-medium text-muted-foreground">Insumos críticos</p><p className="mt-0.5 text-lg font-semibold text-foreground">{summary?.lowStockItems || 0}</p></div>
+          </div>
+          <div className="flex items-center gap-3 p-4">
+            <span className="rounded-lg bg-destructive/10 p-2 text-destructive"><TrendingDown size={16} aria-hidden /></span>
+            <div><p className="text-xs font-medium text-muted-foreground">Fora de estoque</p><p className="mt-0.5 text-lg font-semibold text-foreground">{summary?.outOfStockItems || 0} itens</p></div>
+          </div>
+          <div className="flex items-center gap-3 p-4">
+            <span className="rounded-lg bg-muted p-2 text-muted-foreground"><RefreshCcw size={16} aria-hidden /></span>
+            <div><p className="text-xs font-medium text-muted-foreground">Insumos ativos</p><p className="mt-0.5 text-lg font-semibold text-foreground">{summary?.totalActiveItems || 0}</p></div>
           </div>
         </div>
-
-        <div className={`card-premium p-4 flex flex-col justify-between border-l-4 ${(summary?.lowStockItems || 0) > 0 ? 'border-l-amber-500' : 'border-l-green-500'}`}>
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-sm font-medium text-gray-500">Insumos Críticos</span>
-            <AlertTriangle size={16} className={(summary?.lowStockItems || 0) > 0 ? 'text-amber-500' : 'text-gray-300'} />
-          </div>
-          <div className="text-2xl font-black text-gray-900 dark:text-gray-100">{summary?.lowStockItems || 0}</div>
-        </div>
-
-        <div className="card-premium p-4 flex flex-col justify-between border-l-4 border-l-red-500">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fora de Estoque</span>
-            <TrendingDown size={16} className="text-red-500" />
-          </div>
-          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">{summary?.outOfStockItems || 0} itens</div>
-        </div>
-
-        <div className="card-premium p-4 flex flex-col justify-between border-l-4 border-l-indigo-500">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Ativos</span>
-            <RefreshCcw size={16} className="text-indigo-500" />
-          </div>
-          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">{summary?.totalActiveItems || 0} insumos</div>
-        </div>
-      </div>
+      </section>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/50 p-1 rounded-xl w-fit">
+      <div role="tablist" aria-label="Áreas operacionais do estoque" className="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-border bg-muted/40 p-1">
         {[
           { id: 'ingredients', label: 'Insumos', icon: Package },
           { id: 'movements', label: 'Movimentações', icon: RefreshCcw },
@@ -138,22 +140,28 @@ export function InventoryPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as InventoryTab)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab.id ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            id={`inventory-tab-${tab.id}`}
+            aria-controls={`inventory-panel-${tab.id}`}
+            className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeTab === tab.id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
-            <tab.icon size={14} />
-            <span className="hidden md:inline">{tab.label}</span>
+            <tab.icon size={14} aria-hidden />
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
       {/* Content Area */}
-      <div className="card-premium overflow-hidden border-none shadow-premium bg-white/60 dark:bg-gray-900/60 backdrop-blur-md">
+      <div id={`inventory-panel-${activeTab}`} role="tabpanel" aria-labelledby={`inventory-tab-${activeTab}`} className="overflow-hidden rounded-xl border border-border bg-card">
         {activeTab === 'ingredients' && (
           <div>
             <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <label className="sr-only" htmlFor="inventory-ingredient-search">Buscar insumos</label>
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
                 <input
+                  id="inventory-ingredient-search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="input-premium pl-10 h-10"
@@ -211,8 +219,9 @@ export function InventoryPage() {
                               setIsModalOpen(true);
                             }}
                             className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                            aria-label={`Editar insumo ${ing.name}`}
                           >
-                            <Search size={16} />
+                            <Search size={16} aria-hidden />
                           </button>
                         </td>
                       </tr>

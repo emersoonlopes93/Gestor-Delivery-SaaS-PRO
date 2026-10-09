@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { useDraftSale } from './hooks/useDraftSale';
-import { PosFulfillmentType, OrderResponseDTO, PaymentMethod } from '@gestor/types';
+import { PosFulfillmentType, OrderResponseDTO, PaymentMethod, type CategoryTemplateType, type CreateOrderItemComboSlotSelectionDTO, type CreateOrderItemSelectionGroupDTO, type PizzaCompositionDTO } from '@gestor/types';
+import { getProductConfigurationRoute } from '@gestor/utils';
 import { 
   ShoppingCart, 
   Plus, 
@@ -18,6 +19,7 @@ import {
 import { ProductCard } from './components/ProductCard';
 import { PosSalonView, type SalonTable } from './components/PosSalonView';
 import { TransferTableModal } from './components/TransferTableModal';
+import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
 
 interface CatalogProduct {
   id: string;
@@ -27,6 +29,8 @@ interface CatalogProduct {
   categoryName: string;
   categoryId: string;
   type: 'simple' | 'configurable' | 'combo';
+  categoryTemplateType?: CategoryTemplateType | null;
+  activeOptionGroupCount: number;
 }
 
 interface CartItem {
@@ -38,6 +42,10 @@ interface CartItem {
   basePrice: number;
   quantity: number;
   notes: string;
+  selections?: CreateOrderItemSelectionGroupDTO[];
+  pizzaComposition?: PizzaCompositionDTO;
+  slots?: CreateOrderItemComboSlotSelectionDTO[];
+  compositionLabel?: string;
 }
 
 function formatCurrency(value: number) {
@@ -61,6 +69,7 @@ export default function WaiterPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState('');
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [configProductId, setConfigProductId] = useState<string | null>(null);
 
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [sourceTableForTransfer, setSourceTableForTransfer] = useState<SalonTable | null>(null);
@@ -84,6 +93,8 @@ export default function WaiterPage() {
         categoryId: ((p['category'] as Record<string, unknown>)?.['id'] as string) || 'uncategorized',
         categoryName: ((p['category'] as Record<string, unknown>)?.['name'] as string) || 'Sem Categoria',
         type: (p['type'] as 'simple' | 'configurable' | 'combo') || 'simple',
+        categoryTemplateType: ((p['category'] as Record<string, unknown>)?.['templateType'] as CategoryTemplateType) || null,
+        activeOptionGroupCount: Number(((p['_count'] as Record<string, unknown> | undefined)?.['optionGroupLinks']) ?? 0),
       }));
     },
     refetchOnWindowFocus: false,
@@ -111,6 +122,11 @@ export default function WaiterPage() {
   }, [products, selectedCategoryId]);
 
   const addToCart = useCallback((product: CatalogProduct) => {
+    if (getProductConfigurationRoute(product) !== 'direct') {
+      setConfigProductId(product.id);
+      return;
+    }
+
     const isCombo = product.type === 'combo';
     setCart((prev) => [...prev, {
         cartLineId: generateId(),
@@ -165,8 +181,12 @@ export default function WaiterPage() {
           ...(item.lineType === 'product' ? { productId: item.productId } : { comboId: item.comboId }),
           quantity: item.quantity,
           notes: item.notes || undefined,
+          selections: item.selections,
+          pizzaComposition: item.pizzaComposition,
+          slots: item.slots,
         })),
         fulfillmentType: PosFulfillmentType.TABLE,
+        tableId: selectedTableId || undefined,
         tableNumber,
         paymentMethod: PaymentMethod.cash, // Placeholder for draft
         waiterId: undefined // Let server handle current operator
@@ -197,7 +217,7 @@ export default function WaiterPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-64px)] bg-background text-foreground overflow-hidden">
       
       {/* Top Header Mobile */}
       <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-lg">
@@ -357,6 +377,29 @@ export default function WaiterPage() {
           sourceTableId={sourceTableForTransfer.id}
           sourceTableName={sourceTableForTransfer.name}
           availableTables={salonTables?.map(t => ({ id: t.id, name: t.name, status: t.status })) || []}
+        />
+      )}
+
+      {configProductId && (
+        <PosItemConfiguratorModal
+          isOpen={true}
+          productId={configProductId}
+          onClose={() => setConfigProductId(null)}
+          onConfirm={(result) => {
+            setCart((prev) => [...prev, {
+              cartLineId: generateId(),
+              lineType: result.lineType,
+              ...(result.lineType === 'combo'
+                ? { comboId: result.productId, slots: result.slots }
+                : { productId: result.productId, selections: result.selections, pizzaComposition: result.pizzaComposition }),
+              name: result.name,
+              basePrice: result.computedUnitPrice,
+              quantity: result.quantity,
+              notes: result.notes || '',
+              compositionLabel: result.compositionLabel,
+            }]);
+            setConfigProductId(null);
+          }}
         />
       )}
     </div>

@@ -163,7 +163,7 @@ export class AdminMediaController {
       size: buffer.length,
     };
 
-    let tagsList = parseTags(body.tags) || [];
+    const tagsList = parseTags(body.tags) || [];
     tagsList.push('ai_generated');
 
     const metadata: MediaMetadataInput = {

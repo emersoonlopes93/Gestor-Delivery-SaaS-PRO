@@ -24,14 +24,25 @@ export class SchedulingGeneratorService {
     const tenantId = overrideTenantId || this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
-    const settings = await this.prisma.schedulingSettings.findUnique({ where: { tenantId } });
+    const [settings, tenantSettings] = await Promise.all([
+      this.prisma.schedulingSettings.findUnique({ where: { tenantId } }),
+      this.prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { timezone: true },
+      }),
+    ]);
     if (!settings || !settings.enabled || !settings.acceptScheduledOrders) {
       this.logger.log(`Scheduling disabled for tenant ${tenantId}`);
       return [];
     }
 
     const maxDays = settings.maximumAdvanceDays ?? 7;
-    const nowLocal = DateTime.now().setZone(settings.timezone).startOf('day');
+    const timezone = tenantSettings?.timezone || settings.timezone || 'America/Sao_Paulo';
+    const nowLocal = DateTime.now().setZone(timezone).startOf('day');
+    if (!nowLocal.isValid) {
+      this.logger.error(`Invalid scheduling timezone tenantId=${tenantId} timezone=${timezone}`);
+      throw new Error('Invalid tenant timezone');
+    }
     const rangeStartUtc = nowLocal.toUTC().toJSDate();
     const rangeEndUtc = nowLocal.plus({ days: maxDays }).endOf('day').toUTC().toJSDate();
 
@@ -80,7 +91,7 @@ export class SchedulingGeneratorService {
         }
 
         let current = windowStartUtc;
-        while (current < windowEndUtc) {
+        while (current.getTime() + interval * 60 * 1000 <= windowEndUtc.getTime()) {
           newSlotStartTimes.add(current.getTime());
           current = new Date(current.getTime() + interval * 60 * 1000);
         }

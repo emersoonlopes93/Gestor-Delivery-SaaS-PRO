@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ChatState, MessageDirection, ChatSession, ChatMessage } from '@prisma/client';
@@ -757,6 +758,7 @@ export class ConversationService {
 
     // Emit WebSocket event for session update
     ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitWhatsAppHandoff(session.tenantId, session);
 
     // Log system message
     await this.addMessage({

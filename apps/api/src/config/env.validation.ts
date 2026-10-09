@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
+  ALLOW_WHATSAPP_DEV_RESET: z.enum(['true', 'false']).default('false'),
   API_PORT: z.coerce.number().int().positive().default(3333),
   API_PREFIX: z.string().min(1).default('/api/v1'),
   DATABASE_URL: z.string().min(1),
@@ -35,6 +36,9 @@ const baseEnvSchema = z.object({
   WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {CODE}'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(''),
 
+  // Google Identity Services (customer ID-token verification; no client secret).
+  GOOGLE_CLIENT_ID: z.string().default(''),
+
   // Web Push (VAPID)
   VAPID_PUBLIC_KEY: z.string().default(''),
   VAPID_PRIVATE_KEY: z.string().default(''),
@@ -42,6 +46,51 @@ const baseEnvSchema = z.object({
 
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
+
+  // IFood
+  MARKETPLACE_IFOOD_WEBHOOK_TOKEN: z.string().default(''),
+  MARKETPLACE_IFOOD_CLIENT_ID: z.string().default(''),
+  MARKETPLACE_IFOOD_CLIENT_SECRET: z.string().default(''),
+  MARKETPLACE_IFOOD_API_BASE_URL: z.string().url().default('https://merchant-api.ifood.com.br'),
+  MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_IFOOD_POLLING_INTERVAL_MS: z.coerce.number().int().min(30000).max(300000).default(30000),
+  MARKETPLACE_IFOOD_POLLING_JITTER_MS: z.coerce.number().int().min(0).max(15000).default(5000),
+  MARKETPLACE_IFOOD_POLLING_CONNECTIONS_PER_SCAN: z.coerce.number().int().min(1).max(1000).default(100),
+  MARKETPLACE_IFOOD_POLLING_CATEGORIES: z.string().default('ALL'),
+  MARKETPLACE_IFOOD_POLLING_TYPES: z.string().default(''),
+  MARKETPLACE_IFOOD_POLLING_GROUPS: z.string().default(''),
+  MARKETPLACE_99FOOD_APP_ID: z.string().default(''),
+  MARKETPLACE_99FOOD_CLIENT_SECRET: z.string().default(''),
+  MARKETPLACE_99FOOD_API_BASE_URL: z.string().url().default('https://openapi.99food.com'),
+  MARKETPLACE_99FOOD_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  MARKETPLACE_99FOOD_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_99FOOD_POLLING_ENABLED: z.enum(['true', 'false']).default('false'),
+  MARKETPLACE_99FOOD_POLLING_INTERVAL_MS: z.coerce.number().int().min(30000).max(300000).default(30000),
+  MARKETPLACE_99FOOD_POLLING_LOOKBACK_MS: z.coerce.number().int().min(30000).max(3600000).default(300000),
+  MARKETPLACE_99FOOD_POLLING_CONNECTIONS_PER_SCAN: z.coerce.number().int().min(1).max(1000).default(100),
+  MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY: z.string().default(''),
+  MARKETPLACE_CREDENTIALS_KEY_VERSION: z.string().min(1).default('current'),
+  MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY: z.string().default(''),
+  MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION: z.string().default(''),
+
+  // Delivery road routing. Disabled unless both provider and base URL are explicit.
+  ROUTING_PROVIDER: z.enum(['', 'osrm']).default(''),
+  ROUTING_OSRM_BASE_URL: z.union([z.literal(''), z.string().url()]).default(''),
+  ROUTING_TIMEOUT_MS: z.coerce.number().int().min(500).max(30000).default(4000),
+  ROUTING_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(3600000).default(300000),
+
+  // Upload
+  MEDIA_STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
+  MEDIA_STORAGE_PROVIDER: z.enum(['local', 'r2']).optional(),
+  STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
+  MEDIA_MAX_SIZE_BYTES: z.string().optional(),
+  MEDIA_MAX_FILE_SIZE_MB: z.string().optional(),
+
+  // Campaigns & Upsell
+  CAMPAIGN_AUTOMATION_ENABLED: z.enum(['true', 'false']).default('false'),
+  POST_PURCHASE_UPSELL_DELAY_MINUTES: z.string().default('60'),
 
   // AI Providers. SaaS Admin database config has runtime priority; ENV is fallback.
   OPENAI_API_KEY: z.string().default(''),
@@ -68,34 +117,112 @@ const baseEnvSchema = z.object({
   // Feature Flags
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
   CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
+  BASE_MENU_IMPORT_ENABLED: z.enum(['true', 'false']).default('false'),
+  PUSH_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false'),
   BILLING_DB_PREFLIGHT: z.enum(['strict', 'warn', 'off']).optional(),
 });
 
 export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
+  if (data.ROUTING_PROVIDER === 'osrm' && !data.ROUTING_OSRM_BASE_URL) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ROUTING_OSRM_BASE_URL'], message: 'ROUTING_OSRM_BASE_URL é obrigatória quando ROUTING_PROVIDER=osrm.' });
+  }
   if (data.NODE_ENV === 'production') {
-    if (data.REDIS_ENABLED === 'false') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['REDIS_ENABLED'],
-        message: `REDIS_ENABLED must be 'true' in production.`,
-      });
+    if (data.REDIS_ENABLED === 'true') {
+      if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REDIS_HOST'],
+          message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
+        });
+      }
+    }
+    
+    if (data.CAMPAIGNS_DISPATCH_ENABLED === 'true' && data.BULLMQ_ENABLED !== 'true') {
+       ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['BULLMQ_ENABLED'],
+          message: `BULLMQ_ENABLED deve ser 'true' se CAMPAIGNS_DISPATCH_ENABLED estiver ativo.`,
+        });
     }
 
-    if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['REDIS_HOST'],
-        message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
-      });
+    if (data.PUSH_NOTIFICATIONS_ENABLED === 'true') {
+      if (!data.VAPID_PUBLIC_KEY || !data.VAPID_PRIVATE_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['VAPID_PUBLIC_KEY'],
+          message: `VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY são obrigatórios se PUSH_NOTIFICATIONS_ENABLED for 'true'.`,
+        });
+      }
     }
 
-    if (data.BULLMQ_ENABLED !== 'true') {
+    if (data.MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED === 'true') {
+      if (data.BULLMQ_ENABLED !== 'true' || data.REDIS_ENABLED !== 'true') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED'],
+          message: `iFood bidirecional exige REDIS_ENABLED=true e BULLMQ_ENABLED=true.`,
+        });
+      }
+      if (!data.MARKETPLACE_IFOOD_CLIENT_ID || !data.MARKETPLACE_IFOOD_CLIENT_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['MARKETPLACE_IFOOD_CLIENT_ID'],
+          message: `Credenciais de aplicativo iFood sao obrigatorias para o fluxo bidirecional.`,
+        });
+      }
+      const encryptionKey = Buffer.from(data.MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY, 'base64');
+      if (encryptionKey.length !== 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY'],
+          message: `A chave de credenciais deve conter 32 bytes codificados em base64.`,
+        });
+      }
+    }
+
+  }
+
+  if (data.MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED === 'true') {
+    if (data.MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED !== 'true' || data.BULLMQ_ENABLED !== 'true' || data.REDIS_ENABLED !== 'true') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['BULLMQ_ENABLED'],
-        message: `BULLMQ_ENABLED must be 'true' in production.`,
+        path: ['MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED'],
+        message: `Polling iFood exige bidirecional, Redis e BullMQ habilitados.`,
       });
     }
+    if (data.MARKETPLACE_IFOOD_POLLING_TYPES && data.MARKETPLACE_IFOOD_POLLING_GROUPS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MARKETPLACE_IFOOD_POLLING_TYPES'],
+        message: `Configure types ou groups, nao ambos, para evitar filtros duplicados e auto-ACK inesperado.`,
+      });
+    }
+  }
+
+  if (data.MARKETPLACE_99FOOD_ENABLED === 'true') {
+    if (!data.MARKETPLACE_99FOOD_APP_ID || !data.MARKETPLACE_99FOOD_CLIENT_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MARKETPLACE_99FOOD_APP_ID'],
+        message: '99Food exige App ID e Client Secret.',
+      });
+    }
+    if (Buffer.from(data.MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY, 'base64').length !== 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY'],
+        message: 'A chave de credenciais deve conter 32 bytes codificados em base64.',
+      });
+    }
+  }
+
+  if (data.MARKETPLACE_99FOOD_POLLING_ENABLED === 'true'
+    && (data.MARKETPLACE_99FOOD_ENABLED !== 'true' || data.BULLMQ_ENABLED !== 'true' || data.REDIS_ENABLED !== 'true')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['MARKETPLACE_99FOOD_POLLING_ENABLED'],
+      message: 'Polling 99Food exige integracao, Redis e BullMQ habilitados.',
+    });
   }
 });
 

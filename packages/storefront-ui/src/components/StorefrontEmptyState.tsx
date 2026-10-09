@@ -1,4 +1,4 @@
-import { cn } from '../cn';
+import { cn } from '@gestor/storefront-preview';
 
 interface StorefrontEmptyStateProps {
   title: string;

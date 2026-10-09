@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../lib/api-client';
-import { AlertTriangle, TrendingUp, Users, Store, CheckCircle2, Ticket } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Store, CheckCircle2, Ticket } from 'lucide-react';
 
 interface DashboardStats {
   activeTenants: number;

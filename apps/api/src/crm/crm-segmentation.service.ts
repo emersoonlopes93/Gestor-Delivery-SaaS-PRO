@@ -61,17 +61,27 @@ export class CrmSegmentationService {
   }
 
   /**
-   * Get all customers for a tenant with their RFM segment info.
+   * Get paginated customers for a tenant with their RFM segment info.
    */
-  async getSegmentedCustomers(tenantId: string) {
-    const customers = await this.prisma.customer.findMany({
-      where: { tenantId },
-      orderBy: { lastOrderDate: 'desc' },
-    });
+  async getSegmentedCustomers(tenantId: string, page = 1, limit = 50) {
+    const normalizedPage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+    const normalizedLimit = Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 50;
+    const skip = (normalizedPage - 1) * normalizedLimit;
+    const take = normalizedLimit;
+
+    const [total, customers] = await this.prisma.$transaction([
+      this.prisma.customer.count({ where: { tenantId } }),
+      this.prisma.customer.findMany({
+        where: { tenantId },
+        orderBy: { lastOrderDate: 'desc' },
+        skip,
+        take,
+      }),
+    ]);
 
     const now = new Date();
 
-    return customers.map((customer) => {
+    const data = customers.map((customer) => {
       const recency = customer.lastOrderDate ? differenceInDays(now, customer.lastOrderDate) : 999;
       const frequency = customer.totalOrders;
       const monetary = Number(customer.totalSpent);
@@ -100,6 +110,16 @@ export class CrmSegmentationService {
         },
       };
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        page: normalizedPage,
+        limit: normalizedLimit,
+        totalPages: Math.ceil(total / normalizedLimit),
+      },
+    };
   }
 
   /**

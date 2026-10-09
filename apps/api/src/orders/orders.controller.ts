@@ -9,6 +9,7 @@ import {
   Request,
   ParseIntPipe,
   DefaultValuePipe,
+  Header,
 } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import { OrdersService } from './orders.service';
@@ -19,6 +20,7 @@ import { RequirePermissions, Public } from '../common/decorators';
 import { UseGuards } from '@nestjs/common';
 import type { TenantJwtPayload } from '@gestor/types';
 import { Throttle } from '@nestjs/throttler';
+import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -63,15 +65,23 @@ export class OrdersController {
     @Query('channel') channel?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+    @Query('fulfillmentType') fulfillmentType?: string,
+    @Query('origin') origin?: string,
+    @Query('ownership') ownership?: string,
   ) {
     const tenantId = req.user.tenantId;
-    return this.ordersService.listOrders(tenantId, page, limit, status, channel, startDate, endDate);
+    return this.ordersService.listOrders(
+      tenantId, page, limit, status, channel, startDate, endDate, search,
+      fulfillmentType, origin, ownership,
+    );
   }
 
   // ----------------------------------------------------------------
   // TENANT INTERNAL: Operational Board
   // ----------------------------------------------------------------
   @Get('operation/board')
+  @Header('Cache-Control', 'no-store, private')
   @RequirePermissions('orders.use_kanban')
   async getBoardOrders(
     @Request() req: TenantRequest,
@@ -82,6 +92,18 @@ export class OrdersController {
   }
 
   // ----------------------------------------------------------------
+  // TENANT INTERNAL: Read-only compatibility status lookup
+  // ----------------------------------------------------------------
+  @Get(':id/status')
+  @RequirePermissions('orders.read')
+  async getOrderStatus(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.getOrderDetail(id, req.user.tenantId);
+  }
+
+  // ----------------------------------------------------------------
   // TENANT INTERNAL: Kitchen Display System (KDS)
   // ----------------------------------------------------------------
   @Get('operation/kds')
@@ -89,6 +111,21 @@ export class OrdersController {
   async getKdsOrders(@Request() req: TenantRequest) {
     const tenantId = req.user.tenantId;
     return this.ordersService.getKdsOrders(tenantId);
+  }
+
+  @Get('settings/auto-accept')
+  @RequirePermissions('orders.settings.manage')
+  async getAutoAcceptSettings(@Request() req: TenantRequest) {
+    return this.ordersService.getAutoAcceptSettings(req.user.tenantId);
+  }
+
+  @Patch('settings/auto-accept')
+  @RequirePermissions('orders.settings.manage')
+  async updateAutoAcceptSettings(
+    @Request() req: TenantRequest,
+    @Body() dto: UpdateOrderAutoAcceptSettingsDto,
+  ) {
+    return this.ordersService.updateAutoAcceptSettings(req.user.tenantId, req.user.sub, dto);
   }
 
   // ----------------------------------------------------------------
@@ -156,6 +193,8 @@ export class OrdersController {
   }
 
   @Post(':id/assign-driver')
+  @Header('Deprecation', 'true')
+  @Header('Link', '</api/v1/delivery/runs>; rel="successor-version"')
   @RequirePermissions('delivery.dispatch')
   async assignDriver(
     @Request() req: TenantRequest,

@@ -34,6 +34,12 @@ const BOUNDARIES = [
     message: '@gestor/ui must be isolated from storefront-ui and apps'
   },
   {
+    name: '@gestor/storefront-preview',
+    path: 'packages/storefront-preview/src',
+    forbidden: ['@gestor/ui', '@gestor/storefront-ui', 'apps/web-tenant', 'apps/web-admin', 'apps/web-storefront'],
+    message: '@gestor/storefront-preview must be isolated from app layers and storefront-ui'
+  },
+  {
     name: '@gestor/storefront-ui',
     path: 'packages/storefront-ui/src',
     forbidden: ['@gestor/ui', 'apps/web-tenant', 'apps/web-admin', 'apps/web-storefront'],

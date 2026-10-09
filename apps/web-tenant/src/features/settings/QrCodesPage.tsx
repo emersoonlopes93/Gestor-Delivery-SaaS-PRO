@@ -151,6 +151,7 @@ export function QrCodesPage() {
              <p className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">Ideal para adesivos e mesas</p>
           </div>
 
+          {/* @allow-theme-risk: área branca preserva contraste e leitura óptica do QR Code. */}
           <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-border mb-8">
              <QRCodeSVG 
                id="main-qr"

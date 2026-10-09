@@ -1,5 +1,12 @@
 import 'reflect-metadata';
-import { PrismaClient, TenantStatus } from '@prisma/client';
+import {
+  CashSessionStatus,
+  FinancialAccountType,
+  PrismaClient,
+  TenantStatus,
+  TenantSubscriptionStatus,
+  UnitType,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   TENANT_PERMISSIONS,
@@ -14,6 +21,7 @@ import {
   ensureDefaultTenantRoles,
   ensureTenantPermissionCatalog,
 } from '../src/tenant/default-tenant-roles';
+import { SMOKE_TENANT_FIXTURE } from './smoke-tenant-fixture';
 
 const prisma = new PrismaClient();
 
@@ -394,7 +402,7 @@ async function seedBaseMenus() {
 }
 
 async function seedDemoTenant() {
-  const TENANT_SLUG = 'pizzaria-demo';
+  const TENANT_SLUG = SMOKE_TENANT_FIXTURE.slug;
   console.log('🏪 Seeding demo tenant...');
 
   try {
@@ -432,6 +440,7 @@ async function seedDemoTenant() {
         state: 'SP',
         zipCode: '01310-100',
         pixKey: 'contato@pizzariademo.com',
+        pickupEnabled: true,
         paymentMethods: ['pix', 'credit_card', 'cash'],
         audioNotificationEnabled: true,
         newOrderSound: 'notification.mp3',
@@ -453,8 +462,7 @@ async function seedDemoTenant() {
         street: 'Av. Paulista',
         number: '1000',
         neighborhood: 'Bela Vista',
-
-
+        pickupEnabled: true,
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
@@ -474,9 +482,47 @@ async function seedDemoTenant() {
 
     await ensureDefaultTenantRoles(prisma, tenant.id);
 
-    // Create tenant owner user
-    const ownerEmail = 'demo@demo.com';
-    const ownerPassword = await bcrypt.hash('demo123', 12);
+    // CI owns a deterministic, disposable tenant fixture. Persistent environments
+    // retain the existing demo owner password hash on repeated seeds.
+    const isEphemeralSmokeSeed = process.env.NODE_ENV === 'test';
+    if (isEphemeralSmokeSeed) {
+      const smokePlan = await prisma.billingPlan.findUniqueOrThrow({
+        where: { slug: SMOKE_TENANT_FIXTURE.billingPlanSlug },
+        select: { id: true, requiresPaymentMethod: true },
+      });
+      const existingSubscription = await prisma.tenantBillingSubscription.findFirst({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      const subscriptionData = {
+        billingPlanId: smokePlan.id,
+        status: TenantSubscriptionStatus.active,
+        requiresPaymentMethod: smokePlan.requiresPaymentMethod,
+      };
+
+      if (existingSubscription) {
+        await prisma.tenantBillingSubscription.update({
+          where: { id: existingSubscription.id },
+          data: subscriptionData,
+        });
+      } else {
+        await prisma.tenantBillingSubscription.create({
+          data: {
+            tenantId: tenant.id,
+            startedAt: new Date(),
+            ...subscriptionData,
+          },
+        });
+      }
+    }
+
+    const ownerEmail = isEphemeralSmokeSeed
+      ? SMOKE_TENANT_FIXTURE.ownerEmail
+      : 'demo@demo.com';
+    const ownerPassword = isEphemeralSmokeSeed
+      ? await bcrypt.hash(SMOKE_TENANT_FIXTURE.ownerPassword, 12)
+      : undefined;
 
     const owner = await prisma.tenantUser.upsert({
       where: {
@@ -484,12 +530,13 @@ async function seedDemoTenant() {
       },
       update: {
         isActive: true,
+        ...(ownerPassword ? { passwordHash: ownerPassword } : {}),
       },
       create: {
         tenantId: tenant.id,
         email: ownerEmail,
         name: 'Dono da Pizzaria',
-        passwordHash: ownerPassword,
+        passwordHash: ownerPassword ?? await bcrypt.hash('demo123', 12),
         isActive: true,
       },
     });
@@ -506,6 +553,39 @@ async function seedDemoTenant() {
       update: {},
       create: { userId: owner.id, roleId: ownerRole.id },
     });
+
+    if (isEphemeralSmokeSeed) {
+      await prisma.tenantOnboarding.upsert({
+        where: { tenantId: tenant.id },
+        create: {
+          tenantId: tenant.id,
+          stepBasicInfo: true,
+          stepOperatingHours: true,
+          stepLogo: true,
+          stepAddress: true,
+          stepDelivery: true,
+          stepPayments: true,
+          stepWhatsapp: true,
+          stepMenu: true,
+          stepCatalog: true,
+          stepFirstOrder: true,
+          completedAt: new Date(),
+        },
+        update: {
+          stepBasicInfo: true,
+          stepOperatingHours: true,
+          stepLogo: true,
+          stepAddress: true,
+          stepDelivery: true,
+          stepPayments: true,
+          stepWhatsapp: true,
+          stepMenu: true,
+          stepCatalog: true,
+          stepFirstOrder: true,
+          completedAt: new Date(),
+        },
+      });
+    }
 
     console.log(`   👤 Demo tenant created: ${tenant.name}`);
     console.log(`   👤 Tenant owner: ${ownerEmail}`);
@@ -526,7 +606,9 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create default tenant operating hours (08:00 to 22:00 for Sun-Sat)
+    // Create tenant operating hours
+    const openTime = isEphemeralSmokeSeed ? '00:00' : '08:00';
+    const closeTime = isEphemeralSmokeSeed ? '23:59' : '22:00';
     for (let day = 0; day <= 6; day++) {
       const existingHours = await prisma.tenantOperatingHours.findFirst({
         where: { tenantId: tenant.id, dayOfWeek: day }
@@ -537,39 +619,42 @@ async function seedDemoTenant() {
             tenantId: tenant.id,
             dayOfWeek: day,
             isOpen: true,
-            openTime: '08:00',
-            closeTime: '22:00',
+            openTime,
+            closeTime,
+          }
+        });
+      } else if (isEphemeralSmokeSeed) {
+        // For ephemeral test, ensure it's 24h
+        await prisma.tenantOperatingHours.update({
+          where: { id: existingHours.id },
+          data: {
+            isOpen: true,
+            openTime,
+            closeTime,
           }
         });
       }
     }
 
-    // Create delivery rate rules
-    await prisma.deliveryRateRule.create({
-      data: {
-        tenantId: tenant.id,
-        type: 'neighborhood',
-        neighborhood: 'centro',
-        rate: 8.0,
-      },
-    });
-
-    await prisma.deliveryRateRule.create({
-      data: {
-        tenantId: tenant.id,
-        type: 'neighborhood',
-        neighborhood: 'jardins',
-        rate: 12.0,
-      },
-    });
-
-    await prisma.deliveryRateRule.create({
-      data: {
-        tenantId: tenant.id,
-        type: 'fixed',
-        fixedRate: 10.0,
-      },
-    });
+    // Preserve the small demo delivery set on repeated seeds.
+    const deliveryRules = [
+      { type: 'neighborhood' as const, neighborhood: 'centro', rate: 8.0 },
+      { type: 'neighborhood' as const, neighborhood: 'jardins', rate: 12.0 },
+      { type: 'fixed' as const, fixedRate: 10.0 },
+    ];
+    for (const rule of deliveryRules) {
+      const existingRule = await prisma.deliveryRateRule.findFirst({
+        where: {
+          tenantId: tenant.id,
+          type: rule.type,
+          neighborhood: rule.neighborhood ?? null,
+          fixedRate: rule.fixedRate ?? null,
+        },
+      });
+      if (!existingRule) {
+        await prisma.deliveryRateRule.create({ data: { tenantId: tenant.id, ...rule } });
+      }
+    }
 
     // Create demo category (ProductCategory)
     const category = await prisma.productCategory.upsert({
@@ -583,7 +668,7 @@ async function seedDemoTenant() {
     });
 
     // Create product
-    await prisma.product.upsert({
+    const pizza = await prisma.product.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-de-calabresa' } },
       update: {},
       create: {
@@ -624,6 +709,57 @@ async function seedDemoTenant() {
     });
 
     console.log('   ✅ Catalog data seeded');
+    const supplier = await prisma.supplier.upsert({
+      where: { tenantId_cnpj: { tenantId: tenant.id, cnpj: '11999999000191' } },
+      update: { name: 'Fornecedor Demo', isActive: true },
+      create: { tenantId: tenant.id, name: 'Fornecedor Demo', cnpj: '11999999000191', isActive: true },
+    });
+    const ingredients = await Promise.all([
+      prisma.ingredient.upsert({
+        where: { tenantId_sku: { tenantId: tenant.id, sku: 'DEMO-FARINHA' } },
+        update: { isActive: true },
+        create: {
+          tenantId: tenant.id, name: 'Farinha de Trigo', sku: 'DEMO-FARINHA',
+          unit: UnitType.kg, purchaseUnit: UnitType.kg, conversionFactor: 1,
+          currentCost: 5, currentStock: 20, minStock: 2, isActive: true,
+        },
+      }),
+      prisma.ingredient.upsert({
+        where: { tenantId_sku: { tenantId: tenant.id, sku: 'DEMO-MUSSARELA' } },
+        update: { isActive: true },
+        create: {
+          tenantId: tenant.id, name: 'Mussarela', sku: 'DEMO-MUSSARELA',
+          unit: UnitType.kg, purchaseUnit: UnitType.kg, conversionFactor: 1,
+          currentCost: 30, currentStock: 10, minStock: 1, isActive: true,
+        },
+      }),
+    ]);
+    for (const [ingredient, quantity] of [[ingredients[0], 0.3], [ingredients[1], 0.25]] as const) {
+      await prisma.productRecipeIngredient.upsert({
+        where: { productId_ingredientId: { productId: pizza.id, ingredientId: ingredient.id } },
+        update: { quantity, tenantId: tenant.id },
+        create: { tenantId: tenant.id, productId: pizza.id, ingredientId: ingredient.id, quantity },
+      });
+    }
+
+    const financialAccount = await prisma.financialAccount.findFirst({
+      where: { tenantId: tenant.id, name: 'Caixa Operacional' },
+    });
+    if (!financialAccount) {
+      await prisma.financialAccount.create({
+        data: { tenantId: tenant.id, name: 'Caixa Operacional', type: FinancialAccountType.cash, balance: 0, active: true },
+      });
+    }
+    const openCashSession = await prisma.cashSession.findFirst({
+      where: { tenantId: tenant.id, operatorId: owner.id, status: CashSessionStatus.open },
+    });
+    if (!openCashSession) {
+      await prisma.cashSession.create({
+        data: { tenantId: tenant.id, operatorId: owner.id, status: CashSessionStatus.open, openingAmount: 0, notes: 'Sessao demo' },
+      });
+    }
+
+    console.log(`Operational demo data seeded for ${supplier.name}`);
   } catch (err) {
     console.error('❌ Error inside seedDemoTenant:', err);
     throw err;

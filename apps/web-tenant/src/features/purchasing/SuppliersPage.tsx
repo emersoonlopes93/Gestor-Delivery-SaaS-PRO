@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { SupplierDTO, CreateSupplierDTO } from '@gestor/types';
 import { SupplierModal } from './SupplierModal';
-import { Truck, Plus, Search, Mail, Phone, FileText } from 'lucide-react';
+import { Truck, Plus, Search, Mail, Phone } from 'lucide-react';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 export function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
@@ -10,6 +12,7 @@ export function SuppliersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierDTO | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     loadSuppliers();
@@ -23,13 +26,14 @@ export function SuppliersPage() {
         setSuppliers(response.data);
       }
     } catch (error) {
-      console.error('Erro ao carregar fornecedores:', error);
+      setActionError(error instanceof Error ? error.message : 'Não foi possível carregar fornecedores.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSave = async (data: CreateSupplierDTO) => {
+    setActionError(null);
     try {
       if (editingSupplier) {
         await api.put(`/purchasing/suppliers/${editingSupplier.id}`, data);
@@ -39,8 +43,31 @@ export function SuppliersPage() {
       loadSuppliers();
       setIsModalOpen(false);
     } catch (error) {
-      console.error('Erro ao salvar fornecedor:', error);
+      setActionError(error instanceof Error ? error.message : 'Não foi possível salvar o fornecedor.');
       throw error;
+    }
+  };
+
+  const handleDeactivate = async (supplier: SupplierDTO) => {
+    if (!supplier.isActive) {
+      try {
+        setActionError(null);
+        await api.put(`/purchasing/suppliers/${supplier.id}`, { isActive: true });
+        await loadSuppliers();
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Não foi possível reativar o fornecedor.');
+      }
+      return;
+    }
+
+    if (!window.confirm(`Inativar ${supplier.name}? As compras históricas serão preservadas.`)) return;
+
+    try {
+      setActionError(null);
+      await api.delete(`/purchasing/suppliers/${supplier.id}`);
+      await loadSuppliers();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Não foi possível inativar o fornecedor.');
     }
   };
 
@@ -50,37 +77,50 @@ export function SuppliersPage() {
   );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-left">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
-            <Truck className="h-8 w-8 text-primary-600" />
-            Fornecedores
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie sua rede de parceiros e fornecedores de insumos.</p>
-        </div>
-        <button
+    <div className="mx-auto max-w-7xl space-y-6 p-4 text-left md:p-6">
+      <PageHeader
+        title="Fornecedores"
+        description="Mantenha os parceiros de compra prontos para as próximas entradas."
+        icon={Truck}
+        action={<button
           onClick={() => {
             setEditingSupplier(null);
             setIsModalOpen(true);
           }}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm flex items-center gap-2 group"
+          className="hidden items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:flex"
         >
-          <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
+          <Plus className="h-5 w-5" />
           Novo Fornecedor
-        </button>
-      </div>
+        </button>}
+      />
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50/50">
+      <button
+        type="button"
+        onClick={() => {
+          setEditingSupplier(null);
+          setIsModalOpen(true);
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hidden"
+      >
+        <Plus className="h-5 w-5" aria-hidden />
+        Novo Fornecedor
+      </button>
+
+      <ContextualNavigation itemIds={['inventory.home', 'management.purchases', 'management.suppliers']} />
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {actionError && <p role="alert" className="mx-4 mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p>}
+        <div className="border-b border-border bg-muted/50 p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <label className="sr-only" htmlFor="suppliers-search">Buscar fornecedores</label>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <input
+              id="suppliers-search"
               type="text"
               placeholder="Buscar por nome ou CNPJ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+              className="w-full rounded-xl border border-border bg-background py-2 pl-10 pr-4 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>
@@ -93,42 +133,43 @@ export function SuppliersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-900/50/50">
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fornecedor</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">CNPJ/Doc</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contato</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
+                <tr className="bg-muted/50">
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Fornecedor</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">CNPJ/Doc</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Contato</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              <tbody className="divide-y divide-border">
                 {filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="group hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/80 transition-colors">
+                  <tr key={supplier.id} className="group transition-colors hover:bg-muted/70">
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900 dark:text-gray-100">{supplier.name}</div>
+                      <div className="font-semibold text-foreground">{supplier.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
-                      {supplier.cnpj || '---'}
+                    <td className="px-6 py-4 font-mono text-sm text-muted-foreground">
+                      {supplier.cnpj || 'Não informado'}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-1">
+                      <div className="min-w-[11rem] space-y-1">
                         {supplier.email && (
-                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                            <Mail className="h-3 w-3" />
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3" aria-hidden />
                             {supplier.email}
                           </div>
                         )}
                         {supplier.phone && (
-                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                            <Phone className="h-3 w-3" />
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3" aria-hidden />
                             {supplier.phone}
                           </div>
                         )}
+                        {!supplier.email && !supplier.phone && <span className="text-xs text-muted-foreground">Sem contato informado</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        supplier.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        supplier.isActive ? 'bg-status-success/15 text-status-success' : 'bg-destructive/15 text-destructive'
                       }`}>
                         {supplier.isActive ? 'Ativo' : 'Inativo'}
                       </span>
@@ -136,16 +177,23 @@ export function SuppliersPage() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-3">
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingSupplier(supplier);
                             setIsModalOpen(true);
                           }}
+                          aria-label={`Editar fornecedor ${supplier.name}`}
                           className="text-primary-600 hover:text-primary-700 font-semibold text-xs"
                         >
                           Editar
                         </button>
-                        <button className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors">
-                          <FileText className="h-4 w-4" />
+                        <button
+                          type="button"
+                          onClick={() => void handleDeactivate(supplier)}
+                          aria-label={`${supplier.isActive ? 'Inativar' : 'Reativar'} fornecedor ${supplier.name}`}
+                          className="text-muted-foreground transition-colors hover:text-foreground font-semibold text-xs"
+                        >
+                          {supplier.isActive ? 'Inativar' : 'Reativar'}
                         </button>
                       </div>
                     </td>
@@ -154,7 +202,7 @@ export function SuppliersPage() {
                 {filteredSuppliers.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center justify-center text-gray-400">
+                      <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <Truck className="h-12 w-12 mb-3 opacity-50" />
                         <p>Nenhum fornecedor encontrado.</p>
                       </div>

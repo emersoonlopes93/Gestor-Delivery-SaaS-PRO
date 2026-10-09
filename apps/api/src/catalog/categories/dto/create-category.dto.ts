@@ -1,5 +1,7 @@
-import { IsString, IsOptional, IsBoolean, IsInt } from 'class-validator';
-import { CreateCategoryDto as ICreateCategoryDto } from '@gestor/types';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { CategoryActiveDay, CreateCategoryDto as ICreateCategoryDto } from '@gestor/types';
+
+const CATEGORY_ACTIVE_DAYS: CategoryActiveDay[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
 export class CreateCategoryDto implements ICreateCategoryDto {
   @IsString()
@@ -16,6 +18,13 @@ export class CreateCategoryDto implements ICreateCategoryDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ArrayUnique()
+  @IsIn(CATEGORY_ACTIVE_DAYS, { each: true })
+  activeDays?: CategoryActiveDay[];
 
   @IsBoolean()
   @IsOptional()

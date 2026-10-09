@@ -14,6 +14,10 @@ import type {
   CreateOrderItemComboSlotSelectionDTO,
   PizzaCompositionDTO,
 } from '@gestor/types';
+import {
+  computeOptionSelectionsPrice,
+  getOptionSelectionsPricePreview,
+} from './pos-option-pricing';
 
 type PricingAxis = 'primary' | 'secondary';
 type PriceImpactType = 'none' | 'fixed' | 'replace' | 'percentage';
@@ -49,11 +53,19 @@ type ProductDetail = {
         name: string;
         description?: string | null;
         isActive: boolean;
+        effectiveIsActive?: boolean;
         allowQuantity: boolean;
+        minQty?: number | null;
+        maxQty?: number | null;
         priceImpactType: PriceImpactType;
         priceImpactValue: number;
       }>;
     };
+  }>;
+  optionItemPrices?: Array<{
+    optionItemId: string;
+    price?: number | null;
+    isActive?: boolean | null;
   }>;
   comboMode?: 'bundle' | 'slot' | null;
   comboSlots?: Array<{
@@ -105,6 +117,7 @@ function buildSlotsDto(input: SlotState): CreateOrderItemComboSlotSelectionDTO[]
     .filter((s) => s.items.length > 0);
 }
 
+/*
 function computeOptionSelectionsPrice(detail: ProductDetail, selections: SelectionState): { unitPrice: number; composition: string } {
   const basePrice = Number(detail.basePrice ?? 0);
   const links = (detail.optionGroupLinks ?? []).filter((l) => {
@@ -203,6 +216,7 @@ function computeOptionSelectionsPrice(detail: ProductDetail, selections: Selecti
   return { unitPrice, composition: compositionParts.join('; ') };
 }
 
+*/
 export function PosItemConfiguratorModal(props: {
   isOpen: boolean;
   productId: string;
@@ -438,17 +452,17 @@ export function PosItemConfiguratorModal(props: {
     }
 
     if (hasV2Options) {
-      const priced = computeOptionSelectionsPrice(genericOptionDetail ?? detail, selectionState);
-      return { unitPrice: priced.unitPrice, label: priced.composition };
+      const priced = getOptionSelectionsPricePreview(genericOptionDetail ?? detail, selectionState);
+      return priced ? { unitPrice: priced.unitPrice, label: priced.composition } : { unitPrice: base, label: '' };
     }
 
     if (isPizzaTemplate) {
-      const secondaryOptions = computeOptionSelectionsPrice(detail, selectionState);
+      const secondaryOptions = getOptionSelectionsPricePreview(genericOptionDetail ?? detail, selectionState);
 
       const pizzaBase = pizzaPreview?.unitPrice ?? base;
       return {
-        unitPrice: Number((pizzaBase + (secondaryOptions.unitPrice - base)).toFixed(2)),
-        label: `${pizzaPreview?.label || `Sabores: ${selectedPizzaFlavors.map((f) => f.name).join(' / ')}`}${secondaryOptions.composition ? `; ${secondaryOptions.composition}` : ''}`,
+        unitPrice: Number((pizzaBase + ((secondaryOptions?.unitPrice ?? base) - base)).toFixed(2)),
+        label: `${pizzaPreview?.label || `Sabores: ${selectedPizzaFlavors.map((f) => f.name).join(' / ')}`}${secondaryOptions?.composition ? `; ${secondaryOptions.composition}` : ''}`,
       };
     }
 

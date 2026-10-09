@@ -10,6 +10,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthSessionService } from './auth-session.service';
 import { MailModule } from '../mail/mail.module';
 import { BillingDomainModule } from '../billing/billing-domain.module';
+import { DriverAuthGuard } from './guards/driver-auth.guard';
+import { TenantWebSocketAuthService } from './tenant-websocket-auth.service';
 
 @Module({
   imports: [
@@ -28,7 +30,7 @@ import { BillingDomainModule } from '../billing/billing-domain.module';
     }),
   ],
   controllers: [TenantAuthController, DriverAuthController],
-  providers: [TenantAuthService, DriverAuthService, AuthSessionService, JwtStrategy],
-  exports: [JwtModule, TenantAuthService, DriverAuthService, AuthSessionService],
+  providers: [TenantAuthService, DriverAuthService, DriverAuthGuard, AuthSessionService, JwtStrategy, TenantWebSocketAuthService],
+  exports: [JwtModule, TenantAuthService, DriverAuthService, DriverAuthGuard, AuthSessionService, TenantWebSocketAuthService],
 })
 export class AuthModule {}

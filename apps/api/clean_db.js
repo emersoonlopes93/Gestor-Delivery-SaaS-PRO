@@ -1,9 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Database clean is forbidden when NODE_ENV=production.');
+  }
+
   if (process.env.CLEAN_DB !== 'true') {
-    console.log('CLEAN_DB is not set to "true". Skipping database clean.');
-    return;
+    throw new Error('Destructive database clean requires explicit CLEAN_DB=true.');
   }
 
   console.log('CLEAN_DB="true" detected. Cleaning database schema public...');
@@ -28,4 +31,7 @@ async function main() {
   }
 }
 
-main();
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : 'Database clean failed.');
+  process.exit(1);
+});

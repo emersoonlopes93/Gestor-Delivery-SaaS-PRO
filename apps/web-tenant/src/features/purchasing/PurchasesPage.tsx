@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { PurchaseDTO, PurchaseStatus, PaymentStatus, CreatePurchaseDTO } from '@gestor/types';
+import { PurchaseDTO, PurchaseStatus, PaymentStatus, CreatePurchaseDTO, FinancialAccountDTO } from '@gestor/types';
 import { PurchaseModal } from './PurchaseModal';
-import { LucideIcon, ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { LucideIcon, ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock, Ban, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ContextualNavigation } from '../navigation/NavigationHub';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Modal } from '../../components/Modal';
+import { usePermissions } from '../../hooks/use-tenant-auth';
 
 export function PurchasesPage() {
   const [purchases, setPurchases] = useState<PurchaseDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
+  const [purchaseToPay, setPurchaseToPay] = useState<PurchaseDTO | null>(null);
+  const [payAccountId, setPayAccountId] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const { has } = usePermissions();
+  const canManage = has('purchasing.manage');
 
   useEffect(() => {
     loadPurchases();
@@ -41,11 +51,49 @@ export function PurchasesPage() {
     }
   };
 
+  const openPay = async (purchase: PurchaseDTO) => {
+    try {
+      const response = await api.get<FinancialAccountDTO[]>('/finance/accounts');
+      if (response.success) setAccounts(response.data.filter((account) => account.active));
+      setPayAccountId('');
+      setPurchaseToPay(purchase);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Nao foi possivel carregar as contas financeiras.');
+    }
+  };
+
+  const handlePay = async () => {
+    if (!purchaseToPay || !payAccountId || actionPending) return;
+    setActionPending(true);
+    try {
+      await api.post(`/purchasing/purchases/${purchaseToPay.id}/pay`, { accountId: payAccountId });
+      setPurchaseToPay(null);
+      await loadPurchases();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Nao foi possivel pagar a compra.');
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  const handleCancel = async (purchase: PurchaseDTO) => {
+    if (actionPending || !window.confirm('Cancelar esta compra integralmente e reverter seus efeitos?')) return;
+    setActionPending(true);
+    try {
+      await api.post(`/purchasing/purchases/${purchase.id}/cancel`);
+      await loadPurchases();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Cancelamento bloqueado; verifique a reconciliacao de estoque.');
+    } finally {
+      setActionPending(false);
+    }
+  };
+
   const statusMap: Record<PurchaseStatus, { label: string, color: string, icon: LucideIcon }> = {
-    [PurchaseStatus.DRAFT]: { label: 'Rascunho', color: 'bg-gray-100 text-gray-700 dark:text-gray-300', icon: Clock },
-    [PurchaseStatus.PENDING]: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
-    [PurchaseStatus.RECEIVED]: { label: 'Recebido', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-    [PurchaseStatus.CANCELLED]: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: AlertCircle },
+    [PurchaseStatus.DRAFT]: { label: 'Rascunho', color: 'border border-border bg-muted text-muted-foreground', icon: Clock },
+    [PurchaseStatus.PENDING]: { label: 'Pendente', color: 'border border-status-warning/30 bg-status-warning/10 text-status-warning', icon: AlertCircle },
+    [PurchaseStatus.RECEIVED]: { label: 'Recebido', color: 'border border-status-success/30 bg-status-success/10 text-status-success', icon: CheckCircle2 },
+    [PurchaseStatus.CANCELLED]: { label: 'Cancelado', color: 'border border-destructive/30 bg-destructive/10 text-destructive', icon: AlertCircle },
   };
 
   const paymentStatusMap: Record<PaymentStatus, { label: string, color: string }> = {
@@ -71,52 +119,68 @@ export function PurchasesPage() {
     })
     .reduce((sum, p) => sum + Number(p.totalValue), 0);
 
-  const pendingPurchases = purchases.filter(p => p.paymentStatus === PaymentStatus.PENDING || p.paymentStatus === PaymentStatus.PARTIAL && p.status !== PurchaseStatus.CANCELLED);
+  const pendingPurchases = purchases.filter((purchase) =>
+    (purchase.paymentStatus === PaymentStatus.PENDING || purchase.paymentStatus === PaymentStatus.PARTIAL)
+    && purchase.status !== PurchaseStatus.CANCELLED,
+  );
   const pagamentosPendentes = pendingPurchases.reduce((sum, p) => sum + Number(p.totalValue), 0);
   const uniqueSuppliers = new Set(purchases.map(p => p.supplier?.id)).size;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-left">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
-            <ShoppingCart className="h-8 w-8 text-primary-600" />
-            Compras e Entradas
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Registre entradas de insumos e controle seus custos de aquisição.</p>
-        </div>
-        <button
+    <div className="mx-auto max-w-7xl space-y-6 p-4 pb-24 text-left md:p-6">
+      <PageHeader
+        title="Compras e entradas"
+        description="Registre o recebimento de insumos e acompanhe as compras da operação."
+        icon={ShoppingCart}
+        action={canManage ? <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm flex items-center gap-2 group"
+          className="hidden items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:flex"
         >
-          <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
+          <Plus className="h-5 w-5" />
+          Nova Compra
+        </button> : undefined}
+      />
+
+      {canManage && <div className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 md:hidden">
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <Plus className="h-5 w-5" aria-hidden />
           Nova Compra
         </button>
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+      <ContextualNavigation itemIds={['inventory.home', 'management.purchases', 'management.suppliers']} />
+
+      <section aria-label="Resumo das compras" className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="grid divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="p-4">
           <div className="text-sm font-medium text-muted-foreground mb-1">Total Comprado (Mês)</div>
           <div className="text-2xl font-bold text-foreground">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCompradoMes)}</div>
           <div className="text-xs text-muted-foreground mt-1">Referente a compras não canceladas neste mês</div>
         </div>
-        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+        <div className="p-4">
           <div className="text-sm font-medium text-muted-foreground mb-1">Pagamentos Pendentes</div>
           <div className="text-2xl font-bold text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pagamentosPendentes)}</div>
           <div className="text-xs text-muted-foreground mt-1">{pendingPurchases.length} faturas pendentes ou parciais</div>
         </div>
-        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+        <div className="p-4">
           <div className="text-sm font-medium text-muted-foreground mb-1">Fornecedores Ativos</div>
           <div className="text-2xl font-bold text-primary-600">{uniqueSuppliers}</div>
           <div className="text-xs text-muted-foreground mt-1">Fornecedores que você já comprou</div>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="p-4 border-b border-border bg-muted">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <label className="sr-only" htmlFor="purchases-search">Buscar compras</label>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
             <input
+              id="purchases-search"
               type="text"
               placeholder="Buscar por NF ou fornecedor..."
               value={searchTerm}
@@ -141,6 +205,7 @@ export function PurchasesPage() {
                   <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Total</th>
                   <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Pagamento</th>
+                  {canManage && <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Acoes</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -153,6 +218,36 @@ export function PurchasesPage() {
                       </div>
                       <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{purchase.id.slice(0, 8)}</div>
                     </td>
+                    {canManage && (
+                      <td className="px-6 py-4">
+                        {purchase.status !== PurchaseStatus.CANCELLED && (
+                          <div className="flex gap-2">
+                            {purchase.paymentStatus === PaymentStatus.PENDING && (
+                              <button
+                                type="button"
+                                onClick={() => void openPay(purchase)}
+                                disabled={actionPending}
+                                className="rounded-lg border border-border p-2 text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                                aria-label={`Pagar compra ${purchase.number || purchase.id}`}
+                              >
+                                <CreditCard className="h-4 w-4" aria-hidden />
+                              </button>
+                            )}
+                            {purchase.paymentStatus !== PaymentStatus.PARTIAL && (
+                              <button
+                                type="button"
+                                onClick={() => void handleCancel(purchase)}
+                                disabled={actionPending}
+                                className="rounded-lg border border-border p-2 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                                aria-label={`Cancelar compra ${purchase.number || purchase.id}`}
+                              >
+                                <Ban className="h-4 w-4" aria-hidden />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-foreground">{purchase.supplier?.name}</div>
                     </td>
@@ -177,7 +272,7 @@ export function PurchasesPage() {
                 ))}
                 {filteredPurchases.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={canManage ? 7 : 6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <ShoppingCart className="h-12 w-12 mb-3 opacity-50" />
                         <p>Nenhuma compra registrada.</p>
@@ -196,6 +291,28 @@ export function PurchasesPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
       />
+      <Modal
+        isOpen={Boolean(purchaseToPay)}
+        onClose={() => !actionPending && setPurchaseToPay(null)}
+        title="Pagar compra"
+        footer={(
+          <>
+            <button type="button" onClick={() => setPurchaseToPay(null)} disabled={actionPending} className="rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
+              Voltar
+            </button>
+            <button type="button" onClick={() => void handlePay()} disabled={!payAccountId || actionPending} className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+              {actionPending ? 'Pagando...' : 'Confirmar pagamento'}
+            </button>
+          </>
+        )}
+      >
+        <p className="mb-4 text-sm text-muted-foreground">O valor integral sera debitado uma unica vez da conta selecionada.</p>
+        <label className="mb-1 block text-sm font-semibold text-foreground" htmlFor="purchase-pay-account">Conta financeira ativa</label>
+        <select id="purchase-pay-account" value={payAccountId} onChange={(event) => setPayAccountId(event.target.value)} className="input-premium">
+          <option value="">Selecione uma conta</option>
+          {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+        </select>
+      </Modal>
     </div>
   );
 }

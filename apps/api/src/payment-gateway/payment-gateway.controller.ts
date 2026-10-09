@@ -10,7 +10,7 @@ import {
   HttpCode,
   UseGuards 
 } from '@nestjs/common';
-import { RequirePermissions } from '../common/decorators';
+import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { PaymentGatewayService } from './payment-gateway.service';
@@ -68,16 +68,22 @@ export class PaymentGatewayController {
   @Get('pix/status/:transactionId')
   @UseGuards(TenantAuthGuard, PermissionsGuard)
   @RequirePermissions('orders.read')
-  async getPaymentStatus(@Param('transactionId') transactionId: string) {
-    return this.paymentGatewayService.getPaymentStatus(transactionId);
+  async getPaymentStatus(
+    @CurrentTenant() tenantId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.paymentGatewayService.getPaymentStatus(transactionId, tenantId);
   }
 
   @Post('pix/cancel/:transactionId')
   @UseGuards(TenantAuthGuard, PermissionsGuard)
   @RequirePermissions('orders.update')
   @HttpCode(HttpStatus.OK)
-  async cancelPayment(@Param('transactionId') transactionId: string) {
-    await this.paymentGatewayService.cancelPayment(transactionId);
+  async cancelPayment(
+    @CurrentTenant() tenantId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    await this.paymentGatewayService.cancelPayment(transactionId, tenantId);
     return { message: 'Payment cancelled successfully' };
   }
 

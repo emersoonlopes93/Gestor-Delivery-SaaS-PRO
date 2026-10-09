@@ -1,5 +1,17 @@
 # Scheduling Audit
 
+## Sprint 4 hardening — 2026-07-16
+
+- Migration `20260604120000_add_scheduling_settings_windows_order_schedule_fields` is present in the repository; no new scheduling migration was required.
+- Settings and weekly-window endpoints are implemented with RBAC and tenant-scoped reads/mutations.
+- Remaining `NotImplementedException` endpoints in `SchedulingController` were replaced by tenant-safe implementations.
+- Window overlap/duplicate validation was added; cross-midnight windows are explicitly rejected.
+- Tenant timezone is authoritative, slots are generated in local time and stored as UTC instants.
+- Checkout now verifies feature/configuration, slot/window, exact instant, advance, horizon and capacity.
+- Order, scheduled-order and occupancy creation now share one transaction with a PostgreSQL row lock; capacity failure rolls back the order.
+- Storefront submits the slot ISO instant, refreshes after a stale/full-slot error, and formats using store timezone.
+- Feature classification is `Beta`, with residual limitations in `docs/contracts/scheduling.md` and `docs/product/known-gaps.md`.
+
 Generated: 2026-06-04
 
 ## Summary

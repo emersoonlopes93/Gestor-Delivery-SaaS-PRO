@@ -1,106 +1,28 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import toast from 'react-hot-toast';
-import { requestNotificationPermission, showWebNotification } from '../lib/notification-support';
+import type { OrderChangedEvent, TenantNotificationEventPayload } from '@gestor/types';
+import { requestNotificationPermission } from '../lib/notification-support';
 import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
+import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
+import { playNotificationSound } from '../notifications/soundEngine';
+import { traceNotificationE2E } from '../notifications/e2eTrace';
+import {
+  CONNECTION_GRACE_PERIOD_MS,
+  OFFLINE_DEBOUNCE_MS,
+  connectionIssueCopy,
+  type ConnectivityIssue,
+} from '../notifications/connectivityState';
+import { emitOrdersRealtimeEvent } from '../notifications/ordersRealtimeEvents';
 
-/** Sons disponíveis (devem existir em public/sounds/) */
-export const AVAILABLE_SOUNDS = [
-  { value: 'notification.mp3', label: 'Notificação (Padrão)' },
-  { value: 'Microsoft-Teams.mp3', label: 'Microsoft Teams' },
-  { value: 'Novo Pedido (H).mp3', label: 'Novo Pedido (Voz Masculina)' },
-  { value: 'Novo Pedido (M).mp3', label: 'Novo Pedido (Voz Feminina)' },
-  { value: 'Pedido Pronto (H).mp3', label: 'Pedido Pronto (Voz Masculina)' },
-  { value: 'Pedido Pronto (M).mp3', label: 'Pedido Pronto (Voz Feminina)' },
-  { value: 'pedido de cancelamento(H).mp3', label: 'Pedido de Cancelamento (Voz Masculina)' },
-  { value: 'pedido de cancelamento(M).mp3', label: 'Pedido de Cancelamento (Voz Feminina)' },
-  { value: 'transferindo para atendente (H).mp3', label: 'Transferindo para Atendente (Voz Masculina)' },
-] as const;
-
-export type SoundFile = typeof AVAILABLE_SOUNDS[number]['value'];
-
-const DEFAULT_NEW_ORDER_SOUND: SoundFile = 'notification.mp3';
-const DEFAULT_CANCELLATION_SOUND: SoundFile = 'notification.mp3';
-const DEFAULT_HANDOFF_SOUND: SoundFile = 'notification.mp3';
-const DEFAULT_READY_SOUND: SoundFile = 'notification.mp3';
-
-function buildSoundUrl(filename: string | undefined, fallback: SoundFile): string {
-  if (!filename) {
-    return `/sounds/${fallback}`;
-  }
-  const name = filename.trim();
-  if (name === '' || name === 'undefined') {
-    return `/sounds/${fallback}`;
-  }
-  if (!AVAILABLE_SOUNDS.some((s) => s.value === name)) {
-    console.warn(`[Audio] Invalid sound: "${name}", using fallback: "${fallback}"`);
-    return `/sounds/${fallback}`;
-  }
-  return `/sounds/${name}`;
-}
-
-function playAudio(url: string, volume: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      const audio = new Audio(url);
-      const validVolume = Math.max(0, Math.min(1, volume || 1.0));
-      audio.volume = validVolume;
-      
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log(`[Audio] Playing: ${url} (volume: ${Math.round(validVolume * 100)}%)`);
-            resolve();
-          })
-          .catch((err) => {
-            console.warn(`[Audio] Play error for ${url}:`, err);
-            reject(err);
-          });
-      } else {
-        console.log(`[Audio] Playing: ${url} (volume: ${Math.round(validVolume * 100)}%)`);
-        resolve();
-      }
-    } catch (err) {
-      console.error(`[Audio] Error creating audio element:`, err);
-      reject(err);
-    }
-  });
-}
-
-interface AudioSettings {
-  enabled: boolean;
-  volume: number;
-  newOrderSound?: string;
-  cancellationSound?: string;
-  handoffSound?: string;
-  readySound?: string;
-}
-
-export function useNotificationAudio(tenantId: string | undefined, settings: AudioSettings) {
+export function useNotificationAudio(
+  tenantId: string | undefined,
+) {
   const socketRef = useRef<Socket | null>(null);
-
-  const newOrderUrl = buildSoundUrl(settings.newOrderSound, DEFAULT_NEW_ORDER_SOUND);
-  const cancelledUrl = buildSoundUrl(settings.cancellationSound, DEFAULT_CANCELLATION_SOUND);
-  const handoffUrl = buildSoundUrl(settings.handoffSound, DEFAULT_HANDOFF_SOUND);
-  const readyUrl = buildSoundUrl(settings.readySound, DEFAULT_READY_SOUND);
-
-  // Refs para que o socket handler sempre acesse os valores atualizados sem re-subscribe
-  const settingsRef = useRef(settings);
-  const newOrderUrlRef = useRef(newOrderUrl);
-  const cancelledUrlRef = useRef(cancelledUrl);
-  const handoffUrlRef = useRef(handoffUrl);
-  const readyUrlRef = useRef(readyUrl);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
-  useEffect(() => { newOrderUrlRef.current = newOrderUrl; }, [newOrderUrl]);
-  useEffect(() => { cancelledUrlRef.current = cancelledUrl; }, [cancelledUrl]);
-  useEffect(() => { handoffUrlRef.current = handoffUrl; }, [handoffUrl]);
-  useEffect(() => { readyUrlRef.current = readyUrl; }, [readyUrl]);
+  const processedSocketEventsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!tenantId) {
       if (socketRef.current) {
-        console.log('[Websocket] Disconnecting orders namespace');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -110,122 +32,347 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
     const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
     const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
-    console.log(`[Websocket] Connecting to orders namespace at: ${socketPath}`);
-    
+
     const socket = io(socketPath, {
+      auth: (callback) => callback({ token: localStorage.getItem('accessToken') }),
       reconnection: true,
-      reconnectionAttempts: 3,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 4000,
     });
+    emitOrdersRealtimeEvent({ type: 'connection', state: 'connecting', occurredAt: new Date().toISOString() });
+    let disposed = false;
+    let appActive = document.visibilityState !== 'hidden';
+    let activeIssue: ConnectivityIssue | null = null;
+    let alertTimer: number | null = null;
+
+    const clearAlertTimer = () => {
+      if (alertTimer !== null) {
+        window.clearTimeout(alertTimer);
+        alertTimer = null;
+      }
+    };
+
+    const emitRestored = () => {
+      if (!activeIssue) return;
+      activeIssue = null;
+      emitNotificationEvent(createNotificationEvent({
+        id: `orders:connection.restored:${tenantId}:${Date.now()}`,
+        type: 'connection.restored',
+        title: 'Conexao restaurada',
+        message: 'O painel voltou a receber atualizacoes em tempo real.',
+        priority: 'low',
+        source: 'connection',
+      }));
+    };
+
+    const emitIssue = (issue: ConnectivityIssue) => {
+      if (disposed || !appActive || activeIssue === issue) return;
+      activeIssue = issue;
+      const copy = connectionIssueCopy(issue);
+      emitNotificationEvent(createNotificationEvent({
+        id: `orders:connection.${issue}:${tenantId}:${Date.now()}`,
+        type: 'connection.lost',
+        title: copy.title,
+        message: copy.message,
+        priority: issue === 'offline' ? 'critical' : 'high',
+        source: 'connection',
+      }));
+    };
+
+    const serviceIsReachable = async () => {
+      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 3_000);
+      try {
+        const response = await fetch(`${apiBase}/health/ready/websocket`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        return response.ok;
+      } catch {
+        return false;
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    };
+
+    const scheduleConnectionCheck = (delayMs = CONNECTION_GRACE_PERIOD_MS) => {
+      clearAlertTimer();
+      alertTimer = window.setTimeout(async () => {
+        alertTimer = null;
+        if (disposed || !appActive || socket.connected) return;
+        if (!navigator.onLine) {
+          emitIssue('offline');
+          return;
+        }
+        const serviceReachable = await serviceIsReachable();
+        if (!disposed && appActive && !socket.connected && navigator.onLine) {
+          emitIssue(serviceReachable ? 'reconnecting' : 'service_unavailable');
+        }
+      }, delayMs);
+    };
 
     socket.on('connect', () => {
-      console.log('[Websocket] Connected to orders namespace');
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'reconnecting', occurredAt: new Date().toISOString() });
       socket.emit('joinTenant', { tenantId });
+      clearAlertTimer();
+      emitRestored();
     });
 
-    socket.on('connect_error', (error) => {
-      console.error('[Websocket] Connection error:', error);
+    socket.on('joinedTenant', (data: { tenantId?: string }) => {
+      if (data.tenantId !== tenantId) return;
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'connected', occurredAt: new Date().toISOString() });
     });
 
-    socket.on('disconnect', (reason) => {
-      console.warn('[Websocket] Disconnected:', reason);
+    socket.on('connect_error', () => {
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'reconnecting', occurredAt: new Date().toISOString() });
+      scheduleConnectionCheck();
     });
 
-    socket.on('newOrder', (data: { order: { orderNumber: string; customerName: string; total: number } }) => {
-      console.log('[Websocket] Novo pedido recebido!', data);
+    socket.on('disconnect', () => {
+      emitOrdersRealtimeEvent({ type: 'connection', state: socket.active ? 'reconnecting' : 'disconnected', occurredAt: new Date().toISOString() });
+      scheduleConnectionCheck();
+    });
 
-      if (settingsRef.current.enabled) {
-        playAudio(newOrderUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de novo pedido:', err);
-        });
+    const onOffline = () => {
+      if (appActive) scheduleConnectionCheck(OFFLINE_DEBOUNCE_MS);
+    };
+
+    const onOnline = () => {
+      if (!appActive) return;
+      clearAlertTimer();
+      socket.connect();
+      if (socket.connected) emitRestored();
+      else scheduleConnectionCheck();
+    };
+
+    const onVisibilityChange = () => {
+      appActive = document.visibilityState !== 'hidden';
+      clearAlertTimer();
+      if (!appActive) {
+        emitRestored();
+        return;
+      }
+      if (!navigator.onLine) {
+        scheduleConnectionCheck(OFFLINE_DEBOUNCE_MS);
+        return;
+      }
+      socket.connect();
+      if (!socket.connected) scheduleConnectionCheck();
+    };
+
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    const shouldProcessSocketEvent = (key: string) => {
+      const now = Date.now();
+      for (const [eventKey, timestamp] of processedSocketEventsRef.current.entries()) {
+        if (now - timestamp > 20_000) {
+          processedSocketEventsRef.current.delete(eventKey);
+        }
       }
 
-      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.order.total);
-      toast.success(`🛵 Novo Pedido #${data.order.orderNumber}\n${data.order.customerName} — ${totalFmt}`, {
-        duration: 8000,
-        style: { fontWeight: 'bold', maxWidth: '340px' },
-      });
+      if (processedSocketEventsRef.current.has(key)) {
+        return false;
+      }
 
-      showWebNotification(`Novo Pedido ${data.order.orderNumber}`, {
-        body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
-        icon: '/favicon.ico',
+      processedSocketEventsRef.current.set(key, now);
+      return true;
+    };
+
+    const emitOrderCreated = (
+      data: { orderId?: string; orderNumber: string; customerName: string; total: number | string },
+      sourceEventName: 'order.created' | 'newOrder',
+    ) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      traceNotificationE2E({
+        stage: 'socket.received',
+        eventType: 'order.created',
+        tenantId,
+        orderId,
+        sourceEventName,
+        source: 'socket',
       });
+      if (!shouldProcessSocketEvent(`order.created:${orderId}`)) return;
+      const total = typeof data.total === 'number' ? data.total : Number(data.total);
+      const safeTotal = Number.isFinite(total) ? total : 0;
+      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(safeTotal);
+
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.created:${orderId}`,
+        type: 'order.created',
+        orderId,
+        title: `Novo pedido #${data.orderNumber}`,
+        message: `${data.customerName} - ${totalFmt}`,
+        priority: 'critical',
+        source: 'socket',
+      }));
 
       showNewOrderNotification({
-        orderNumber: data.order.orderNumber,
-        customerName: data.order.customerName,
-        total: data.order.total,
+        id: data.orderId,
+        orderNumber: data.orderNumber,
+        customerName: data.customerName,
+        total: safeTotal,
       }).catch((err) => {
         console.warn('[NativeNotifications] Falha ao exibir notificacao de novo pedido:', err);
       });
+    };
+
+    socket.on('order.created', (data: TenantNotificationEventPayload) => {
+      if (!data.orderNumber || !data.customerName || typeof data.total === 'undefined') return;
+      emitOrderCreated({
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        customerName: data.customerName,
+        total: data.total,
+      }, 'order.created');
     });
 
-    socket.on('orderCancelled', (data: { orderNumber?: string }) => {
-      console.log('[Websocket] Pedido cancelado!', data);
-      if (settingsRef.current.enabled) {
-        playAudio(cancelledUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de cancelamento:', err);
-        });
-      }
-      toast.error(`❌ Pedido${data.orderNumber ? ` #${data.orderNumber}` : ''} cancelado!`, {
-        duration: 7000,
-        style: { fontWeight: 'bold' },
-      });
+    socket.on('newOrder', (data: { order: { id?: string; orderNumber: string; customerName: string; total: number } }) => {
+      emitOrderCreated({
+        orderId: data.order.id,
+        orderNumber: data.order.orderNumber,
+        customerName: data.order.customerName,
+        total: data.order.total,
+      }, 'newOrder');
     });
 
-    // IA Handoff: Transfer to human agent
-    socket.on('aiHandoff', (data: { sessionId: string; sessionName?: string; customerName?: string }) => {
-      console.log('[Websocket] IA Handoff - Transferência para atendente humano!', data);
-      if (settingsRef.current.enabled) {
-        playAudio(handoffUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de transferência:', err);
-        });
-      }
-      toast(`👤 Transferência: Chat #${data.sessionId}\n${data.customerName || 'Cliente'} aguardando atendimento humano`, {
-        duration: 7000,
-        style: { fontWeight: 'bold' },
-      });
-
-      showWebNotification('Transferência de Atendimento', {
-        body: `${data.customerName || 'Cliente'} aguardando atendimento humano.\nSessão: #${data.sessionId}`,
-        icon: '/favicon.ico',
-        tag: `handoff-${data.sessionId}`,
-      });
+    socket.on('order.auto_accepted', (data: TenantNotificationEventPayload) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!orderId || !shouldProcessSocketEvent(`order.auto_accepted:${orderId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.auto_accepted:${orderId}`,
+        type: 'order.auto_accepted',
+        orderId,
+        title: `Pedido ${data.orderNumber} aceito automaticamente`,
+        message: `${data.customerName || 'Cliente'} - pronto para seguir no fluxo operacional.`,
+        priority: 'high',
+        source: 'socket',
+      }));
     });
 
-    // Order Ready: Order marked as ready for pickup/delivery
-    socket.on('orderReady', (data: { orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
-      console.log('[Websocket] Pedido Pronto!', data);
-      if (settingsRef.current.enabled) {
-        playAudio(readyUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de pedido pronto:', err);
-        });
-      }
+    socket.on('orderAutoAccepted', (data: { orderId: string; orderNumber: string; customerName?: string; total?: number | string }) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!shouldProcessSocketEvent(`order.auto_accepted:${orderId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.auto_accepted:${orderId}`,
+        type: 'order.auto_accepted',
+        orderId,
+        title: `Pedido ${data.orderNumber} aceito automaticamente`,
+        message: `${data.customerName || 'Cliente'} - pronto para seguir no fluxo operacional.`,
+        priority: 'high',
+        source: 'socket',
+      }));
+    });
 
+    socket.on('order.cancelled', (data: TenantNotificationEventPayload) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!orderId || !shouldProcessSocketEvent(`order.cancelled:${orderId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.cancelled:${orderId}`,
+        type: 'order.cancelled',
+        orderId,
+        title: data.orderNumber ? `Pedido #${data.orderNumber} cancelado` : 'Pedido cancelado',
+        message: 'Revise o pedido e a operacao no painel.',
+        priority: 'high',
+        source: 'socket',
+      }));
+    });
+
+    socket.on('orderCancelled', (data: { orderId?: string; orderNumber?: string }) => {
+      const orderId = data.orderId ?? data.orderNumber ?? 'unknown';
+      if (!shouldProcessSocketEvent(`order.cancelled:${orderId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.cancelled:${orderId}`,
+        type: 'order.cancelled',
+        orderId,
+        title: data.orderNumber ? `Pedido #${data.orderNumber} cancelado` : 'Pedido cancelado',
+        message: 'Revise o pedido e a operacao no painel.',
+        priority: 'high',
+        source: 'socket',
+      }));
+    });
+
+    const emitWhatsAppHandoff = (data: { sessionId: string; customerName?: string }) => {
+      if (!shouldProcessSocketEvent(`whatsapp.handoff:${data.sessionId}`)) return;
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:whatsapp.handoff:${data.sessionId}`,
+        type: 'whatsapp.handoff',
+        title: 'Transferencia para atendimento humano',
+        message: `${data.customerName || 'Cliente'} aguardando atendimento.`,
+        priority: 'high',
+        source: 'socket',
+      }));
+    };
+
+    socket.on('whatsapp.handoff', (data: TenantNotificationEventPayload) => {
+      if (!data.sessionId) return;
+      emitWhatsAppHandoff({ sessionId: data.sessionId, customerName: data.customerName ?? data.sessionName });
+    });
+
+    socket.on('aiHandoff', (data: { sessionId: string; customerName?: string }) => {
+      emitWhatsAppHandoff(data);
+    });
+
+    const emitOrderReady = (data: { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
+      const orderId = data.orderId ?? data.orderNumber;
+      if (!shouldProcessSocketEvent(`order.ready:${orderId}`)) return;
       const fulfillmentText = data.fulfillmentType === 'delivery' ? 'para entrega' : 'para retirada';
-      toast.success(`📦 Pedido #${data.orderNumber} está pronto ${fulfillmentText}!`, {
-        duration: 7000,
-        style: { fontWeight: 'bold' },
-      });
 
-      showWebNotification(`Pedido #${data.orderNumber} Pronto`, {
-        body: `${data.customerName || 'Cliente'} — Pedido está pronto ${fulfillmentText}`,
-        icon: '/favicon.ico',
-        tag: `ready-${data.orderNumber}`,
-      });
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.ready:${orderId}`,
+        type: 'order.ready',
+        orderId,
+        title: `Pedido #${data.orderNumber} pronto`,
+        message: `${data.customerName || 'Cliente'} - ${fulfillmentText}.`,
+        priority: 'high',
+        source: 'socket',
+      }));
+    };
+
+    socket.on('order.ready', (data: TenantNotificationEventPayload) => {
+      if (!data.orderNumber) return;
+      emitOrderReady(data as { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string });
+    });
+
+    socket.on('orderReady', (data: { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
+      emitOrderReady(data);
+    });
+
+    socket.on('order.changed', (data: OrderChangedEvent) => {
+      if (
+        !data
+        || typeof data.eventId !== 'string'
+        || typeof data.orderId !== 'string'
+        || typeof data.occurredAt !== 'string'
+        || typeof data.reason !== 'string'
+      ) return;
+      emitOrdersRealtimeEvent({ type: 'order.changed', hint: data });
+    });
+
+    socket.on('order.alert.changed', (data: { alertId?: string; state?: 'ACTIVE' | 'RECOVERED'; reason?: 'created' | 'acknowledged' | 'recovered'; occurredAt?: string }) => {
+      if (!data.alertId || !data.state || !data.reason || !data.occurredAt) return;
+      emitOrdersRealtimeEvent({ type: 'order.alert.changed', alertId: data.alertId, state: data.state, reason: data.reason, occurredAt: data.occurredAt });
     });
 
     socketRef.current = socket;
 
     return () => {
-      if (socketRef.current) {
-        console.log('[Websocket] Cleaning up socket connection');
-        socketRef.current.disconnect();
+      disposed = true;
+      clearAlertTimer();
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      socket.disconnect();
+      emitOrdersRealtimeEvent({ type: 'connection', state: 'disconnected', occurredAt: new Date().toISOString() });
+      if (socketRef.current === socket) {
+        socketRef.current = null;
       }
     };
-  // Re-subscribe apenas quando tenantId ou enabled muda — volume/som são lidos por ref
-  }, [tenantId, settings.enabled]);
+  }, [tenantId]);
 
   const requestPermission = useCallback(() => {
     requestNotificationPermission();
@@ -234,25 +381,10 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     });
   }, []);
 
-  /** Testa o som de novo pedido com o volume e som actuais */
-  const playTestNewOrder = useCallback(() => {
-    return playAudio(newOrderUrlRef.current, settingsRef.current.volume);
-  }, []);
-
-  /** Testa o som de cancelamento com o volume e som actuais */
-  const playTestCancellation = useCallback(() => {
-    return playAudio(cancelledUrlRef.current, settingsRef.current.volume);
-  }, []);
-
-  /** Testa o som de transferência IA */
-  const playTestHandoff = useCallback(() => {
-    return playAudio(handoffUrlRef.current, settingsRef.current.volume);
-  }, []);
-
-  /** Testa o som de pedido pronto */
-  const playTestReady = useCallback(() => {
-    return playAudio(readyUrlRef.current, settingsRef.current.volume);
-  }, []);
+  const playTestNewOrder = useCallback(() => playNotificationSound('order.created', 1), []);
+  const playTestCancellation = useCallback(() => playNotificationSound('order.cancelled', 1), []);
+  const playTestHandoff = useCallback(() => playNotificationSound('whatsapp.handoff', 1), []);
+  const playTestReady = useCallback(() => playNotificationSound('order.ready', 1), []);
 
   return { requestPermission, playTestNewOrder, playTestCancellation, playTestHandoff, playTestReady };
 }

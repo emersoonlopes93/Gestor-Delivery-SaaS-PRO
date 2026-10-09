@@ -140,7 +140,8 @@ export function BaseMediaLibraryPage() {
 
   useEffect(() => {
     void loadItems();
-  }, [page]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, category, status, tag]);
 
   const toggleSelected = (id: string) => {
     setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);

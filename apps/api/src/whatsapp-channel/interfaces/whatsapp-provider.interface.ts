@@ -18,6 +18,7 @@ export interface WhatsAppSendTextInput {
   text: string;
   delay?: number; // ms de delay de digitação
   quotedMessageId?: string;
+  idempotencyKey?: string;
 }
 
 export interface WhatsAppSendMediaInput {
@@ -27,6 +28,7 @@ export interface WhatsAppSendMediaInput {
   caption?: string;
   filename?: string;
   delay?: number;
+  idempotencyKey?: string;
 }
 
 export interface WhatsAppSendListInput {
@@ -63,6 +65,7 @@ export interface WhatsAppSendResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  retryable?: boolean;
 }
 
 export interface WhatsAppCreateInstanceInput {
@@ -107,6 +110,8 @@ export interface IWhatsAppProvider {
    * Identifica o tipo do provider
    */
   readonly providerType: 'evolution_go' | 'meta_cloud';
+  /** True only when the provider contract guarantees deduplication by idempotencyKey. */
+  readonly supportsIdempotencyKey?: boolean;
 
   /**
    * Cria uma nova instância no provider externo

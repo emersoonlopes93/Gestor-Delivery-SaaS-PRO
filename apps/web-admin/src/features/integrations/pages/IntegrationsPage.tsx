@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../lib/api-client';
 import { useToast } from '../../../contexts/ToastContext';
 import { 
@@ -9,7 +9,9 @@ import {
   RefreshCcw,
   AlertCircle,
   Zap,
-  Badge
+  Badge,
+  UploadCloud,
+  X
 } from 'lucide-react';
 import { APP_NAME_STORAGE_KEY, DEFAULT_APP_NAME, normalizeAppName } from '../../../lib/branding';
 
@@ -21,6 +23,8 @@ const GOOGLE_AI_FREE_MODELS = [
 
 interface SystemConfig {
   appName: string;
+  platformLogoMediaId?: string | null;
+  platformLogoMedia?: { id: string; publicUrl: string } | null;
   defaultWhatsAppProvider: 'evolution_go' | 'meta_cloud';
   defaultAiProvider: 'openai' | 'anthropic' | 'google_ai' | 'openrouter';
   evolutionUrl: string;
@@ -34,9 +38,13 @@ interface SystemConfig {
   baseAiPrompt: string;
 }
 
+const ACCEPTED_LOGO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_LOGO_SIZE_BYTES = 10 * 1024 * 1024;
+
 export default function IntegrationsPage() {
   const { showToast } = useToast();
   const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [initialConfig, setInitialConfig] = useState<SystemConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,16 +52,47 @@ export default function IntegrationsPage() {
   const [openRouterModels, setOpenRouterModels] = useState<Array<{id: string, displayName: string}>>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [pendingLogoPreviewUrl, setPendingLogoPreviewUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  const currentLogoUrl = useMemo(() => {
+    if (pendingLogoPreviewUrl) return pendingLogoPreviewUrl;
+    const url = config?.platformLogoMedia?.publicUrl;
+    return typeof url === 'string' && url.length > 0 ? url : null;
+  }, [config?.platformLogoMedia?.publicUrl, pendingLogoPreviewUrl]);
+
   useEffect(() => {
     fetchConfig();
+    // Initial load only; fetchConfig has no reactive inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pendingLogoPreviewUrl) {
+        URL.revokeObjectURL(pendingLogoPreviewUrl);
+      }
+    };
+  }, [pendingLogoPreviewUrl]);
+
+  const cloneConfig = (source: SystemConfig): SystemConfig => ({
+    ...source,
+    platformLogoMedia: source.platformLogoMedia ? { ...source.platformLogoMedia } : null,
+  });
 
   const fetchConfig = async () => {
     try {
       setLoading(true);
       const response = await api.get<SystemConfig>('/admin/integrations/config');
       if (response.success) {
-        setConfig(response.data);
+        setInitialConfig(cloneConfig(response.data));
+        setConfig(cloneConfig(response.data));
+        setPendingLogoFile(null);
+        setPendingLogoPreviewUrl(null);
+        setLogoError(null);
       } else {
         throw new Error('Falha ao carregar configurações');
       }
@@ -87,35 +126,127 @@ export default function IntegrationsPage() {
     try {
       setSaving(true);
       setError(null);
+      setLogoError(null);
+
+      let nextConfig: SystemConfig = config;
+      if (pendingLogoFile) {
+        setLogoUploading(true);
+        try {
+          const formData = new FormData();
+          formData.set('file', pendingLogoFile);
+          formData.set('title', 'platform_logo');
+          formData.set('altText', normalizeAppName(config.appName) || DEFAULT_APP_NAME);
+          formData.set('publicationStatus', 'draft');
+          formData.set('tags', 'platform_logo');
+          const uploadResponse = await api.upload<{ id: string; publicUrl: string }>(
+            '/admin/media/gallery/upload',
+            formData,
+          );
+          if (!uploadResponse.success) {
+            throw new Error('Falha ao enviar a logo');
+          }
+          nextConfig = {
+            ...config,
+            platformLogoMediaId: uploadResponse.data.id,
+            platformLogoMedia: {
+              id: uploadResponse.data.id,
+              publicUrl: uploadResponse.data.publicUrl,
+            },
+          };
+          setConfig(nextConfig);
+          setPendingLogoFile(null);
+          setPendingLogoPreviewUrl(null);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Erro desconhecido';
+          setLogoError(message);
+          throw err;
+        } finally {
+          setLogoUploading(false);
+        }
+      }
 
       const updatePayload = {
-        appName: normalizeAppName(config.appName),
-        defaultWhatsAppProvider: config.defaultWhatsAppProvider,
-        defaultAiProvider: config.defaultAiProvider,
-        evolutionUrl: config.evolutionUrl,
-        evolutionGlobalToken: config.evolutionGlobalToken,
-        openaiApiKey: config.openaiApiKey,
-        anthropicApiKey: config.anthropicApiKey,
-        googleAiApiKey: config.googleAiApiKey,
-        openrouterApiKey: config.openrouterApiKey,
-        googleAiModel: config.googleAiModel,
-        openrouterModel: config.openrouterModel,
+        appName: normalizeAppName(nextConfig.appName),
+        platformLogoMediaId: nextConfig.platformLogoMediaId ?? null,
+        defaultWhatsAppProvider: nextConfig.defaultWhatsAppProvider,
+        defaultAiProvider: nextConfig.defaultAiProvider,
+        evolutionUrl: nextConfig.evolutionUrl,
+        evolutionGlobalToken: nextConfig.evolutionGlobalToken,
+        openaiApiKey: nextConfig.openaiApiKey,
+        anthropicApiKey: nextConfig.anthropicApiKey,
+        googleAiApiKey: nextConfig.googleAiApiKey,
+        openrouterApiKey: nextConfig.openrouterApiKey,
+        googleAiModel: nextConfig.googleAiModel,
+        openrouterModel: nextConfig.openrouterModel,
       };
 
       const response = await api.patch('/admin/integrations/config', updatePayload);
 
       if (!response.success) throw new Error('Falha ao salvar configurações');
-      const nextAppName = normalizeAppName(config.appName);
+      const nextAppName = normalizeAppName(nextConfig.appName);
       localStorage.setItem(APP_NAME_STORAGE_KEY, nextAppName);
       document.title = `${nextAppName} - SaaS Admin`;
       
       showToast('success', 'Configurações salvas com sucesso!');
+      setInitialConfig(cloneConfig(nextConfig));
 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogoSelectClick = () => {
+    logoInputRef.current?.click();
+  };
+
+  const handleLogoFileChange = (file: File | null) => {
+    if (!file) return;
+    setLogoError(null);
+
+    if (!ACCEPTED_LOGO_MIME.has(file.type)) {
+      setLogoError('Formato inválido. Use JPG, PNG ou WEBP.');
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      setLogoError('A imagem deve ter no máximo 10 MB.');
+      return;
+    }
+
+    if (pendingLogoPreviewUrl) {
+      URL.revokeObjectURL(pendingLogoPreviewUrl);
+    }
+
+    setPendingLogoFile(file);
+    setPendingLogoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRemoveLogo = () => {
+    if (!config) return;
+    if (pendingLogoPreviewUrl) {
+      URL.revokeObjectURL(pendingLogoPreviewUrl);
+    }
+    setPendingLogoFile(null);
+    setPendingLogoPreviewUrl(null);
+    setConfig({
+      ...config,
+      platformLogoMediaId: null,
+      platformLogoMedia: null,
+    });
+  };
+
+  const handleCancelChanges = () => {
+    if (!initialConfig) return;
+    if (pendingLogoPreviewUrl) {
+      URL.revokeObjectURL(pendingLogoPreviewUrl);
+    }
+    setPendingLogoFile(null);
+    setPendingLogoPreviewUrl(null);
+    setLogoError(null);
+    setConfig(cloneConfig(initialConfig));
+    setError(null);
   };
 
   if (loading) {
@@ -151,15 +282,69 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
-          <div className="p-8 space-y-2">
-            <label className="text-sm font-semibold text-foreground">Nome do sistema</label>
-            <input
-              placeholder={DEFAULT_APP_NAME}
-              className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-              value={config?.appName || DEFAULT_APP_NAME}
-              onChange={(e) => setConfig(prev => prev ? { ...prev, appName: e.target.value } : null)}
-            />
-            <p className="text-xs text-muted-foreground">Este nome aparece no SaaS Admin e pode ser trocado futuramente sem alterar o codigo.</p>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Nome do sistema</label>
+              <input
+                placeholder={DEFAULT_APP_NAME}
+                className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
+                value={config?.appName || DEFAULT_APP_NAME}
+                onChange={(e) => setConfig(prev => prev ? { ...prev, appName: e.target.value } : null)}
+              />
+              <p className="text-xs text-muted-foreground">Este nome aparece no SaaS Admin e pode ser trocado futuramente sem alterar o codigo.</p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-foreground">Logo do sistema (opcional)</label>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="h-14 w-full sm:w-[220px] rounded-xl border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+                  {currentLogoUrl ? (
+                    <img
+                      src={currentLogoUrl}
+                      alt={normalizeAppName(config?.appName || DEFAULT_APP_NAME)}
+                      className="block max-h-[42px] max-w-[200px] object-contain"
+                    />
+                  ) : (
+                    <span className="text-xs font-semibold text-muted-foreground">Sem logo</span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => handleLogoFileChange(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLogoSelectClick}
+                    disabled={saving || logoUploading}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-bold"
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    {currentLogoUrl ? 'Substituir' : 'Selecionar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    disabled={saving || logoUploading || (!currentLogoUrl && !config?.platformLogoMediaId)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-bold"
+                  >
+                    <X className="h-4 w-4" />
+                    Remover
+                  </button>
+                </div>
+              </div>
+
+              {logoError ? (
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 px-4 py-2 rounded-lg">
+                  {logoError}
+                </div>
+              ) : null}
+              <p className="text-xs text-muted-foreground">Formatos aceitos: JPG, PNG, WEBP. Limite: 10 MB.</p>
+            </div>
           </div>
         </section>
 
@@ -360,23 +545,33 @@ export default function IntegrationsPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn-primary ml-auto flex items-center gap-2 px-6 py-3 rounded-xl"
-          >
-            {saving ? (
-              <>
-                <RefreshCcw className="h-5 w-5 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Save className="h-5 w-5" />
-                Salvar Configurações
-              </>
-            )}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancelChanges}
+              disabled={saving || logoUploading || !initialConfig}
+              className="px-6 py-3 rounded-xl border border-border bg-card text-foreground hover:bg-muted transition-colors font-bold"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || logoUploading}
+              className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl"
+            >
+              {saving ? (
+                <>
+                  <RefreshCcw className="h-5 w-5 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-5 w-5" />
+                  Salvar Configurações
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>

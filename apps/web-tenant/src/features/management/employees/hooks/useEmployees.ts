@@ -43,7 +43,7 @@ export function useEmployees() {
   const createEmployee = async (data: CreateEmployeeDTO) => {
     const response = await api.post<TenantUser>('/tenant/users', data);
     if (response.success) {
-      await loadEmployees();
+      void loadEmployees();
     }
     return response;
   };
@@ -51,7 +51,7 @@ export function useEmployees() {
   const updateEmployee = async (id: string, data: Partial<CreateEmployeeDTO>) => {
     const response = await api.patch<TenantUser>(`/tenant/users/${id}`, data);
     if (response.success) {
-      await loadEmployees();
+      void loadEmployees();
     }
     return response;
   };
@@ -59,7 +59,7 @@ export function useEmployees() {
   const deleteEmployee = async (id: string) => {
     const response = await api.delete(`/tenant/users/${id}`);
     if (response.success) {
-      await loadEmployees();
+      void loadEmployees();
     }
     return response;
   };

@@ -18,6 +18,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { KdsModule } from '../kds/kds.module';
 import { BillingDomainModule } from '../billing/billing-domain.module';
 import { MarketplaceModule } from '../marketplace/marketplace.module';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
+import { PrintingModule } from '../printing/printing.module';
+import { PublicOrderTrackingAccessService } from './public-order-tracking-access.service';
+import { OrderAlertsController } from './alerts/order-alerts.controller';
+import { OrderAlertsService } from './alerts/order-alerts.service';
 
 @Module({
   imports: [
@@ -32,12 +38,15 @@ import { MarketplaceModule } from '../marketplace/marketplace.module';
     PaymentGatewayModule,
     SchedulingModule,
     forwardRef(() => NotificationsModule),
-    KdsModule,
+    forwardRef(() => KdsModule),
     BillingDomainModule,
     forwardRef(() => MarketplaceModule),
+    FeatureControlModule,
+    AnalyticsModule,
+    PrintingModule,
   ],
-  controllers: [OrdersController, PublicOrdersController],
-  providers: [OrdersService, CheckoutValidatorService, OrdersGateway],
-  exports: [OrdersService, CheckoutValidatorService, OrdersGateway],
+  controllers: [OrdersController, PublicOrdersController, OrderAlertsController],
+  providers: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService, OrderAlertsService],
+  exports: [OrdersService, CheckoutValidatorService, OrdersGateway, PublicOrderTrackingAccessService, OrderAlertsService],
 })
 export class OrdersModule {}

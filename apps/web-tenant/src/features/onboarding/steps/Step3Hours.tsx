@@ -174,7 +174,7 @@ export function Step3Hours({ onNext, onPrev, onMarkValid }: Step3Props) {
                     onClick={() => toggleDay(day)}
                     className={`relative w-11 h-6 rounded-full transition-all ${isOpen ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                   >
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isOpen ? 'left-5' : 'left-0.5'}`} />
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-primary-foreground shadow transition-all ${isOpen ? 'left-5' : 'left-0.5'}`} />
                   </button>
                   <span className={`font-black text-sm ${isOpen ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>
                     {DAY_NAMES_FULL[day]}
