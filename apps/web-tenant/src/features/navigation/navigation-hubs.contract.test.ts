@@ -24,9 +24,9 @@ describe('navigation hubs UI contract', () => {
     expect(channels).toContain("'settings.integrations'");
     expect(channels).toContain("'whatsapp.config'");
     expect(channels).toContain("'marketing.automations'");
-    expect(management).not.toContain("'analytics.reports'");
+    expect(management).toContain("'analytics.reports'");
     expect(management).toContain("'analytics.goals'");
-    expect(management).toContain("'analytics.performance'");
+    expect(management).not.toContain("'analytics.performance'");
     expect(management).toContain("'analytics.bi'");
     expect(management).toContain("'management.employees'");
     expect(app).toContain('path="/management" element={<ManagementPage />}');
@@ -40,7 +40,7 @@ describe('navigation hubs UI contract', () => {
     const management = read('./ManagementPage.tsx');
 
     expect(management).toContain("id: 'management-priorities'");
-    expect(management).toContain("itemIds: ['analytics.goals', 'analytics.performance']");
+    expect(management).toContain("itemIds: ['analytics.reports', 'analytics.goals']");
     expect(management).toContain("id: 'management-support'");
     expect(management).toContain("itemIds: ['analytics.bi', 'management.employees']");
     expect(management).toContain('sections={MANAGEMENT_SECTIONS}');

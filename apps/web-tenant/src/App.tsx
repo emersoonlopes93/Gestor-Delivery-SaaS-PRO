@@ -52,7 +52,6 @@ import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { InventoryPage } from './features/inventory/InventoryPage';
 import { ReportsPage, GoalsPage } from './features/analytics';
 import { BusinessIntelligencePage } from './features/analytics/BusinessIntelligencePage';
-import { PerformancePage } from './features/analytics/PerformancePage';
 import { SuppliersPage } from './features/purchasing/SuppliersPage';
 import { PurchasesPage } from './features/purchasing/PurchasesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
@@ -486,7 +485,7 @@ export function App() {
           element={
             <ModuleGate module="reports">
               <PermissionGate permission="reports.read">
-                <PerformancePage />
+                <ReportsPage initialTab="performance" />
               </PermissionGate>
             </ModuleGate>
           }
