@@ -109,8 +109,8 @@ export function OperationsDashboard({
 
   const kpis = [
     { label: 'Pedidos', value: number(total), icon: ShoppingBag, comparison: calculateComparison(total, previous?.operational.totalOrders), accent: 'via-sky-500' },
-    { label: 'Receita concluída', value: money(completedRevenue), icon: Banknote, comparison: calculateComparison(completedRevenue, previous?.commercial.totalRevenue), accent: 'via-emerald-500' },
-    { label: 'Ticket concluído', value: money(averageTicket), icon: ReceiptText, comparison: calculateComparison(averageTicket, previous?.commercial.averageTicket), accent: 'via-indigo-500' },
+    { label: 'Vendas concluídas', value: money(completedRevenue), icon: Banknote, comparison: calculateComparison(completedRevenue, previous?.commercial.totalRevenue), accent: 'via-emerald-500' },
+    { label: 'Ticket médio', value: money(averageTicket), icon: ReceiptText, comparison: calculateComparison(averageTicket, previous?.commercial.averageTicket), accent: 'via-indigo-500' },
     { label: 'Cancelamentos', value: `${cancellationRate.toFixed(1)}%`, icon: XCircle, comparison: calculateComparison(cancellationRate, previous?.operational.cancellationRate), inverse: true, accent: 'via-rose-500' },
     { label: 'Preparo médio', value: `${Math.round(preparation)} min`, icon: ChefHat, comparison: calculateComparison(preparation, previous?.operational.averagePreparationTimeMinutes), inverse: true, accent: 'via-amber-500' },
     { label: 'Em andamento', value: number(inProgress), icon: Clock3, comparison: calculateComparison(inProgress, getOrdersInProgress(previous)), accent: 'via-violet-500' },
@@ -221,13 +221,13 @@ export function OperationsDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        <Panel title="Receita concluída" subtitle="Somente pedidos concluídos" className="xl:col-span-1">
+        <Panel title="Vendas concluídas" subtitle="Valor bruto dos pedidos concluídos" className="xl:col-span-1">
           <div className="p-4">
             <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{money(completedRevenue)}</p>
             <div className="mt-1"><Comparison value={calculateComparison(completedRevenue, previous?.commercial.totalRevenue)} /></div>
             <div className="mt-4 rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-4">
               <div className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /><p className="text-xs font-semibold">Detalhamento por hora indisponível</p></div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">A API atual não fornece receita horária. O total acima permanece preciso.</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">A API atual não fornece vendas por hora. O total acima usa o valor comercial dos pedidos concluídos.</p>
             </div>
           </div>
         </Panel>

@@ -35,7 +35,11 @@ describe('OperationsDashboard', () => {
       </MemoryRouter>,
     );
     expect(html).toContain('Loja aberta');
-    expect(html).toContain('Receita concluída');
+    expect(html).toContain('Vendas concluídas');
+    expect(html).toContain('Ticket médio');
+    expect(html).toContain('Valor bruto dos pedidos concluídos');
+    expect(html).not.toContain('Receita concluída');
+    expect(html).not.toContain('Ticket concluído');
     expect(html).toContain('Pizza Margherita');
     expect(html).toContain('Detalhamento por hora indisponível');
     expect(html).toContain('operação');
