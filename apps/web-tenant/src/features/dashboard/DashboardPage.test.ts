@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   DASHBOARD_ACTION_MENU_DISABLED_CLASS,
   DASHBOARD_ACTION_MENU_ITEM_CLASS,
@@ -7,6 +9,11 @@ import {
 } from './DashboardPage';
 
 describe('dashboard action menu theme classes', () => {
+  it('protects the dashboard route with the dashboard permission', () => {
+    const appSource = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf8');
+    expect(appSource).toContain('<PermissionGate permission="dashboard.view">');
+  });
+
   it('keeps menu items readable with hover and focus in both themes', () => {
     expect(DASHBOARD_ACTION_MENU_ITEM_CLASS).toContain('hover:bg-slate-100');
     expect(DASHBOARD_ACTION_MENU_ITEM_CLASS).toContain('dark:hover:bg-slate-800');

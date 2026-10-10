@@ -33,6 +33,11 @@ export function canAccessDashboardReports(permissions: string[], enabledModules:
     && enabledModules.includes('reports');
 }
 
+/** The operational home is a core dashboard surface, not a Reports entitlement. */
+export function canAccessDashboard(permissions: string[]) {
+  return hasPermission(permissions, 'dashboard.view');
+}
+
 export function getDashboardPeriod(preset: DashboardPeriodPreset, now = new Date()) {
   const end = new Date(now);
   const start = new Date(now);
