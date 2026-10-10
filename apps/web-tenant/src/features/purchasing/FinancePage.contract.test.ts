@@ -46,4 +46,19 @@ describe('FinancePage UX contract', () => {
     expect(source).toContain('paidWithoutPaymentDate');
     expect(source).toContain('não foram alterados automaticamente');
   });
+
+  it('keeps the detailed workspace compact, paginated, and local to the loaded period', () => {
+    expect(source).toContain("type FinanceTab = 'transactions' | 'settlements' | 'payables' | 'channels'");
+    expect(source).toContain('const PAGE_SIZE = 20');
+    expect(source).toContain('Buscar descrição ou categoria');
+    expect(source).toContain('filteredTransactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)');
+    expect(source).toContain('Nenhum lançamento corresponde à busca.');
+  });
+
+  it('uses a selected transaction drawer and keeps reconciliation exclusively in the settlements tab', () => {
+    expect(source).toContain('Detalhes do lançamento');
+    expect(source).toContain('Referências técnicas e identificadores do provedor não são exibidos nesta visão.');
+    expect(source).toContain("activeTab === 'settlements' && <Food99ReconciliationPanel");
+    expect(source).not.toContain('</section>\n      <Food99ReconciliationPanel');
+  });
 });
