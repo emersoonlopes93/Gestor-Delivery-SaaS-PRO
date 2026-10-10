@@ -22,6 +22,7 @@ import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { PrismaService } from '../../database/prisma.service';
 import { OrdersService } from '../../orders/orders.service';
 import { MARKETPLACE_EVENT_QUEUE } from '../marketplace.constants';
+import { food99OrderStatus } from '../providers/food99-order-status';
 import { IfoodApiError } from '../providers/ifood-api.error';
 import { MarketplaceDivergenceService } from './marketplace-divergence.service';
 import { MarketplaceOrderIngestionService } from './marketplace-order-ingestion.service';
@@ -170,7 +171,7 @@ export class MarketplaceReconciliationService implements OnModuleInit {
       return { resolved: false, alerted: true };
     }
 
-    const remoteState = this.readRemoteState(remoteOrder);
+    const remoteState = this.readRemoteState(operation.provider, remoteOrder);
     if (!remoteState) {
       await this.recordUnknownState(operation, correlationId, 'Provider order has no recognized status.');
       return { resolved: false, alerted: true, remoteState: null };
@@ -390,7 +391,10 @@ export class MarketplaceReconciliationService implements OnModuleInit {
     return null;
   }
 
-  private readRemoteState(value: Record<string, unknown>): string | null {
+  private readRemoteState(provider: MarketplaceProvider, value: Record<string, unknown>): string | null {
+    if (provider === MarketplaceProvider.FOOD_99 && typeof value.status === 'number') {
+      return food99OrderStatus(value.status);
+    }
     for (const key of ['status', 'orderStatus', 'state']) {
       const candidate = value[key];
       if (typeof candidate === 'string' && candidate.trim()) return candidate.trim().toUpperCase();

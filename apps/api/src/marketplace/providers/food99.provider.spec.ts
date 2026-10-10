@@ -1,5 +1,6 @@
 import { MarketplaceProvider } from '@prisma/client';
 import { createHash } from 'crypto';
+import { food99OrderStatus } from './food99-order-status';
 import { Food99Provider } from './food99.provider';
 
 describe('Food99Provider', () => {
@@ -17,6 +18,20 @@ describe('Food99Provider', () => {
     .update(rawBody)
     .update('secret', 'utf8')
     .digest('hex');
+
+  it.each([
+    [100, 'CREATED'],
+    [200, 'CONFIRMED'],
+    [400, 'DISPATCHED'],
+    [600, 'COMPLETED'],
+    [901, 'CANCELLED'],
+  ])('maps the documented native Order Detail status %i', (status, expected) => {
+    expect(food99OrderStatus(status)).toBe(expected);
+  });
+
+  it('keeps unknown native Order Detail codes unresolved', () => {
+    expect(food99OrderStatus(777)).toBeNull();
+  });
 
   it('accepts the official MD5 signature of raw body plus app secret', async () => {
     const rawBody = Buffer.from('{"eventId":"evt-1"}');

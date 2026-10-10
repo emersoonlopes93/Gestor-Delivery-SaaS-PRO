@@ -99,6 +99,67 @@ describe('MarketplaceReconciliationService', () => {
     );
   });
 
+  it.each([
+    [200, MarketplaceOperationType.CONFIRM, OrderStatus.pending, OrderStatus.confirmed],
+    [400, MarketplaceOperationType.CONFIRM, OrderStatus.pending, OrderStatus.confirmed],
+    [600, MarketplaceOperationType.DELIVER, OrderStatus.out_for_delivery, OrderStatus.completed],
+    [901, MarketplaceOperationType.CANCEL, OrderStatus.pending, OrderStatus.cancelled],
+  ])('maps documented numeric 99Food detail status %i through the canonical operation', async (
+    remoteStatus,
+    operationType,
+    localStatus,
+    expectedStatus,
+  ) => {
+    const { service, prisma, provider, ordersService, divergences } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...operation,
+      provider: MarketplaceProvider.FOOD_99,
+      operation: operationType,
+      connection: { ...operation.connection, provider: MarketplaceProvider.FOOD_99 },
+      marketplaceOrder: {
+        ...operation.marketplaceOrder,
+        statusInternal: localStatus,
+        internalOrder: { id: 'order-1', status: localStatus, fulfillmentType: 'delivery' },
+      },
+    });
+    provider.fetchCurrentOrder.mockResolvedValueOnce({ status: remoteStatus });
+
+    await expect(service.reconcileOperation('tenant-1', 'operation-1', `reconcile-food99-${remoteStatus}`)).resolves.toEqual({
+      resolved: true,
+      alerted: false,
+      remoteState: expect.any(String),
+    });
+
+    expect(ordersService.updateOrderStatus).toHaveBeenCalledWith(
+      'order-1',
+      'tenant-1',
+      expect.objectContaining({ status: expectedStatus }),
+      undefined,
+      { marketplaceEvent: true },
+    );
+    expect(divergences.record).not.toHaveBeenCalled();
+  });
+
+  it('keeps an undocumented numeric 99Food detail status as an unknown external state', async () => {
+    const { service, prisma, provider, divergences } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...operation,
+      provider: MarketplaceProvider.FOOD_99,
+      connection: { ...operation.connection, provider: MarketplaceProvider.FOOD_99 },
+    });
+    provider.fetchCurrentOrder.mockResolvedValueOnce({ status: 777 });
+
+    await expect(service.reconcileOperation('tenant-1', 'operation-1', 'reconcile-food99-unknown')).resolves.toEqual({
+      resolved: false,
+      alerted: true,
+      remoteState: null,
+    });
+    expect(divergences.record).toHaveBeenCalledWith(expect.objectContaining({
+      type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
+      reason: 'Provider order has no recognized status.',
+    }));
+  });
+
   it('reapplies persisted terminal 99Food events during the scheduled reconciliation batch', async () => {
     const { service } = makeService();
     const ingestion: {
