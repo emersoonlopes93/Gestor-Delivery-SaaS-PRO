@@ -116,10 +116,7 @@ export function DashboardPage() {
         <OperationsDashboard
           current={overview.current}
           storeStatus={overview.storeStatus}
-          tenantSlug={overview.tenant?.slug}
-          tenantName={overview.tenant?.name}
           billingWarning={overview.billing?.warning}
-          onCopyMenu={() => void copyMenu()}
           analyticsAvailable={overview.canReadReports}
           canOpenReports={overview.canReadReports}
         />

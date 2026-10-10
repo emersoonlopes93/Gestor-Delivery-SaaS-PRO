@@ -31,10 +31,9 @@ describe('OperationsDashboard', () => {
   it('renders supported context without session internals', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={overview} storeStatus="open" tenantSlug="demo" tenantName="Loja Demo" analyticsAvailable canOpenReports onCopyMenu={() => undefined} />
+        <OperationsDashboard current={overview} storeStatus="open" analyticsAvailable canOpenReports />
       </MemoryRouter>,
     );
-    expect(html).toContain('Loja aberta');
     expect(html).toContain('Vendas concluídas');
     expect(html).toContain('Ticket médio');
     expect(html).toContain('Valor dos pedidos concluídos');
@@ -42,11 +41,14 @@ describe('OperationsDashboard', () => {
     expect(html).not.toContain('Ticket concluído');
     expect(html).toContain('Pedidos concluídos');
     expect(html).toContain('Ver relatórios');
-    expect(html).toContain('Atenção');
     expect(html).toContain('Fluxo operacional');
+    expect(html).toContain('Pontos de atenção');
     expect(html).not.toContain('Produtos em destaque');
     expect(html).not.toContain('Horários de pico');
     expect(html).not.toContain('Pedidos por canal');
+    expect(html).not.toContain('Ações rápidas');
+    expect(html).not.toContain('Cozinha');
+    expect(html).not.toContain('Pulso da operação');
     expect(html).not.toContain('Ãƒ');
     expect(html).not.toContain('Tenant ID');
     expect(html).not.toContain('Permissões');
@@ -65,35 +67,33 @@ describe('OperationsDashboard', () => {
     };
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={empty} storeStatus="closed" tenantSlug="demo" analyticsAvailable canOpenReports onCopyMenu={() => undefined} />
+        <OperationsDashboard current={empty} storeStatus="closed" analyticsAvailable canOpenReports />
       </MemoryRouter>,
     );
     expect(html).toContain('Loja fechada');
     expect(html).toContain('Vendas concluídas');
     expect(html).not.toContain('Ãƒ');
   });
-  it('uses explicit light and dark theme pairs for the store status card', () => {
+  it('shows a non-open store only as an actionable attention item', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={overview} storeStatus="closed" tenantSlug="demo" analyticsAvailable canOpenReports onCopyMenu={() => undefined} />
+        <OperationsDashboard current={overview} storeStatus="closed" analyticsAvailable canOpenReports />
       </MemoryRouter>,
     );
 
-    expect(html).toContain('border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-card dark:border-slate-800 dark:bg-slate-900');
-    expect(html).toContain('text-slate-900');
-    expect(html).toContain('dark:text-slate-100');
     expect(html).toContain('Loja fechada');
-    expect(html).not.toContain('bg-slate-950');
+    expect(html).toContain('Pontos de atenção');
+    expect(html).not.toContain('Pulso da operação');
   });
 
   it('keeps the operational dashboard usable without reports.read', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={null} storeStatus="open" tenantSlug="demo" analyticsAvailable={false} canOpenReports={false} onCopyMenu={() => undefined} />
+        <OperationsDashboard current={null} storeStatus="open" analyticsAvailable={false} canOpenReports={false} />
       </MemoryRouter>,
     );
     expect(html).toContain('Painel operacional disponível');
-    expect(html).toContain('Ações rápidas');
+    expect(html).not.toContain('Ações rápidas');
     expect(html).not.toContain('Vendas concluídas');
   });
 });
