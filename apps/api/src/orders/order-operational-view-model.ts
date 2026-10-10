@@ -166,7 +166,7 @@ function food99DeliveryFacts(input: OperationalOrderInput): Pick<OrderOperationa
     '140': 'Retirou o pedido',
     '150': 'Chegou ao cliente',
     '160': 'Entregue',
-    '170': 'Ocorrência logística',
+    '170': 'Entrega 99Food cancelada',
     '180': 'Entregador reassociado',
     '190': 'Operação logística abortada',
   };

@@ -36,6 +36,17 @@ function applyFood99DeliveryStatus(service: MarketplaceOrderIngestionService, in
     .call(service, input.tenantId, input.connectionId, input.externalOrderId, input.rawPayload);
 }
 
+function applyFood99ShopStatus(service: MarketplaceOrderIngestionService, input: {
+  tenantId: string;
+  connectionId: string;
+  rawPayload: Record<string, unknown>;
+}): Promise<void> {
+  const candidate: unknown = Reflect.get(service, 'applyFood99ShopStatus');
+  if (typeof candidate !== 'function') throw new Error('99Food shop-status handler is unavailable.');
+  return (candidate as (tenantId: string, connectionId: string, rawPayload: Record<string, unknown>) => Promise<void>)
+    .call(service, input.tenantId, input.connectionId, input.rawPayload);
+}
+
 function isCompleteFood99Snapshot(service: MarketplaceOrderIngestionService, input: {
   externalOrderId: string;
   customerName: string;
@@ -341,7 +352,14 @@ describe('MarketplaceOrderIngestionService', () => {
       rawPayload: { data: { delivery_status: 170 } },
     });
 
-    expect(divergence.record).toHaveBeenCalledWith(expect.objectContaining({ remoteState: 'DELIVERY_STATUS_170' }));
+    expect(prisma.marketplaceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        normalizedPayload: expect.objectContaining({
+          logistics: expect.objectContaining({ deliveryStatus: '170', providerDeliveryState: 'CANCELLED' }),
+        }),
+      }),
+    }));
+    expect(divergence.record).not.toHaveBeenCalled();
     expect(ordersService.updateOrderStatus).not.toHaveBeenCalled();
     expect(alerts.refreshTenant).toHaveBeenCalledWith('tenant-1');
   });
@@ -516,6 +534,77 @@ describe('MarketplaceOrderIngestionService', () => {
     await expect(service.processInboxEvent('inbox-finish')).resolves.toMatchObject({ lifecycleOnly: true });
     expect(prisma.marketplaceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ lastExternalEventTopic: 'orderFinish', lastExternalEventId: 'event-finish' }),
+    }));
+  });
+
+  it('processes a 99Food shopStatus callback without an order id or commercial order mutation', async () => {
+    const connection = { id: 'conn-99', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99 };
+    const prisma = {
+      marketplaceEventInbox: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'inbox-shop-status', provider: MarketplaceProvider.FOOD_99, status: MarketplaceEventStatus.QUEUED,
+          connection, externalOrderId: null, eventId: 'event-shop-status', eventCreatedAt: new Date(),
+          eventSequence: null, topic: 'shopStatus', correlationId: 'correlation-1',
+          rawPayload: { data: { store_status: 3, sub_biz_status: 2, biz_status: 1 } },
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      marketplaceConnection: {
+        findFirst: jest.fn().mockResolvedValue({ settingsJson: { presenceMode: 'WEBHOOK' } }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      marketplaceOrder: { findFirst: jest.fn() },
+      order: { findFirst: jest.fn() },
+    };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never, { get: jest.fn().mockReturnValue({}) } as never, {} as never, {} as never, ordersGatewayStub() as never,
+      {} as never, {} as never, {} as never,
+    );
+
+    await expect(service.processInboxEvent('inbox-shop-status')).resolves.toMatchObject({ processed: true, shopStatus: true });
+    expect(prisma.marketplaceConnection.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'conn-99', tenantId: 'tenant-1', provider: MarketplaceProvider.FOOD_99 }),
+      data: expect.objectContaining({
+        settingsJson: expect.objectContaining({
+          food99ShopStatus: expect.objectContaining({
+            storeStatus: '3', effectiveState: 'BUSINESS_PAUSED', subBusinessStatusLabel: 'PAUSED', businessStatus: '1',
+          }),
+        }),
+      }),
+    }));
+    expect(prisma.marketplaceOrder.findFirst).not.toHaveBeenCalled();
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ store_status: 1, biz_status: 2 }, 'ONLINE', null],
+    [{ store_status: 2, biz_status: 1 }, 'BUSINESS_CLOSED', null],
+    [{ biz_status: true }, 'ONLINE', null],
+    [{ biz_status: false }, 'OFFLINE', null],
+    [{ store_status: 3, sub_biz_status: 4 }, 'BUSINESS_PAUSED', 'DISCONNECTED_AT_STORE_APP_LEVEL'],
+    [{ store_status: 2, sub_biz_status: 6 }, 'BUSINESS_CLOSED', 'BLOCKED_BY_PROVIDER'],
+    [{ store_status: 2, sub_biz_status: 7 }, 'BUSINESS_CLOSED', 'CLOSED_BY_PROVIDER_SYSTEM'],
+  ])('stores 99Food shop status %# without changing the integration state', async (status, effectiveState, subBusinessStatusLabel) => {
+    const prisma = {
+      marketplaceConnection: {
+        findFirst: jest.fn().mockResolvedValue({ settingsJson: {} }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const { service } = makeFood99LifecycleService(prisma);
+
+    await applyFood99ShopStatus(service, {
+      tenantId: 'tenant-1', connectionId: 'conn-99', rawPayload: { data: status },
+    });
+
+    expect(prisma.marketplaceConnection.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.not.objectContaining({ status: expect.anything() }),
+      data: expect.objectContaining({
+        settingsJson: expect.objectContaining({
+          food99ShopStatus: expect.objectContaining({ effectiveState, subBusinessStatusLabel }),
+        }),
+      }),
     }));
   });
 

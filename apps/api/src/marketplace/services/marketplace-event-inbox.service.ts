@@ -57,9 +57,13 @@ export class MarketplaceEventInboxService {
     const food99AuthorizationCallback = input.provider === MarketplaceProvider.FOOD_99
       && parsed.topic === 'authorizationBindStatus'
       && !parsed.externalOrderId;
+    const food99ShopStatusCallback = input.provider === MarketplaceProvider.FOOD_99
+      && parsed.topic?.trim().toUpperCase() === 'SHOPSTATUS'
+      && !parsed.externalOrderId;
 
     if (input.provider === MarketplaceProvider.FOOD_99
       && !food99AuthorizationCallback
+      && !food99ShopStatusCallback
       && (!parsed.eventId || !parsed.externalOrderId || !parsed.externalStoreId || !parsed.topic)) {
       this.logger.warn({
         message: 'food99_webhook_payload_unmapped',

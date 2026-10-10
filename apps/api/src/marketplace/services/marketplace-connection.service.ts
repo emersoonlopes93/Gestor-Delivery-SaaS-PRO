@@ -114,7 +114,7 @@ export class MarketplaceConnectionService {
             : this.parseTokenExpiration(input.tokenExpiresAt),
           settingsJson: input.settingsJson === undefined
             ? existing.settingsJson ?? undefined
-            : this.sanitizeSettings(input.settingsJson),
+            : this.sanitizeSettings(input.settingsJson, existing.settingsJson),
         },
       });
     } catch (error) {
@@ -266,7 +266,10 @@ export class MarketplaceConnectionService {
     }
   }
 
-  private sanitizeSettings(settings?: Prisma.InputJsonValue): Prisma.InputJsonObject {
+  private sanitizeSettings(
+    settings?: Prisma.InputJsonValue,
+    existingSettings?: Prisma.JsonValue | null,
+  ): Prisma.InputJsonObject {
     const record: Record<string, unknown> = typeof settings === 'object' && settings !== null && !Array.isArray(settings)
       ? Object.fromEntries(Object.entries(settings))
       : {};
@@ -279,6 +282,15 @@ export class MarketplaceConnectionService {
     if (pollingFallbackEnabled !== (presenceMode === 'POLLING')) {
       throw new BadRequestException('Marketplace polling and presence mode must be enabled or disabled together.');
     }
+    const existing = typeof existingSettings === 'object' && existingSettings !== null && !Array.isArray(existingSettings)
+      ? existingSettings as Record<string, Prisma.JsonValue>
+      : null;
+    const food99ShopStatus = existing?.food99ShopStatus;
+    const preservedFood99ShopStatus = typeof food99ShopStatus === 'object'
+      && food99ShopStatus !== null
+      && !Array.isArray(food99ShopStatus)
+      ? JSON.parse(JSON.stringify(food99ShopStatus)) as Prisma.InputJsonObject
+      : null;
     return {
       autoConfirmOrders: record.autoConfirmOrders === true,
       pollingFallbackEnabled,
@@ -286,6 +298,7 @@ export class MarketplaceConnectionService {
       importAsStatus: importAsStatus === 'confirmed' || importAsStatus === 'preparing'
         ? importAsStatus
         : 'pending',
+      ...(preservedFood99ShopStatus ? { food99ShopStatus: preservedFood99ShopStatus } : {}),
     };
   }
 }
