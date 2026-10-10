@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DashboardStatsDTO, TenantOperatingHours } from '@gestor/types';
 import {
   canAccessDashboardReports,
+  canAccessDashboard,
   calculateComparison,
   getOperationalSteps,
   getOrdersInProgress,
@@ -29,6 +30,11 @@ const stats = {
 } satisfies DashboardStatsDTO;
 
 describe('dashboard derivations', () => {
+  it('uses dashboard.view for the operational home independently of reports access', () => {
+    expect(canAccessDashboard(['dashboard.view'])).toBe(true);
+    expect(canAccessDashboard(['reports.read'])).toBe(false);
+  });
+
   it('requires both reports permission and enabled module before querying analytics', () => {
     expect(canAccessDashboardReports(['reports.read'], ['reports'])).toBe(true);
     expect(canAccessDashboardReports(['reports.read'], [])).toBe(false);

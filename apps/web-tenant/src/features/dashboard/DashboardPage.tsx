@@ -1,13 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SetupWizard } from './SetupWizard';
 import { useDashboardOverview } from './useDashboardOverview';
-import {
-  DASHBOARD_PERIOD_LABELS,
-  type DashboardPeriodPreset,
-} from './dashboard.utils';
 import { DashboardSkeleton } from './components/DashboardSkeleton';
 import { OperationsDashboard } from './components/OperationsDashboard';
 
@@ -34,8 +30,7 @@ function deriveStorefrontBaseUrl() {
 }
 
 export function DashboardPage() {
-  const [periodPreset, setPeriodPreset] = useState<DashboardPeriodPreset>('today');
-  const overview = useDashboardOverview(periodPreset);
+  const overview = useDashboardOverview('today');
   const [actionsOpen, setActionsOpen] = useState(false);
   const firstName = overview.user?.name?.trim().split(/\s+/)[0] || 'operador';
   const menuUrl = useMemo(() => overview.tenant?.slug ? `${deriveStorefrontBaseUrl()}/${overview.tenant.slug}` : '', [overview.tenant?.slug]);
@@ -59,26 +54,11 @@ export function DashboardPage() {
             <span className="hidden h-1.5 w-1.5 rounded-full bg-emerald-500 sm:block" aria-hidden="true" />
           </div>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Acompanhe o ritmo {DASHBOARD_PERIOD_LABELS[periodPreset].sentence} e priorize o que pede atenção.
+            Priorize o que pede atenção agora e mantenha a operação em movimento.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="relative inline-flex items-center rounded-lg border border-border bg-card text-xs font-semibold text-foreground shadow-card focus-within:ring-2 focus-within:ring-ring">
-            <CalendarDays className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-            <span className="sr-only">Período do dashboard</span>
-            <select
-              aria-label="Período do dashboard"
-              value={periodPreset}
-              onChange={(event) => setPeriodPreset(event.target.value as DashboardPeriodPreset)}
-              className={DASHBOARD_PERIOD_SELECT_CLASS}
-            >
-              {(Object.entries(DASHBOARD_PERIOD_LABELS) as Array<[DashboardPeriodPreset, { control: string; sentence: string }]>).map(([value, label]) => (
-                <option key={value} value={value} className={DASHBOARD_PERIOD_OPTION_CLASS}>{label.control}</option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-2 text-[10px] text-muted-foreground" aria-hidden="true">▾</span>
-          </label>
           <button
             type="button"
             onClick={() => void overview.refetch()}
@@ -127,25 +107,19 @@ export function DashboardPage() {
         />
       )}
 
-      {overview.isLoading ? <DashboardSkeleton /> : overview.canReadReports ? (
+      {!overview.canViewDashboard ? (
+        <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">
+          <p className="text-sm font-bold text-foreground">Seu perfil não pode acessar o painel de hoje</p>
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">Peça a um administrador o acesso ao painel operacional.</p>
+        </section>
+      ) : overview.isLoading ? <DashboardSkeleton /> : (
         <OperationsDashboard
           current={overview.current}
-          previous={overview.previous}
           storeStatus={overview.storeStatus}
-          tenantSlug={overview.tenant?.slug}
-          tenantName={overview.tenant?.name}
           billingWarning={overview.billing?.warning}
-          onCopyMenu={() => void copyMenu()}
-          onRefresh={() => void overview.refetch()}
-          refreshing={overview.isAnalyticsLoading}
-          periodLabel={DASHBOARD_PERIOD_LABELS[periodPreset].sentence}
+          analyticsAvailable={overview.canReadReports}
+          canOpenReports={overview.canReadReports}
         />
-      ) : (
-        <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">
-          <p className="text-sm font-bold text-foreground">Visão analítica indisponível para este perfil</p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">Seu acesso continua normal. Solicite a permissão de relatórios para visualizar métricas operacionais e comerciais.</p>
-          <Link to="/orders" className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90">Ir para pedidos</Link>
-        </section>
       )}
     </main>
   );
