@@ -93,6 +93,11 @@ export class MarketplaceOrderIngestionService {
 
     try {
       const provider = this.providerRegistry.get(inbox.provider);
+      if (this.isFood99ShopStatusTopic(inbox.provider, inbox.topic)) {
+        await this.applyFood99ShopStatus(connection.tenantId, connection.id, inbox.rawPayload);
+        await this.markInboxProcessed(inbox.id);
+        return { processed: true, shopStatus: true };
+      }
       const externalOrderId = inbox.externalOrderId?.trim() || this.readString(inbox.rawPayload, ['orderId', 'id']);
       if (!externalOrderId) {
         throw new Error('externalOrderId missing in marketplace payload.');
@@ -512,6 +517,10 @@ export class MarketplaceOrderIngestionService {
 
   private isFood99DeliveryStatusTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
     return provider === MarketplaceProvider.FOOD_99 && topic?.trim().toUpperCase() === 'DELIVERYSTATUS';
+  }
+
+  private isFood99ShopStatusTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
+    return provider === MarketplaceProvider.FOOD_99 && topic?.trim().toUpperCase() === 'SHOPSTATUS';
   }
 
   private isFood99WebhookLifecycleTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
@@ -959,6 +968,7 @@ export class MarketplaceOrderIngestionService {
     const logistics = {
       ...previousLogistics,
       deliveryStatus,
+      ...(deliveryStatus === '170' ? { providerDeliveryState: 'CANCELLED' } : {}),
       riderName: this.readRecordString(delivery, ['rider_name']),
       riderPhone: this.readRecordString(delivery, ['rider_phone']),
       riderToBusinessEta: this.readRecordString(delivery, ['rider_to_B_ETA']),
@@ -994,23 +1004,62 @@ export class MarketplaceOrderIngestionService {
         currentStatus: order.status,
         fulfillmentType: order.fulfillmentType,
       }, OrderStatus.completed, '99Food confirmou a entrega concluida.');
-    } else if (deliveryStatus === '170') {
-      await this.divergenceService.record({
-        tenantId,
-        marketplaceOrderId: marketplaceOrder.id,
-        internalOrderId: marketplaceOrder.internalOrderId,
-        provider: MarketplaceProvider.FOOD_99,
-        externalOrderId,
-        type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
-        localState: order.status,
-        remoteState: 'DELIVERY_STATUS_170',
-        reason: '99Food cancelou somente a entrega; o pedido comercial foi preservado para reconciliacao.',
-        recommendedAction: 'Confirme a nova logistica ou resolva a entrega manualmente antes de cancelar o pedido comercial.',
-        correlationId: `food99:${externalOrderId}:delivery:170`,
-      });
     }
 
     await this.orderAlertsService.refreshTenant(tenantId);
+  }
+
+  private async applyFood99ShopStatus(
+    tenantId: string,
+    connectionId: string,
+    rawPayload: Prisma.JsonValue,
+  ): Promise<void> {
+    const data = this.asRecord(rawPayload)?.data;
+    const status = this.asRecord(data);
+    const storeStatus = this.readRecordString(status, ['store_status']);
+    const subBusinessStatus = this.readRecordString(status, ['sub_biz_status']);
+    const businessStatus = this.readRecordString(status, ['biz_status']);
+    const effectiveState = this.food99EffectiveShopState(storeStatus, businessStatus);
+    const previous = await this.prisma.marketplaceConnection.findFirst({
+      where: { id: connectionId, tenantId, provider: MarketplaceProvider.FOOD_99 },
+      select: { settingsJson: true },
+    });
+    if (!previous) throw new Error('99Food marketplace connection not found for shop status event.');
+    const settings = this.asRecord(previous.settingsJson) ?? {};
+    const snapshot = {
+      storeStatus,
+      storeStatusLabel: this.food99StoreStatusLabel(storeStatus),
+      subBusinessStatus,
+      subBusinessStatusLabel: this.food99SubBusinessStatusLabel(subBusinessStatus),
+      businessStatus,
+      effectiveState,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.prisma.marketplaceConnection.updateMany({
+      where: { id: connectionId, tenantId, provider: MarketplaceProvider.FOOD_99 },
+      data: { settingsJson: this.toInputJsonValue({ ...settings, food99ShopStatus: snapshot }) },
+    });
+  }
+
+  private food99EffectiveShopState(storeStatus: string | null, businessStatus: string | null): string | null {
+    if (storeStatus === '1') return 'ONLINE';
+    if (storeStatus === '2') return 'BUSINESS_CLOSED';
+    if (storeStatus === '3') return 'BUSINESS_PAUSED';
+    if (businessStatus === '1' || businessStatus?.toLowerCase() === 'true') return 'ONLINE';
+    if (businessStatus === '2' || businessStatus?.toLowerCase() === 'false') return 'OFFLINE';
+    return null;
+  }
+
+  private food99StoreStatusLabel(storeStatus: string | null): string | null {
+    return ({ '1': 'ONLINE', '2': 'BUSINESS_CLOSED', '3': 'BUSINESS_PAUSED' } as Record<string, string>)[storeStatus ?? ''] ?? null;
+  }
+
+  private food99SubBusinessStatusLabel(subBusinessStatus: string | null): string | null {
+    return ({
+      '0': 'DEFAULT', '1': 'OPENED', '2': 'PAUSED', '3': 'CLOSED',
+      '4': 'DISCONNECTED_AT_STORE_APP_LEVEL', '5': 'CLOSED_FOR_DAY',
+      '6': 'BLOCKED_BY_PROVIDER', '7': 'CLOSED_BY_PROVIDER_SYSTEM',
+    } as Record<string, string>)[subBusinessStatus ?? ''] ?? null;
   }
 
   private isFood99TerminalTopic(topic?: string | null): boolean {
@@ -1358,6 +1407,7 @@ export class MarketplaceOrderIngestionService {
       const candidate = record[key];
       if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
       if (typeof candidate === 'number' && Number.isSafeInteger(candidate)) return String(candidate);
+      if (typeof candidate === 'boolean') return String(candidate);
     }
     return null;
   }
