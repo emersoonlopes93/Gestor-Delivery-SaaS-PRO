@@ -2,8 +2,8 @@ import { ChartLine } from 'lucide-react';
 import { NavigationHub } from './NavigationHub';
 
 const MANAGEMENT_ITEM_IDS = [
+  'analytics.reports',
   'analytics.goals',
-  'analytics.performance',
   'analytics.bi',
   'management.employees',
 ] as const;
@@ -13,7 +13,7 @@ const MANAGEMENT_SECTIONS = [
     id: 'management-priorities',
     label: 'Decisões prioritárias',
     description: 'Comece pelo que orienta as próximas decisões da sua loja.',
-    itemIds: ['analytics.goals', 'analytics.performance'],
+    itemIds: ['analytics.reports', 'analytics.goals'],
     emphasis: 'primary' as const,
   },
   {
