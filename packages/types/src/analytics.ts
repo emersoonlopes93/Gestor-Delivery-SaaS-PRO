@@ -72,7 +72,8 @@ export interface CostMarginMetricsDTO {
 export interface DashboardStatsDTO {
   operational: OperationalMetricsDTO;
   commercial: CommercialMetricsDTO;
-  costs: CostMarginMetricsDTO;
+  /** Omitted when the authenticated user cannot view cost and margin data. */
+  costs?: CostMarginMetricsDTO;
   financial: {
     totalIncome: number;
     totalExpenses: number;

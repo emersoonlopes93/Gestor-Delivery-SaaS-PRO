@@ -23,12 +23,12 @@ type BiPayload = {
       conversionRate: number;
     };
   };
-  profitability: {
+  profitability?: {
     product: Array<{ id: string; name: string; revenue: number; estimatedCost: number; grossProfit: number; marginPercentage: number; quantity: number }>;
     category: Array<{ name: string; revenue: number; profit: number; marginPercentage: number }>;
     channel: Array<{ name: string; revenue: number; profit: number; marginPercentage: number }>;
   };
-  abcCurve: {
+  abcCurve?: {
     revenue: Array<{ id: string; name: string; revenue: number; classification: 'A' | 'B' | 'C' }>;
   };
   customerIntelligence: {
@@ -47,7 +47,7 @@ type BiPayload = {
     next7Days: { predictedOrders: number; predictedRevenue: number };
     next30Days: { predictedOrders: number; predictedRevenue: number };
   };
-  products: {
+  products?: {
     bestSellers: Array<{ id: string; name: string; quantity: number; revenue: number }>;
     mostProfitable: Array<{ id: string; name: string; grossProfit: number; marginPercentage: number }>;
     lowestMargin: Array<{ id: string; name: string; marginPercentage: number }>;
@@ -92,12 +92,15 @@ export function BusinessIntelligencePage() {
     },
   });
 
+  const canViewCosts = Boolean(data?.profitability);
+
   const { data: ai } = useQuery({
     queryKey: ['business-intelligence-ai-insights'],
     queryFn: async () => {
       const res = await api.get<AiPayload>('/analytics/ai-insights');
       return res.data;
     },
+    enabled: canViewCosts,
   });
 
   if (isLoading || !data) {
@@ -105,7 +108,8 @@ export function BusinessIntelligencePage() {
   }
 
   const heatmap = data.heatmap.cells.filter((cell) => cell.orders > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 12);
-  const productChart = data.profitability.product.slice(0, 8).map((item) => ({ name: item.name, lucro: item.grossProfit, receita: item.revenue }));
+  const productChart = data.profitability?.product.slice(0, 8).map((item) => ({ name: item.name, lucro: item.grossProfit, receita: item.revenue })) ?? [];
+  const abcCurve = data.abcCurve;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -128,8 +132,8 @@ export function BusinessIntelligencePage() {
         <Metric title="Ticket medio" value={money.format(data.dashboard.orders.averageTicket)} icon={BadgeCheck} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
-        <Panel title="Rentabilidade por produto">
+      {data.profitability || canViewCosts ? <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
+        {data.profitability ? <Panel title="Rentabilidade por produto">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={productChart}>
@@ -148,9 +152,9 @@ export function BusinessIntelligencePage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Panel>
+        </Panel> : null}
 
-        <Panel title="IA Comercial Enterprise" icon={Bot}>
+        {canViewCosts ? <Panel title="IA Comercial Enterprise" icon={Bot}>
           <div className="divide-y divide-border">
             {(ai?.insights ?? []).slice(0, 7).map((insight) => (
               <div key={insight.type} className="py-3">
@@ -161,8 +165,8 @@ export function BusinessIntelligencePage() {
               </div>
             ))}
           </div>
-        </Panel>
-      </div>
+        </Panel> : null}
+      </div> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Panel title="Clientes">
@@ -193,14 +197,14 @@ export function BusinessIntelligencePage() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {abcCurve ? <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Panel title="Curva ABC por receita">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {(['A', 'B', 'C'] as const).map((klass) => (
               <div key={klass} className="rounded-lg border border-border p-4">
                 <p className="text-xs font-black text-muted-foreground">Classe {klass}</p>
                 <div className="mt-3 space-y-2">
-                  {data.abcCurve.revenue.filter((item) => item.classification === klass).slice(0, 5).map((item) => (
+                  {abcCurve.revenue.filter((item) => item.classification === klass).slice(0, 5).map((item) => (
                     <div key={`${klass}-${item.id}`} className="flex justify-between gap-3 text-sm">
                       <span className="truncate text-foreground">{item.name}</span>
                       <span className="font-bold text-muted-foreground">{money.format(item.revenue)}</span>
@@ -223,16 +227,18 @@ export function BusinessIntelligencePage() {
             ))}
           </div>
         </Panel>
-      </div>
+      </div> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Panel title="Produtos">
           <List rows={[
-            ['Mais vendido', data.products.bestSellers[0]?.name ?? '-'],
-            ['Mais lucrativo', data.products.mostProfitable[0]?.name ?? '-'],
-            ['Menor margem', data.products.lowestMargin[0]?.name ?? '-'],
-            ['Em crescimento', data.products.growing[0]?.name ?? '-'],
-            ['Em queda', data.products.falling[0]?.name ?? '-'],
+            ['Mais vendido', data.products?.bestSellers[0]?.name ?? '-'],
+            ...(data.products ? [
+              ['Mais lucrativo', data.products.mostProfitable[0]?.name ?? '-'],
+              ['Menor margem', data.products.lowestMargin[0]?.name ?? '-'],
+              ['Em crescimento', data.products.growing[0]?.name ?? '-'],
+              ['Em queda', data.products.falling[0]?.name ?? '-'],
+            ] as Array<[string, string]> : []),
           ]} />
         </Panel>
         <Panel title="Campanhas">

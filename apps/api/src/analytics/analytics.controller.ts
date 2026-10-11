@@ -1,12 +1,13 @@
-import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, Get, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
 import { BusinessIntelligenceService } from './business-intelligence.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
-import { RequirePermissions, CurrentTenant } from '../common/decorators';
+import { RequirePermissions, CurrentTenant, CurrentUser } from '../common/decorators';
 import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
+import { RbacService } from '../rbac/rbac.service';
 import { MetricFilterDTO, DashboardStatsDTO } from '@gestor/types';
 import { AnalyticsPerformanceService, type AcquisitionQuery, type PerformanceQuery, type ProductsQuery } from './analytics-performance.service';
 
@@ -23,6 +24,7 @@ export class AnalyticsController {
     private readonly businessInsightsService: BusinessInsightsService,
     private readonly businessIntelligenceService: BusinessIntelligenceService,
     private readonly performanceService: AnalyticsPerformanceService,
+    private readonly rbacService: RbacService,
   ) {}
 
   @Get('performance/overview')
@@ -60,16 +62,21 @@ export class AnalyticsController {
   @RequirePermissions('reports.read')
   async getDashboardStats(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Query() filter: MetricFilterDTO
   ): Promise<DashboardStatsDTO> {
-    const [operational, commercial, costs, financial] = await Promise.all([
+    const [operational, commercial, financial, canViewCosts] = await Promise.all([
       this.analyticsService.getOperationalMetrics(tenantId, filter),
       this.analyticsService.getCommercialMetrics(tenantId, filter),
-      this.analyticsService.getCostMarginMetrics(tenantId, filter),
       this.analyticsService.getFinancialMetrics(tenantId, filter),
+      this.rbacService.hasPermissionOrElevatedRole(userId, 'reports.view_costs'),
     ]);
 
-    return { operational, commercial, costs, financial };
+    const costs = canViewCosts
+      ? await this.analyticsService.getCostMarginMetrics(tenantId, filter)
+      : undefined;
+
+    return { operational, commercial, ...(costs ? { costs } : {}), financial };
   }
 
   @Get('operational')
@@ -123,7 +130,24 @@ export class AnalyticsController {
   @Get('business-intelligence')
   @RequiresFeature('bi_advanced')
   @RequirePermissions('reports.read')
-  async getBusinessIntelligence(@CurrentTenant() tenantId: string) {
+  async getBusinessIntelligence(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    const canViewCosts = await this.rbacService.hasPermissionOrElevatedRole(userId, 'reports.view_costs');
+    if (!canViewCosts) {
+      const [dashboard, customerIntelligence, heatmap, forecast, campaigns, loyalty] = await Promise.all([
+        this.businessIntelligenceService.getDashboard(tenantId),
+        this.businessIntelligenceService.getCustomerIntelligence(tenantId),
+        this.businessIntelligenceService.getHeatmap(tenantId),
+        this.businessIntelligenceService.getForecast(tenantId),
+        this.businessIntelligenceService.getCampaignDashboard(tenantId),
+        this.businessIntelligenceService.getLoyaltyDashboard(tenantId),
+      ]);
+
+      return { dashboard, customerIntelligence, heatmap, forecast, campaigns, loyalty };
+    }
+
     const [dashboard, profitability, abcCurve, customerIntelligence, heatmap, forecast, products, campaigns, loyalty] =
       await Promise.all([
         this.businessIntelligenceService.getDashboard(tenantId),
@@ -152,7 +176,11 @@ export class AnalyticsController {
 
   @Get('ai-insights')
   @RequirePermissions('reports.read')
-  async getAiInsights(@CurrentTenant() tenantId: string) {
+  async getAiInsights(@CurrentTenant() tenantId: string, @CurrentUser('sub') userId: string) {
+    const canViewCosts = await this.rbacService.hasPermissionOrElevatedRole(userId, 'reports.view_costs');
+    if (!canViewCosts) {
+      throw new ForbiddenException('Cost and margin permission required');
+    }
     return this.businessIntelligenceService.getAiInsights(tenantId);
   }
 }

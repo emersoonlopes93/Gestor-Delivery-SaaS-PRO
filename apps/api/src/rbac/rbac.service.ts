@@ -59,6 +59,21 @@ export class RbacService {
   }
 
   /**
+   * Mirrors the elevated-role behavior of PermissionsGuard for code paths that
+   * must project a response differently instead of rejecting the whole route.
+   */
+  async hasPermissionOrElevatedRole(userId: string, permission: string): Promise<boolean> {
+    const [permissions, roles] = await Promise.all([
+      this.getUserPermissions(userId),
+      this.getUserRoles(userId),
+    ]);
+
+    return roles.includes('tenant_owner')
+      || roles.includes('tenant_admin')
+      || permissions.includes(permission);
+  }
+
+  /**
    * Get all roles for a tenant with their permissions.
    */
   async getTenantRoles(tenantId: string) {
