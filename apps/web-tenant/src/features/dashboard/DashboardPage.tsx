@@ -107,19 +107,18 @@ export function DashboardPage() {
         />
       )}
 
-      {!overview.canViewDashboard ? (
-        <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">
-          <p className="text-sm font-bold text-foreground">Seu perfil não pode acessar o painel de hoje</p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">Peça a um administrador o acesso ao painel operacional.</p>
-        </section>
-      ) : overview.isLoading ? <DashboardSkeleton /> : (
+      {overview.isLoading ? <DashboardSkeleton /> : overview.canReadReports ? (
         <OperationsDashboard
           current={overview.current}
           storeStatus={overview.storeStatus}
           billingWarning={overview.billing?.warning}
-          analyticsAvailable={overview.canReadReports}
-          canOpenReports={overview.canReadReports}
         />
+      ) : (
+        <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">
+          <p className="text-sm font-bold text-foreground">Visão analítica indisponível para este perfil</p>
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">Seu acesso continua normal. Solicite a permissão de relatórios para visualizar métricas operacionais e comerciais.</p>
+          <Link to="/orders" className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90">Ir para pedidos</Link>
+        </section>
       )}
     </main>
   );

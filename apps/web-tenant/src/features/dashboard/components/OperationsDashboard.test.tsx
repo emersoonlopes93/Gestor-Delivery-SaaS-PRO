@@ -31,7 +31,7 @@ describe('OperationsDashboard', () => {
   it('renders supported context without session internals', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={overview} storeStatus="open" analyticsAvailable canOpenReports />
+        <OperationsDashboard current={overview} storeStatus="open" />
       </MemoryRouter>,
     );
     expect(html).toContain('Vendas concluídas');
@@ -67,7 +67,7 @@ describe('OperationsDashboard', () => {
     };
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={empty} storeStatus="closed" analyticsAvailable canOpenReports />
+        <OperationsDashboard current={empty} storeStatus="closed" />
       </MemoryRouter>,
     );
     expect(html).toContain('Loja fechada');
@@ -77,7 +77,7 @@ describe('OperationsDashboard', () => {
   it('shows a non-open store only as an actionable attention item', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={overview} storeStatus="closed" analyticsAvailable canOpenReports />
+        <OperationsDashboard current={overview} storeStatus="closed" />
       </MemoryRouter>,
     );
 
@@ -86,14 +86,4 @@ describe('OperationsDashboard', () => {
     expect(html).not.toContain('Pulso da operação');
   });
 
-  it('keeps the operational dashboard usable without reports.read', () => {
-    const html = renderToStaticMarkup(
-      <MemoryRouter>
-        <OperationsDashboard current={null} storeStatus="open" analyticsAvailable={false} canOpenReports={false} />
-      </MemoryRouter>,
-    );
-    expect(html).toContain('Painel operacional disponível');
-    expect(html).not.toContain('Ações rápidas');
-    expect(html).not.toContain('Vendas concluídas');
-  });
 });

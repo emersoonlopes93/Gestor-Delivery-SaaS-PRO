@@ -14,7 +14,6 @@ import { api } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import {
   canAccessDashboardReports,
-  canAccessDashboard,
   getDashboardPeriod,
   getStoreStatus,
   type DashboardPeriodPreset,
@@ -37,7 +36,6 @@ const analyticsUrl = (start: Date, end: Date) =>
 export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
   const { user } = useAuthStore();
   const permissions = user?.permissions ?? [];
-  const canViewDashboard = canAccessDashboard(permissions);
   const canReadReports = canAccessDashboardReports(permissions, user?.enabledModules);
   const canReadBilling = hasPermission(permissions, 'billing.read');
   const canReadCatalog = hasPermission(permissions, 'catalog.read');
@@ -49,7 +47,6 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
     queryFn: async () => (await api.get<TenantOverview>('/tenant/me')).data,
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    enabled: canViewDashboard,
   });
 
   const setupQuery = useQuery({
@@ -66,7 +63,7 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
         hasProducts: products?.success === true && products.data.length > 0,
       };
     },
-    enabled: canViewDashboard && (canReadSettings || canReadCatalog),
+    enabled: canReadSettings || canReadCatalog,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -82,20 +79,20 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
         previous: previous.success ? previous.data : null,
       };
     },
-    enabled: canViewDashboard && canReadReports,
+    enabled: canReadReports,
     retry: 1,
   });
 
   const billingQuery = useQuery({
     queryKey: ['billing-state', 'dashboard-warning'],
     queryFn: async () => (await api.get<TenantBillingState>('/billing/state')).data,
-    enabled: canViewDashboard && canReadBilling,
+    enabled: canReadBilling,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
   const operatingHours = tenantQuery.data?.operatingHours ?? setupQuery.data?.operatingHours ?? [];
-  const setupAvailable = canViewDashboard && canReadSettings && canReadCatalog;
+  const setupAvailable = canReadSettings && canReadCatalog;
   return {
     user,
     tenant: tenantQuery.data ?? null,
@@ -104,7 +101,6 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
     previous: analyticsQuery.data?.previous ?? null,
     billing: billingQuery.data ?? null,
     storeStatus: getStoreStatus(tenantQuery.data?.settings, operatingHours),
-    canViewDashboard,
     canReadReports,
     isLoading: tenantQuery.isLoading || (setupAvailable && setupQuery.isLoading) || (canReadReports && analyticsQuery.isLoading),
     isAnalyticsLoading: canReadReports && analyticsQuery.isLoading,
