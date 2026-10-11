@@ -111,6 +111,17 @@ describe('useDashboardOverview operational authorization', () => {
     expect(get.mock.calls.some(([endpoint]) => endpoint.startsWith('/analytics/'))).toBe(false);
   });
 
+  it('does not change the operational request or expose cost data for reports.view_costs', async () => {
+    await act(async () => setSession(['dashboard.view', 'reports.view_costs']));
+    const get = mockRequests();
+    const { result } = renderHook(() => useDashboardOverview('today'), { wrapper });
+
+    await waitFor(() => expect(result.current.current).toEqual(snapshot));
+
+    expect(get.mock.calls.some(([endpoint]) => endpoint.startsWith('/analytics/costs'))).toBe(false);
+    expect('costs' in (result.current.current ?? {})).toBe(false);
+  });
+
   it('does not request operational data without dashboard.view', async () => {
     await act(async () => setSession(['reports.read'], ['reports']));
     const get = mockRequests();
