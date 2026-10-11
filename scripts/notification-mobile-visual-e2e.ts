@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chromium, type Page, type Route } from '@playwright/test';
+import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test';
 
 const baseUrl = process.env.WEB_TENANT_URL || 'http://127.0.0.1:5173';
 const artifactDir = join(process.cwd(), 'tmp', 'notification-visual-proof');
@@ -11,7 +11,7 @@ const user = {
   email: 'visual@example.invalid',
   name: 'Operador Visual',
   roles: ['owner'],
-  permissions: ['billing.read', 'orders.read', 'settings.read', 'settings.manage'],
+  permissions: ['billing.read', 'dashboard.view', 'orders.read', 'settings.read', 'settings.manage'],
   enabledModules: [],
   onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
   tenant: { id: 'visual-tenant', name: 'Loja Visual', slug: 'loja-visual', status: 'active' },
@@ -129,40 +129,48 @@ async function assertNoOverflow(page: Page) {
 async function main() {
   process.stdout.write('VISUAL_STAGE prepare\n');
   await mkdir(artifactDir, { recursive: true });
-  const browser = await chromium.launch({ headless: true });
-  process.stdout.write('VISUAL_STAGE browser-launched\n');
-  const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    colorScheme: 'light',
-  });
-  await context.route('**/api/v1/**', mockApi);
-  await context.addInitScript(() => {
-    localStorage.setItem('accessToken', 'visual-local-token');
-  });
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  let testFailure: unknown;
 
-  const page = await context.newPage();
-  process.stdout.write('VISUAL_STAGE page-created\n');
-  const consoleErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => consoleErrors.push(error.message));
+  try {
+    browser = await chromium.launch({ headless: true });
+    process.stdout.write('VISUAL_STAGE browser-launched\n');
+    context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      colorScheme: 'light',
+    });
+    await context.route('**/api/v1/**', mockApi);
+    await context.addInitScript(() => {
+      localStorage.setItem('accessToken', 'visual-local-token');
+    });
 
-  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
-  await applySafeAreaSimulation(page);
-  process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
-  await page.getByText('Receba alertas de novos pedidos').waitFor();
-  process.stdout.write('VISUAL_STAGE activation-visible\n');
-  const activationBanner = page.getByRole('alert').filter({ hasText: 'Receba alertas de novos pedidos' });
-  const activationBox = await activationBanner.boundingBox();
-  assert.ok(activationBox);
-  await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
-  assert.ok(
+    const page = await context.newPage();
+    process.stdout.write('VISUAL_STAGE page-created\n');
+    if (process.env.NOTIFICATION_MOBILE_VISUAL_E2E_FORCE_FAILURE === '1') {
+      throw new Error('Controlled notification mobile visual E2E failure');
+    }
+    const consoleErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('pageerror', (error) => consoleErrors.push(error.message));
+
+    await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await applySafeAreaSimulation(page);
+    process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
+    await page.getByText('Receba alertas de novos pedidos').waitFor();
+    process.stdout.write('VISUAL_STAGE activation-visible\n');
+    const activationBanner = page.getByRole('alert').filter({ hasText: 'Receba alertas de novos pedidos' });
+    const activationBox = await activationBanner.boundingBox();
+    assert.ok(activationBox);
+    await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
+    assert.ok(
     activationBox.y + activationBox.height <= 844 - 24,
     `activation banner overlaps bottom safe area: ${JSON.stringify(activationBox)}`,
-  );
-  process.stdout.write('VISUAL_STAGE activation-captured\n');
-  await assertNoOverflow(page);
+    );
+    process.stdout.write('VISUAL_STAGE activation-captured\n');
+    await assertNoOverflow(page);
 
   await activationBanner.getByRole('button', { name: /Permitir e ativar|Tentar novamente/ }).click();
   await page.waitForTimeout(300);
@@ -246,9 +254,33 @@ async function main() {
   await assertNoOverflow(page);
 
   assert.deepEqual(consoleErrors, [], `browser errors: ${consoleErrors.join('\n')}`);
-  await context.close();
-  await browser.close();
   process.stdout.write(`NOTIFICATION_MOBILE_VISUAL_E2E_PASS artifacts=${artifactDir}\n`);
+  } catch (error: unknown) {
+    testFailure = error;
+    throw error;
+  } finally {
+    const cleanupFailures: unknown[] = [];
+    if (context) {
+      try {
+        await context.close();
+      } catch (error: unknown) {
+        cleanupFailures.push(error);
+      }
+    }
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (error: unknown) {
+        cleanupFailures.push(error);
+      }
+    }
+    for (const cleanupFailure of cleanupFailures) {
+      process.stderr.write(`Notification mobile visual E2E cleanup failed: ${cleanupFailure instanceof Error ? cleanupFailure.message : String(cleanupFailure)}\n`);
+    }
+    if (testFailure === undefined && cleanupFailures.length > 0) {
+      throw cleanupFailures[0];
+    }
+  }
 }
 
 void main().catch((error: unknown) => {
