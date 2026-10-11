@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DashboardStatsDTO, TenantOperatingHours } from '@gestor/types';
+import type { DashboardOperationalDTO, DashboardStatsDTO, TenantOperatingHours } from '@gestor/types';
 import {
   canAccessDashboardReports,
   calculateComparison,
@@ -7,6 +7,7 @@ import {
   getOrdersInProgress,
   getStoreStatus,
   getDashboardPeriod,
+  getOperationalDashboardPeriod,
 } from './dashboard.utils';
 
 const stats = {
@@ -57,6 +58,13 @@ describe('dashboard derivations', () => {
     expect(sevenDays.previous.end.getTime()).toBe(sevenDays.current.start.getTime() - 1);
   });
 
+  it('builds the operational query in the tenant calendar without exceeding its supported range', () => {
+    const now = new Date('2026-10-11T02:30:00.000Z');
+    expect(getOperationalDashboardPeriod('today', 'America/Sao_Paulo', now)).toEqual({ from: '2026-10-10', to: '2026-10-10' });
+    expect(getOperationalDashboardPeriod('yesterday', 'America/Sao_Paulo', now)).toEqual({ from: '2026-10-09', to: '2026-10-09' });
+    expect(getOperationalDashboardPeriod('last7days', 'America/Sao_Paulo', now)).toEqual({ from: '2026-10-04', to: '2026-10-10' });
+  });
+
   it('only compares metrics with a meaningful baseline', () => {
     expect(calculateComparison(120, 100)).toEqual({ direction: 'up', percentage: 20 });
     expect(calculateComparison(10, 0)).toBeNull();
@@ -70,6 +78,17 @@ describe('dashboard derivations', () => {
   it('derives operational flow and active orders from real statuses', () => {
     expect(getOrdersInProgress(stats)).toBe(7);
     expect(getOperationalSteps(stats).find((step) => step.key === 'preparing')).toMatchObject({ count: 3, share: 30 });
+  });
+
+  it('derives operational flow from the restricted operational DTO without analytics fields', () => {
+    const operational: DashboardOperationalDTO = {
+      period: { from: '2026-10-10', to: '2026-10-10', timezone: 'America/Sao_Paulo' },
+      orders: { total: 2, byStatus: { pending: 1, confirmed: 0, preparing: 0, ready_for_pickup: 0, ready_for_delivery: 0, out_for_delivery: 0, completed: 1, cancelled: 0, draft: 0 }, cancelled: 0, cancellationRate: 0 },
+      completedSales: { orderCount: 1, grossOrderTotal: 2500, averageTicket: 2500 },
+    };
+
+    expect(getOrdersInProgress(operational)).toBe(1);
+    expect(getOperationalSteps(operational).find((step) => step.key === 'completed')).toMatchObject({ count: 1, share: 50 });
   });
 
   it('derives paused, closed and open states from settings and hours', () => {

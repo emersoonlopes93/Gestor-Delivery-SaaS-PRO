@@ -1,4 +1,4 @@
-import type { DashboardStatsDTO, OrderStatus, TenantOperatingHours, TenantSettings } from '@gestor/types';
+import type { DashboardOperationalDTO, DashboardStatsDTO, OrderStatus, TenantOperatingHours, TenantSettings } from '@gestor/types';
 import { hasPermission } from '@gestor/auth';
 import { resolveStoreOperationalStatus, type StoreOperationalStatus } from '../../components/store/store-operational-status';
 
@@ -24,8 +24,23 @@ export type OperationalStep = {
   tone: 'sky' | 'amber' | 'indigo' | 'emerald' | 'slate';
 };
 
-const countStatuses = (stats: DashboardStatsDTO | null, statuses: OrderStatus[]) =>
-  statuses.reduce((total, status) => total + (stats?.operational.ordersByStatus[status] ?? 0), 0);
+type DashboardOperationalMetrics = Pick<DashboardOperationalDTO, 'orders'>
+  | Pick<DashboardStatsDTO, 'operational'>;
+
+function orderStatusCounts(metrics: DashboardOperationalMetrics | null) {
+  if (!metrics) return null;
+  return 'orders' in metrics ? metrics.orders.byStatus : metrics.operational.ordersByStatus;
+}
+
+function totalOrders(metrics: DashboardOperationalMetrics | null) {
+  if (!metrics) return 0;
+  return 'orders' in metrics ? metrics.orders.total : metrics.operational.totalOrders;
+}
+
+const countStatuses = (metrics: DashboardOperationalMetrics | null, statuses: OrderStatus[]) => {
+  const byStatus = orderStatusCounts(metrics);
+  return statuses.reduce((total, status) => total + (byStatus?.[status] ?? 0), 0);
+};
 
 export function canAccessDashboardReports(permissions: string[], enabledModules: string[] | undefined) {
   return hasPermission(permissions, 'reports.read')
@@ -56,6 +71,48 @@ export function getDashboardPeriod(preset: DashboardPeriodPreset, now = new Date
   };
 }
 
+function calendarDateInTimezone(now: Date, timezone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+    const year = value('year');
+    const month = value('month');
+    const day = value('day');
+    if (year && month && day) return `${year}-${month}-${day}`;
+  } catch {
+    // The API validates the configured tenant timezone. Use the local calendar only as a safe UI fallback.
+  }
+
+  return now.toISOString().slice(0, 10);
+}
+
+function shiftCalendarDate(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Builds the API's inclusive YYYY-MM-DD query in the tenant calendar. The
+ * operational API owns interval validation and caps requests at 31 days.
+ */
+export function getOperationalDashboardPeriod(
+  preset: DashboardPeriodPreset,
+  timezone: string | null | undefined,
+  now = new Date(),
+) {
+  const to = calendarDateInTimezone(now, timezone || 'America/Sao_Paulo');
+  const days = preset === 'last7days' ? 7 : 1;
+  const from = preset === 'yesterday' ? shiftCalendarDate(to, -1) : shiftCalendarDate(to, -(days - 1));
+  return { from, to: preset === 'yesterday' ? from : to };
+}
+
 export function calculateComparison(current: number | null | undefined, previous: number | null | undefined): MetricComparison {
   if (current == null || previous == null || !Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) {
     return null;
@@ -75,19 +132,19 @@ export function getStoreStatus(
   return resolveStoreOperationalStatus(settings, operatingHours, now).status;
 }
 
-export function getOrdersInProgress(stats: DashboardStatsDTO | null) {
-  return countStatuses(stats, ['pending', 'confirmed', 'preparing', 'ready_for_pickup', 'ready_for_delivery', 'out_for_delivery']);
+export function getOrdersInProgress(metrics: DashboardOperationalMetrics | null) {
+  return countStatuses(metrics, ['pending', 'confirmed', 'preparing', 'ready_for_pickup', 'ready_for_delivery', 'out_for_delivery']);
 }
 
-export function getOperationalSteps(stats: DashboardStatsDTO | null): OperationalStep[] {
-  const total = stats?.operational.totalOrders ?? 0;
+export function getOperationalSteps(metrics: DashboardOperationalMetrics | null): OperationalStep[] {
+  const total = totalOrders(metrics);
   const makeStep = (
     key: string,
     label: string,
     statuses: OrderStatus[],
     tone: OperationalStep['tone'],
   ): OperationalStep => {
-    const count = countStatuses(stats, statuses);
+    const count = countStatuses(metrics, statuses);
     return { key, label, count, share: total > 0 ? (count / total) * 100 : 0, tone };
   };
   return [

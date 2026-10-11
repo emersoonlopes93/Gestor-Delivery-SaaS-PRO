@@ -107,18 +107,19 @@ export function DashboardPage() {
         />
       )}
 
-      {overview.isLoading ? <DashboardSkeleton /> : overview.canReadReports ? (
+      {overview.isLoading ? <DashboardSkeleton /> : overview.hasOperationalError ? (
+        <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">
+          <p className="text-sm font-bold text-foreground">Não foi possível atualizar os dados operacionais</p>
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">Tente novamente em instantes. Nenhum dado foi substituído por zero.</p>
+          <button type="button" onClick={() => void overview.refetch()} className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90">Tentar novamente</button>
+        </section>
+      ) : (
         <OperationsDashboard
           current={overview.current}
           storeStatus={overview.storeStatus}
           billingWarning={overview.billing?.warning}
+          canReadReports={overview.canReadReports}
         />
-      ) : (
-        <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">
-          <p className="text-sm font-bold text-foreground">Visão analítica indisponível para este perfil</p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">Seu acesso continua normal. Solicite a permissão de relatórios para visualizar métricas operacionais e comerciais.</p>
-          <Link to="/orders" className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90">Ir para pedidos</Link>
-        </section>
       )}
     </main>
   );

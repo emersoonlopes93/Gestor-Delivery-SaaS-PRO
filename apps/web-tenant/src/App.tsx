@@ -88,7 +88,14 @@ export function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <PermissionGate permission="dashboard.view">
+              <DashboardPage />
+            </PermissionGate>
+          }
+        />
         <Route
           path="/billing"
           element={

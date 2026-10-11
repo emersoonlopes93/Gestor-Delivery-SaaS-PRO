@@ -1,42 +1,34 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import type { DashboardStatsDTO } from '@gestor/types';
+import type { DashboardOperationalDTO } from '@gestor/types';
 import { OperationsDashboard } from './OperationsDashboard';
 
-const overview: DashboardStatsDTO = {
-  operational: {
-    totalOrders: 8,
-    ordersByStatus: {
+const overview: DashboardOperationalDTO = {
+  period: { from: '2026-10-11', to: '2026-10-11', timezone: 'America/Sao_Paulo' },
+  orders: {
+    total: 8,
+    byStatus: {
       pending: 1, confirmed: 1, preparing: 1, ready_for_pickup: 1, ready_for_delivery: 0,
       out_for_delivery: 1, completed: 2, cancelled: 1, draft: 0,
     },
-    ordersByChannel: { storefront: 5, whatsapp: 3 },
-    ordersByFulfillment: { delivery: 5, pickup: 3, dine_in: 0, table: 0 },
-    averagePreparationTimeMinutes: 18,
-    averageDeliveryTimeMinutes: 32,
-    cancellationRate: 12.5,
-    peakHours: [{ hour: 12, count: 3 }, { hour: 13, count: 5 }],
+    cancelled: 1,
+    cancellationRate: 0.125,
   },
-  commercial: {
-    totalRevenue: 240, averageTicket: 120, totalOrders: 2, revenueByChannel: {}, revenueByCategory: {},
-    topProducts: [{ id: 'p1', name: 'Pizza Margherita', quantity: 4, revenue: 160 }],
-    topCombos: [], couponUsage: [], cashbackStats: { earnedTotal: 0, redeemedTotal: 0 },
-  },
-  costs: { estimatedCMV: 0, estimatedGrossMargin: 0, grossMarginPercentage: 0, productPerformance: [] },
-  financial: { totalIncome: 240, totalExpenses: 0, cashBalance: 240, netCashFlow: 240 },
+  completedSales: { orderCount: 2, grossOrderTotal: 240, averageTicket: 120 },
 };
 
 describe('OperationsDashboard', () => {
   it('renders supported context without session internals', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={overview} storeStatus="open" />
+        <OperationsDashboard current={overview} storeStatus="open" canReadReports />
       </MemoryRouter>,
     );
     expect(html).toContain('Vendas concluídas');
     expect(html).toContain('Ticket médio');
     expect(html).toContain('Valor dos pedidos concluídos');
+    expect(html).toContain('12.5%');
     expect(html).not.toContain('Receita concluída');
     expect(html).not.toContain('Ticket concluído');
     expect(html).toContain('Pedidos concluídos');
@@ -57,17 +49,18 @@ describe('OperationsDashboard', () => {
   it('renders the honest no-order state', () => {
     const empty: DashboardStatsDTO = {
       ...overview,
-      operational: {
-        ...overview.operational,
-        totalOrders: 0,
-        ordersByStatus: { pending: 0, confirmed: 0, preparing: 0, ready_for_pickup: 0, ready_for_delivery: 0, out_for_delivery: 0, completed: 0, cancelled: 0, draft: 0 },
-        ordersByChannel: {},
+      orders: {
+        ...overview.orders,
+        total: 0,
+        byStatus: { pending: 0, confirmed: 0, preparing: 0, ready_for_pickup: 0, ready_for_delivery: 0, out_for_delivery: 0, completed: 0, cancelled: 0, draft: 0 },
+        cancelled: 0,
+        cancellationRate: 0,
       },
-      commercial: { ...overview.commercial, totalRevenue: 0, averageTicket: 0, totalOrders: 0, topProducts: [] },
+      completedSales: { orderCount: 0, grossOrderTotal: 0, averageTicket: 0 },
     };
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={empty} storeStatus="closed" />
+        <OperationsDashboard current={empty} storeStatus="closed" canReadReports />
       </MemoryRouter>,
     );
     expect(html).toContain('Loja fechada');
@@ -77,13 +70,23 @@ describe('OperationsDashboard', () => {
   it('shows a non-open store only as an actionable attention item', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
-        <OperationsDashboard current={overview} storeStatus="closed" />
+        <OperationsDashboard current={overview} storeStatus="closed" canReadReports />
       </MemoryRouter>,
     );
 
     expect(html).toContain('Loja fechada');
     expect(html).toContain('Pontos de atenção');
     expect(html).not.toContain('Pulso da operação');
+  });
+
+  it('does not render the reports CTA for a profile without reports access', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <OperationsDashboard current={overview} storeStatus="open" canReadReports={false} />
+      </MemoryRouter>,
+    );
+
+    expect(html).not.toContain('Ver relatórios');
   });
 
 });
