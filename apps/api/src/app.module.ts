@@ -31,6 +31,7 @@ import { CrmModule } from './crm/crm.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { GoalsModule } from './goals/goals.module';
 import { validateEnv } from './config/env.validation';
 import { UploadModule } from './upload/upload.module';
@@ -311,6 +312,7 @@ if (enableBullmq) {
 
     // Analytics & Goals (Phase 10)
     AnalyticsModule,
+    DashboardModule,
     GoalsModule,
 
     // Upload (Images)

@@ -87,3 +87,27 @@ export interface MetricFilterDTO {
   endDate: string;
   channel?: string;
 }
+
+/**
+ * Read-only dashboard data that is safe for operational staff.  It deliberately
+ * contains order volume and completed-order totals only; it is not a financial
+ * statement, receivables view, or profitability report.
+ */
+export interface DashboardOperationalDTO {
+  period: {
+    from: string;
+    to: string;
+    timezone: string;
+  };
+  orders: {
+    total: number;
+    byStatus: Record<OrderStatus, number>;
+    cancelled: number;
+    cancellationRate: number;
+  };
+  completedSales: {
+    orderCount: number;
+    grossOrderTotal: number;
+    averageTicket: number;
+  };
+}

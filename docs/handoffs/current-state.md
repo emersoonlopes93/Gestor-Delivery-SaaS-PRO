@@ -1,3 +1,10 @@
+## Fix A1 — Dashboard operational access (2026-10-11)
+
+- Added the read-only `GET /dashboard/operational` contract in a standalone `DashboardModule`. It requires tenant authentication and only `dashboard.view`; it does not inherit `reports`, `reports.read`, BI, cost, finance or feature gates.
+- The response allowlists tenant-scoped order-status counts, cancellation rate and completed-order gross totals/average ticket. It explicitly excludes preparation/delivery durations until a canonical source is available, and never queries costs, inventory, financial transactions, balances, settlements, BI or AI insights.
+- Date ranges use the tenant timezone, require paired `from`/`to` dates, and are capped at 31 days. The legacy `/analytics/dashboard` and its PR #143 cost-filtering contract remain unchanged.
+- Validation: Prisma generate; focused service/controller/PR #143 regression suites (3 suites, 19 tests); global typecheck; API and global lint; `check:no-any`, boundaries and features; full build; and `git diff --check` passed locally. No schema/migration, remote database, provider, deploy or merge was performed. CI and review remain pending after the PR is opened.
+
 ## 99Food native authorization recovery (2026-10-05)
 
 - Native V1 order actions now honor the documented `errno=10100` recovery path: they obtain the per-shop token again with a cache bypass and retry the rejected request once. The retry is limited to this authentication code; provider business errors are not replayed.
