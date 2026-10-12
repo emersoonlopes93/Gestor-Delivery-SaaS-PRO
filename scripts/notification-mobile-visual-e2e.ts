@@ -159,11 +159,14 @@ async function main() {
     await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
     await applySafeAreaSimulation(page);
     process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
-    await page.getByText('Receba alertas de novos pedidos').waitFor();
+    const activationBanner = page
+      .locator('[role="alert"]:visible')
+      .filter({ has: page.getByText('Receba alertas de novos pedidos', { exact: true }) });
+    await activationBanner.waitFor({ state: 'visible' });
     process.stdout.write('VISUAL_STAGE activation-visible\n');
-    const activationBanner = page.getByRole('alert').filter({ hasText: 'Receba alertas de novos pedidos' });
+    assert.equal(await activationBanner.count(), 1, 'activation banner must resolve to one visible alert');
     const activationBox = await activationBanner.boundingBox();
-    assert.ok(activationBox);
+    assert.ok(activationBox, 'activation banner must have a visible layout box');
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
     assert.ok(
     activationBox.y + activationBox.height <= 844 - 24,
