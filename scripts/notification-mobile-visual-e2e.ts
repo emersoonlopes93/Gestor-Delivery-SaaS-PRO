@@ -3,17 +3,6 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test';
 
-type LayoutBox = { x: number; y: number; width: number; height: number };
-
-function isLayoutBox(value: unknown): value is LayoutBox {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<LayoutBox>;
-  return typeof candidate.x === 'number'
-    && typeof candidate.y === 'number'
-    && typeof candidate.width === 'number'
-    && typeof candidate.height === 'number';
-}
-
 const baseUrl = process.env.WEB_TENANT_URL || 'http://127.0.0.1:5173';
 const artifactDir = join(process.cwd(), 'tmp', 'notification-visual-proof');
 const user = {
@@ -170,19 +159,11 @@ async function main() {
     await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
     await applySafeAreaSimulation(page);
     process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
-    const activationTitle = page.getByText('Receba alertas de novos pedidos', { exact: true });
-    await activationTitle.waitFor({ state: 'visible' });
+    await page.getByText('Receba alertas de novos pedidos').waitFor();
     process.stdout.write('VISUAL_STAGE activation-visible\n');
-    assert.equal(await activationTitle.count(), 1, 'activation title must resolve to one visible element');
-    const activationBanner = page.getByRole('alert');
-    await activationBanner.waitFor({ state: 'visible' });
-    assert.equal(await activationBanner.count(), 1, 'activation banner must resolve to one visible element');
-    const activationBoxValue = await activationBanner.evaluate((element) => {
-      const { x, y, width, height } = element.getBoundingClientRect();
-      return { x, y, width, height };
-    });
-    assert.ok(isLayoutBox(activationBoxValue), 'activation banner must have a visible layout box');
-    const activationBox = activationBoxValue;
+    const activationBanner = page.getByRole('alert').filter({ hasText: 'Receba alertas de novos pedidos' });
+    const activationBox = await activationBanner.boundingBox();
+    assert.ok(activationBox);
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
     assert.ok(
     activationBox.y + activationBox.height <= 844 - 24,
