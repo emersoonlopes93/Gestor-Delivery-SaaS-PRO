@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test';
+import type { DashboardOperationalDTO } from '@gestor/types';
 
 const baseUrl = process.env.WEB_TENANT_URL || 'http://127.0.0.1:5173';
 const artifactDir = join(process.cwd(), 'tmp', 'notification-visual-proof');
@@ -28,6 +29,29 @@ const tenant = {
   },
   operatingHours: [],
 };
+
+function dashboardOperationalFixture(url: URL): DashboardOperationalDTO {
+  const byStatus: DashboardOperationalDTO['orders']['byStatus'] = {
+    pending: 0,
+    confirmed: 0,
+    preparing: 0,
+    ready_for_pickup: 0,
+    ready_for_delivery: 0,
+    out_for_delivery: 0,
+    completed: 0,
+    cancelled: 0,
+    draft: 0,
+  };
+  return {
+    period: {
+      from: url.searchParams.get('from') ?? '2026-01-01',
+      to: url.searchParams.get('to') ?? '2026-01-01',
+      timezone: 'America/Sao_Paulo',
+    },
+    orders: { total: 0, byStatus, cancelled: 0, cancellationRate: 0 },
+    completedSales: { orderCount: 0, grossOrderTotal: 0, averageTicket: 0 },
+  };
+}
 
 function responseFor(url: URL) {
   if (url.pathname.endsWith('/auth/tenant/me')) return user;
@@ -80,6 +104,7 @@ function responseFor(url: URL) {
     },
     partners: [],
   };
+  if (url.pathname.endsWith('/dashboard/operational')) return dashboardOperationalFixture(url);
   if (url.pathname.endsWith('/health/ready/websocket')) return { status: 'ok', gateways: {} };
   if (url.pathname.endsWith('/orders')) return { items: [], total: 0 };
   return {};
