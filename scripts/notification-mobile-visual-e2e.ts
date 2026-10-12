@@ -161,10 +161,11 @@ async function main() {
     process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
     await page.getByText('Receba alertas de novos pedidos').waitFor();
     process.stdout.write('VISUAL_STAGE activation-visible\n');
-    const activationBanner = page.getByRole('alert').filter({ hasText: 'Receba alertas de novos pedidos' });
-    const activationBox = await activationBanner.boundingBox();
-    assert.ok(activationBox);
+    const activationBanner = page.locator('div[role="alert"]').filter({ hasText: 'Receba alertas de novos pedidos' });
+    await activationBanner.waitFor({ state: 'visible' });
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
+    const activationBox = await activationBanner.boundingBox();
+    assert.ok(activationBox, `activation banner must have a layout box (matches=${await activationBanner.count()})`);
     assert.ok(
     activationBox.y + activationBox.height <= 844 - 24,
     `activation banner overlaps bottom safe area: ${JSON.stringify(activationBox)}`,
