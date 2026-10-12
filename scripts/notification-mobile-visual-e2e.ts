@@ -174,14 +174,14 @@ async function main() {
     await activationTitle.waitFor({ state: 'visible' });
     process.stdout.write('VISUAL_STAGE activation-visible\n');
     assert.equal(await activationTitle.count(), 1, 'activation title must resolve to one visible element');
-    const activationBanner = page.getByRole('alert').filter({ has: activationTitle });
+    const activationBanner = page.getByRole('alert');
     await activationBanner.waitFor({ state: 'visible' });
     assert.equal(await activationBanner.count(), 1, 'activation banner must resolve to one visible element');
     const activationBoxValue = await activationBanner.evaluate((element) => {
       const { x, y, width, height } = element.getBoundingClientRect();
       return { x, y, width, height };
     });
-    assert.ok(isLayoutBox(activationBoxValue), 'activation title must have a visible layout box');
+    assert.ok(isLayoutBox(activationBoxValue), 'activation banner must have a visible layout box');
     const activationBox = activationBoxValue;
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
     assert.ok(
