@@ -159,14 +159,13 @@ async function main() {
     await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
     await applySafeAreaSimulation(page);
     process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
-    const activationBanner = page
-      .locator('[role="alert"]:visible')
-      .filter({ has: page.getByText('Receba alertas de novos pedidos', { exact: true }) });
-    await activationBanner.waitFor({ state: 'visible' });
+    const activationTitle = page.getByText('Receba alertas de novos pedidos', { exact: true });
+    await activationTitle.waitFor({ state: 'visible' });
     process.stdout.write('VISUAL_STAGE activation-visible\n');
-    assert.equal(await activationBanner.count(), 1, 'activation banner must resolve to one visible alert');
-    const activationBox = await activationBanner.boundingBox();
-    assert.ok(activationBox, 'activation banner must have a visible layout box');
+    assert.equal(await activationTitle.count(), 1, 'activation title must resolve to one visible element');
+    const activationBox = await activationTitle.boundingBox();
+    assert.ok(activationBox, 'activation title must have a visible layout box');
+    const activationBanner = page.getByRole('alert').filter({ has: activationTitle });
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
     assert.ok(
     activationBox.y + activationBox.height <= 844 - 24,
@@ -175,7 +174,7 @@ async function main() {
     process.stdout.write('VISUAL_STAGE activation-captured\n');
     await assertNoOverflow(page);
 
-  await activationBanner.getByRole('button', { name: /Permitir e ativar|Tentar novamente/ }).click();
+  await activationBanner.getByRole('button', { name: /Permitir notificacoes e ativar som|Tentar novamente/ }).click();
   await page.waitForTimeout(300);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await applySafeAreaSimulation(page);
