@@ -174,16 +174,15 @@ async function main() {
     await activationTitle.waitFor({ state: 'visible' });
     process.stdout.write('VISUAL_STAGE activation-visible\n');
     assert.equal(await activationTitle.count(), 1, 'activation title must resolve to one visible element');
-    const activationBoxValue = await page.waitForFunction(() => {
-      const titles = Array.from(document.querySelectorAll('p'))
-        .filter((element) => element.textContent?.trim() === 'Receba alertas de novos pedidos');
-      if (titles.length !== 1) return null;
-      const { x, y, width, height } = titles[0].getBoundingClientRect();
-      return width > 0 && height > 0 ? { x, y, width, height } : null;
-    }, undefined, { timeout: 5_000 }).then((handle) => handle.jsonValue());
+    const activationBanner = page.getByRole('alert').filter({ has: activationTitle });
+    await activationBanner.waitFor({ state: 'visible' });
+    assert.equal(await activationBanner.count(), 1, 'activation banner must resolve to one visible element');
+    const activationBoxValue = await activationBanner.evaluate((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    });
     assert.ok(isLayoutBox(activationBoxValue), 'activation title must have a visible layout box');
     const activationBox = activationBoxValue;
-    const activationBanner = page.getByRole('alert').filter({ has: activationTitle });
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
     assert.ok(
     activationBox.y + activationBox.height <= 844 - 24,
