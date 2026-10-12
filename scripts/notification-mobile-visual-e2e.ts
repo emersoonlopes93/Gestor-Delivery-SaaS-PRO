@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test';
 
@@ -126,11 +126,77 @@ async function assertNoOverflow(page: Page) {
   assert.ok(dimensions.scrollWidth <= dimensions.clientWidth + 2, `horizontal overflow: ${JSON.stringify(dimensions)}`);
 }
 
+async function saveActivationDiagnostic(page: Page, phase: 'before-role-wait' | 'on-failure'): Promise<void> {
+  const prefix = join(artifactDir, `activation-${phase}`);
+  try {
+    await page.screenshot({ path: `${prefix}.png`, fullPage: true });
+    process.stdout.write(`VISUAL_DIAGNOSTIC_SCREENSHOT phase=${phase} path=${prefix}.png\n`);
+  } catch (error: unknown) {
+    process.stderr.write(`VISUAL_DIAGNOSTIC_SCREENSHOT_FAILED phase=${phase} reason=${error instanceof Error ? error.message : String(error)}\n`);
+  }
+
+  try {
+    const snapshot = await page.evaluate(() => {
+      const title = 'Receba alertas de novos pedidos';
+      const describe = (element: Element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const closestAlert = element.closest('[role="alert"]');
+        return {
+          tagName: element.tagName,
+          isConnected: element.isConnected,
+          className: element.getAttribute('class'),
+          role: element.getAttribute('role'),
+          ariaHidden: element.getAttribute('aria-hidden'),
+          display: style.display,
+          visibility: style.visibility,
+          opacity: style.opacity,
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          closestAlert: closestAlert
+            ? { tagName: closestAlert.tagName, className: closestAlert.getAttribute('class'), role: closestAlert.getAttribute('role') }
+            : null,
+        };
+      };
+      const titleNodes = Array.from(document.querySelectorAll('p'))
+        .filter((element) => element.textContent?.trim() === title)
+        .map(describe);
+      const alerts = Array.from(document.querySelectorAll('[role="alert"]'));
+      const alertCandidates = alerts.map((element) => ({
+        ...describe(element),
+        containsActivationTitle: element.textContent?.includes(title) ?? false,
+        textLength: element.textContent?.trim().length ?? 0,
+        containsTitleNode: Array.from(element.querySelectorAll('p')).some((node) => node.textContent?.trim() === title),
+      }));
+      const activationButton = Array.from(document.querySelectorAll('button')).find((button) => (
+        button.textContent?.includes('ativar som') || button.textContent?.includes('Tentar novamente')
+      ));
+
+      return {
+        capturedAt: new Date().toISOString(),
+        location: window.location.pathname,
+        readyState: document.readyState,
+        titleNodeCount: titleNodes.length,
+        titleNodes,
+        alertCount: alerts.length,
+        divAlertCount: document.querySelectorAll('div[role="alert"]').length,
+        alertsContainingTitleCount: alertCandidates.filter((candidate) => candidate.containsActivationTitle).length,
+        alertCandidates,
+        activationButton: activationButton ? describe(activationButton) : null,
+      };
+    });
+    await writeFile(`${prefix}.json`, JSON.stringify(snapshot, null, 2));
+    process.stdout.write(`VISUAL_DIAGNOSTIC_DOM phase=${phase} path=${prefix}.json\n`);
+  } catch (error: unknown) {
+    process.stderr.write(`VISUAL_DIAGNOSTIC_DOM_FAILED phase=${phase} reason=${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
+
 async function main() {
   process.stdout.write('VISUAL_STAGE prepare\n');
   await mkdir(artifactDir, { recursive: true });
   let browser: Browser | undefined;
   let context: BrowserContext | undefined;
+  let page: Page | undefined;
   let testFailure: unknown;
 
   try {
@@ -145,7 +211,7 @@ async function main() {
       localStorage.setItem('accessToken', 'visual-local-token');
     });
 
-    const page = await context.newPage();
+    page = await context.newPage();
     process.stdout.write('VISUAL_STAGE page-created\n');
     if (process.env.NOTIFICATION_MOBILE_VISUAL_E2E_FORCE_FAILURE === '1') {
       throw new Error('Controlled notification mobile visual E2E failure');
@@ -161,6 +227,7 @@ async function main() {
     process.stdout.write('VISUAL_STAGE dashboard-loaded\n');
     await page.getByText('Receba alertas de novos pedidos').waitFor();
     process.stdout.write('VISUAL_STAGE activation-visible\n');
+    await saveActivationDiagnostic(page, 'before-role-wait');
     const activationBanner = page.locator('div[role="alert"]').filter({ hasText: 'Receba alertas de novos pedidos' });
     await activationBanner.waitFor({ state: 'visible' });
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
@@ -258,6 +325,9 @@ async function main() {
   process.stdout.write(`NOTIFICATION_MOBILE_VISUAL_E2E_PASS artifacts=${artifactDir}\n`);
   } catch (error: unknown) {
     testFailure = error;
+    if (page && !page.isClosed()) {
+      await saveActivationDiagnostic(page, 'on-failure');
+    }
     throw error;
   } finally {
     const cleanupFailures: unknown[] = [];
