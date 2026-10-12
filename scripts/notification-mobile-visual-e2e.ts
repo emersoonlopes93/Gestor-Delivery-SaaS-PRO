@@ -3,6 +3,17 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test';
 
+type LayoutBox = { x: number; y: number; width: number; height: number };
+
+function isLayoutBox(value: unknown): value is LayoutBox {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<LayoutBox>;
+  return typeof candidate.x === 'number'
+    && typeof candidate.y === 'number'
+    && typeof candidate.width === 'number'
+    && typeof candidate.height === 'number';
+}
+
 const baseUrl = process.env.WEB_TENANT_URL || 'http://127.0.0.1:5173';
 const artifactDir = join(process.cwd(), 'tmp', 'notification-visual-proof');
 const user = {
@@ -163,8 +174,15 @@ async function main() {
     await activationTitle.waitFor({ state: 'visible' });
     process.stdout.write('VISUAL_STAGE activation-visible\n');
     assert.equal(await activationTitle.count(), 1, 'activation title must resolve to one visible element');
-    const activationBox = await activationTitle.boundingBox();
-    assert.ok(activationBox, 'activation title must have a visible layout box');
+    const activationBoxValue = await page.waitForFunction(() => {
+      const titles = Array.from(document.querySelectorAll('p'))
+        .filter((element) => element.textContent?.trim() === 'Receba alertas de novos pedidos');
+      if (titles.length !== 1) return null;
+      const { x, y, width, height } = titles[0].getBoundingClientRect();
+      return width > 0 && height > 0 ? { x, y, width, height } : null;
+    }, undefined, { timeout: 5_000 }).then((handle) => handle.jsonValue());
+    assert.ok(isLayoutBox(activationBoxValue), 'activation title must have a visible layout box');
+    const activationBox = activationBoxValue;
     const activationBanner = page.getByRole('alert').filter({ has: activationTitle });
     await page.screenshot({ path: join(artifactDir, 'dashboard-mobile-light-activation-banner.png'), fullPage: true });
     assert.ok(
