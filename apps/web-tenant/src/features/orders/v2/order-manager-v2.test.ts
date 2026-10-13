@@ -132,6 +132,19 @@ describe('Order Manager V2 visual contracts', () => {
     expect(topbar).toContain("'/order-alerts'");
   });
 
+  it('renders the alert center as a compact, keyboard-dismissible popover', () => {
+    const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
+    expect(page).toContain('const alertsRef = useRef<HTMLElement | null>(null);');
+    expect(page).toContain('fixed top-14 right-3');
+    expect(page).toContain('max-h-[min(480px,65vh)]');
+    expect(page).toContain('overflow-y-auto');
+    expect(page).toContain('role="dialog"');
+    expect(page).toContain('aria-label="Fechar central de alertas"');
+    expect(page).toContain('if (event.key === "Escape") setAlertsOpen(false);');
+    expect(page).toContain('!alertsRef.current.contains(event.target as Node)');
+    expect(page).toContain('setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null); setAlertsOpen(false);');
+  });
+
   it('keeps search and filters outside the persisted collapsible cockpit panel', () => {
     const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
     expect(page).toContain('COCKPIT_COLLAPSED_STORAGE_KEY');

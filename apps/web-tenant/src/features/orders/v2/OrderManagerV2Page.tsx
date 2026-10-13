@@ -94,6 +94,7 @@ export function OrderManagerV2Page() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [cockpitCollapsed, setCockpitCollapsed] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem(COCKPIT_COLLAPSED_STORAGE_KEY) === "true");
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
+  const alertsRef = useRef<HTMLElement | null>(null);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
   const alertPlayedAtRef = useRef<Map<string, number>>(new Map());
   const now = useSharedClock();
@@ -137,6 +138,27 @@ export function OrderManagerV2Page() {
     window.addEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
     return () => window.removeEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
   }, [fetchAlerts]);
+
+  useEffect(() => {
+    if (!alertsOpen) return;
+
+    alertsRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAlertsOpen(false);
+    };
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      if (alertsRef.current && !alertsRef.current.contains(event.target as Node)) {
+        setAlertsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+    };
+  }, [alertsOpen]);
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     const response = await api.patch<OrderAlert>(`/order-alerts/${alertId}/acknowledge`, {});
@@ -329,16 +351,18 @@ export function OrderManagerV2Page() {
           </div>
         </div>
         {alertsOpen ? (
-          <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
-            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
+          <section ref={alertsRef} role="dialog" aria-modal="false" aria-label="Central de alertas" tabIndex={-1} className="fixed top-14 right-3 z-50 flex max-h-[min(480px,65vh)] w-[380px] max-w-[calc(100vw-24px)] flex-col rounded-2xl border border-border bg-background p-3 shadow-xl sm:right-6 sm:w-[420px]">
+            <div className="mb-2 flex shrink-0 items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" aria-label="Fechar central de alertas" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
+            <div className="min-h-0 overflow-y-auto">
             {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
               <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
                 <span className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alert.severity}</span>
                 <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
-                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
+                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => { setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null); setAlertsOpen(false); }}>Abrir</button> : null}
                 {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
               </div>
             ))}
+            </div>
           </section>
         ) : null}
         <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
