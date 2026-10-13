@@ -154,7 +154,23 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page.indexOf('Buscar pedido, cliente ou item')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
     expect(page).toContain('Metric label="Ativos"');
     expect(page).toContain('2xl:justify-end');
-    expect(page).toContain('sm:w-[260px]');
+    expect(page).toContain('lg:w-[360px]');
+    expect(page).toContain('grid-cols-2 gap-2 sm:grid-cols-4 2xl:grid-cols-8');
+  });
+
+  it('keeps a single realtime indicator while preserving the compact cockpit controls', () => {
+    const page = readFileSync(resolve(__dirname, 'OrderManagerV2Page.tsx'), 'utf8');
+    const controls = readFileSync(resolve(__dirname, 'OperationalControlCenter.tsx'), 'utf8');
+    expect((page.match(/Sincronizado/g) ?? [])).toHaveLength(1);
+    expect(page).toContain('Dados aguardando atualização');
+    expect(page).toContain('const realtimeIsHealthy = realtime.connectionState === "connected" && !realtime.isStale;');
+    expect(page).toContain('aria-label="Indicadores operacionais"');
+    expect(page).toContain('aria-label="Filtrar origem"');
+    expect(page).toContain('Som {soundManager.soundPreferenceEnabled ? "on" : "off"}');
+    expect(page).toContain('Voz {voiceEnabled ? "on" : "off"}');
+    expect(controls).toContain('auto-rows-fr grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:p-3 xl:grid-cols-3');
+    expect(controls).toContain('min-w-[88px] flex-1');
+    expect(controls).toContain('min-h-[68px]');
   });
 
   it('labels card scan indicators and repeats operational context in details', () => {
