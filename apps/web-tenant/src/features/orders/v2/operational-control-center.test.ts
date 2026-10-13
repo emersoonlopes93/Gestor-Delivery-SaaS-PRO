@@ -44,9 +44,9 @@ describe('Operational Control Center counters', () => {
     expect(source).toContain('bg-card');
     expect(source).toContain('text-foreground');
     expect(source).toContain('dark:text-emerald-300');
-    expect(source).toContain('grid grid-cols-3 gap-1 sm:flex');
-    expect(source).toContain('grid grid-cols-3 gap-1 bg-background');
-    expect(source).toContain('min-h-[44px]');
+    expect(source).toContain('flex flex-wrap gap-1.5');
+    expect(source).toContain('grid auto-rows-fr grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:p-3 xl:grid-cols-3');
+    expect(source).toContain('min-h-[68px]');
     expect(source).toContain('ChevronRight');
   });
 });

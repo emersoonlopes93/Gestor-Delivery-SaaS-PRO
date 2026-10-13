@@ -153,9 +153,9 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('hidden={cockpitCollapsed}');
     expect(page.indexOf('Buscar pedido, cliente ou item')).toBeGreaterThan(page.indexOf('order-manager-v2-cockpit-expanded'));
     expect(page).toContain('Metric label="Ativos"');
-    expect(page).toContain('2xl:justify-end');
+    expect(page).toContain('aria-label="Controles secundários de alertas"');
     expect(page).toContain('lg:w-[360px]');
-    expect(page).toContain('grid-cols-2 gap-2 sm:grid-cols-4 2xl:grid-cols-8');
+    expect(page).toContain('grid-cols-2 gap-2 sm:grid-cols-4 min-[1400px]:grid-cols-8');
   });
 
   it('keeps a single realtime indicator while preserving the compact cockpit controls', () => {
@@ -166,8 +166,16 @@ describe('Order Manager V2 visual contracts', () => {
     expect(page).toContain('const realtimeIsHealthy = realtime.connectionState === "connected" && !realtime.isStale;');
     expect(page).toContain('aria-label="Indicadores operacionais"');
     expect(page).toContain('aria-label="Filtrar origem"');
+    expect(page).toContain('const ORIGIN_LABELS: Record<(typeof ORIGINS)[number], string>');
+    expect(page).toContain('PEDEHUB: "PedeHub"');
+    expect(page).toContain('IFOOD: "iFood"');
+    expect(page).toContain('FOOD_99: "99Food"');
+    expect(page).toContain('{ORIGIN_LABELS[candidate]}');
+    expect(page).toContain('min-h-[56px] items-center gap-2 rounded-lg');
     expect(page).toContain('Som {soundManager.soundPreferenceEnabled ? "on" : "off"}');
     expect(page).toContain('Voz {voiceEnabled ? "on" : "off"}');
+    expect(page).toContain('aria-label="Controles secundários de alertas"');
+    expect(page.indexOf('Buscar pedido, cliente ou item')).toBeLessThan(page.indexOf('Controles secundários de alertas'));
     expect(controls).toContain('auto-rows-fr grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:p-3 xl:grid-cols-3');
     expect(controls).toContain('min-w-[88px] flex-1');
     expect(controls).toContain('min-h-[68px]');

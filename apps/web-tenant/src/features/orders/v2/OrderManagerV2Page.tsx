@@ -63,6 +63,12 @@ import {
 } from "./order-alert-coordinator";
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
+const ORIGIN_LABELS: Record<(typeof ORIGINS)[number], string> = {
+  all: "Todos",
+  PEDEHUB: "PedeHub",
+  IFOOD: "iFood",
+  FOOD_99: "99Food",
+};
 type OrderAlert = { id: string; orderId: string | null; ruleKey: string; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
 type BoardLane = 'kitchen' | 'ready' | 'route';
 const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
@@ -380,18 +386,18 @@ export function OrderManagerV2Page() {
             </div>
           </section>
         ) : null}
-        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="space-y-3 px-3 py-3 sm:px-4">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 2xl:grid-cols-8" aria-label="Indicadores operacionais">
+        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="space-y-2 px-3 py-2.5 sm:px-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 min-[1400px]:grid-cols-8" aria-label="Indicadores operacionais">
           <Metric label="Aguardando ação" value={intelligence.waitingAction} icon={Clock3} tone="text-amber-700 dark:text-amber-300" />
           <Metric label="Atrasados" value={intelligence.delayed} icon={CircleAlert} tone="text-destructive" />
           <Metric label="Prontos" value={intelligence.ready} icon={PackageCheck} tone="text-emerald-700 dark:text-emerald-300" />
           <Metric label="Delivery" value={intelligence.delivery} icon={Truck} />
           <Metric label="Retirada" value={intelligence.pickup} icon={HandPlatter} />
-          <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} icon={Store} />
+          <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} icon={Store} tone="text-primary" />
           <Metric label="iFood" value={intelligence.channels.IFOOD} icon={Activity} tone="text-rose-700 dark:text-rose-300" />
           <Metric label="99Food" value={intelligence.channels.FOOD_99} icon={Route} tone="text-amber-700 dark:text-amber-300" />
         </div>
-        <div className="hidden flex-col gap-2 sm:flex 2xl:flex-row 2xl:items-center 2xl:justify-end">
+        <div className="hidden">
           <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
@@ -409,88 +415,9 @@ export function OrderManagerV2Page() {
             />
             <Metric label="Em rota" value={kpis.route} />
           </div>
-          <div className="flex flex-wrap items-stretch gap-1.5">
-            <div className="flex flex-wrap items-center gap-1 border border-border bg-background p-1">
-              <button
-                type="button"
-                onClick={() =>
-                  soundManager.setSoundPreferenceEnabled(
-                    !soundManager.soundPreferenceEnabled,
-                  )
-                }
-                className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${soundManager.soundPreferenceEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground hover:bg-muted"}`}
-                aria-pressed={soundManager.soundPreferenceEnabled}
-              >
-                {soundManager.soundPreferenceEnabled ? (
-                  <Volume1 className="h-3.5 w-3.5" />
-                ) : (
-                  <VolumeX className="h-3.5 w-3.5" />
-                )}
-                Som {soundManager.soundPreferenceEnabled ? "on" : "off"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setVoiceAlertsEnabled(!voiceEnabled, voiceScope)}
-                className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${voiceEnabled ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}
-                aria-pressed={voiceEnabled}
-              >
-                {voiceEnabled ? (
-                  <Volume2 className="h-3.5 w-3.5" />
-                ) : (
-                  <VolumeX className="h-3.5 w-3.5" />
-                )}
-                Voz {voiceEnabled ? "on" : "off"}
-              </button>
-              <label className="flex min-h-9 items-center gap-2 px-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-                Volume
-                <input
-                  aria-label="Volume dos alertas"
-                  className="w-20 accent-primary"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={soundManager.volume}
-                  onChange={(event) => soundManager.setVolume(Number(event.target.value))}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void soundManager.testSound()}
-                className="inline-flex min-h-9 items-center gap-1.5 border border-border px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Testar som
-              </button>
-              <button
-                type="button"
-                onClick={() => void testVoice()}
-                className="inline-flex min-h-9 items-center gap-1.5 border border-border px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Testar voz
-              </button>
-              {soundManager.needsAudioUnlock ? (
-                <button
-                  type="button"
-                  onClick={() => void soundManager.unlockAudio()}
-                  className="inline-flex min-h-9 items-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-2 text-[10px] font-black uppercase tracking-wide text-amber-800 dark:text-amber-200"
-                >
-                  <BellRing className="h-3.5 w-3.5" />
-                  Liberar
-                </button>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => void fetchBoard()}
-              className="grid min-h-11 min-w-11 place-items-center border border-border text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label="Atualizar pedidos"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
         </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-3 sm:px-4">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5 sm:px-4">
           <label className="relative w-full sm:w-[320px] lg:w-[360px]">
             <span className="sr-only">
               Buscar pedido, cliente ou item
@@ -512,10 +439,25 @@ export function OrderManagerV2Page() {
                 onClick={() => setOrigin(candidate)}
                 className={`min-h-10 rounded-lg px-3 text-[10px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${origin === candidate ? "bg-primary text-primary-foreground shadow-sm" : "border border-border bg-background text-muted-foreground hover:bg-muted"}`}
               >
-                {candidate === "all" ? "Todos" : candidate}
+                {ORIGIN_LABELS[candidate]}
               </button>
             ))}
           </div>
+          {!cockpitCollapsed ? <div className="hidden w-full flex-wrap items-center gap-1.5 border-t border-border/70 pt-2 sm:flex lg:ml-auto lg:w-auto lg:border-t-0 lg:pt-0" aria-label="Controles secundários de alertas">
+            <div className="flex flex-wrap items-center gap-1 border border-border bg-muted/30 p-1">
+              <button type="button" onClick={() => soundManager.setSoundPreferenceEnabled(!soundManager.soundPreferenceEnabled)} className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${soundManager.soundPreferenceEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border bg-background text-muted-foreground hover:bg-muted"}`} aria-pressed={soundManager.soundPreferenceEnabled}>
+                {soundManager.soundPreferenceEnabled ? <Volume1 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Som {soundManager.soundPreferenceEnabled ? "on" : "off"}
+              </button>
+              <button type="button" onClick={() => setVoiceAlertsEnabled(!voiceEnabled, voiceScope)} className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${voiceEnabled ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:bg-muted"}`} aria-pressed={voiceEnabled}>
+                {voiceEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Voz {voiceEnabled ? "on" : "off"}
+              </button>
+              <label className="flex min-h-9 items-center gap-2 px-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground">Volume<input aria-label="Volume dos alertas" className="w-16 accent-primary" type="range" min="0" max="1" step="0.05" value={soundManager.volume} onChange={(event) => soundManager.setVolume(Number(event.target.value))} /></label>
+              <button type="button" onClick={() => void soundManager.testSound()} className="inline-flex min-h-9 items-center gap-1.5 border border-border bg-background px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary">Testar som</button>
+              <button type="button" onClick={() => void testVoice()} className="inline-flex min-h-9 items-center gap-1.5 border border-border bg-background px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary">Testar voz</button>
+              {soundManager.needsAudioUnlock ? <button type="button" onClick={() => void soundManager.unlockAudio()} className="inline-flex min-h-9 items-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-2 text-[10px] font-black uppercase tracking-wide text-amber-800 dark:text-amber-200"><BellRing className="h-3.5 w-3.5" />Liberar</button> : null}
+            </div>
+            <button type="button" onClick={() => void fetchBoard()} className="grid min-h-10 min-w-10 place-items-center border border-border bg-background text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary" aria-label="Atualizar pedidos"><RefreshCw className="h-4 w-4" /></button>
+          </div> : null}
         </div>
       </header>
       <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={handleOperationalTabChange} />
@@ -623,11 +565,11 @@ function Metric({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="flex min-h-[72px] flex-col items-start justify-center gap-1 rounded-xl border border-border bg-background px-2.5 py-2 shadow-sm">
-      {Icon ? <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-muted/70 ${tone}`}><Icon className="h-3.5 w-3.5" /></span> : null}
-      <div>
+    <div className="flex min-h-[56px] items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 shadow-sm sm:px-2.5">
+      {Icon ? <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border border-current/10 bg-muted/80 ${tone}`}><Icon className="h-3.5 w-3.5" /></span> : null}
+      <div className="min-w-0">
         <p className={`text-lg font-black leading-none tabular-nums ${tone}`}>{value}</p>
-        <p className="mt-1 text-[10px] font-black uppercase leading-tight tracking-wide text-muted-foreground">
+        <p className="mt-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-muted-foreground">
           {label}
         </p>
       </div>
