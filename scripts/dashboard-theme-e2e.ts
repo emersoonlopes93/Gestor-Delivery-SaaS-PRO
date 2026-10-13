@@ -25,7 +25,7 @@ const captures = [
 const routes = [
   { slug: 'dashboard', path: '/dashboard', readyText: 'Abrir ações rápidas' },
   { slug: 'delivery-rates', path: '/delivery/rates', readyText: 'Salvar configurações' },
-  { slug: 'analytics-reports', path: '/analytics/reports', readyText: 'Relatórios Gerenciais' },
+  { slug: 'analytics-reports', path: '/analytics/reports', readyText: 'Relatórios' },
   { slug: 'suppliers', path: '/management/suppliers', readyText: 'Fornecedores' },
   { slug: 'inventory', path: '/inventory', readyText: 'Estoque' },
   { slug: 'promotions', path: '/promotions', readyText: 'Promoções e Retenção' },
