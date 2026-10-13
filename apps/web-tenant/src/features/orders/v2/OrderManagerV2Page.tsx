@@ -3,19 +3,25 @@ import {
   Activity,
   AlertTriangle,
   BellRing,
+  CircleAlert,
   ChevronDown,
   ChevronUp,
   ChefHat,
+  Clock3,
+  HandPlatter,
   PackageCheck,
   RefreshCw,
   Route,
   Search,
+  Store,
+  Truck,
   Volume1,
   Volume2,
   VolumeX,
   Wifi,
   WifiOff,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type {
   OrderBoardItemDTO,
   OrderChangedEvent,
@@ -57,6 +63,12 @@ import {
 } from "./order-alert-coordinator";
 
 const ORIGINS = ["all", "PEDEHUB", "IFOOD", "FOOD_99"] as const;
+const ORIGIN_LABELS: Record<(typeof ORIGINS)[number], string> = {
+  all: "Todos",
+  PEDEHUB: "PedeHub",
+  IFOOD: "iFood",
+  FOOD_99: "99Food",
+};
 type OrderAlert = { id: string; orderId: string | null; ruleKey: string; severity: "INFO" | "ATTENTION" | "CRITICAL"; state: "ACTIVE" | "RECOVERED"; title: string; message: string; acknowledgedAt: string | null; firstSeenAt: string; lastSeenAt: string; recoveredAt: string | null };
 type BoardLane = 'kitchen' | 'ready' | 'route';
 const COCKPIT_COLLAPSED_STORAGE_KEY = "gestor:orders-v2:cockpit-collapsed";
@@ -94,6 +106,7 @@ export function OrderManagerV2Page() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [cockpitCollapsed, setCockpitCollapsed] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem(COCKPIT_COLLAPSED_STORAGE_KEY) === "true");
   const ordersRef = useRef<OrderBoardItemDTO[]>([]);
+  const alertsRef = useRef<HTMLElement | null>(null);
   const reconcileRef = useRef<Map<string, Promise<void>>>(new Map());
   const alertPlayedAtRef = useRef<Map<string, number>>(new Map());
   const now = useSharedClock();
@@ -137,6 +150,27 @@ export function OrderManagerV2Page() {
     window.addEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
     return () => window.removeEventListener(ORDER_ALERT_CENTER_TOGGLE_EVENT, openAlertCenter);
   }, [fetchAlerts]);
+
+  useEffect(() => {
+    if (!alertsOpen) return;
+
+    alertsRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAlertsOpen(false);
+    };
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      if (alertsRef.current && !alertsRef.current.contains(event.target as Node)) {
+        setAlertsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+    };
+  }, [alertsOpen]);
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     const response = await api.patch<OrderAlert>(`/order-alerts/${alertId}/acknowledge`, {});
@@ -311,48 +345,59 @@ export function OrderManagerV2Page() {
     }),
     [filtered, grouped.route.length],
   );
+  const realtimeStatus = realtime.isStale
+    ? "Dados aguardando atualização"
+    : realtime.connectionState === "connected"
+      ? "Sincronizado"
+      : "Reconectando";
+  const realtimeIsHealthy = realtime.connectionState === "connected" && !realtime.isStale;
 
   return (
-    <main className="mx-auto max-w-[1800px] space-y-2 p-2 sm:space-y-3 sm:p-4">
-      <header className="rounded-2xl border border-border border-b-4 border-b-primary bg-card p-1.5 shadow-sm sm:p-3">
-        <div id="order-manager-v2-cockpit" className="rounded-xl bg-muted/35 p-2 sm:p-3">
-          <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
-            <div className="min-w-0 flex-1 sm:mr-auto sm:flex-none"><h1 className="text-base font-black tracking-tight text-foreground sm:text-xl">Painel de Operações</h1><p className="truncate text-[9px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p></div>
-            <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[9px] font-black sm:px-2.5 sm:py-2 sm:text-xs ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}><Wifi className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{realtime.connectionState === "connected" ? "Atualizações em tempo real" : "Reconectando"}</span>
-            <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-9 sm:w-9"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}</button>
-          </div>
-          <div className="mt-2"><OperationalQuickActions orders={orders} onOpenOrder={setSelected} /></div>
-          <div className="mt-2 hidden grid-cols-3 gap-1.5 sm:grid sm:flex-wrap">
-            <Metric label="Ativos" value={kpis.active} />
-            <Metric label="Atenção" value={kpis.attention} tone="text-amber-700 dark:text-amber-300" />
-            <Metric label="Em rota" value={kpis.route} />
+    <main className="mx-auto max-w-[1800px] space-y-3 p-2 sm:p-4">
+      <header className="overflow-hidden rounded-2xl border border-border border-b-4 border-b-primary bg-card shadow-sm">
+        <div id="order-manager-v2-cockpit" className="border-b border-border bg-muted/20 px-3 py-3 sm:px-4">
+          <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-black tracking-tight text-foreground sm:text-2xl">Painel de Operações</h1>
+              <p className="mt-0.5 truncate text-[10px] font-semibold text-muted-foreground sm:text-xs">Acompanhe e gerencie seus pedidos em tempo real</p>
+            </div>
+            <div className="order-3 flex w-full flex-wrap items-center gap-1.5 lg:order-2 lg:w-auto lg:justify-end">
+              <OperationalQuickActions orders={orders} onOpenOrder={setSelected} />
+            </div>
+            <span className={`order-2 inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-black sm:text-xs lg:order-3 ${realtimeIsHealthy ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>
+              {realtimeIsHealthy ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+              {realtimeStatus}
+            </span>
+            <button type="button" aria-expanded={!cockpitCollapsed} aria-controls="order-manager-v2-cockpit-expanded" title={cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"} onClick={() => setCockpitCollapsed((current) => !current)} className="order-2 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-background text-muted-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:order-4"><span className="sr-only">{cockpitCollapsed ? "Expandir painel operacional" : "Recolher painel operacional"}</span>{cockpitCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
           </div>
         </div>
         {alertsOpen ? (
-          <section className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-background p-3" aria-label="Central de alertas">
-            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
+          <section ref={alertsRef} role="dialog" aria-modal="false" aria-label="Central de alertas" tabIndex={-1} className="fixed top-14 right-3 z-50 flex max-h-[min(480px,65vh)] w-[380px] max-w-[calc(100vw-24px)] flex-col rounded-2xl border border-border bg-background p-3 shadow-xl sm:right-6 sm:w-[420px]">
+            <div className="mb-2 flex shrink-0 items-center justify-between"><p className="text-xs font-black">Central de alertas</p><div className="flex gap-3"><button type="button" className="text-xs font-bold text-primary" onClick={() => void fetchAlerts()}>Atualizar</button><button type="button" className="text-xs font-bold text-muted-foreground" aria-label="Fechar central de alertas" onClick={() => setAlertsOpen(false)}>Fechar</button></div></div>
+            <div className="min-h-0 overflow-y-auto">
             {alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum alerta operacional no histórico recente.</p> : alerts.map((alert) => (
               <div key={alert.id} className="mb-2 flex gap-2 border-b border-border pb-2 last:border-0">
                 <span className={`mt-0.5 text-[10px] font-black ${alert.severity === 'CRITICAL' ? 'text-destructive' : alert.severity === 'ATTENTION' ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>{alert.severity}</span>
                 <div className="min-w-0 flex-1"><p className="text-xs font-bold">{alert.title}</p><p className="text-[11px] text-muted-foreground">{alert.state === 'RECOVERED' ? 'Recuperado' : alert.acknowledgedAt ? 'Reconhecido' : 'Pendente'} · {new Date(alert.lastSeenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p></div>
-                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null)}>Abrir</button> : null}
+                {alert.orderId ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => { setSelected(ordersRef.current.find((order) => order.id === alert.orderId) ?? null); setAlertsOpen(false); }}>Abrir</button> : null}
                 {alert.state === 'ACTIVE' && !alert.acknowledgedAt ? <button type="button" className="text-[11px] font-bold text-primary" onClick={() => void acknowledgeAlert(alert.id)}>ACK</button> : null}
               </div>
             ))}
+            </div>
           </section>
         ) : null}
-        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="mt-2">
-        <div className="grid grid-cols-4 gap-1 sm:flex sm:flex-wrap" aria-label="Indicadores operacionais">
-          <Metric label="Aguardando ação" value={intelligence.waitingAction} tone="text-amber-700 dark:text-amber-300" />
-          <Metric label="Atrasados" value={intelligence.delayed} tone="text-destructive" />
-          <Metric label="Prontos" value={intelligence.ready} tone="text-emerald-700 dark:text-emerald-300" />
-          <Metric label="Delivery" value={intelligence.delivery} />
-          <Metric label="Retirada" value={intelligence.pickup} />
-          <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} />
-          <Metric label="iFood" value={intelligence.channels.IFOOD} />
-          <Metric label="99Food" value={intelligence.channels.FOOD_99} />
+        <div id="order-manager-v2-cockpit-expanded" hidden={cockpitCollapsed} className="space-y-2 px-3 py-2.5 sm:px-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 min-[1400px]:grid-cols-8" aria-label="Indicadores operacionais">
+          <Metric label="Aguardando ação" value={intelligence.waitingAction} icon={Clock3} tone="text-amber-700 dark:text-amber-300" />
+          <Metric label="Atrasados" value={intelligence.delayed} icon={CircleAlert} tone="text-destructive" />
+          <Metric label="Prontos" value={intelligence.ready} icon={PackageCheck} tone="text-emerald-700 dark:text-emerald-300" />
+          <Metric label="Delivery" value={intelligence.delivery} icon={Truck} />
+          <Metric label="Retirada" value={intelligence.pickup} icon={HandPlatter} />
+          <Metric label="PedeHub" value={intelligence.channels.PEDEHUB} icon={Store} tone="text-primary" />
+          <Metric label="iFood" value={intelligence.channels.IFOOD} icon={Activity} tone="text-rose-700 dark:text-rose-300" />
+          <Metric label="99Food" value={intelligence.channels.FOOD_99} icon={Route} tone="text-amber-700 dark:text-amber-300" />
         </div>
-        <div className="mt-2 hidden flex-col gap-2 sm:flex 2xl:flex-row 2xl:items-center 2xl:justify-end">
+        <div className="hidden">
           <div className="hidden">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               Sala de controle · operação ao vivo
@@ -370,89 +415,10 @@ export function OrderManagerV2Page() {
             />
             <Metric label="Em rota" value={kpis.route} />
           </div>
-          <div className="flex flex-wrap items-stretch gap-1.5">
-            <div className="flex flex-wrap items-center gap-1 border border-border bg-background p-1">
-              <button
-                type="button"
-                onClick={() =>
-                  soundManager.setSoundPreferenceEnabled(
-                    !soundManager.soundPreferenceEnabled,
-                  )
-                }
-                className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${soundManager.soundPreferenceEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground hover:bg-muted"}`}
-                aria-pressed={soundManager.soundPreferenceEnabled}
-              >
-                {soundManager.soundPreferenceEnabled ? (
-                  <Volume1 className="h-3.5 w-3.5" />
-                ) : (
-                  <VolumeX className="h-3.5 w-3.5" />
-                )}
-                Som {soundManager.soundPreferenceEnabled ? "on" : "off"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setVoiceAlertsEnabled(!voiceEnabled, voiceScope)}
-                className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${voiceEnabled ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}
-                aria-pressed={voiceEnabled}
-              >
-                {voiceEnabled ? (
-                  <Volume2 className="h-3.5 w-3.5" />
-                ) : (
-                  <VolumeX className="h-3.5 w-3.5" />
-                )}
-                Voz {voiceEnabled ? "on" : "off"}
-              </button>
-              <label className="flex min-h-9 items-center gap-2 px-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-                Volume
-                <input
-                  aria-label="Volume dos alertas"
-                  className="w-20 accent-primary"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={soundManager.volume}
-                  onChange={(event) => soundManager.setVolume(Number(event.target.value))}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void soundManager.testSound()}
-                className="inline-flex min-h-9 items-center gap-1.5 border border-border px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Testar som
-              </button>
-              <button
-                type="button"
-                onClick={() => void testVoice()}
-                className="inline-flex min-h-9 items-center gap-1.5 border border-border px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Testar voz
-              </button>
-              {soundManager.needsAudioUnlock ? (
-                <button
-                  type="button"
-                  onClick={() => void soundManager.unlockAudio()}
-                  className="inline-flex min-h-9 items-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-2 text-[10px] font-black uppercase tracking-wide text-amber-800 dark:text-amber-200"
-                >
-                  <BellRing className="h-3.5 w-3.5" />
-                  Liberar
-                </button>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => void fetchBoard()}
-              className="grid min-h-11 min-w-11 place-items-center border border-border text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label="Atualizar pedidos"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
         </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
-          <label className="relative w-full sm:w-[260px]">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5 sm:px-4">
+          <label className="relative w-full sm:w-[320px] lg:w-[360px]">
             <span className="sr-only">
               Buscar pedido, cliente ou item
             </span>
@@ -462,7 +428,7 @@ export function OrderManagerV2Page() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar pedido, cliente ou item..."
-              className="h-8 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-[11px] outline-none focus:border-primary sm:h-9 sm:text-xs"
+              className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs font-medium outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </label>
           <div className="flex flex-wrap gap-1" aria-label="Filtrar origem">
@@ -471,26 +437,27 @@ export function OrderManagerV2Page() {
                 key={candidate}
                 type="button"
                 onClick={() => setOrigin(candidate)}
-                className={`rounded-lg px-2 py-1.5 text-[9px] font-black sm:text-[10px] ${origin === candidate ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}
+                className={`min-h-10 rounded-lg px-3 text-[10px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${origin === candidate ? "bg-primary text-primary-foreground shadow-sm" : "border border-border bg-background text-muted-foreground hover:bg-muted"}`}
               >
-                {candidate === "all" ? "Todos" : candidate}
+                {ORIGIN_LABELS[candidate]}
               </button>
             ))}
           </div>
-          <span
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-bold ${realtime.connectionState === "connected" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}
-          >
-            {realtime.connectionState === "connected" ? (
-              <Wifi className="h-3.5 w-3.5" />
-            ) : (
-              <WifiOff className="h-3.5 w-3.5" />
-            )}
-            {realtime.isStale
-              ? "Dados aguardando atualização"
-              : realtime.connectionState === "connected"
-                ? "Atualizações em tempo real"
-                : "Reconectando"}
-          </span>
+          {!cockpitCollapsed ? <div className="hidden w-full flex-wrap items-center gap-1.5 border-t border-border/70 pt-2 sm:flex lg:ml-auto lg:w-auto lg:border-t-0 lg:pt-0" aria-label="Controles secundários de alertas">
+            <div className="flex flex-wrap items-center gap-1 border border-border bg-muted/30 p-1">
+              <button type="button" onClick={() => soundManager.setSoundPreferenceEnabled(!soundManager.soundPreferenceEnabled)} className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${soundManager.soundPreferenceEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border bg-background text-muted-foreground hover:bg-muted"}`} aria-pressed={soundManager.soundPreferenceEnabled}>
+                {soundManager.soundPreferenceEnabled ? <Volume1 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Som {soundManager.soundPreferenceEnabled ? "on" : "off"}
+              </button>
+              <button type="button" onClick={() => setVoiceAlertsEnabled(!voiceEnabled, voiceScope)} className={`inline-flex min-h-9 items-center gap-1.5 border px-2 text-[10px] font-black uppercase tracking-wide focus-visible:ring-2 focus-visible:ring-primary ${voiceEnabled ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:bg-muted"}`} aria-pressed={voiceEnabled}>
+                {voiceEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Voz {voiceEnabled ? "on" : "off"}
+              </button>
+              <label className="flex min-h-9 items-center gap-2 px-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground">Volume<input aria-label="Volume dos alertas" className="w-16 accent-primary" type="range" min="0" max="1" step="0.05" value={soundManager.volume} onChange={(event) => soundManager.setVolume(Number(event.target.value))} /></label>
+              <button type="button" onClick={() => void soundManager.testSound()} className="inline-flex min-h-9 items-center gap-1.5 border border-border bg-background px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary">Testar som</button>
+              <button type="button" onClick={() => void testVoice()} className="inline-flex min-h-9 items-center gap-1.5 border border-border bg-background px-2 text-[10px] font-black uppercase tracking-wide text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary">Testar voz</button>
+              {soundManager.needsAudioUnlock ? <button type="button" onClick={() => void soundManager.unlockAudio()} className="inline-flex min-h-9 items-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-2 text-[10px] font-black uppercase tracking-wide text-amber-800 dark:text-amber-200"><BellRing className="h-3.5 w-3.5" />Liberar</button> : null}
+            </div>
+            <button type="button" onClick={() => void fetchBoard()} className="grid min-h-10 min-w-10 place-items-center border border-border bg-background text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary" aria-label="Atualizar pedidos"><RefreshCw className="h-4 w-4" /></button>
+          </div> : null}
         </div>
       </header>
       <OperationalControlCenter orders={orders} activeTab={operationalTab} onTabChange={handleOperationalTabChange} />
@@ -517,7 +484,7 @@ export function OrderManagerV2Page() {
         </div>
       ) : (
         <section
-          className="space-y-2 pb-5 sm:-mx-3 sm:flex sm:snap-x sm:snap-mandatory sm:gap-3 sm:overflow-x-auto sm:overscroll-x-contain sm:scroll-px-3 sm:px-3 sm:pb-5 xl:mx-0 xl:grid xl:grid-cols-3 xl:overflow-visible xl:px-0"
+          className="space-y-2 pb-5 sm:-mx-3 sm:flex sm:snap-x sm:snap-mandatory sm:space-y-0 sm:gap-3 sm:overflow-x-auto sm:overscroll-x-contain sm:scroll-px-3 sm:px-3 sm:pb-5 xl:mx-0 xl:grid xl:grid-cols-3 xl:overflow-visible xl:px-0"
           aria-label="Kanban operacional"
         >
           {ORDER_MANAGER_LANES.filter((lane) => OPERATIONAL_TAB_LANES[operationalTab].includes(lane.id)).map((lane) => {
@@ -526,11 +493,11 @@ export function OrderManagerV2Page() {
             return (
               <section
                 key={lane.id}
-                className={`${activeMobileLane === lane.id ? 'block' : 'hidden'} min-h-[300px] w-full rounded-2xl border border-border bg-muted/15 sm:block sm:min-w-[22rem] sm:snap-start xl:min-w-0 ${style.rule}`}
+                className={`${activeMobileLane === lane.id ? 'block' : 'hidden'} min-h-[320px] w-full overflow-hidden rounded-2xl border border-border bg-muted/15 sm:block sm:min-w-[22rem] sm:snap-start xl:min-w-0 ${style.rule}`}
               >
-                <header className="flex items-start justify-between rounded-t-2xl border-b border-border bg-card px-3 py-2">
-                  <div className="flex items-start gap-2">
-                    <Icon className="mt-0.5 h-4 w-4 text-foreground" />
+                <header className="flex min-h-[68px] items-center justify-between border-b border-border bg-card px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`grid h-8 w-8 place-items-center rounded-lg ${style.badge}`}><Icon className="h-4 w-4" /></span>
                     <div>
                       <h2 className="text-sm font-black text-foreground">
                         {lane.label}
@@ -546,7 +513,7 @@ export function OrderManagerV2Page() {
                     {grouped[lane.id].length}
                   </span>
                 </header>
-                <div className="space-y-2 p-2.5 sm:p-3">
+                <div className="min-h-[248px] space-y-2 p-2.5 sm:p-3">
                   {grouped[lane.id].map((order) => (
                     <OrderCardV2
                       key={order.id}
@@ -562,7 +529,7 @@ export function OrderManagerV2Page() {
                     />
                   ))}
                   {grouped[lane.id].length === 0 ? (
-                    <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border p-4 text-center text-xs font-bold text-muted-foreground">
+                    <div className="grid min-h-40 place-items-center rounded-xl border border-dashed border-border bg-background/40 p-4 text-center text-xs font-bold text-muted-foreground">
                       Sem pedidos nesta etapa
                     </div>
                   ) : null}
@@ -590,17 +557,22 @@ function Metric({
   label,
   value,
   tone = "text-foreground",
+  icon: Icon,
 }: {
   label: string;
   value: number;
   tone?: string;
+  icon?: LucideIcon;
 }) {
   return (
-    <div className="min-w-14 rounded-lg border border-border bg-background px-2 py-1 text-center">
-      <p className={`text-sm font-black tabular-nums ${tone}`}>{value}</p>
-      <p className="text-[8px] font-black uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
+    <div className="flex min-h-[56px] items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 shadow-sm sm:px-2.5">
+      {Icon ? <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border border-current/10 bg-muted/80 ${tone}`}><Icon className="h-3.5 w-3.5" /></span> : null}
+      <div className="min-w-0">
+        <p className={`text-lg font-black leading-none tabular-nums ${tone}`}>{value}</p>
+        <p className="mt-0.5 text-[10px] font-black uppercase leading-tight tracking-wide text-muted-foreground">
+          {label}
+        </p>
+      </div>
     </div>
   );
 }
