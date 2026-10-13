@@ -16,6 +16,8 @@ export type NavigationItem = {
   breadcrumbLabel?: string;
   hubLabel?: string;
   hubDescription?: string;
+  /** Hub visibility can be inherited from at least one authorized destination. */
+  childAccessItemIds?: readonly string[];
   match?: (pathname: string) => boolean;
 };
 
@@ -25,7 +27,7 @@ export type NavigationGroup = {
   itemIds: readonly string[];
 };
 
-export type SidebarNavigationItem = Pick<NavigationItem, 'id' | 'label' | 'permission' | 'featureFlag' | 'featureKey' | 'match'> & {
+export type SidebarNavigationItem = Pick<NavigationItem, 'id' | 'label' | 'permission' | 'module' | 'featureFlag' | 'featureKey' | 'childAccessItemIds' | 'match'> & {
   to: string;
   icon: LucideIcon;
   isExternal?: boolean;

@@ -20,7 +20,8 @@ describe('Mobile bottom navigation contract', () => {
     expect(source).toContain("to: '/management/finance'");
     expect(source).toContain("to: '/customers'");
     expect(source).toContain('onOpenMore={openMobile}');
-    expect(source).toContain('<MobileMoreSheet groups={groups}');
+    expect(source).toContain('<MobileMoreSheet groups={groups} excludedDestinations={mobileDestinations}');
+    expect(source).toContain('!excludedDestinations.includes(item.to)');
     expect(source).toContain('Mais opções de navegação');
   });
 
@@ -29,6 +30,8 @@ describe('Mobile bottom navigation contract', () => {
     expect(source).toContain("hasPermission(userPermissions, 'orders.use_kanban')");
     expect(source).toContain("hasPermission(userPermissions, 'finance.read')");
     expect(source).toContain("hasPermission(userPermissions, 'crm.read')");
+    expect(source).toContain("hasEnabledModule('finance')");
+    expect(source).toContain("hasEnabledModule('crm')");
     expect(source).toContain("location.pathname === '/orders/manager' ? 'hidden' : ''");
   });
 });
