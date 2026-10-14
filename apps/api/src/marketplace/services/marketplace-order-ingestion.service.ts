@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { MarketplaceProviderRegistryService } from './marketplace-provider-registry.service';
+import { food99OrderStatus } from '../providers/food99-order-status';
 import { MarketplaceConnectionService } from './marketplace-connection.service';
 import { CustomerService } from '../../crm/customer.service';
 import { OrdersGateway } from '../../orders/orders.gateway';
@@ -1193,7 +1194,7 @@ export class MarketplaceOrderIngestionService {
     externalStatus: string | null;
     rawPayload: Record<string, unknown>;
   }): Promise<void> {
-    if (input.externalStatus !== '600') return;
+    if (food99OrderStatus(input.externalStatus) !== 'COMPLETED') return;
     const order = await this.prisma.order.findFirst({
       where: { id: input.internalOrderId, tenantId: input.tenantId },
       select: { status: true, fulfillmentType: true },

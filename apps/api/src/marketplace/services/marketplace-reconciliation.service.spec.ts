@@ -99,6 +99,28 @@ describe('MarketplaceReconciliationService', () => {
     );
   });
 
+  it('normalizes a 99Food native confirmation without recording a divergence', async () => {
+    const { service, prisma, provider, divergences } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...operation, provider: MarketplaceProvider.FOOD_99,
+      connection: { ...operation.connection, provider: MarketplaceProvider.FOOD_99 },
+    });
+    provider.fetchCurrentOrder.mockResolvedValueOnce({ status: 200 });
+    await expect(service.reconcileOperation('tenant-1', 'operation-1', 'food99-confirm')).resolves.toEqual(expect.objectContaining({ resolved: true, remoteState: 'CONFIRMED' }));
+    expect(divergences.record).not.toHaveBeenCalled();
+  });
+
+  it('keeps an undocumented 99Food native status divergent', async () => {
+    const { service, prisma, provider, divergences } = makeService();
+    prisma.marketplaceOperation.findFirst.mockResolvedValueOnce({
+      ...operation, provider: MarketplaceProvider.FOOD_99,
+      connection: { ...operation.connection, provider: MarketplaceProvider.FOOD_99 },
+    });
+    provider.fetchCurrentOrder.mockResolvedValueOnce({ status: 777 });
+    await expect(service.reconcileOperation('tenant-1', 'operation-1', 'food99-unknown')).resolves.toEqual(expect.objectContaining({ alerted: true, remoteState: null }));
+    expect(divergences.record).toHaveBeenCalledWith(expect.objectContaining({ type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE }));
+  });
+
   it('reapplies persisted terminal 99Food events during the scheduled reconciliation batch', async () => {
     const { service } = makeService();
     const ingestion: {
