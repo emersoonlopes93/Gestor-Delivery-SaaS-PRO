@@ -15,9 +15,9 @@ describe('mutation permission guards', () => {
   it('keeps Finance readable while gating transaction creation by finance.manage', () => {
     expect(app).toContain('permission="finance.read"');
     expect(finance).toContain("const canManageFinance = has('finance.manage');");
-    expect(finance).toContain('{canManageFinance && (');
+    expect(finance).toContain('{canManageFinance && <button');
     expect(finance).toContain('Novo lançamento');
-    expect(finance).toContain('<TransactionModal');
+    expect(finance).toContain('{canManageFinance && <TransactionModal');
   });
 
   it('gates goal creation, editing, and deletion independently', () => {
