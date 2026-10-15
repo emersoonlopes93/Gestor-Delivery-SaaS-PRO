@@ -203,7 +203,7 @@ describe('getOrderOperationalViewModel', () => {
 
     expect(result.deliverySummary).toMatchObject({
       providerStatus: '170',
-      providerStatusLabel: 'Ocorrência logística',
+      providerStatusLabel: 'Entrega 99Food cancelada',
       riderName: 'Entregador da plataforma',
       riderPhone: '11999999999',
     });
