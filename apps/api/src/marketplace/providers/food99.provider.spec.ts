@@ -94,6 +94,19 @@ describe('Food99Provider', () => {
     });
   });
 
+  it('parses a shopStatus callback without requiring an order id', async () => {
+    const rawBody = Buffer.from('{"app_id":5764607772295955723,"app_shop_id":"store-99","type":"shopStatus","timestamp":1768815260,"data":{"shop_id":5764687916991317793,"store_status":3,"sub_biz_status":2,"biz_status":1}}');
+    const parsed = await provider.parseWebhookEvent({ headers: {}, rawBody, body: {} });
+
+    expect(parsed).toMatchObject({
+      eventId: expect.stringMatching(/^food99:[a-f0-9]{64}$/),
+      topic: 'shopStatus',
+      externalStoreId: 'store-99',
+      externalOrderId: null,
+    });
+    expect((parsed.rawPayload.data as Record<string, unknown>).shop_id).toBe('5764687916991317793');
+  });
+
   it('preserves 64-bit deliveryStatus identifiers without Number conversion', async () => {
     const rawBody = Buffer.from('{"app_id":5764608647577512345,"app_shop_id":"store-99","type":"deliveryStatus","timestamp":1768815260,"data":{"order_id":5764607618872501234,"delivery_status":130,"rider_name":"Rider"}}');
     const parsed = await provider.parseWebhookEvent({ headers: {}, rawBody, body: {} });

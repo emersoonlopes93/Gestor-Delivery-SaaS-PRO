@@ -99,6 +99,29 @@ describe('MarketplaceConnectionService multi-merchant foundation', () => {
     }));
   });
 
+  it('preserves the provider-owned 99Food shop status snapshot when manual settings are updated', async () => {
+    const { service, prisma } = makeService();
+    const connection = {
+      ...existingConnection('connection-99', 'tenant-1', 'merchant-99'),
+      provider: MarketplaceProvider.FOOD_99,
+      settingsJson: { food99ShopStatus: { storeStatus: '3', effectiveState: 'BUSINESS_PAUSED' } },
+    };
+    prisma.marketplaceConnection.findFirst
+      .mockResolvedValueOnce(connection)
+      .mockResolvedValueOnce(null);
+    prisma.marketplaceConnection.update.mockResolvedValue(connection);
+
+    await service.updateManual('tenant-1', 'connection-99', {
+      settingsJson: { pollingFallbackEnabled: false, presenceMode: 'WEBHOOK' },
+    });
+
+    expect(prisma.marketplaceConnection.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        settingsJson: expect.objectContaining({ food99ShopStatus: connection.settingsJson.food99ShopStatus }),
+      }),
+    }));
+  });
+
   it('disconnects one merchant without changing another connection', async () => {
     const { service, prisma } = makeService();
     const connection = existingConnection('connection-a', 'tenant-1', 'merchant-a');
