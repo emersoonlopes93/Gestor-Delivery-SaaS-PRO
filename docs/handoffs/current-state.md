@@ -1,3 +1,10 @@
+## 99Food partial-cancellation reconciliation (2026-10-16)
+
+- `orderPartialCancel` obtains its authoritative 99Food order-detail snapshot through the existing inbox flow. For an active linked order with fully resolved catalog identities, item rows and operational totals are replaced atomically while the commercial lifecycle status remains unchanged.
+- The canonical theoretical-stock ledger reverses only the active prior depletion movements and applies one depletion for the replacement items in the same transaction. This preserves the audit trail and keeps a later full cancellation idempotent.
+- Terminal orders and ambiguous/unmapped catalog snapshots fail closed: their marketplace snapshot/inbox is retained for diagnosis, while the internal order, stock, KDS and lifecycle remain untouched. No schema, migration, provider call, remote database operation, deployment or merge was performed.
+- Local validation: theoretical-stock 12/12; marketplace ingestion 36/36; 99Food provider plus reconciliation 54/54; API typecheck, lint, build, `check:no-any`, boundaries, features and `git diff --check` passed. Required CI remains pending after the branch is published.
+
 ## Fix A1 — Dashboard operational access (2026-10-11)
 
 - Added the read-only `GET /dashboard/operational` contract in a standalone `DashboardModule`. It requires tenant authentication and only `dashboard.view`; it does not inherit `reports`, `reports.read`, BI, cost, finance or feature gates.

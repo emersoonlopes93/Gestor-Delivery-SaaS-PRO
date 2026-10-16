@@ -318,3 +318,67 @@ describe('TheoreticalStockService reverseOrderDepletion', () => {
     expect(currentStock).toBe(10);
   });
 });
+
+describe('TheoreticalStockService reconcileOrderDepletionInTransaction', () => {
+  it('reverses only active depletion and reapplies the recipe from the updated order snapshot', async () => {
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(0),
+      stockMovement: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'old-depletion',
+            ingredientId: 'ingredient-a',
+            quantity: new Prisma.Decimal('2'),
+            unitCost: new Prisma.Decimal('3'),
+            orderId: 'order-1',
+            reversal: null,
+          },
+        ]),
+        create: jest.fn().mockResolvedValue({ id: 'reversal-1' }),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      ingredient: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: jest.fn().mockResolvedValue([{ id: 'ingredient-a', currentCost: new Prisma.Decimal('3') }]),
+      },
+      order: {
+        findFirst: jest.fn().mockResolvedValue({
+          items: [{ productId: 'product-a', quantity: 1, snapshotCatalogV2Json: null }],
+        }),
+      },
+      productRecipeIngredient: {
+        findMany: jest.fn().mockResolvedValue([{ ingredientId: 'ingredient-a', quantity: new Prisma.Decimal('1') }]),
+      },
+    };
+
+    await new TheoreticalStockService({} as never).reconcileOrderDepletionInTransaction(
+      tx as never,
+      'tenant-a',
+      'order-1',
+    );
+
+    expect(tx.stockMovement.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: 'theoretical_reversal',
+        reversalOfMovementId: 'old-depletion',
+        notes: 'Theoretical reversal for reconciled order order-1',
+      }),
+    });
+    expect(tx.ingredient.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: 'ingredient-a', tenantId: 'tenant-a' },
+      data: { currentStock: { increment: new Prisma.Decimal('2') } },
+    });
+    expect(tx.ingredient.updateMany).toHaveBeenNthCalledWith(2, {
+      where: { id: 'ingredient-a', tenantId: 'tenant-a', currentStock: { gte: 1 } },
+      data: { currentStock: { decrement: 1 } },
+    });
+    expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        type: 'theoretical_depletion',
+        ingredientId: 'ingredient-a',
+        quantity: 1,
+        orderId: 'order-1',
+      })],
+    });
+  });
+});

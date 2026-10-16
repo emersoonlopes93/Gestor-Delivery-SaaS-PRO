@@ -107,6 +107,8 @@ export class MarketplaceOrderIngestionService {
       const existingOrder = await this.prisma.marketplaceOrder.findFirst({
         where: { connectionId: connection.id, provider: inbox.provider, externalOrderId },
         select: {
+          id: true,
+          internalOrderId: true,
           lastExternalEventAt: true,
           lastExternalEventSequence: true,
           lastExternalEventTopic: true,
@@ -161,6 +163,28 @@ export class MarketplaceOrderIngestionService {
       });
       const catalogResolution = await this.resolveCatalogProducts(normalizedOrder);
       this.assertCompleteFood99Snapshot(catalogResolution.order);
+
+      if (
+        existingOrder?.internalOrderId
+        && this.isFood99PartialCancelTopic(inbox.provider, inbox.topic)
+        && catalogResolution.unmappedExternalItemIds.length === 0
+      ) {
+        const reconciled = await this.reconcileFood99PartialCancellation({
+          tenantId: connection.tenantId,
+          connectionId: connection.id,
+          marketplaceOrderId: existingOrder.id,
+          internalOrderId: existingOrder.internalOrderId,
+          inboxId: inbox.id,
+          event: {
+            id: inbox.eventId,
+            createdAt: inbox.eventCreatedAt,
+            sequence: inbox.eventSequence,
+            topic: inbox.topic,
+          },
+          normalized: catalogResolution.order,
+        });
+        return { processed: true, partialCancellation: true, reconciled };
+      }
 
       const marketplaceOrder = await this.upsertMarketplaceOrder(
         connection.tenantId,
@@ -528,6 +552,10 @@ export class MarketplaceOrderIngestionService {
     return this.isNativeFood99LifecycleTopic(provider, topic) || this.isFood99DeliveryStatusTopic(provider, topic);
   }
 
+  private isFood99PartialCancelTopic(provider: MarketplaceProvider, topic?: string | null): boolean {
+    return provider === MarketplaceProvider.FOOD_99 && topic?.trim().toUpperCase() === 'ORDERPARTIALCANCEL';
+  }
+
   private async upsertMarketplaceOrder(
     tenantId: string,
     connectionId: string,
@@ -584,6 +612,151 @@ export class MarketplaceOrderIngestionService {
         deliveryOwnership: normalized.deliveryOwnership,
       },
     });
+  }
+
+  /**
+   * A partial cancellation is not a terminal lifecycle transition. 99Food only
+   * sends the order ID in the callback, so the detail snapshot is the sole
+   * authority for the remaining items and totals. Keep that replacement and
+   * its stock reconciliation in one transaction; a retry cannot expose a
+   * partially updated order to the operational board.
+   */
+  private async reconcileFood99PartialCancellation(input: {
+    tenantId: string;
+    connectionId: string;
+    marketplaceOrderId: string;
+    internalOrderId: string;
+    inboxId: string;
+    event: { id?: string | null; createdAt?: Date | null; sequence?: bigint | null; topic?: string | null };
+    normalized: NormalizedMarketplaceOrder;
+  }): Promise<boolean> {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: input.internalOrderId, tenantId: input.tenantId },
+        select: { status: true },
+      });
+      if (!order) {
+        throw new BadRequestException('Internal order not found for 99Food partial cancellation.');
+      }
+
+      const marketplaceOrderUpdated = await tx.marketplaceOrder.updateMany({
+        where: {
+          id: input.marketplaceOrderId,
+          tenantId: input.tenantId,
+          connectionId: input.connectionId,
+          provider: MarketplaceProvider.FOOD_99,
+        },
+        data: {
+          externalDisplayId: input.normalized.externalDisplayId ?? null,
+          statusExternal: input.normalized.externalStatus ?? null,
+          externalCreatedAt: input.normalized.externalCreatedAt ?? undefined,
+          preparationStartAt: input.normalized.preparationStartAt ?? undefined,
+          confirmationDeadlineAt: input.normalized.confirmationDeadlineAt ?? undefined,
+          lastExternalEventAt: input.event.createdAt ?? new Date(),
+          lastExternalEventId: input.event.id ?? null,
+          lastExternalEventSequence: input.event.sequence ?? null,
+          lastExternalEventTopic: input.event.topic ?? null,
+          rawPayload: this.toInputJsonValue(input.normalized.rawPayload),
+          normalizedPayload: this.toInputJsonValue(input.normalized),
+          deliveryOwnership: input.normalized.deliveryOwnership,
+          lastSyncedAt: new Date(),
+        },
+      });
+      if (marketplaceOrderUpdated.count !== 1) {
+        throw new BadRequestException('99Food marketplace order not found for partial cancellation.');
+      }
+
+      if (order.status === OrderStatus.completed || order.status === OrderStatus.cancelled) {
+        await tx.marketplaceEventInbox.updateMany({
+          where: { id: input.inboxId, tenantId: input.tenantId, connectionId: input.connectionId },
+          data: {
+            status: MarketplaceEventStatus.PROCESSED,
+            processedAt: new Date(),
+            processingStartedAt: null,
+            lastError: null,
+          },
+        });
+        return false;
+      }
+
+      const itemsSubtotal = input.normalized.itemsSubtotal
+        ?? input.normalized.items.reduce((sum, item) => sum + item.totalPrice, 0);
+      const orderUpdated = await tx.order.updateMany({
+        where: { id: input.internalOrderId, tenantId: input.tenantId },
+        data: {
+          itemsSubtotal,
+          discountTotal: input.normalized.discountTotal ?? 0,
+          deliveryFee: input.normalized.deliveryFee ?? 0,
+          normalDeliveryFee: input.normalized.deliveryFee ?? 0,
+          serviceFee: input.normalized.serviceFee ?? 0,
+          total: input.normalized.total ?? itemsSubtotal,
+          notes: input.normalized.notes ?? null,
+          paymentMethod: (input.normalized.paymentMethod ?? PaymentMethod.other) as PaymentMethod,
+          changeFor: input.normalized.changeFor,
+        },
+      });
+      if (orderUpdated.count !== 1) {
+        throw new BadRequestException('Internal order not found for 99Food partial cancellation.');
+      }
+      await tx.orderItem.deleteMany({ where: { orderId: input.internalOrderId, tenantId: input.tenantId } });
+      for (const item of input.normalized.items) {
+        await tx.orderItem.create({
+          data: {
+            orderId: input.internalOrderId,
+            tenantId: input.tenantId,
+            lineType: 'product',
+            productId: item.productId ?? null,
+            comboId: null,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            lineTotal: item.totalPrice,
+            notes: item.notes ?? null,
+            snapshotName: item.name,
+            snapshotImage: null,
+            snapshotBasePrice: item.unitPrice,
+            snapshotExtrasTotal: 0,
+            snapshotComposition: this.marketplaceSnapshotComposition(item),
+          },
+        });
+      }
+      await this.theoreticalStockService.reconcileOrderDepletionInTransaction(
+        tx,
+        input.tenantId,
+        input.internalOrderId,
+      );
+      await tx.orderTimeline.create({
+        data: {
+          tenantId: input.tenantId,
+          orderId: input.internalOrderId,
+          status: order.status,
+          note: 'Itens e valores reconciliados após cancelamento parcial confirmado pela 99Food.',
+          actorType: 'system',
+        },
+      });
+      await tx.marketplaceEventInbox.updateMany({
+        where: { id: input.inboxId, tenantId: input.tenantId, connectionId: input.connectionId },
+        data: {
+          status: MarketplaceEventStatus.PROCESSED,
+          processedAt: new Date(),
+          processingStartedAt: null,
+          lastError: null,
+        },
+      });
+      return true;
+    });
+
+    if (result) {
+      this.ordersGateway.emitOrderChanged(input.tenantId, input.internalOrderId, 'marketplace');
+    } else {
+      this.logger.warn({
+        message: 'food99_partial_cancel_after_terminal_order',
+        tenantId: input.tenantId,
+        connectionId: input.connectionId,
+        marketplaceOrderId: input.marketplaceOrderId,
+        internalOrderId: input.internalOrderId,
+      });
+    }
+    return result;
   }
 
   private isOlderEvent(

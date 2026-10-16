@@ -24,6 +24,12 @@ function reconcileFood99DetailsCompletion(service: MarketplaceOrderIngestionServ
   return (candidate as (request: Record<string, unknown>) => Promise<void>).call(service, input);
 }
 
+function reconcileFood99PartialCancellation(service: MarketplaceOrderIngestionService, input: Record<string, unknown>): Promise<boolean> {
+  const candidate: unknown = Reflect.get(service, 'reconcileFood99PartialCancellation');
+  if (typeof candidate !== 'function') throw new Error('99Food partial-cancellation reconciler is unavailable.');
+  return (candidate as (request: Record<string, unknown>) => Promise<boolean>).call(service, input);
+}
+
 function applyFood99DeliveryStatus(service: MarketplaceOrderIngestionService, input: {
   tenantId: string;
   connectionId: string;
@@ -66,11 +72,19 @@ function makeFood99LifecycleService(prisma: Record<string, unknown>, ordersServi
   applyOrderStatusTransitionInTransaction: jest.fn().mockResolvedValue({}),
 }, options?: {
   catalogMappings?: { resolveProducts: jest.Mock };
-  theoreticalStockService?: { processOrderDepletionInTransaction: jest.Mock; reverseOrderDepletionInTransaction: jest.Mock };
+  theoreticalStockService?: {
+    processOrderDepletionInTransaction: jest.Mock;
+    reverseOrderDepletionInTransaction: jest.Mock;
+    reconcileOrderDepletionInTransaction: jest.Mock;
+  };
   orderAlertsService?: { refreshTenant: jest.Mock };
 }) {
   const catalogMappings = options?.catalogMappings ?? { resolveProducts: jest.fn().mockResolvedValue(new Map()) };
-  const theoreticalStockService = options?.theoreticalStockService ?? { processOrderDepletionInTransaction: jest.fn(), reverseOrderDepletionInTransaction: jest.fn() };
+  const theoreticalStockService = options?.theoreticalStockService ?? {
+    processOrderDepletionInTransaction: jest.fn(),
+    reverseOrderDepletionInTransaction: jest.fn(),
+    reconcileOrderDepletionInTransaction: jest.fn(),
+  };
   const orderAlertsService = options?.orderAlertsService ?? { refreshTenant: jest.fn().mockResolvedValue(undefined) };
   return {
     service: new MarketplaceOrderIngestionService(
@@ -108,6 +122,129 @@ describe('MarketplaceOrderIngestionService', () => {
       customerName: 'Cliente 99Food',
       items: [{ name: 'Pizza' }],
     })).toBe(true);
+  });
+
+  it('reconciles an active 99Food partial cancellation from the authoritative detail snapshot without changing status', async () => {
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue({ status: OrderStatus.preparing }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      orderItem: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn().mockResolvedValue({}) },
+      orderTimeline: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceEventInbox: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = { $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<boolean>) => callback(tx)) };
+    const ordersGateway = ordersGatewayStub();
+    const theoreticalStockService = {
+      processOrderDepletionInTransaction: jest.fn(),
+      reverseOrderDepletionInTransaction: jest.fn(),
+      reconcileOrderDepletionInTransaction: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      ordersGateway as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      theoreticalStockService as never,
+      {} as never,
+    );
+
+    const reconciled = await reconcileFood99PartialCancellation(service, {
+      tenantId: 'tenant-1',
+      connectionId: 'connection-1',
+      marketplaceOrderId: 'marketplace-order-1',
+      internalOrderId: 'order-1',
+      inboxId: 'inbox-1',
+      event: { id: 'event-1', topic: 'orderPartialCancel' },
+      normalized: {
+        provider: MarketplaceProvider.FOOD_99,
+        externalOrderId: '5764687916991317793',
+        externalDisplayId: '210004',
+        externalStatus: '400',
+        itemsSubtotal: 18,
+        discountTotal: 2,
+        deliveryFee: 0,
+        serviceFee: 0,
+        total: 16,
+        paymentMethod: 'pix',
+        changeFor: null,
+        notes: null,
+        deliveryOwnership: 'PROVIDER',
+        rawPayload: {},
+        items: [{
+          externalItemId: 'item-1',
+          name: 'Item remaining',
+          quantity: 1,
+          unitPrice: 18,
+          totalPrice: 18,
+          productId: 'product-1',
+          options: [],
+        }],
+      },
+    });
+
+    expect(reconciled).toBe(true);
+    expect(tx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'order-1', tenantId: 'tenant-1' },
+      data: expect.objectContaining({ itemsSubtotal: 18, discountTotal: 2, total: 16 }),
+    }));
+    expect(tx.orderItem.deleteMany).toHaveBeenCalledWith({ where: { orderId: 'order-1', tenantId: 'tenant-1' } });
+    expect(theoreticalStockService.reconcileOrderDepletionInTransaction).toHaveBeenCalledWith(tx, 'tenant-1', 'order-1');
+    expect(tx.orderTimeline.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: OrderStatus.preparing }),
+    }));
+    expect(tx.marketplaceEventInbox.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'inbox-1', tenantId: 'tenant-1', connectionId: 'connection-1' },
+      data: expect.objectContaining({ status: MarketplaceEventStatus.PROCESSED }),
+    }));
+    expect(ordersGateway.emitOrderChanged).toHaveBeenCalledWith('tenant-1', 'order-1', 'marketplace');
+  });
+
+  it('persists the provider snapshot but leaves a terminal order unchanged on a late partial cancellation', async () => {
+    const tx = {
+      order: { findFirst: jest.fn().mockResolvedValue({ status: OrderStatus.completed }), updateMany: jest.fn() },
+      marketplaceOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      orderItem: { deleteMany: jest.fn(), create: jest.fn() },
+      orderTimeline: { create: jest.fn() },
+      marketplaceEventInbox: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = { $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<boolean>) => callback(tx)) };
+    const ordersGateway = ordersGatewayStub();
+    const stock = {
+      processOrderDepletionInTransaction: jest.fn(),
+      reverseOrderDepletionInTransaction: jest.fn(),
+      reconcileOrderDepletionInTransaction: jest.fn(),
+    };
+    const service = new MarketplaceOrderIngestionService(
+      prisma as never, {} as never, {} as never, {} as never, ordersGateway as never,
+      {} as never, {} as never, {} as never, {} as never, stock as never, {} as never,
+    );
+
+    const reconciled = await reconcileFood99PartialCancellation(service, {
+      tenantId: 'tenant-1', connectionId: 'connection-1', marketplaceOrderId: 'marketplace-order-1',
+      internalOrderId: 'order-1', inboxId: 'inbox-1', event: { topic: 'orderPartialCancel' },
+      normalized: {
+        provider: MarketplaceProvider.FOOD_99, externalOrderId: '5764687916991317793', externalDisplayId: null,
+        externalStatus: '600', itemsSubtotal: 0, discountTotal: 0, deliveryFee: 0, serviceFee: 0,
+        total: 0, paymentMethod: 'other', changeFor: null, notes: null, deliveryOwnership: 'PROVIDER', rawPayload: {}, items: [],
+      },
+    });
+
+    expect(reconciled).toBe(false);
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
+    expect(tx.orderItem.deleteMany).not.toHaveBeenCalled();
+    expect(stock.reconcileOrderDepletionInTransaction).not.toHaveBeenCalled();
+    expect(ordersGateway.emitOrderChanged).not.toHaveBeenCalled();
+    expect(tx.marketplaceEventInbox.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MarketplaceEventStatus.PROCESSED }),
+    }));
   });
 
   it('reconciles official Order Details status 600 through the canonical terminal transition', async () => {

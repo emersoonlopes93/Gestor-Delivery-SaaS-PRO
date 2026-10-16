@@ -45,6 +45,37 @@ export class TheoreticalStockService {
       return;
     }
 
+    await this.depleteCurrentOrderItemsInTransaction(tx, tenantId, orderId);
+  }
+
+  /**
+   * Replaces the active theoretical depletion using the order's current items.
+   * It is intended for an authoritative provider snapshot that changed an
+   * already-imported order (for example, a 99Food partial cancellation).
+   */
+  async reconcileOrderDepletionInTransaction(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    orderId: string,
+  ): Promise<void> {
+    const lockKey = `${tenantId}:${orderId}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+
+    await this.reverseActiveOrderDepletionInTransaction(
+      tx,
+      tenantId,
+      orderId,
+      `Theoretical reversal for reconciled order ${orderId}`,
+    );
+    await this.depleteCurrentOrderItemsInTransaction(tx, tenantId, orderId);
+  }
+
+  private async depleteCurrentOrderItemsInTransaction(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    orderId: string,
+  ): Promise<void> {
+
     const order = await tx.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -157,6 +188,21 @@ export class TheoreticalStockService {
     const lockKey = `${tenantId}:${orderId}`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
+    await this.reverseActiveOrderDepletionInTransaction(
+      tx,
+      tenantId,
+      orderId,
+      `Theoretical reversal for cancelled order ${orderId}`,
+    );
+  }
+
+  private async reverseActiveOrderDepletionInTransaction(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    orderId: string,
+    note: string,
+  ): Promise<void> {
+
     const movements = await tx.stockMovement.findMany({
       where: {
         orderId,
@@ -178,7 +224,7 @@ export class TheoreticalStockService {
           unitCost: move.unitCost,
           orderId: move.orderId,
           reversalOfMovementId: move.id,
-          notes: `Theoretical reversal for cancelled order ${orderId}`,
+          notes: note,
         },
       });
       const restored = await tx.ingredient.updateMany({
