@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MarketplaceDivergenceStatus, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus, Prisma } from '@prisma/client';
+import { MarketplaceDivergenceStatus, MarketplaceDivergenceType, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { OrdersGateway } from '../orders.gateway';
 
@@ -29,6 +29,18 @@ const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.ready_for_delivery,
   OrderStatus.out_for_delivery,
 ];
+
+const LEGACY_CATALOG_MAPPING_REASON_PREFIX = 'Marketplace catalog items are unmapped: ';
+const LEGACY_CATALOG_MAPPING_RECOMMENDED_ACTION = 'Map each marketplace app item ID to a tenant catalog product before inventory can be depleted.';
+
+type OpenMarketplaceDivergence = {
+  id: string;
+  type: MarketplaceDivergenceType;
+  operationId: string | null;
+  internalOrderId: string | null;
+  reason: string;
+  recommendedAction: string;
+};
 
 @Injectable()
 export class OrderAlertsService {
@@ -63,7 +75,9 @@ export class OrderAlertsService {
         id: true, orderNumber: true, status: true, createdAt: true,
         marketplaceOrders: { select: {
           operations: { where: { status: { in: [MarketplaceOperationStatus.FAILED, MarketplaceOperationStatus.INTERVENTION_REQUIRED] } }, select: { id: true, status: true } },
-          divergences: { where: { status: MarketplaceDivergenceStatus.OPEN }, select: { id: true } },
+          divergences: { where: { status: MarketplaceDivergenceStatus.OPEN }, select: {
+            id: true, type: true, operationId: true, internalOrderId: true, reason: true, recommendedAction: true,
+          } },
           provider: true,
           deliveryOwnership: true,
           normalizedPayload: true,
@@ -84,7 +98,9 @@ export class OrderAlertsService {
         orderId: order.id, ruleKey: ORDER_ALERT_RULES.ORDER_SYNC_FAILED, severity: OrderAlertSeverity.CRITICAL,
         title: `Falha de sincronização no pedido #${order.orderNumber}`, message: 'Uma operação de marketplace falhou e exige verificação.', metadata: { orderNumber: order.orderNumber },
       });
-      if (order.marketplaceOrders.some((marketplaceOrder) => marketplaceOrder.divergences.length > 0)) candidates.push({
+      if (order.marketplaceOrders.some((marketplaceOrder) => marketplaceOrder.divergences.some(
+        (divergence) => !this.isLegacyCatalogMappingDivergence(divergence),
+      ))) candidates.push({
         orderId: order.id, ruleKey: ORDER_ALERT_RULES.PROVIDER_RECONCILIATION_FAILED, severity: OrderAlertSeverity.CRITICAL,
         title: `Divergência de reconciliação no pedido #${order.orderNumber}`, message: 'A reconciliação do provider exige verificação operacional.', metadata: { orderNumber: order.orderNumber },
       });
@@ -111,6 +127,14 @@ export class OrderAlertsService {
   }
 
   private fingerprint(candidate: Candidate) { return `${candidate.orderId}:${candidate.ruleKey}`; }
+
+  private isLegacyCatalogMappingDivergence(divergence: OpenMarketplaceDivergence): boolean {
+    return divergence.type === MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE
+      && divergence.operationId === null
+      && divergence.internalOrderId === null
+      && divergence.reason.startsWith(LEGACY_CATALOG_MAPPING_REASON_PREFIX)
+      && divergence.recommendedAction === LEGACY_CATALOG_MAPPING_RECOMMENDED_ACTION;
+  }
 
   private isFood99CourierAtRestaurant(marketplaceOrder: {
     provider: string;

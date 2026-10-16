@@ -1,4 +1,4 @@
-import { MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus } from '@prisma/client';
+import { MarketplaceDivergenceStatus, MarketplaceDivergenceType, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus } from '@prisma/client';
 import { OrderAlertsService } from './order-alerts.service';
 
 describe('OrderAlertsService', () => {
@@ -82,6 +82,56 @@ describe('OrderAlertsService', () => {
     await service.refreshTenant(tenantId);
 
     expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ruleKey: 'ORDER_SYNC_FAILED', severity: OrderAlertSeverity.CRITICAL }) }));
+  });
+
+  it('recovers the false reconciliation alert created by the legacy catalog-mapping path', async () => {
+    const { prisma, gateway, service } = setup();
+    prisma.order.findMany.mockResolvedValue([{
+      id: 'order-a', orderNumber: '100', status: OrderStatus.confirmed, createdAt: new Date(),
+      marketplaceOrders: [{
+        operations: [],
+        divergences: [{
+          id: 'legacy-catalog', type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
+          operationId: null, internalOrderId: null,
+          reason: 'Marketplace catalog items are unmapped: app-item-99',
+          recommendedAction: 'Map each marketplace app item ID to a tenant catalog product before inventory can be depleted.',
+        }],
+      }],
+    }]);
+    prisma.orderAlert.findMany.mockResolvedValue([{ id: 'alert-legacy', fingerprint: 'order-a:PROVIDER_RECONCILIATION_FAILED' }]);
+    prisma.orderAlert.update.mockResolvedValue({ id: 'alert-legacy' });
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).not.toHaveBeenCalled();
+    expect(prisma.orderAlert.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'alert-legacy' }, data: expect.objectContaining({ state: OrderAlertState.RECOVERED }),
+    }));
+    expect(gateway.emitOrderAlertChanged).toHaveBeenCalledWith(tenantId, 'alert-legacy', 'RECOVERED', 'recovered');
+  });
+
+  it('keeps a real unknown-provider divergence eligible for a critical reconciliation alert', async () => {
+    const { prisma, service } = setup();
+    prisma.order.findMany.mockResolvedValue([{
+      id: 'order-a', orderNumber: '100', status: OrderStatus.confirmed, createdAt: now,
+      marketplaceOrders: [{
+        operations: [],
+        divergences: [{
+          id: 'unknown-777', type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
+          operationId: 'operation-a', internalOrderId: 'order-a', reason: '99Food returned unknown native status 777.',
+          recommendedAction: 'Inspect the sanitized provider response and retry reconciliation after validation.',
+        }],
+      }],
+    }]);
+    prisma.orderAlert.findFirst.mockResolvedValue(null);
+    prisma.orderAlert.create.mockResolvedValue({ id: 'alert-unknown' });
+    prisma.orderAlert.findMany.mockResolvedValue([]);
+
+    await service.refreshTenant(tenantId);
+
+    expect(prisma.orderAlert.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      ruleKey: 'PROVIDER_RECONCILIATION_FAILED', severity: OrderAlertSeverity.CRITICAL,
+    }) }));
   });
 
   it('creates one active courier-arrived alert only for provider-owned 99Food logistics', async () => {
