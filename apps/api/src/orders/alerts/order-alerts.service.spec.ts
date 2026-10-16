@@ -1,4 +1,4 @@
-import { MarketplaceDivergenceStatus, MarketplaceDivergenceType, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus } from '@prisma/client';
+import { MarketplaceDivergenceType, MarketplaceOperationStatus, OrderAlertSeverity, OrderAlertState, OrderStatus } from '@prisma/client';
 import { OrderAlertsService } from './order-alerts.service';
 
 describe('OrderAlertsService', () => {
