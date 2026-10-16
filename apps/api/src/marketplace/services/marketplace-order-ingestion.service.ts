@@ -199,18 +199,14 @@ export class MarketplaceOrderIngestionService {
       );
       let internalOrderId = marketplaceOrder.internalOrderId;
       if (catalogResolution.unmappedExternalItemIds.length > 0) {
-        await this.divergenceService.record({
+        this.logger.warn({
+          message: 'marketplace_catalog_mapping_pending',
           tenantId: connection.tenantId,
-          marketplaceOrderId: marketplaceOrder.id,
-          internalOrderId: marketplaceOrder.internalOrderId,
           provider: marketplaceOrder.provider,
+          connectionId: connection.id,
           externalOrderId,
-          type: MarketplaceDivergenceType.UNKNOWN_EXTERNAL_STATE,
-          localState: marketplaceOrder.statusInternal,
-          remoteState: marketplaceOrder.statusExternal,
-          reason: `Marketplace catalog items are unmapped: ${catalogResolution.unmappedExternalItemIds.join(', ')}`,
-          recommendedAction: 'Map each marketplace app item ID to a tenant catalog product before inventory can be depleted.',
           correlationId: inbox.correlationId,
+          unmappedItemCount: catalogResolution.unmappedExternalItemIds.length,
         });
       }
       if (marketplaceOrder.confirmationDeadlineAt) {

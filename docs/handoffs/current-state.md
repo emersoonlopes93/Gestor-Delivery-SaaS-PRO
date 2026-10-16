@@ -2799,3 +2799,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - No schema, migration, provider call, remote database action, deployment or merge was performed. Focused controller/interceptor HTTP tests prove the exact raw ACK, the normal-route envelope, and no ACK after invalid signature, invalid payload, or pre-acceptance failure. Full gates and a new deployed callback probe must be recorded on the final branch SHA before promotion.
 
 - Runtime observability adds only `food99_webhook_ack_sent` after an accepted 99Food callback, recording the fixed status and ACK fields without raw payload, signature, credentials, customer data or inbox identifiers. A callback warning about an unmapped payload is not treated as an ACK failure.
+## 99Food catalog-mapping false reconciliation alert (2026-10-16)
+
+- An exact catalog identity that is missing or ambiguous leaves the marketplace item operational with no `productId`; it now emits the sanitized `marketplace_catalog_mapping_pending` observation instead of recording `UNKNOWN_EXTERNAL_STATE`. This preserves fail-closed stock behavior and avoids turning a catalog task into a CRITICAL reconciliation alert.
+- Existing, exact historical mapping-only divergences remain auditable but no longer qualify an order for the reconciliation-alert rule. Real provider state, lifecycle, timeout, cancellation and operation divergences remain eligible for CRITICAL alerts.
+- The observed `findUnique where id: undefined` queue error is independent of this alert path: the current processor routes named reconciliation jobs correctly, while the runtime evidence indicates an unrecognized/stale job without an inbox ID. It is not changed in this scoped hotfix.
+- No schema, migration, provider call, remote database operation, deployment or merge was performed. Focused tests and required local gates are pending on this branch.

@@ -53,6 +53,18 @@ function applyFood99ShopStatus(service: MarketplaceOrderIngestionService, input:
     .call(service, input.tenantId, input.connectionId, input.rawPayload);
 }
 
+function resolveCatalogProducts(service: MarketplaceOrderIngestionService, input: Record<string, unknown>): Promise<{
+  order: { items: Array<{ productId: string | null }> };
+  unmappedExternalItemIds: string[];
+}> {
+  const candidate: unknown = Reflect.get(service, 'resolveCatalogProducts');
+  if (typeof candidate !== 'function') throw new Error('Marketplace catalog resolver is unavailable.');
+  return (candidate as (normalized: Record<string, unknown>) => Promise<{
+    order: { items: Array<{ productId: string | null }> };
+    unmappedExternalItemIds: string[];
+  }>).call(service, input);
+}
+
 function isCompleteFood99Snapshot(service: MarketplaceOrderIngestionService, input: {
   externalOrderId: string;
   customerName: string;
@@ -114,6 +126,49 @@ const food99LifecycleInput = {
 };
 
 describe('MarketplaceOrderIngestionService', () => {
+  it('keeps an unmapped 99Food item importable and discoverable for catalog attention', async () => {
+    const catalogMappings = { resolveProducts: jest.fn().mockResolvedValue(new Map()) };
+    const { service } = makeFood99LifecycleService({}, undefined, { catalogMappings });
+
+    const result = await resolveCatalogProducts(service, {
+      provider: MarketplaceProvider.FOOD_99,
+      connection: { tenantId: 'tenant-1', id: 'connection-1' },
+      items: [{ catalogIdentity: 'app-item-unmapped', externalItemId: 'volatile-order-item', name: 'Pizza externa', options: [] }],
+    });
+
+    expect(result.order.items[0].productId).toBeNull();
+    expect(result.unmappedExternalItemIds).toEqual(['app-item-unmapped']);
+  });
+
+  it('keeps 99Food items with options unmapped even when the base identity is exact', async () => {
+    const catalogMappings = { resolveProducts: jest.fn().mockResolvedValue(new Map([['app-item-exact', 'product-a']])) };
+    const { service } = makeFood99LifecycleService({}, undefined, { catalogMappings });
+
+    const result = await resolveCatalogProducts(service, {
+      provider: MarketplaceProvider.FOOD_99,
+      connection: { tenantId: 'tenant-1', id: 'connection-1' },
+      items: [{ catalogIdentity: 'app-item-exact', externalItemId: 'volatile-order-item', name: 'Pizza externa', options: [{ name: 'Borda' }] }],
+    });
+
+    expect(result.order.items[0].productId).toBeNull();
+    expect(result.unmappedExternalItemIds).toEqual(['app-item-exact']);
+    expect(catalogMappings.resolveProducts).toHaveBeenCalledWith('tenant-1', 'connection-1', MarketplaceProvider.FOOD_99, []);
+  });
+
+  it('resolves a 99Food item only through its exact catalog identity', async () => {
+    const catalogMappings = { resolveProducts: jest.fn().mockResolvedValue(new Map([['app-item-exact', 'product-a']])) };
+    const { service } = makeFood99LifecycleService({}, undefined, { catalogMappings });
+
+    const result = await resolveCatalogProducts(service, {
+      provider: MarketplaceProvider.FOOD_99,
+      connection: { tenantId: 'tenant-1', id: 'connection-1' },
+      items: [{ catalogIdentity: 'app-item-exact', externalItemId: 'volatile-order-item', name: 'Pizza externa', options: [] }],
+    });
+
+    expect(result.order.items[0].productId).toBe('product-a');
+    expect(result.unmappedExternalItemIds).toEqual([]);
+  });
+
   it('accepts a complete 99Food snapshot even when the provider withholds the customer name', () => {
     const { service } = makeFood99LifecycleService({});
 

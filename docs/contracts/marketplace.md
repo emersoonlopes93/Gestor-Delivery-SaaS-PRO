@@ -303,8 +303,11 @@ Canonical stock remains local and recipe-driven: a tenant-scoped
 `MarketplaceCatalogMapping(connectionId, provider, externalItemId) -> Product` resolves the
 provider item before the existing idempotent `OrderItem.productId` depletion engine runs.
 The exact connection, provider, tenant and external ID are all enforced by lookup and database
-constraints. Unmapped items are persisted and remain operational, but create a divergence and
-never trigger name/fuzzy stock matching. A commercial marketplace cancellation uses the same
+constraints. Unmapped or ambiguous items are persisted and remain operational, but are a
+catalog-attention condition rather than a reconciliation divergence: they never trigger a
+critical reconciliation alert, automatic product assignment, or name/fuzzy stock matching.
+Historical `UNKNOWN_EXTERNAL_STATE` rows created solely by the former catalog-mapping path are
+retained for audit but excluded from the reconciliation-alert condition. A commercial marketplace cancellation uses the same
 idempotent local reversal engine once; delivery-only status `170` does not restore stock.
 
 The same mapping model can represent iFood only for the exact item identity carried by its
