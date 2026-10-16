@@ -1,9 +1,9 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../lib/api-client';
+import { api, logoutCustomerSession, switchCustomerTenant } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload, StorefrontCategoryPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Award,
@@ -35,9 +35,15 @@ import {
   ProductRenderer,
   CategoryNavigation,
   StorefrontEmptyState,
-  cn
+  cn,
+  toStorefrontProduct,
 } from '@gestor/storefront-ui';
 import type { StorefrontProductLayout, StorefrontLayoutSettings } from '@gestor/theme';
+import { useAnalytics } from '../features/analytics';
+import { useStorefrontConsent } from '../features/consent';
+import { SmartShowcase } from '../components/SmartShowcase';
+import { useCategoryScrollSpy } from '../hooks/useCategoryScrollSpy';
+import { getStorefrontStartingPrice, hasStorefrontStartingPrice } from '../lib/product-pricing';
 
 type CustomerHomePayload = {
   profile: { name: string; totalOrders: number };
@@ -101,13 +107,16 @@ export function StorefrontPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
-  const { customer, logout, isLoggedIn, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
+  const { customer, isLoggedIn, tenantSlug: customerTenantSlug } = useCustomerStore();
+  const analytics = useAnalytics();
+  const { canUseAnalytics } = useStorefrontConsent();
+  const menuTracked = useRef(false);
 
   useEffect(() => {
     if (!tenantSlug) return;
-    setTenantSlug(tenantSlug);
+    void switchCustomerTenant(tenantSlug);
     setCartTenantSlug(tenantSlug);
-  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
+  }, [tenantSlug, setCartTenantSlug]);
 
   // Demo state for layout testing
   const [productLayout, setProductLayout] = useState<StorefrontProductLayout>('grid');
@@ -160,11 +169,17 @@ export function StorefrontPage() {
 
     return index;
   }, [data?.categories]);
+  const scrollSpyCategories = useMemo(() => data?.categories ?? [], [data?.categories]);
+  const { activeCategoryId, selectCategory } = useCategoryScrollSpy(scrollSpyCategories);
 
   useEffect(() => {
     if (data?.tenant) {
       const { tenant } = data;
       setTenantId(tenant.id);
+      if (!menuTracked.current && canUseAnalytics) {
+        analytics.track('menu_viewed');
+        menuTracked.current = true;
+      }
       if (tableIdParam) {
         setTableId(tableIdParam);
       }
@@ -174,28 +189,31 @@ export function StorefrontPage() {
       document.title = `${tenant.name}${suffix}`.substring(0, 80); // Limita o tamanho para exibição otimizada na aba
 
       // Atualizar o favicon (ícone da aba) dinamicamente com a logo do Tenant
-      if (tenant.logo) {
-        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-        if (!link) {
-          link = document.createElement('link');
-          link.rel = 'icon';
-          document.getElementsByTagName('head')[0].appendChild(link);
-        }
-        link.href = tenant.logo;
+      let link: HTMLLinkElement | null = document.querySelector("link[rel='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
       }
+      link.href = tenant.logo || '/favicon.svg';
 
       // Atualizar a meta description para SEO dinamicamente
-      if (tenant.description) {
-        let meta: HTMLMetaElement | null = document.querySelector("meta[name='description']");
-        if (!meta) {
-          meta = document.createElement('meta');
-          meta.name = 'description';
-          document.getElementsByTagName('head')[0].appendChild(meta);
-        }
-        meta.content = tenant.description;
+      let meta: HTMLMetaElement | null = document.querySelector("meta[name='description']");
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        document.getElementsByTagName('head')[0].appendChild(meta);
       }
+      meta.content = tenant.description || 'Confira nosso cardápio online e faça seu pedido.';
     }
-  }, [data, setTenantId, tableIdParam, setTableId]);
+  }, [analytics, canUseAnalytics, data, setTenantId, tableIdParam, setTableId]);
+
+  useEffect(() => {
+    if (selectedProduct) {
+      analytics.track('product_selected', { productId: selectedProduct.id });
+      analytics.track('product_viewed', { productId: selectedProduct.id });
+    }
+  }, [analytics, selectedProduct]);
 
   if (isLoading) {
     return (
@@ -300,7 +318,7 @@ export function StorefrontPage() {
                 <p className="text-sm font-bold text-[var(--storefront-foreground)]">{displayCustomerName || 'Cliente'}</p>
               </div>
               <button
-                onClick={logout}
+                onClick={() => { void logoutCustomerSession(); }}
                 className="p-2 text-[var(--storefront-muted-foreground)] hover:text-red-500 transition-colors"
                 title="Sair"
               >
@@ -397,11 +415,27 @@ export function StorefrontPage() {
         </div>
       )}
 
+      <SmartShowcase
+        showcase={data.showcase}
+        businessSegment={data.tenant.businessSegment}
+        productLayout={effectiveProductLayout}
+        imageMode={layoutSettings.productImageMode}
+        showDescription={layoutSettings.showProductDescription}
+        showBadges={layoutSettings.showBadges}
+        onSelectProduct={(product) => {
+          setSelectedProduct(product);
+          setSelectedProductCategory(productCategoryIndex.get(product.id) ?? null);
+        }}
+      />
+
       {/* Categories Navigation */}
       <CategoryNavigation
         categories={categories}
+        activeCategoryId={activeCategoryId}
         layout={layoutSettings.categoryLayout || 'tabs'}
         onCategoryClick={(slug) => {
+          const category = categories.find((candidate) => candidate.slug === slug);
+          if (category) selectCategory(category.id);
           const el = document.getElementById(slug);
           if (el) {
             const offset = 80; // Adjust for sticky header
@@ -520,20 +554,15 @@ export function StorefrontPage() {
                 {category.products.map((product) => (
                   <ProductRenderer
                     key={product.id}
-                    product={{
-                      id: product.id,
-                      name: product.name,
-                      description: product.shortDescription,
-                      imageUrl: product.image,
-                      price: product.basePrice,
-                      compareAtPrice: product.compareAtPrice,
-                      isAvailable: product.isAvailable,
-                      badges: product.badges,
-                    }}
+                    product={toStorefrontProduct({
+                      ...product,
+                      startingPrice: hasStorefrontStartingPrice(product) ? getStorefrontStartingPrice(product) : null,
+                    })}
                     layout={effectiveProductLayout}
                     imageMode={layoutSettings.productImageMode}
                     showDescription={layoutSettings.showProductDescription}
                     showBadges={layoutSettings.showBadges}
+                    businessSegment={data.tenant.businessSegment}
                     onSelectProduct={() => {
                       setSelectedProduct(product);
                       setSelectedProductCategory(productCategoryIndex.get(product.id) ?? category ?? null);
@@ -595,7 +624,10 @@ export function StorefrontPage() {
       {cartItemsCount > 0 && !isCartOpen && tenant.isOpen && (
         <div className="fixed bottom-6 left-0 right-0 px-4 pointer-events-none z-40">
           <button
-            onClick={() => setIsCartOpen(true)}
+            onClick={() => {
+              setIsCartOpen(true);
+              analytics.track('cart_viewed', { itemCount: cartItemsCount, value: cartSubtotal });
+            }}
             className="w-full max-w-lg mx-auto h-14 bg-primary-600 text-white rounded-2xl shadow-xl shadow-primary-200 flex items-center justify-between px-6 pointer-events-auto active:scale-95 transition-transform animate-in fade-in slide-in-from-bottom-5 duration-300"
           >
             <div className="flex items-center gap-3">

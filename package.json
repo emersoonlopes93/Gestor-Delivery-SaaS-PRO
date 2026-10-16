@@ -10,6 +10,7 @@
     "dev:web-storefront": "pnpm --filter @gestor/web-storefront dev",
     "dev:all": "pnpm -r --parallel --filter @gestor/api --filter @gestor/web-tenant --filter @gestor/web-admin --filter @gestor/web-storefront run dev",
     "build": "pnpm -r run build",
+    "test": "pnpm -r --if-present run test",
     "build:api": "pnpm --filter @gestor/api... build",
     "build:web-tenant": "pnpm --filter @gestor/web-tenant build",
     "build:web-admin": "pnpm --filter @gestor/web-admin build",
@@ -26,16 +27,21 @@
     "start:web-admin": "pnpm --filter @gestor/web-admin preview",
     "start:web-storefront": "pnpm --filter @gestor/web-storefront preview",
     "check:no-any": "node scripts/check-no-any.js",
+    "check:android-tenant-branding": "node scripts/check-android-tenant-branding.js",
     "check:theme:critical": "node scripts/check-theme-hardcoded-classes.js --critical",
     "check:theme:report": "node scripts/check-theme-hardcoded-classes.js --report",
     "check:theme:baseline": "node scripts/check-theme-hardcoded-classes.js --baseline",
     "check:boundaries": "node scripts/check-package-boundaries.js",
     "check:theme:write-baseline": "node scripts/check-theme-hardcoded-classes.js --report --write-baseline",
     "check:theme": "pnpm check:theme:critical",
+    "check:features": "node scripts/check-stub-features.js",
+    "test:secret-scanner-negative": "node scripts/test-secret-scanner-negative.js",
     "smoke:p1": "pnpm -C apps/api smoke:p1",
     "smoke:media": "pnpm -C apps/api smoke:media",
+    "analytics:rollup-backfill": "pnpm -C apps/api analytics:rollup-backfill",
     "qa:visual": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts",
-    "qa:visual:update": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts"
+    "qa:visual:update": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts",
+    "e2e:multi-ifood-web-tenant": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/multi-ifood-web-tenant-e2e.ts"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -43,6 +49,7 @@
   },
   "packageManager": "pnpm@9.0.0",
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@playwright/test": "^1.60.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "~4.2.0",

@@ -1,5 +1,5 @@
 import { AdminTenantListItem, BillingUsageSnapshot, RevenueEvent, SubscriptionStatusHistory } from '../admin-billing-api';
-import { money, formatDate, shortId, TabId, TABS, statusLabels } from '../types';
+import { money, formatDate, shortId, statusLabels } from '../types';
 import { ClipboardList, FileText, Search, ShieldAlert } from 'lucide-react';
 import { StatusBadge } from './BillingStatusBadge';
 import { Panel, EmptyState, LoadingBlock } from './BillingShared';

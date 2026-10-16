@@ -1,16 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from '@gestor/utils';
-import { Prisma } from '@prisma/client';
+import { CategoryActiveDay, Prisma } from '@prisma/client';
+import { BulkSetCategoryActiveDto } from './dto/bulk-set-category-active.dto';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -19,6 +23,21 @@ export class CategoriesService {
       throw new NotFoundException('Tenant context não encontrado');
     }
     return tenantId;
+  }
+
+  private normalizeActiveDays(activeDays: string[] | undefined) {
+    if (activeDays === undefined) return undefined;
+    const ordered = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    return ordered.filter((day) => activeDays.includes(day)) as CategoryActiveDay[];
+  }
+
+  private async invalidateStorefrontCache(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } });
+    if (!tenant?.slug) return;
+    await Promise.all([
+      this.cacheManager.del(`storefront:${tenant.slug}:delivery`),
+      this.cacheManager.del(`storefront:${tenant.slug}:pickup`),
+    ]);
   }
 
   async create(createCategoryDto: CreateCategoryDto) {
@@ -63,6 +82,7 @@ export class CategoriesService {
         description: createCategoryDto.description ?? null,
         image: createCategoryDto.image ?? null,
         isActive: createCategoryDto.isActive ?? true,
+        activeDays: this.normalizeActiveDays(createCategoryDto.activeDays) ?? [],
         isFeatured: createCategoryDto.isFeatured ?? false,
         order: createCategoryDto.order ?? 0,
         templateType: createCategoryDto.templateType ?? 'none',
@@ -139,13 +159,14 @@ export class CategoriesService {
 
     const slug = updateCategoryDto.name ? slugify(updateCategoryDto.name) : undefined;
 
-    return this.prisma.tenantClient.productCategory.update({
+    const category = await this.prisma.tenantClient.productCategory.update({
       where: { id },
       data: {
         name: updateCategoryDto.name,
         description: updateCategoryDto.description ?? undefined,
         image: updateCategoryDto.image ?? undefined,
         isActive: updateCategoryDto.isActive,
+        activeDays: this.normalizeActiveDays(updateCategoryDto.activeDays),
         isFeatured: updateCategoryDto.isFeatured,
         order: updateCategoryDto.order,
         templateType: updateCategoryDto.templateType,
@@ -153,6 +174,27 @@ export class CategoriesService {
         ...(slug ? { slug } : {}),
       },
     });
+    await this.invalidateStorefrontCache(this.getRequiredTenantId());
+    return category;
+  }
+
+  async bulkSetActive(dto: BulkSetCategoryActiveDto) {
+    const tenantId = this.getRequiredTenantId();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const categories = await tx.productCategory.findMany({
+        where: { tenantId, id: { in: dto.ids }, deletedAt: null },
+        select: { id: true },
+      });
+      if (categories.length !== dto.ids.length) {
+        throw new BadRequestException('Uma ou mais categorias não pertencem a esta loja ou não estão disponíveis.');
+      }
+      return tx.productCategory.updateMany({
+        where: { tenantId, id: { in: dto.ids }, deletedAt: null },
+        data: { isActive: dto.isActive },
+      });
+    });
+    await this.invalidateStorefrontCache(tenantId);
+    return { updated: updated.count, isActive: dto.isActive };
   }
 
   async remove(id: string) {

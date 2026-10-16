@@ -471,7 +471,7 @@ export function DeliveryRatesPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-3xl font-black text-foreground">Entrega</h1>
-                  <p className="mt-2 text-sm text-slate-500">Configure onde sua loja entrega e quanto será cobrado.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Configure onde sua loja entrega e quanto será cobrado.</p>
                 </div>
                 <button
                   type="button"
@@ -502,7 +502,7 @@ export function DeliveryRatesPage() {
               </div>
 
               <div className="mt-6 rounded-3xl border border-border bg-muted/40 p-5">
-                <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Forma de cálculo</div>
+                <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">Forma de cálculo</div>
                 <div className="mt-4 space-y-3">
                   <label className="block space-y-2">
                     <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -527,13 +527,13 @@ export function DeliveryRatesPage() {
                     </div>
                     <div className="mt-1 text-sm text-blue-900">Recomendado</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 opacity-70">
-                    <div className="text-sm font-black text-slate-700">Entrega por rota</div>
-                    <div className="mt-1 text-sm text-slate-500">Em breve / Premium</div>
+                  <div className="rounded-2xl border border-border bg-card p-4 opacity-70">
+                    <div className="text-sm font-black text-foreground">Entrega por rota</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Em breve / Premium</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 opacity-70">
-                    <div className="text-sm font-black text-slate-700">Entrega por bairro</div>
-                    <div className="mt-1 text-sm text-slate-500">Futuro</div>
+                  <div className="rounded-2xl border border-border bg-card p-4 opacity-70">
+                    <div className="text-sm font-black text-foreground">Entrega por bairro</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Futuro</div>
                   </div>
                 </div>
               </div>
@@ -554,7 +554,7 @@ export function DeliveryRatesPage() {
                     </button>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Raio máximo (km)</span>
+                    <span className="text-sm font-semibold text-foreground">Raio máximo (km)</span>
                     <input
                       type="number"
                       min={0}
@@ -565,7 +565,7 @@ export function DeliveryRatesPage() {
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Preço padrão por km</span>
+                    <span className="text-sm font-semibold text-foreground">Preço padrão por km</span>
                     <CurrencyInput
                       value={coverageDraft.defaultPricePerKm}
                       onChange={(value) => setCoverageDraft((prev) => ({ ...prev, defaultPricePerKm: value }))}
@@ -573,7 +573,7 @@ export function DeliveryRatesPage() {
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Tempo padrão (min)</span>
+                    <span className="text-sm font-semibold text-foreground">Tempo padrão (min)</span>
                     <input
                       type="number"
                       min={1}
@@ -586,7 +586,7 @@ export function DeliveryRatesPage() {
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Taxa mínima</span>
+                    <span className="text-sm font-semibold text-foreground">Taxa mínima</span>
                     <CurrencyInput
                       value={coverageDraft.minimumFee ?? 0}
                       onChange={(value) => setCoverageDraft((prev) => ({ ...prev, minimumFee: value }))}
@@ -594,7 +594,7 @@ export function DeliveryRatesPage() {
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Taxa máxima</span>
+                    <span className="text-sm font-semibold text-foreground">Taxa máxima</span>
                     <CurrencyInput
                       value={coverageDraft.maximumFee ?? 0}
                       onChange={(value) => setCoverageDraft((prev) => ({ ...prev, maximumFee: value }))}
@@ -682,7 +682,7 @@ export function DeliveryRatesPage() {
                 type="button"
                 onClick={() => void handleSaveAll()}
                 disabled={savingAll}
-                className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-slate-950"
+                className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-primary-foreground px-4 text-sm font-black text-primary"
               >
                 <Save className="h-4 w-4" />
                 {savingAll ? 'Salvando...' : 'Salvar configurações'}
@@ -691,42 +691,42 @@ export function DeliveryRatesPage() {
 
             {error ? <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{error}</div> : null}
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
                 <MapPin className="h-4 w-4" />
                 Loja / ponto de partida
               </div>
-              <div className="mt-3 text-sm font-semibold text-slate-900">{storeAddressLabel}</div>
+              <div className="mt-3 text-sm font-semibold text-foreground">{storeAddressLabel}</div>
               <button type="button" onClick={() => navigate('/settings')} className="mt-3 text-sm font-bold text-blue-600">
                 Alterar endereço
               </button>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Forma de cálculo</div>
-              <div className="mt-3 rounded-2xl border border-blue-500 bg-blue-50 p-4 text-sm font-bold text-blue-700">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+              <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">Forma de cálculo</div>
+              <div className="mt-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm font-bold text-primary">
                 Entrega por raio • Recomendado
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Configuração básica</div>
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+              <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">Configuração básica</div>
               <div className="mt-4 grid gap-4">
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Entrega ativa</span>
+                  <span className="text-sm font-semibold text-foreground">Entrega ativa</span>
                   <button
                     type="button"
                     onClick={() => setCoverageDraft((prev) => ({ ...prev, isDeliveryEnabled: !prev.isDeliveryEnabled }))}
                     className={
                       'relative inline-flex h-11 w-full items-center rounded-2xl px-4 text-left text-sm font-bold transition ' +
-                      (coverageDraft.isDeliveryEnabled ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700')
+                      (coverageDraft.isDeliveryEnabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')
                     }
                   >
                     {coverageDraft.isDeliveryEnabled ? 'Ligada' : 'Desligada'}
                   </button>
                 </label>
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Raio máximo (km)</span>
+                  <span className="text-sm font-semibold text-foreground">Raio máximo (km)</span>
                   <input
                     type="number"
                     min={0}
@@ -737,7 +737,7 @@ export function DeliveryRatesPage() {
                   />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Preço padrão por km</span>
+                  <span className="text-sm font-semibold text-foreground">Preço padrão por km</span>
                   <CurrencyInput
                     value={coverageDraft.defaultPricePerKm}
                     onChange={(value) => setCoverageDraft((prev) => ({ ...prev, defaultPricePerKm: value }))}
@@ -745,7 +745,7 @@ export function DeliveryRatesPage() {
                   />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Tempo padrão (min)</span>
+                  <span className="text-sm font-semibold text-foreground">Tempo padrão (min)</span>
                   <input
                     type="number"
                     min={1}
@@ -760,7 +760,7 @@ export function DeliveryRatesPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
               <RadiusTiersPanel
                 tiers={tiers}
                 tierForm={tierForm}
@@ -779,16 +779,16 @@ export function DeliveryRatesPage() {
               />
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Áreas especiais</div>
-              <div className="mt-3 text-sm text-slate-600">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+              <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">Áreas especiais</div>
+              <div className="mt-3 text-sm text-muted-foreground">
                 Existem {summaryAreasCount} áreas criadas. Para desenhar ou editar áreas no mapa, recomendamos usar um computador.
               </div>
               <div className="mt-4 space-y-3">
                 {areas.map((area) => (
-                  <div key={area.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-sm font-black text-slate-900">{area.name || 'Área especial'}</div>
-                    <div className="mt-1 text-sm text-slate-500">
+                  <div key={area.id} className="rounded-2xl border border-border bg-muted/50 p-4">
+                    <div className="text-sm font-black text-foreground">{area.name || 'Área especial'}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
                       {area.zoneKind === 'blocked_zone'
                         ? 'Área bloqueada'
                         : `${area.pricingMode === 'free' ? 'Entrega grátis' : area.pricingMode === 'distance' ? 'Cobrança por km' : `Taxa ${fmtMoney(Number(area.fixedFee ?? area.fixedRate ?? 0))}`} • ${area.estimatedDeliveryMinutes ?? coverageDraft.defaultEstimatedDeliveryMinutes} min`}
@@ -807,12 +807,12 @@ export function DeliveryRatesPage() {
               onSubmit={() => void handleRunTest()}
             />
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
                 <Navigation className="h-4 w-4" />
                 Mapa no desktop
               </div>
-              <div className="mt-2 text-sm text-slate-600">
+              <div className="mt-2 text-sm text-muted-foreground">
                 No computador, o mapa fica sempre visível para desenhar áreas especiais e visualizar sua cobertura.
               </div>
             </div>

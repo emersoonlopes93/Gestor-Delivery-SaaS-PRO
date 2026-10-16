@@ -27,25 +27,28 @@ FROM dependencies AS builder
 WORKDIR /app
 COPY . .
 RUN pnpm --filter @gestor/api prisma:generate
-RUN pnpm --filter @gestor/api build
+# A API resolve pacotes internos por links de workspace; construa tambem as
+# dependencias transitivas para que os artefatos delas existam no runner.
+RUN pnpm --filter @gestor/api... build
 
 # Stage 4: Runner
 FROM base AS runner
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/scripts/revoke-all-active-sessions.ts ./apps/api/scripts/revoke-all-active-sessions.ts
 COPY --from=builder /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
-COPY --from=builder /app/apps/api/clean_db.js ./apps/api/clean_db.js
 
 ENV NODE_ENV=production
 EXPOSE 3333
 
 RUN npm i -g prisma@5.22.0
-RUN chmod +x ./apps/api/docker-entrypoint.sh
+RUN sed -i 's/\r$//' ./apps/api/docker-entrypoint.sh && chmod +x ./apps/api/docker-entrypoint.sh
 
 WORKDIR /app/apps/api
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["pnpm", "start:api"]
+CMD ["node", "dist/apps/api/src/main.js"]

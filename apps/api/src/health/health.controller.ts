@@ -51,9 +51,9 @@ export class HealthController {
       status: allActive ? 'ok' : 'degraded',
       timestamp: payload.timestamp,
       gateways: {
-        orders: { active: ws.ordersGateway.active, connections: ws.ordersGateway.clientsCount },
-        delivery: { active: ws.deliveryGateway.active, connections: ws.deliveryGateway.clientsCount },
-        chat: { active: ws.chatGateway.active, connections: ws.chatGateway.clientsCount },
+        orders: { active: ws.ordersGateway.active, connections: ws.ordersGateway.clientsCount, reason: ws.ordersGateway.reason },
+        delivery: { active: ws.deliveryGateway.active, connections: ws.deliveryGateway.clientsCount, reason: ws.deliveryGateway.reason },
+        chat: { active: ws.chatGateway.active, connections: ws.chatGateway.clientsCount, reason: ws.chatGateway.reason },
       },
     };
   }

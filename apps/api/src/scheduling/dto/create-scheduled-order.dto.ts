@@ -1,4 +1,15 @@
-import { IsString, IsNotEmpty, IsDateString, IsNumber, IsOptional } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
+import { TimeSlotStatus } from '@prisma/client';
 
 export class CreateScheduledOrderDTO {
   @IsString() @IsNotEmpty()
@@ -52,6 +63,9 @@ export class UpdateScheduledOrderDTO {
 
   @IsString() @IsOptional()
   notes?: string;
+
+  @IsString() @IsOptional()
+  timeSlotId?: string;
 }
 
 export class CancelScheduledOrderDTO {
@@ -66,7 +80,7 @@ export class UpdateTimeSlotDTO {
   @IsDateString() @IsOptional()
   endTime?: string;
 
-  @IsNumber() @IsOptional()
+  @IsInt() @Min(1) @IsOptional()
   capacity?: number;
 
   @IsNumber() @IsOptional()
@@ -75,12 +89,12 @@ export class UpdateTimeSlotDTO {
   @IsNumber() @IsOptional()
   maxOrderValue?: number;
 
-  @IsNumber() @IsOptional()
+  @IsInt() @Min(1) @IsOptional()
   maxItems?: number;
 
-  @IsString() @IsOptional()
-  status?: string;
+  @IsEnum(TimeSlotStatus) @IsOptional()
+  status?: TimeSlotStatus;
 
-  @IsString() @IsOptional()
+  @IsBoolean() @IsOptional()
   isActive?: boolean;
 }

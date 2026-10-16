@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CreateOptionGroupDto, OptionGroup, OptionItem } from '@gestor/types';
 import { Modal } from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Globe, Info } from 'lucide-react';
 import { CurrencyInput } from '@gestor/ui';
 
-type GroupWithItems = OptionGroup & { items?: OptionItem[] };
+type GroupWithItems = OptionGroup & { items?: OptionItem[]; _count?: { optionGroupLinks: number } };
 
 interface OptionGroupEditorModalProps {
   isOpen: boolean;
@@ -22,6 +22,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [usageCount, setUsageCount] = useState<number | null>(null);
 
   const [groupForm, setGroupForm] = useState<CreateOptionGroupDto>({
     name: '',
@@ -66,6 +67,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
           isActive: g.isActive,
           order: g.order,
         });
+        setUsageCount(g._count?.optionGroupLinks ?? 0);
         const sortedItems = [...(g.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         setItems(sortedItems.length > 0 ? sortedItems : [createEmptyItem()]);
         setDeletedItemIds([]);
@@ -80,6 +82,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
       if (groupId) {
         loadGroup(groupId);
       } else {
+        setUsageCount(0);
         setGroupForm({
           name: '',
           description: '',
@@ -209,6 +212,38 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Guardrail Usage Banner */}
+          {groupId && usageCount !== null && usageCount > 1 && (
+            <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-600 dark:text-amber-400">
+              <Globe className="w-5 h-5 shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-black uppercase tracking-wider bg-amber-500/20 px-2 py-0.5 rounded-md text-[10px]">
+                    Grupo compartilhado
+                  </span>
+                  <span className="font-bold text-foreground">Usado em {usageCount} produtos</span>
+                </div>
+                <p className="text-muted-foreground font-medium leading-relaxed">
+                  As alterações feitas aqui são aplicadas ao grupo compartilhado e podem aparecer em todos os produtos vinculados.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {groupId && usageCount === 1 && (
+            <div className="flex items-center gap-2.5 p-3.5 bg-muted/40 border border-border rounded-xl text-xs text-muted-foreground font-medium">
+              <Info className="w-4 h-4 shrink-0 text-primary" />
+              <span>Este grupo está vinculado a 1 produto.</span>
+            </div>
+          )}
+
+          {groupId && usageCount === 0 && (
+            <div className="flex items-center gap-2.5 p-3.5 bg-muted/40 border border-border rounded-xl text-xs text-muted-foreground font-medium">
+              <Info className="w-4 h-4 shrink-0" />
+              <span>Este grupo ainda não está vinculado a nenhum produto.</span>
+            </div>
+          )}
+
           {/* Grupo de Opções - Informações Básicas */}
           <div className="bg-muted/30 border border-border p-5 rounded-2xl space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -301,6 +336,9 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
             </div>
 
             <div className="border border-border rounded-xl overflow-hidden bg-card">
+              <div className="border-b border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+                “Define o preço final” substitui o preço-base quando este grupo estiver vinculado ao eixo principal do produto.
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="bg-muted/50 border-b border-border">
@@ -333,7 +371,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                           >
                             <option value="none">Nenhum</option>
                             <option value="fixed">Adicional Fixo</option>
-                            <option value="replace">Substituir</option>
+                            <option value="replace">Define o preço final</option>
                             <option value="percentage">% Adicional</option>
                           </select>
                         </td>

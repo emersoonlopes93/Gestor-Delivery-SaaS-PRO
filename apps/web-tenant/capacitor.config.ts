@@ -9,7 +9,8 @@ const config: CapacitorConfig = {
       enabled: true,
     },
     LocalNotifications: {
-      iconColor: '#0c93e9',
+      iconColor: '#22c55e',
+      smallIcon: 'ic_stat_pedehub',
     },
   },
 };

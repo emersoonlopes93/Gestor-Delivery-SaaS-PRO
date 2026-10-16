@@ -11,6 +11,7 @@ export type FeatureDecisionReason =
   | 'plan_not_allowed'
   | 'tenant_disabled'
   | 'tenant_enabled_override'
+  | 'tenant_opt_in_required'
   | 'missing_permission'
   | 'beta_disabled'
   | 'env_disabled'
@@ -30,6 +31,7 @@ export type CatalogFeatureKey =
   | 'storefront_core'
   | 'checkout_core'
   | 'orders_core'
+  | 'order_manager_v2'
   | 'upload_core'
   | 'health_check'
   | 'feature_control_center'
@@ -58,10 +60,11 @@ export type CatalogFeatureKey =
   | 'loyalty'
   | 'coupons'
   | 'scheduling'
-  | 'dine_in'
   | 'ai_agent'
   | 'franchise'
-  | 'admin_integrations';
+  | 'admin_integrations'
+  | 'dine_in'
+  | 'push_notifications';
 
 export type BillingEntitlementKey =
   | 'ai_agent'
@@ -92,6 +95,11 @@ export type FeatureCatalogEntry = {
   envFallbackKey?: string;
   billingEntitlementKey?: BillingEntitlementKey;
   billingEntitlementFlagKey?: BillingEntitlementFlagKey;
+  /**
+   * Keeps a reversible beta feature unavailable until an operator explicitly
+   * enables it for one tenant. A global disable remains the kill switch.
+   */
+  requiresExplicitTenantEnablement?: boolean;
 };
 
 export type ModuleCatalogEntry = {
@@ -252,6 +260,19 @@ const CORE_FEATURES: readonly FeatureCatalogEntry[] = [
 ] as const;
 
 const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
+  {
+    key: 'order_manager_v2',
+    name: 'Gestor de Pedidos 2.0',
+    description: 'Cockpit operacional visual para pedidos, mantido como experiencia beta reversivel.',
+    category: 'orders',
+    essential: false,
+    canDisable: true,
+    status: 'beta',
+    moduleKey: 'orders',
+    requiredPermission: 'orders.use_kanban',
+    envFallbackKey: 'VITE_FEATURE_ORDER_MANAGER_V2',
+    requiresExplicitTenantEnablement: true,
+  },
   {
     key: 'delivery_radius',
     name: 'Entrega por Raio',
@@ -451,6 +472,17 @@ const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
     billingEntitlementFlagKey: 'canUseAdvancedReports',
   },
   {
+    key: 'push_notifications',
+    name: 'Notificações Push',
+    description: 'Envio de push notifications via web-push.',
+    category: 'notifications',
+    essential: false,
+    canDisable: true,
+    status: 'beta',
+    moduleKey: 'notifications',
+    envFallbackKey: 'VITE_FEATURE_PUSH_NOTIFICATIONS',
+  },
+  {
     key: 'goals',
     name: 'Metas',
     description: 'Metas gerenciais e acompanhamento.',
@@ -535,7 +567,7 @@ const OPTIONAL_FEATURES: readonly FeatureCatalogEntry[] = [
     category: 'operations',
     essential: false,
     canDisable: true,
-    status: 'stable',
+    status: 'beta',
     requiredPermission: 'scheduling.view',
   },
   {

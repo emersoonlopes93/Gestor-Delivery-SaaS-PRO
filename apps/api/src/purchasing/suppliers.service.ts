@@ -7,6 +7,11 @@ import { Prisma } from '@prisma/client';
 export class SuppliersService {
   constructor(private prisma: PrismaService) {}
 
+  private normalizeOptionalCnpj(cnpj: string | undefined): string | null {
+    const normalized = cnpj?.trim();
+    return normalized ? normalized : null;
+  }
+
   async findAll(tenantId: string): Promise<SupplierDTO[]> {
     const suppliers = await this.prisma.supplier.findMany({
       where: { tenantId },
@@ -28,9 +33,10 @@ export class SuppliersService {
   }
 
   async create(tenantId: string, dto: CreateSupplierDTO): Promise<SupplierDTO> {
-    if (dto.cnpj) {
+    const cnpj = this.normalizeOptionalCnpj(dto.cnpj);
+    if (cnpj) {
       const existing = await this.prisma.supplier.findFirst({
-        where: { tenantId, cnpj: dto.cnpj },
+        where: { tenantId, cnpj },
       });
 
       if (existing) {
@@ -41,12 +47,12 @@ export class SuppliersService {
     const supplier = await this.prisma.supplier.create({
       data: {
         name: dto.name,
-        cnpj: dto.cnpj,
+        cnpj,
         email: dto.email,
         phone: dto.phone,
         contactName: dto.contactName,
         category: dto.category,
-        isActive: true,
+        isActive: dto.isActive ?? true,
         tenantId,
       },
     });
@@ -55,10 +61,11 @@ export class SuppliersService {
 
   async update(tenantId: string, id: string, dto: UpdateSupplierDTO): Promise<SupplierDTO> {
     const supplier = await this.findOne(tenantId, id);
+    const cnpj = dto.cnpj === undefined ? undefined : this.normalizeOptionalCnpj(dto.cnpj);
 
-    if (dto.cnpj && dto.cnpj !== supplier.cnpj) {
+    if (cnpj && cnpj !== supplier.cnpj) {
       const existing = await this.prisma.supplier.findFirst({
-        where: { tenantId, cnpj: dto.cnpj },
+        where: { tenantId, cnpj },
       });
 
       if (existing) {
@@ -70,7 +77,7 @@ export class SuppliersService {
       where: { id },
       data: {
         name: dto.name,
-        cnpj: dto.cnpj,
+        cnpj,
         email: dto.email,
         phone: dto.phone,
         contactName: dto.contactName,
@@ -100,10 +107,9 @@ export class SuppliersService {
   async remove(tenantId: string, id: string): Promise<void> {
     await this.findOne(tenantId, id);
     
-    // Check if supplier has purchases before deleting? 
-    // Usually we prefer soft delete or active/inactive, which we have.
-    await this.prisma.supplier.delete({
+    await this.prisma.supplier.update({
       where: { id },
+      data: { isActive: false },
     });
   }
 }

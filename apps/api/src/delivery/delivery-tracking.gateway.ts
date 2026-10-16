@@ -6,11 +6,22 @@ import {
   OnGatewayDisconnect,
   MessageBody,
   ConnectedSocket,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger, Inject, forwardRef } from '@nestjs/common';
-import { DriverLocationUpdatedEvent } from '@gestor/types';
+import {
+  DriverDeliveryEvent,
+  DriverLocationUpdatedEvent,
+  DriverRouteEvent,
+  DriverLocationPointDTO,
+} from '@gestor/types';
+import { OnEvent } from '@nestjs/event-emitter';
 import { DriversService } from './drivers.service';
+import { DriverAuthService } from '../auth/driver-auth.service';
+import { TenantWebSocketAuthService } from '../auth/tenant-websocket-auth.service';
+import { PublicOrderTrackingAccessService } from '../orders/public-order-tracking-access.service';
+import { AUTH_SESSION_REVOKED_EVENT, AuthSessionRevokedEvent } from '../auth/auth-session.events';
 
 @WebSocketGateway({
   cors: true,
@@ -26,11 +37,31 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   constructor(
     @Inject(forwardRef(() => DriversService))
     private readonly driversService: DriversService,
+    private readonly driverAuthService: DriverAuthService,
+    private readonly tenantSocketAuth: TenantWebSocketAuthService,
+    private readonly publicTrackingAccess: PublicOrderTrackingAccessService,
   ) {
     DeliveryTrackingGateway.instance = this;
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
+    const token = client.handshake.auth?.token;
+    if (typeof token === 'string' && token.length > 0) {
+      try {
+        const payload = await this.tenantSocketAuth.validateAccessToken(token);
+        client.data.tenantAccess = { token, userId: payload.sub, tenantId: payload.tenantId };
+      } catch {
+        try {
+          const payload = await this.driverAuthService.validateAccessToken(token);
+          client.data.driverAccess = { token, driverId: payload.sub, tenantId: payload.tenantId };
+          client.data.authSessionId = payload.sid;
+          await client.join(this.driverRoom(payload.tenantId, payload.sub));
+        } catch {
+          client.disconnect(true);
+          return;
+        }
+      }
+    }
     this.logger.log(`Client connected: ${client.id}`);
   }
 
@@ -38,16 +69,52 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
+  @OnEvent(AUTH_SESSION_REVOKED_EVENT)
+  handleSessionRevoked(event: AuthSessionRevokedEvent) {
+    for (const socket of this.server?.sockets.sockets.values() ?? []) {
+      if (socket.data.authSessionId === event.sessionId) {
+        socket.disconnect(true);
+      }
+    }
+  }
+
+  emitDriverDeliveryEvent(tenantId: string, driverId: string, event: DriverDeliveryEvent) {
+    this.server?.to(this.driverRoom(tenantId, driverId)).emit('driverDeliveryEvent', event);
+  }
+
+  emitDriverRouteEvent(tenantId: string, driverId: string, event: DriverRouteEvent) {
+    this.server?.to(this.driverRoom(tenantId, driverId)).emit('driverRouteEvent', event);
+  }
+
+  private driverRoom(tenantId: string, driverId: string) {
+    return `driver:${tenantId}:${driverId}`;
+  }
+
   /**
    * Customers join a room named by the order tracking token to receive updates.
    */
   @SubscribeMessage('joinTracking')
-  handleJoinTracking(
+  async handleJoinTracking(
     @MessageBody() data: { token: string },
     @ConnectedSocket() client: Socket,
   ) {
+    const boundToken = client.data.publicOrderToken;
+    if (
+      typeof data.token !== 'string'
+      || data.token.length === 0
+      || (typeof boundToken === 'string' && boundToken !== data.token)
+    ) {
+      throw new WsException('Não autorizado para este canal.');
+    }
+    client.data.publicOrderToken = data.token;
+    if (!(await this.publicTrackingAccess.isValidToken(data.token))) {
+      if (client.data.publicOrderToken === data.token) {
+        delete client.data.publicOrderToken;
+      }
+      throw new WsException('Não autorizado para este canal.');
+    }
     client.join(`order:${data.token}`);
-    this.logger.log(`Client ${client.id} joined tracking for order: ${data.token}`);
+    this.logger.log(`Client ${client.id} joined authorized public delivery tracking`);
     return { event: 'joined', data: { token: data.token } };
   }
 
@@ -65,17 +132,43 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
     this.server.to(`order:${orderToken}`).emit('locationUpdate', event);
   }
 
+  emitDriverLocationUpdated(tenantId: string, event: DriverLocationUpdatedEvent) {
+    this.server?.to(`tenant:${tenantId}`).emit('driverLocationUpdated', event);
+  }
+
   /**
    * Tenant joining to track all its drivers.
    */
   @SubscribeMessage('joinTenantTracking')
-  handleJoinTenantTracking(
+  async handleJoinTenantTracking(
     @MessageBody() data: { tenantId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(`tenant:${data.tenantId}`);
-    this.logger.log(`Client ${client.id} joined tracking for tenant: ${data.tenantId}`);
-    return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
+    const tenantAccess = client.data.tenantAccess as {
+      token: string;
+      userId: string;
+      tenantId: string;
+    } | undefined;
+    if (!tenantAccess) {
+      throw new WsException('Não autorizado para este canal.');
+    }
+
+    try {
+      const payload = await this.tenantSocketAuth.validateAccessToken(tenantAccess.token);
+      if (
+        payload.sub !== tenantAccess.userId
+        || payload.tenantId !== tenantAccess.tenantId
+        || (data.tenantId && data.tenantId !== payload.tenantId)
+      ) {
+        throw new Error('socket identity changed');
+      }
+      client.join(`tenant:${payload.tenantId}`);
+      this.logger.log(`Client ${client.id} joined its authorized tenant tracking`);
+      return { event: 'joinedTenant', data: { tenantId: payload.tenantId } };
+    } catch {
+      this.logger.warn(`Rejected unauthorized delivery tenant room join: ${client.id}`);
+      throw new WsException('Não autorizado para este canal.');
+    }
   }
 
   /**
@@ -86,29 +179,43 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
    */
   @SubscribeMessage('updateDriverLocation')
   async handleUpdateDriverLocation(
-    @MessageBody() data: { driverId: string; tenantId: string; lat: number; lng: number },
+    @MessageBody() data: DriverLocationPointDTO,
+    @ConnectedSocket() client: Socket,
   ) {
+    const driverAccess = client.data.driverAccess as {
+      token: string;
+      driverId: string;
+      tenantId: string;
+    } | undefined;
+    if (
+      !driverAccess
+      || !data.eventKey
+      || !data.recordedAt
+      || !Number.isFinite(data.lat)
+      || !Number.isFinite(data.lng)
+    ) {
+      throw new WsException('Não autorizado para este canal.');
+    }
+
+    let driver: { driverId: string; tenantId: string };
+    try {
+      const payload = await this.driverAuthService.validateAccessToken(driverAccess.token);
+      if (payload.sub !== driverAccess.driverId || payload.tenantId !== driverAccess.tenantId) {
+        throw new Error('socket identity changed');
+      }
+      driver = { driverId: payload.sub, tenantId: payload.tenantId };
+    } catch {
+      throw new WsException('Não autorizado para este canal.');
+    }
+
     // Persist to DB so polling-based map always has fresh coords
     try {
-      await this.driversService.updateDriverLocation(data.tenantId, data.driverId, {
-        lat: data.lat,
-        lng: data.lng,
-      });
+      await this.driversService.ingestDriverLocations(driver.tenantId, driver.driverId, [data]);
     } catch (err) {
       this.logger.warn(
-        `Failed to persist location for driver ${data.driverId}: ${(err as Error).message}`,
+        `Failed to persist authenticated driver location: ${(err as Error).message}`,
       );
     }
 
-    const event: DriverLocationUpdatedEvent = {
-      driverId: data.driverId,
-      tenantId: data.tenantId,
-      lat: data.lat,
-      lng: data.lng,
-      lastLocationAt: new Date().toISOString(),
-    };
-
-    // Fire to tenant tracking UI
-    this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', event);
   }
 }

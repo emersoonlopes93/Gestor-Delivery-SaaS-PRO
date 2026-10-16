@@ -18,8 +18,12 @@ export class CustomerController {
 
   @Get()
   @RequirePermissions('crm.read', 'crm.manage_customers')
-  async list(@Request() req: { user: { tenantId: string } }) {
-    return this.crmSegmentationService.getSegmentedCustomers(req.user.tenantId);
+  async list(
+    @Request() req: { user: { tenantId: string } },
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+  ) {
+    return this.crmSegmentationService.getSegmentedCustomers(req.user.tenantId, Number(page), Number(limit));
   }
 
   @Get('search')

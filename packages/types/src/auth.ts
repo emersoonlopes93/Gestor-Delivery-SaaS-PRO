@@ -117,6 +117,7 @@ export interface DriverUserSession {
   name: string;
   phone: string;
   isActive: boolean;
+  status: import('./enums').DriverStatus;
   tenant?: {
     id: string;
     name: string;
@@ -129,8 +130,7 @@ export interface CustomerJwtPayload {
   sub: string;        // customerId
   tenantId: string;
   type: 'customer';
-  phone: string;
-  name: string;
+  sid: string;
   iat?: number;
   exp?: number;
 }
@@ -149,6 +149,7 @@ export interface ValidateOtpRequest {
 /** Customer Login Response */
 export interface CustomerLoginResponse {
   accessToken: string;
+  refreshToken: string;
   customer: {
     id: string;
     tenantId: string;
@@ -157,14 +158,53 @@ export interface CustomerLoginResponse {
   };
 }
 
+export interface CustomerGoogleSignInRequest {
+  credential: string;
+}
+
+export interface CustomerGoogleLinkRequest extends ValidateOtpRequest {
+  googleLinkCapability?: string;
+}
+
+export interface CustomerRefreshTokenRequest {
+  refreshToken: string;
+}
+
+export type CustomerRefreshResponse = CustomerLoginResponse;
+
+export type CustomerGoogleSignInResponse =
+  | ({ status: 'AUTHENTICATED' } & CustomerLoginResponse)
+  | { status: 'PHONE_LINK_REQUIRED'; googleLinkCapability: string };
+
 /** Driver Login Request */
 export interface DriverLoginRequest {
   phone: string;
   pin: string; // Senha ou PIN de 4/6 dígitos usado por entregadores
-  tenantSlug: string; // Necessário para multi-tenant aware login
+  tenantSlug?: string; // Compatibilidade temporária com clientes antigos
 }
 
 /** Driver Login Response */
 export interface DriverLoginResponse extends AuthTokens {
   driver: DriverUserSession;
 }
+
+export interface DriverTenantSelectionOption {
+  driverId: string;
+  tenant: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface DriverTenantSelectionRequired {
+  requiresTenantSelection: true;
+  selectionToken: string;
+  tenants: DriverTenantSelectionOption[];
+}
+
+export interface DriverTenantSelectionRequest {
+  selectionToken: string;
+  driverId: string;
+}
+
+export type DriverLoginResult = DriverLoginResponse | DriverTenantSelectionRequired;

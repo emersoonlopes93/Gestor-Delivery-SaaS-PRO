@@ -6,6 +6,7 @@ import { TenantBillingResolverService } from '../../billing/tenant-billing-resol
 import { REQUIRES_FEATURE_KEY } from '../decorators/requires-feature.decorator';
 import { FeatureControlService } from '../../feature-control/feature-control.service';
 import { getFeatureCatalogEntry } from '@gestor/core';
+import { resolveEffectiveBillingEntitlement } from '../../billing/billing-entitlement-decision';
 
 type RequestWithTenant = {
   headers: Record<string, string | string[] | undefined>;
@@ -49,7 +50,7 @@ export class PlanGatingGuard implements CanActivate {
         const decision = await this.featureControlService.resolveTenantFeature({
           tenantId,
           featureKey: requiredFeature,
-          userId: request.user?.type === 'tenant' ? request.user.sub ?? request.user.id : undefined,
+          userId: this.resolveTenantUserId(request),
         });
 
         if (decision.enabled) {
@@ -92,22 +93,22 @@ export class PlanGatingGuard implements CanActivate {
       return;
     }
 
-    const now = new Date();
-    const normalizedStatus = status?.toString().toLowerCase() ?? '';
-    const trialExpired = normalizedStatus === 'trialing' && trialEndsAt != null && trialEndsAt < now;
-    const graceExpired = normalizedStatus === 'grace_period' && gracePeriodEndsAt != null && gracePeriodEndsAt < now;
-    const blockedStatus = ['past_due', 'suspended', 'canceled', 'cancelled', 'blocked'].includes(normalizedStatus);
+    const entitlement = resolveEffectiveBillingEntitlement({
+      status,
+      trialEndsAt,
+      gracePeriodEndsAt,
+    });
 
-    if (!trialExpired && !graceExpired && !blockedStatus) {
+    if (entitlement.canOperate) {
       return;
     }
 
     this.logger.warn({
       message: 'tenant_financial_enforcement_blocked',
       tenantId,
-      status: normalizedStatus || 'none',
-      trialExpired,
-      graceExpired,
+      status: entitlement.effectiveStatus ?? 'none',
+      trialExpired: entitlement.trialExpired,
+      graceExpired: entitlement.graceExpired,
       method: request.method,
       path: request.originalUrl ?? request.url ?? request.route?.path,
     });
@@ -116,9 +117,9 @@ export class PlanGatingGuard implements CanActivate {
       error: 'TENANT_FINANCIAL_BLOCKED',
       message: 'Sua assinatura precisa ser regularizada para operar. Acesse o billing para reativar.',
       details: {
-        status: normalizedStatus || null,
-        trialExpired,
-        graceExpired,
+        status: entitlement.effectiveStatus,
+        trialExpired: entitlement.trialExpired,
+        graceExpired: entitlement.graceExpired,
       },
     });
   }
@@ -154,6 +155,30 @@ export class PlanGatingGuard implements CanActivate {
       const payload = this.jwtService.verify<{ type?: string; tenantId?: string }>(token);
       if (payload.type === 'tenant' && payload.tenantId) {
         return payload.tenantId;
+      }
+    } catch {
+      return undefined;
+    }
+
+    return undefined;
+  }
+
+  private resolveTenantUserId(request: RequestWithTenant): string | undefined {
+    if (request.user?.type === 'tenant') {
+      return request.user.sub ?? request.user.id;
+    }
+
+    const authorization = request.headers.authorization;
+    const rawAuthorization = Array.isArray(authorization) ? authorization[0] : authorization;
+    const token = rawAuthorization?.startsWith('Bearer ') ? rawAuthorization.slice('Bearer '.length).trim() : '';
+    if (!token) {
+      return undefined;
+    }
+
+    try {
+      const payload = this.jwtService.verify<{ type?: string; sub?: string; id?: string }>(token);
+      if (payload.type === 'tenant') {
+        return payload.sub ?? payload.id;
       }
     } catch {
       return undefined;

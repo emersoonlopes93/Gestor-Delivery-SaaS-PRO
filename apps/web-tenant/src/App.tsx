@@ -22,7 +22,10 @@ import { OrderSimulationPage } from './features/catalog/OrderSimulationPage';
 import { UpsellsPage } from './features/catalog/UpsellsPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
+import { OrderManagerV2Page } from './features/orders/v2/OrderManagerV2Page';
+import { OrderManagerV2AccessDenied } from './features/orders/v2/OrderManagerV2AccessDenied';
 import { KdsPage } from './features/orders/KdsPage';
+import { OrderAutomationSettingsPage } from './features/orders/OrderAutomationSettingsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
 import { DeliveryZonesPageRefactored } from './features/delivery/DeliveryZonesPageRefactored';
@@ -53,6 +56,8 @@ import { SuppliersPage } from './features/purchasing/SuppliersPage';
 import { PurchasesPage } from './features/purchasing/PurchasesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
 import { EmployeesPage } from './features/management/employees/EmployeesPage';
+import { ChannelsPage } from './features/navigation/ChannelsPage';
+import { ManagementPage } from './features/navigation/ManagementPage';
 
 // WhatsApp & IA & Campanhas (Phase 11)
 import { WhatsAppConfigPage } from './features/whatsapp/pages/WhatsAppConfigPage';
@@ -82,7 +87,14 @@ export function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <PermissionGate permission="dashboard.view">
+              <DashboardPage />
+            </PermissionGate>
+          }
+        />
         <Route
           path="/billing"
           element={
@@ -201,10 +213,30 @@ export function App() {
           }
         />
         <Route
+          path="/orders/manager"
+          element={
+            <FeatureGate featureKey="order_manager_v2" fallback={<OrderManagerV2AccessDenied />}>
+              <PermissionGate permission="orders.use_kanban" fallback={<OrderManagerV2AccessDenied />}>
+                <OrderManagerV2Page />
+              </PermissionGate>
+            </FeatureGate>
+          }
+        />
+        <Route
           path="/orders/kds"
           element={
-            <PermissionGate permission="kds.use">
-              <KdsPage />
+            <FeatureGate featureKey="kds">
+              <PermissionGate permission="kds.use">
+                <KdsPage />
+              </PermissionGate>
+            </FeatureGate>
+          }
+        />
+        <Route
+          path="/orders/settings/automation"
+          element={
+            <PermissionGate permission="orders.settings.manage">
+              <OrderAutomationSettingsPage />
             </PermissionGate>
           }
         />
@@ -268,17 +300,21 @@ export function App() {
         <Route
           path="/pos/tables"
           element={
-            <PermissionGate permission="pos.read">
-              <TablesPage />
-            </PermissionGate>
+            <FeatureGate featureKey="dine_in">
+              <PermissionGate permission="pos.read">
+                <TablesPage />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route
           path="/pos/printers"
           element={
-            <PermissionGate permission="settings.manage">
-              <PrinterSettings />
-            </PermissionGate>
+            <FeatureGate featureKey="printing">
+              <PermissionGate permission="settings.manage">
+                <PrinterSettings />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route
@@ -361,10 +397,19 @@ export function App() {
           path="/whatsapp/inbox"
           element={
             <FeatureGate featureKey="whatsapp_advanced">
-              <PermissionGate permission="orders.read">
+              <PermissionGate permission="chat.read">
                 <InboxPage />
               </PermissionGate>
             </FeatureGate>
+          }
+        />
+
+        <Route
+          path="/channels"
+          element={
+            <PermissionGate permission="orders.read">
+              <ChannelsPage />
+            </PermissionGate>
           }
         />
 
@@ -381,6 +426,7 @@ export function App() {
         />
 
         {/* Phase 3 - Management Layer */}
+        <Route path="/management" element={<ManagementPage />} />
         <Route
           path="/management/suppliers"
           element={
@@ -442,6 +488,16 @@ export function App() {
           }
         />
         <Route
+          path="/analytics/performance"
+          element={
+            <ModuleGate module="reports">
+              <PermissionGate permission="reports.read">
+                <ReportsPage initialTab="performance" />
+              </PermissionGate>
+            </ModuleGate>
+          }
+        />
+        <Route
           path="/analytics/goals"
           element={
             <FeatureGate featureKey="goals">
@@ -472,7 +528,7 @@ export function App() {
         <Route
           path="/settings/integrations"
           element={
-            <FeatureGate featureKey="ifood_marketplace">
+            <FeatureGate featureKey="marketplace_orders">
               <PermissionGate permission="settings.manage">
                 <IntegrationsPage />
               </PermissionGate>
@@ -506,9 +562,11 @@ export function App() {
         <Route
           path="/settings/scheduling"
           element={
-            <PermissionGate permission="settings.manage">
-              <SchedulingSettingsPage />
-            </PermissionGate>
+            <FeatureGate featureKey="scheduling">
+              <PermissionGate permission="settings.manage">
+                <SchedulingSettingsPage />
+              </PermissionGate>
+            </FeatureGate>
           }
         />
         <Route

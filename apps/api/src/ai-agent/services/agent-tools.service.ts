@@ -1275,14 +1275,20 @@ export class AgentToolsService {
   private async executeConsultarFormasPagamento(
     tenantId: string,
   ): Promise<ReturnType<typeof buildAgentPaymentMethodsResult>> {
-    const settings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId },
-      select: {
-        paymentMethods: true,
-        pixKey: true,
-        mercadoPagoAccessToken: true,
-      },
-    });
+    const [settings, mercadoPagoConnection] = await Promise.all([
+      this.prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: {
+          paymentMethods: true,
+          pixKey: true,
+          mercadoPagoAccessToken: true,
+        },
+      }),
+      this.prisma.paymentProviderConnection.findFirst({
+        where: { tenantId, provider: 'mercado_pago', status: 'CONNECTED' },
+        select: { id: true },
+      }),
+    ]);
 
     if (!settings) {
       return {
@@ -1295,7 +1301,7 @@ export class AgentToolsService {
     return buildAgentPaymentMethodsResult({
       paymentMethodsRaw: settings.paymentMethods,
       pixKey: settings.pixKey,
-      mercadoPagoAccessToken: settings.mercadoPagoAccessToken,
+      mercadoPagoConnected: Boolean(mercadoPagoConnection || settings.mercadoPagoAccessToken?.trim()),
     });
   }
 

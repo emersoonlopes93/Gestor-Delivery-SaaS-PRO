@@ -21,13 +21,13 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-black text-slate-900">Raios e taxas</h3>
-          <p className="text-sm text-slate-500">Configure a cobrança principal por distância.</p>
+          <h3 className="text-lg font-black text-foreground">Raios e taxas</h3>
+          <p className="text-sm text-muted-foreground">Configure a cobrança principal por distância.</p>
         </div>
         <button
           type="button"
           onClick={props.onStartAdd}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-black text-white transition hover:bg-slate-800"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-sm font-black text-background transition hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
           Novo raio
@@ -44,14 +44,14 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
             <div key={`${tier.minDistanceKm}-${tier.maxDistanceKm}-${index}`} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-base font-black text-slate-900">{tierLabel(tier)}</div>
-                  <div className="mt-1 text-sm text-slate-500">{fmtMoney(tier.fee)} • {tier.estimatedDeliveryMinutes} min</div>
+                  <div className="text-base font-black text-foreground">{tierLabel(tier)}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{fmtMoney(tier.fee)} • {tier.estimatedDeliveryMinutes} min</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => props.onStartEdit(index)}
-                    className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                    className="inline-flex h-9 items-center gap-1 rounded-xl border border-border px-3 text-sm font-bold text-foreground transition hover:bg-muted"
                   >
                     <Pencil className="h-4 w-4" />
                     Editar
@@ -59,7 +59,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
                   <button
                     type="button"
                     onClick={() => props.onRemove(index)}
-                    className="inline-flex h-9 items-center gap-1 rounded-xl border border-red-200 px-3 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                    className="inline-flex h-9 items-center gap-1 rounded-xl border border-destructive/30 px-3 text-sm font-bold text-destructive transition hover:bg-destructive/10"
                   >
                     <Trash2 className="h-4 w-4" />
                     Remover
@@ -72,12 +72,12 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
       </div>
 
       <div className="rounded-3xl border border-border bg-muted/40 p-5">
-        <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+        <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
           {props.editingIndex == null ? 'Novo raio de entrega' : 'Editar raio'}
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Distância inicial (km)</span>
+            <span className="text-sm font-semibold text-foreground">Distância inicial (km)</span>
             <input
               type="number"
               min={0}
@@ -88,7 +88,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Distância final (km)</span>
+            <span className="text-sm font-semibold text-foreground">Distância final (km)</span>
             <input
               type="number"
               min={0}
@@ -99,7 +99,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Valor da entrega</span>
+            <span className="text-sm font-semibold text-foreground">Valor da entrega</span>
             <CurrencyInput
               value={props.tierForm.fee}
               onChange={(value) => props.onTierFormChange({ ...props.tierForm, fee: value })}
@@ -107,7 +107,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Tempo estimado (min)</span>
+            <span className="text-sm font-semibold text-foreground">Tempo estimado (min)</span>
             <input
               type="number"
               min={1}

@@ -43,7 +43,6 @@ services:
       - key: ASAAS_WEBHOOK_HMAC_SECRET
         sync: false
     # Opcional (Se aplicável para rodar migrações seguras antes de subir)
-    preDeployCommand: pnpm -C apps/api prisma:migrate deploy && pnpm -C apps/api prisma:seed
     healthCheckPath: /api/v1/health
     
 databases:

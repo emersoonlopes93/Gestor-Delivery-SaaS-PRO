@@ -13,14 +13,44 @@ import { DeliveryRateController } from './delivery-rate.controller';
 import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 import { GeocodingService } from './geocoding.service';
+import { OsrmRoutingProvider } from './osrm-routing.provider';
+import { RoutingV2Service } from './routing-v2.service';
 import { LocationModule } from '../location/location.module';
+import { DeliveryRunsService } from './delivery-runs.service';
+import { DeliveryRunsController } from './delivery-runs.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { DeliveryLocationRetentionService } from './delivery-location-retention.service';
+import { DriverEarningsService } from './driver-earnings.service';
+import { DriverSettlementsController, DriverSettlementHistoryController } from './driver-settlements.controller';
+import { DriverSettlementsService } from './driver-settlements.service';
+import { SmartDispatchService } from './smart-dispatch.service';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, LocationModule, forwardRef(() => OrdersModule)],
-  controllers: [DriversController, DriverOperationsController, DeliveryRateController, DeliveryCoverageController],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    RbacModule,
+    LocationModule,
+    NotificationsModule,
+    forwardRef(() => OrdersModule),
+  ],
+  controllers: [
+    DriversController,
+    DriverOperationsController,
+    DeliveryRunsController,
+    DriverSettlementsController,
+    DriverSettlementHistoryController,
+    DeliveryRateController,
+    DeliveryCoverageController,
+  ],
   providers: [
     DriversService,
+    DeliveryRunsService,
+    DriverEarningsService,
+    DriverSettlementsService,
+    SmartDispatchService,
     DeliveryTrackingGateway,
+    DeliveryLocationRetentionService,
     DeliveryCoverageService,
     {
       provide: DELIVERY_RATE_RULE_REPO,
@@ -33,8 +63,10 @@ import { LocationModule } from '../location/location.module';
       useFactory: (prisma: PrismaService) => prisma.deliveryCoverageConfig,
     },
     GeocodingService,
+    OsrmRoutingProvider,
+    RoutingV2Service,
     DeliveryRateService,
   ],
-  exports: [DeliveryRateService, DriversService, GeocodingService, DeliveryTrackingGateway],
+  exports: [DeliveryRateService, DriversService, DeliveryRunsService, GeocodingService, DeliveryTrackingGateway, RoutingV2Service],
 })
 export class DeliveryModule {}

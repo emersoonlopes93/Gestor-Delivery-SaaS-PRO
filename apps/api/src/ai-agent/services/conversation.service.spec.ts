@@ -21,12 +21,15 @@ describe('ConversationService - Session Expiration & Exit Commands', () => {
           useValue: {
             chatSession: {
               findFirst: jest.fn(),
+              findMany: jest.fn().mockResolvedValue([]),
               findUnique: jest.fn(),
               update: jest.fn(),
+              updateMany: jest.fn(),
               create: jest.fn(),
             },
             chatMessage: {
               create: jest.fn(),
+              count: jest.fn().mockResolvedValue(0),
               findUnique: jest.fn(),
               findMany: jest.fn(),
             },
@@ -54,6 +57,11 @@ describe('ConversationService - Session Expiration & Exit Commands', () => {
     service = module.get<ConversationService>(ConversationService);
     prisma = module.get<PrismaService>(PrismaService);
     chatGateway = module.get<ChatGateway>(ChatGateway);
+    ChatGateway.instance = chatGateway;
+  });
+
+  afterEach(() => {
+    ChatGateway.instance = null;
   });
 
   describe('Teste 1: Sessão expira por inatividade', () => {

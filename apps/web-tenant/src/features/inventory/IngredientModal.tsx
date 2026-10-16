@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IngredientDTO, CreateIngredientDTO, UnitType } from '@gestor/types';
 import { CurrencyInput } from '@gestor/ui';
+import { Switch } from '../../components/ui/Switch';
 
 interface IngredientModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingIngredient) {
@@ -37,7 +39,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         description: editingIngredient.description || '',
         unit: editingIngredient.unit,
         purchaseUnit: editingIngredient.purchaseUnit || editingIngredient.unit,
-        conversionFactor: editingIngredient.conversionFactor || 1,
+        conversionFactor: editingIngredient.conversionFactor ?? 1,
         category: editingIngredient.category || '',
         minStock: editingIngredient.minStock || 0,
         initialPurchaseActive: false,
@@ -62,19 +64,6 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
     }
   }, [editingIngredient, isOpen]);
 
-  // Auto-detect conversion factor
-  useEffect(() => {
-    if (editingIngredient) return; // Don't auto-change during edit
-
-    let factor = 1;
-    if (formData.unit === UnitType.G && formData.purchaseUnit === UnitType.KG) factor = 1000;
-    if (formData.unit === UnitType.ML && formData.purchaseUnit === UnitType.L) factor = 1000;
-    
-    if (factor !== formData.conversionFactor) {
-      setFormData(prev => ({ ...prev, conversionFactor: factor }));
-    }
-  }, [formData.unit, formData.purchaseUnit, editingIngredient, formData.conversionFactor]);
-
   const calculatedValues = useMemo(() => {
     if (!formData.initialPurchaseActive || !formData.initialPurchase) return null;
     
@@ -95,6 +84,13 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const conversionFactor = formData.conversionFactor;
+    if (conversionFactor === undefined || !Number.isFinite(conversionFactor) || conversionFactor <= 0) {
+      setFormError('Informe um fator de conversão maior que zero.');
+      return;
+    }
+
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const payload = { ...formData };
@@ -195,11 +191,17 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                 <input
                   type="number"
                   step="0.0001"
-                  value={formData.conversionFactor}
-                  onChange={(e) => setFormData({ ...formData, conversionFactor: Number(e.target.value) })}
+                  min="0.0001"
+                  aria-label="Fator de Conversão"
+                  value={formData.conversionFactor ?? ''}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    conversionFactor: e.target.value === '' ? undefined : Number(e.target.value),
+                  })}
                   className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground text-sm"
                 />
                 <p className="text-[10px] text-muted-foreground">Ex: 1000 se base=g e compra=kg</p>
+                {formError && <p role="alert" className="text-xs text-destructive">{formError}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -220,21 +222,19 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
           {/* BLOCO B - COMPRA INICIAL / ENTRADA INICIAL */}
           {!editingIngredient && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
+              <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2">
                   <div className="w-1 h-5 bg-green-500 rounded-full"></div>
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
                 </div>
-                <label className="inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    checked={formData.initialPurchaseActive}
-                    onChange={(e) => setFormData({ ...formData, initialPurchaseActive: e.target.checked })}
+                <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
+                  <span className="min-w-0 text-sm font-medium text-muted-foreground">Lançar compra agora</span>
+                  <Switch
+                    checked={Boolean(formData.initialPurchaseActive)}
+                    onCheckedChange={(initialPurchaseActive) => setFormData({ ...formData, initialPurchaseActive })}
+                    aria-label="Lançar compra inicial agora"
                   />
-                  <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                  <span className="ml-3 text-sm font-medium text-muted-foreground">Lançar compra agora</span>
-                </label>
+                </div>
               </div>
 
               {formData.initialPurchaseActive && (

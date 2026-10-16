@@ -1,13 +1,16 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Logger,
   Inject,
   forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { evaluateOwnFleetEligibility } from '../delivery/own-fleet-eligibility';
+import { MarketplaceProvider, OrderStatus, Prisma, DineInTable, Order as PrismaOrder, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
@@ -17,6 +20,7 @@ import { TheoreticalStockService } from '../inventory/theoretical-stock.service'
 import { PaymentGatewayService } from '../payment-gateway/payment-gateway.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { WhatsappService } from '../notifications/whatsapp.service';
+import { PushService } from '../notifications/push.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
@@ -33,15 +37,53 @@ import type {
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionDTO,
   PizzaCompositionDTO,
+  OrderAutoAcceptSettings,
+  DriverDeliveryEvent,
+  DriverRouteEvent,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import type { FulfillmentType } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
+import { PrintingService } from '../printing/printing.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
 import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
 import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
+import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
+import { canAutoAcceptOrder } from './order-auto-accept.policy';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
+import { AuthoritativeOrderAnalyticsService } from '../analytics/authoritative-order-analytics.service';
+import { DeliveryTrackingGateway } from '../delivery/delivery-tracking.gateway';
+import { DeliveryRunsService } from '../delivery/delivery-runs.service';
+import {
+  assertOrderIdempotencyPayload,
+  isPrismaUniqueConstraintError,
+} from './order-idempotency.util';
+import { getOrderOperationalViewModel } from './order-operational-view-model';
+import { OrderAlertsService } from './alerts/order-alerts.service';
+
+export type OrderStatusTransitionResult = {
+  orderBeforeTransition: PrismaOrder;
+  updatedOrder: PrismaOrder;
+  fromStatus: OrderStatus;
+  toStatus: OrderStatus;
+};
+
+/**
+ * The normal lifecycle is the only transition policy available to regular
+ * callers. 99Food is allowed to report a terminal provider fact even when a
+ * preceding event was missed, and ORDERREADY can arrive before ORDERCONFIRM.
+ */
+export type OrderStatusTransitionPolicy = 'canonical' | 'food99_authoritative';
+
+function isFood99AuthoritativeTransitionAllowed(from: OrderStatus, to: OrderStatus): boolean {
+  if (from === OrderStatus.completed || from === OrderStatus.cancelled) return false;
+  if (to === OrderStatus.completed || to === OrderStatus.cancelled) return true;
+  if (to === OrderStatus.out_for_delivery) return true;
+  return from === OrderStatus.pending
+    && (to === OrderStatus.ready_for_pickup || to === OrderStatus.ready_for_delivery);
+}
 
 @Injectable()
 export class OrdersService {
@@ -64,6 +106,93 @@ export class OrdersService {
     return 'delivery';
   }
 
+  private getAutoAcceptSettingsSnapshot(
+    settings: {
+      autoAcceptOrdersEnabled?: boolean | null;
+      autoAcceptDelaySeconds?: number | null;
+      autoAcceptDeliveryOrders?: boolean | null;
+      autoAcceptPickupOrders?: boolean | null;
+    } | null | undefined,
+  ): OrderAutoAcceptSettings {
+    return {
+      autoAcceptOrdersEnabled: settings?.autoAcceptOrdersEnabled ?? false,
+      autoAcceptDelaySeconds: (settings?.autoAcceptDelaySeconds ?? 0) as 0 | 30 | 60,
+      autoAcceptDeliveryOrders: settings?.autoAcceptDeliveryOrders ?? true,
+      autoAcceptPickupOrders: settings?.autoAcceptPickupOrders ?? true,
+    };
+  }
+
+  async getAutoAcceptSettings(tenantId: string): Promise<OrderAutoAcceptSettings> {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: {
+        autoAcceptOrdersEnabled: true,
+        autoAcceptDelaySeconds: true,
+        autoAcceptDeliveryOrders: true,
+        autoAcceptPickupOrders: true,
+      },
+    });
+
+    return this.getAutoAcceptSettingsSnapshot(settings);
+  }
+
+  async updateAutoAcceptSettings(
+    tenantId: string,
+    actorUserId: string,
+    dto: UpdateOrderAutoAcceptSettingsDto,
+  ): Promise<OrderAutoAcceptSettings> {
+    if (dto.autoAcceptDelaySeconds && dto.autoAcceptDelaySeconds > 0) {
+      throw new BadRequestException('Nesta fase o autoaceite suporta apenas aceite imediato.');
+    }
+
+    const existing = await this.getAutoAcceptSettings(tenantId);
+    const next: OrderAutoAcceptSettings = {
+      autoAcceptOrdersEnabled: dto.autoAcceptOrdersEnabled ?? existing.autoAcceptOrdersEnabled,
+      autoAcceptDelaySeconds: dto.autoAcceptDelaySeconds ?? existing.autoAcceptDelaySeconds,
+      autoAcceptDeliveryOrders: dto.autoAcceptDeliveryOrders ?? existing.autoAcceptDeliveryOrders,
+      autoAcceptPickupOrders: dto.autoAcceptPickupOrders ?? existing.autoAcceptPickupOrders,
+    };
+    const existingAuditSnapshot: Prisma.InputJsonObject = {
+      autoAcceptOrdersEnabled: existing.autoAcceptOrdersEnabled,
+      autoAcceptDelaySeconds: existing.autoAcceptDelaySeconds,
+      autoAcceptDeliveryOrders: existing.autoAcceptDeliveryOrders,
+      autoAcceptPickupOrders: existing.autoAcceptPickupOrders,
+    };
+    const nextAuditSnapshot: Prisma.InputJsonObject = {
+      autoAcceptOrdersEnabled: next.autoAcceptOrdersEnabled,
+      autoAcceptDelaySeconds: next.autoAcceptDelaySeconds,
+      autoAcceptDeliveryOrders: next.autoAcceptDeliveryOrders,
+      autoAcceptPickupOrders: next.autoAcceptPickupOrders,
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantSettings.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          ...next,
+        },
+        update: next,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          userId: actorUserId,
+          userType: 'tenant_user',
+          action: 'tenant.order.auto_accept_config.update',
+          resource: 'tenant_settings',
+          details: {
+            before: existingAuditSnapshot,
+            after: nextAuditSnapshot,
+          },
+        },
+      });
+    });
+
+    return next;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
@@ -77,12 +206,22 @@ export class OrdersService {
     private readonly whatsappService: WhatsappService,
     private readonly ordersGateway: OrdersGateway,
     private readonly kdsService: KdsService,
+    private readonly printingService: PrintingService,
     private readonly revenueLedgerService: RevenueLedgerService,
     @Inject(forwardRef(() => MarketplaceStatusSyncService))
     private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
+    private readonly pushService: PushService,
+    @Optional() private readonly authoritativeOrderAnalyticsService?: AuthoritativeOrderAnalyticsService,
+    @Optional() @Inject(forwardRef(() => DeliveryTrackingGateway))
+    private readonly deliveryTrackingGateway?: DeliveryTrackingGateway,
+    @Optional() @Inject(forwardRef(() => DeliveryRunsService))
+    private readonly deliveryRunsService?: DeliveryRunsService,
+    private readonly orderAlertsService?: OrderAlertsService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
+    assertOrderIdempotencyPayload(dto);
+
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug },
       include: { settings: true },
@@ -103,7 +242,7 @@ export class OrdersService {
 
     let dineInTable: DineInTable | null = null;
     if (dto.tableId) {
-      dineInTable = await this.prisma.dineInTable.findUnique({
+      dineInTable = await this.prisma.dineInTable.findFirst({
         where: { id: dto.tableId, tenantId: tenant.id },
       });
       if (!dineInTable) {
@@ -130,7 +269,17 @@ export class OrdersService {
       scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
       timeSlotId: dto.timeSlotId,
     });
-    const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
+    const {
+      tenantId,
+      lines,
+      itemsSubtotal,
+      discountTotal,
+      deliveryFee,
+      total,
+      couponId,
+      cashbackUsed,
+      resolvedDeliveryCoordinates,
+    } = validation;
 
     this.logger.debug(
       `createOrder: fulfillmentType=${dto.fulfillmentType} hasAddress=${!!dto.deliveryAddress} channel=${validatorChannel}`,
@@ -158,8 +307,11 @@ export class OrdersService {
     // 4. Transactional order creation
     const finalTotal = total; 
 
-    const order = await this.prisma.$transaction(
-      async (tx) => {
+    let order: Prisma.OrderGetPayload<Record<string, never>>;
+    try {
+      order = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx) => {
         // Atomic increment of order sequence
         const updatedTenant = await tx.tenant.update({
           where: { id: tenantId },
@@ -181,6 +333,7 @@ export class OrdersService {
             itemsSubtotal,
             discountTotal: discountTotal || 0,
             deliveryFee,
+            normalDeliveryFee: deliveryFee,
             serviceFee: 0,
             total: finalTotal,
             sourceChannel: dto.sourceChannel || 'direct_online',
@@ -195,6 +348,7 @@ export class OrdersService {
             isScheduled: dto.scheduledFor && dto.timeSlotId ? true : false,
             publicTrackingToken: generatePublicTrackingToken(),
             tableNumber: dineInTable?.name || null,
+            tableId: dineInTable?.id || null,
           },
         });
 
@@ -243,8 +397,8 @@ export class OrdersService {
               state: dto.deliveryAddress.state,
               zipCode: dto.deliveryAddress.zipCode,
               reference: dto.deliveryAddress.reference || null,
-              lat: dto.deliveryAddress.lat || null,
-              lng: dto.deliveryAddress.lng || null,
+              lat: dto.deliveryAddress.lat ?? resolvedDeliveryCoordinates?.lat ?? null,
+              lng: dto.deliveryAddress.lng ?? resolvedDeliveryCoordinates?.lng ?? null,
             },
           });
         }
@@ -261,68 +415,86 @@ export class OrdersService {
 
         // Update DineInTable
         if (dineInTable) {
-          await tx.dineInTable.update({
-            where: { id: dineInTable.id },
+          const claimedTable = await tx.dineInTable.updateMany({
+            where: {
+              id: dineInTable.id,
+              tenantId,
+              OR: [
+                { status: 'free', activeOrderId: null },
+                { activeOrderId: newOrder.id },
+              ],
+            },
             data: {
               activeOrderId: newOrder.id,
               status: 'occupied',
             },
           });
+          if (claimedTable.count !== 1) {
+            throw new ConflictException(`A mesa ${dineInTable.name} já está ocupada por outro atendimento ativo.`);
+          }
+        }
+
+        if (dto.scheduledFor && dto.timeSlotId) {
+          if (!customerId) {
+            throw new BadRequestException('Cliente identificado é obrigatório para agendamento.');
+          }
+          await this.schedulingService.reserveScheduledOrderInTransaction(tx, {
+            tenantId,
+            orderId: newOrder.id,
+            customerId,
+            fulfillmentType: dto.fulfillmentType,
+            scheduledFor: new Date(dto.scheduledFor),
+            timeSlotId: dto.timeSlotId,
+            estimatedDuration: dto.estimatedDuration || 30,
+            notes: `Agendado para pedido ${newOrder.orderNumber}`,
+          });
+        }
+
+        await this.inventoryService.processOrderDepletionInTransaction(tx, tenantId, newOrder.id);
+
+        if (cashbackUsed && customerId) {
+          await this.cashbackService.createTransaction({
+            tenantId,
+            customerId,
+            type: 'used',
+            amount: cashbackUsed,
+            orderId: newOrder.id,
+            description: `Usado no pedido ${newOrder.orderNumber}`,
+          }, tx);
+        }
+
+        if (couponId) {
+          await tx.coupon.update({
+            where: { id: couponId },
+            data: { usedCount: { increment: 1 } },
+          });
         }
 
         return newOrder;
-      },
-      {
-        timeout: 20_000,
-        maxWait: 5_000,
-      },
-    );
-
-    // Process Stock Depletion
-    await this.inventoryService.processOrderDepletion(tenantId, order.id).catch(e => {
-        this.logger.error(`Error processing stock depletion for order ${order.id}: ${e.message}`);
-    });
-
-    // Update Cashback Ledger & Coupon Usage
-    if (cashbackUsed && customerId) {
-      await this.cashbackService.createTransaction({
-        tenantId,
-        customerId: customerId,
-        type: 'used',
-        amount: cashbackUsed,
-        orderId: order.id,
-        description: `Usado no pedido ${order.orderNumber}`
-      }).catch(e => this.logger.error(`Error applying cashback: ${e.message}`));
-    }
-
-    if (couponId) {
-      await this.prisma.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } }
-      }).catch(e => this.logger.error(`Error updating coupon usage: ${e.message}`));
-    }
-
-    // Criar agendamento se especificado
-    if (dto.scheduledFor && dto.timeSlotId && customerId) {
-      try {
-        await this.schedulingService.createScheduledOrder({
-          orderId: order.id,
-          customerId,
-          fulfillmentType: dto.fulfillmentType,
-          scheduledFor: new Date(dto.scheduledFor),
-          timeSlotId: dto.timeSlotId,
-          estimatedDuration: dto.estimatedDuration || 30, // 30 min padrão
-          notes: `Agendado para pedido ${order.orderNumber}`,
+        },
+        {
+          timeout: 20_000,
+          maxWait: 5_000,
+          onRetry: (attempt, delayMs) => this.logger.warn(
+            `Retrying public checkout transaction after P2034 (attempt ${attempt + 1}/3, backoff ${delayMs}ms)`,
+          ),
+        },
+      );
+    } catch (error: unknown) {
+      if (isPrismaUniqueConstraintError(error)) {
+        const concurrentOrder = await this.prisma.order.findUnique({
+          where: {
+            tenantId_idempotencyKey: { tenantId, idempotencyKey: dto.idempotencyKey },
+          },
         });
-        this.logger.log(`Scheduled order ${order.id} for ${dto.scheduledFor}`);
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(`Error creating scheduled order: ${message}`);
-        // Não falhar o pedido, apenas logar erro
+        if (concurrentOrder) {
+          return this.getOrderDetail(concurrentOrder.id, tenantId);
+        }
       }
+      throw error;
     }
 
-    const orderDetail = await this.getOrderDetail(order.id, tenantId);
+    let orderDetail = await this.getOrderDetail(order.id, tenantId);
 
     if (customerId && dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
       await this.customerService.saveDeliveryAddressFromOrder(tenantId, customerId, {
@@ -334,19 +506,63 @@ export class OrdersService {
         state: dto.deliveryAddress.state,
         zipCode: dto.deliveryAddress.zipCode,
         reference: dto.deliveryAddress.reference || null,
-        lat: dto.deliveryAddress.lat ?? null,
-        lng: dto.deliveryAddress.lng ?? null,
+        lat: dto.deliveryAddress.lat ?? resolvedDeliveryCoordinates?.lat ?? null,
+        lng: dto.deliveryAddress.lng ?? resolvedDeliveryCoordinates?.lng ?? null,
       }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unknown address sync error';
         this.logger.warn(`Failed to sync customer address from order ${order.id}: ${message}`);
       });
     }
     
-    // Emitir via Socket para o painel administrativo (tempo real)
-    this.ordersGateway.emitNewOrder(tenantId, {
-      ...orderDetail,
-      itemCount: orderDetail.items.length,
+    const autoAcceptSettings = this.getAutoAcceptSettingsSnapshot(tenant.settings);
+    const autoAcceptDecision = canAutoAcceptOrder({
+      id: order.id,
+      status: order.status,
+      fulfillmentType: dto.fulfillmentType,
+      sourceChannel: order.sourceChannel,
+      paymentMethod: order.paymentMethod,
+    }, autoAcceptSettings, {
+      tenantStatus: tenant.status,
+      storePaused: tenant.settings?.isStorePaused ?? false,
     });
+
+    if (autoAcceptDecision.allowed) {
+      await this.updateOrderStatus(order.id, tenantId, {
+        status: 'confirmed',
+        note: 'Pedido aceito automaticamente pelo sistema.',
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          userType: 'system',
+          action: 'order.auto_accepted',
+          resource: 'order',
+          details: {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            reason: 'eligible_storefront_auto_accept',
+          },
+        },
+      });
+
+      orderDetail = await this.getOrderDetail(order.id, tenantId);
+      this.ordersGateway.emitOrderAutoAccepted(tenantId, {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        total: order.total.toString(),
+      });
+    } else {
+      // Emitir via Socket para o painel administrativo (tempo real)
+      this.ordersGateway.emitNewOrder(tenantId, {
+        ...orderDetail,
+        itemCount: orderDetail.items.length,
+      });
+    }
+    if (!autoAcceptDecision.allowed) {
+      this.ordersGateway.emitOrderChanged(tenantId, order.id, 'created');
+    }
     
     // Se pagamento for PIX, gerar QR code
     if (dto.payment.method === 'pix') {
@@ -420,13 +636,47 @@ export class OrdersService {
     channel?: string,
     startDate?: string,
     endDate?: string,
+    search?: string,
+    fulfillmentType?: string,
+    origin?: string,
+    ownership?: string,
   ): Promise<{ items: OrderListItemDTO[]; total: number }> {
     const skip = (page - 1) * limit;
+    const operationalFilters: Prisma.OrderWhereInput[] = [];
+
+    if (origin === 'PEDEHUB') {
+      operationalFilters.push({ marketplaceOrders: { none: {} } });
+    } else if (origin === 'IFOOD' || origin === 'FOOD_99') {
+      operationalFilters.push({ marketplaceOrders: { some: { provider: origin } } });
+    }
+
+    if (ownership === 'MERCHANT') {
+      operationalFilters.push({
+        OR: [
+          { marketplaceOrders: { none: {} } },
+          { marketplaceOrders: { some: { deliveryOwnership: 'MERCHANT' } } },
+        ],
+      });
+    } else if (ownership === 'PROVIDER' || ownership === 'UNKNOWN') {
+      operationalFilters.push({ marketplaceOrders: { some: { deliveryOwnership: ownership } } });
+    }
 
     const where: Prisma.OrderWhereInput = {
       tenantId,
       ...(status ? { status } : {}),
       ...(channel ? { sourceChannel: channel } : {}),
+      ...(fulfillmentType ? { fulfillmentType: fulfillmentType as FulfillmentType } : {}),
+      ...(search?.trim()
+        ? {
+            OR: [
+              { orderNumber: { contains: search.trim(), mode: 'insensitive' } },
+              { customerName: { contains: search.trim(), mode: 'insensitive' } },
+              { customerPhone: { contains: search.trim() } },
+              { deliveryDriver: { name: { contains: search.trim(), mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+      ...(operationalFilters.length > 0 ? { AND: operationalFilters } : {}),
       ...(startDate || endDate
         ? {
             createdAt: {
@@ -446,6 +696,23 @@ export class OrdersService {
           orderBy: { createdAt: 'desc' },
           include: {
             _count: { select: { items: true } },
+            deliveryDriver: { select: { name: true } },
+            marketplaceOrders: {
+              select: {
+                id: true,
+                provider: true,
+                externalDisplayId: true,
+                statusExternal: true,
+                deliveryOwnership: true,
+                rawPayload: true,
+                normalizedPayload: true,
+                operations: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: { operation: true, status: true },
+                },
+              },
+            },
           },
         }),
         this.prisma.order.count({ where }),
@@ -466,6 +733,22 @@ export class OrdersService {
           isScheduled: o.isScheduled ?? false,
           sourceChannel: o.sourceChannel,
           createdAt: o.createdAt.toISOString(),
+          operational: getOrderOperationalViewModel({
+            status: o.status as OrderStatus,
+            fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
+            sourceChannel: o.sourceChannel,
+            total: Number(o.total),
+            itemsSubtotal: Number(o.itemsSubtotal),
+            deliveryDriverName: o.deliveryDriver?.name,
+            provider: o.marketplaceOrders[0]?.provider,
+            externalDisplayId: o.marketplaceOrders[0]?.externalDisplayId,
+            marketplaceOrderId: o.marketplaceOrders[0]?.id,
+            marketplaceExternalStatus: o.marketplaceOrders[0]?.statusExternal,
+            deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+            marketplaceRawPayload: o.marketplaceOrders[0]?.rawPayload,
+            marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
+            latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
+          }),
         })),
         total,
       };
@@ -607,9 +890,28 @@ export class OrdersService {
       include: {
         items: true,
         deliveryDriver: true,
+        table: { select: { id: true, name: true } },
+        marketplaceOrders: {
+          select: {
+            id: true,
+            provider: true,
+            externalDisplayId: true,
+            statusExternal: true,
+            deliveryOwnership: true,
+            rawPayload: true,
+            normalizedPayload: true,
+            operations: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { operation: true, status: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    await this.orderAlertsService?.refreshTenant(tenantId);
 
     return orders.map((o) => ({
       id: o.id,
@@ -617,12 +919,33 @@ export class OrdersService {
       status: o.status as OrderStatus,
       fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       customerName: o.customerName,
+      customerPhone: o.customerPhone,
       total: Number(o.total),
+      itemsSubtotal: Number(o.itemsSubtotal),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
+      searchText: o.items.map((i) => [i.snapshotName, i.snapshotComposition, i.notes]
+        .filter((value): value is string => Boolean(value?.trim()))
+        .join(' ')).join(' '),
       sourceChannel: o.sourceChannel,
       scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
       isScheduled: o.isScheduled ?? false,
+      operational: getOrderOperationalViewModel({
+        status: o.status as OrderStatus,
+        fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
+        sourceChannel: o.sourceChannel,
+        total: Number(o.total),
+        itemsSubtotal: Number(o.itemsSubtotal),
+        deliveryDriverName: o.deliveryDriver?.name,
+        provider: o.marketplaceOrders[0]?.provider,
+        externalDisplayId: o.marketplaceOrders[0]?.externalDisplayId,
+        marketplaceOrderId: o.marketplaceOrders[0]?.id,
+        marketplaceExternalStatus: o.marketplaceOrders[0]?.statusExternal,
+        deliveryOwnership: o.marketplaceOrders[0]?.deliveryOwnership,
+        marketplaceRawPayload: o.marketplaceOrders[0]?.rawPayload,
+        marketplaceNormalizedPayload: o.marketplaceOrders[0]?.normalizedPayload,
+        latestMarketplaceOperation: o.marketplaceOrders[0]?.operations[0] ?? null,
+      }),
       createdAt: o.createdAt.toISOString(),
       notes: o.notes,
       deliveryDriverId: o.deliveryDriverId || undefined,
@@ -680,13 +1003,69 @@ export class OrdersService {
         },
         deliveryAddress: true,
         deliveryDriver: true,
+        table: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
+        marketplaceOrders: {
+          select: {
+            id: true,
+            provider: true,
+            connectionId: true,
+            externalOrderId: true,
+            externalDisplayId: true,
+            statusExternal: true,
+            deliveryOwnership: true,
+            rawPayload: true,
+            normalizedPayload: true,
+            operations: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { operation: true, status: true },
+            },
+          },
+        },
       },
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    return this.mapOrderResponse(order);
+    const expectedNetAmountCents = await this.getExpectedNetAmountCents(
+      tenantId,
+      order.marketplaceOrders,
+    );
+
+    return this.mapOrderResponse(order, expectedNetAmountCents);
+  }
+
+  /**
+   * The order detail only reads already-synchronized Bill Data. It never calls
+   * the provider and uses the exact connection-scoped external order identity.
+   */
+  private async getExpectedNetAmountCents(
+    tenantId: string,
+    marketplaceOrders: Array<{
+      provider: string;
+      connectionId: string;
+      externalOrderId: string;
+    }>,
+  ): Promise<number | null> {
+    const food99Order = marketplaceOrders.find((entry) => entry.provider === MarketplaceProvider.FOOD_99);
+    if (!food99Order) return null;
+
+    const aggregate = await this.prisma.marketplaceBillEntry.aggregate({
+      where: {
+        tenantId,
+        provider: MarketplaceProvider.FOOD_99,
+        connectionId: food99Order.connectionId,
+        orderId: food99Order.externalOrderId,
+        orderType: { not: 5 },
+      },
+      _sum: { settlementAmount: true },
+    });
+    const amount = aggregate._sum.settlementAmount;
+    if (amount === null) return null;
+
+    const cents = Number(amount);
+    return Number.isSafeInteger(cents) ? cents : null;
   }
 
   async getPublicOrderSummary(identifier: string, token?: string): Promise<OrderResponseDTO> {
@@ -705,6 +1084,7 @@ export class OrdersService {
         },
         deliveryAddress: true,
         deliveryDriver: true,
+        table: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
         paymentTransactions: {
           where: { method: 'pix' },
@@ -811,6 +1191,9 @@ export class OrdersService {
     cashbackUsed?: Prisma.Decimal | number | null;
     deliveryDriverId?: string | null;
     deliveryDriver?: { name?: string | null; phone?: string | null; status?: string | null } | null;
+    tableId?: string | null;
+    tableNumber?: string | null;
+    table?: { id: string; name: string } | null;
     items: Array<{
       id: string;
       lineType: string;
@@ -853,12 +1236,26 @@ export class OrdersService {
       createdAt: Date;
       metadata: Prisma.JsonValue | null;
     }>;
-  }): OrderResponseDTO {
+    marketplaceOrders?: Array<{
+      provider: string;
+      id?: string;
+      connectionId?: string;
+      externalOrderId?: string;
+      externalDisplayId?: string | null;
+      statusExternal?: string | null;
+      deliveryOwnership: string;
+      rawPayload?: Prisma.JsonValue | null;
+      normalizedPayload?: Prisma.JsonValue | null;
+      operations: Array<{ operation: string; status: string }>;
+    }>;
+  }, expectedNetAmountCents: number | null = null): OrderResponseDTO {
+    const fulfillmentType = this.mapFulfillmentType(order.fulfillmentType);
+    const marketplaceOrder = order.marketplaceOrders?.[0];
     return {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status as OrderStatus,
-      fulfillmentType: order.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
@@ -874,9 +1271,31 @@ export class OrdersService {
       changeFor: order.changeFor ? Number(order.changeFor) : null,
       scheduledFor: order.scheduledFor ? order.scheduledFor.toISOString() : null,
       isScheduled: order.isScheduled ?? false,
+      expectedNetAmountCents,
+      ...(order.marketplaceOrders ? {
+        operational: getOrderOperationalViewModel({
+          status: order.status as OrderStatus,
+          fulfillmentType,
+          sourceChannel: order.sourceChannel,
+          total: Number(order.total),
+          itemsSubtotal: Number(order.itemsSubtotal),
+          deliveryDriverName: order.deliveryDriver?.name,
+          provider: marketplaceOrder?.provider,
+          externalDisplayId: marketplaceOrder?.externalDisplayId,
+          marketplaceOrderId: marketplaceOrder?.id,
+          marketplaceExternalStatus: marketplaceOrder?.statusExternal,
+          deliveryOwnership: marketplaceOrder?.deliveryOwnership,
+          marketplaceRawPayload: marketplaceOrder?.rawPayload,
+          marketplaceNormalizedPayload: marketplaceOrder?.normalizedPayload,
+          latestMarketplaceOperation: marketplaceOrder?.operations[0] ?? null,
+        }),
+      } : {}),
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
+      tableId: order.tableId ?? null,
+      tableNumber: order.tableNumber ?? null,
+      table: order.table ?? null,
       deliveryDriverId: order.deliveryDriverId,
       deliveryDriverName: order.deliveryDriver?.name,
       deliveryDriverPhone: order.deliveryDriver?.phone,
@@ -922,7 +1341,71 @@ export class OrdersService {
     };
   }
 
-  async updateOrderStatus(orderId: string, tenantId: string, dto: UpdateOrderStatusDTO, actorId?: string) {
+  async applyOrderStatusTransitionInTransaction(
+    tx: Prisma.TransactionClient,
+    input: {
+      tenantId: string;
+      orderId: string;
+      expectedCurrentStatus: OrderStatus;
+      targetStatus: OrderStatus;
+      expectedDeliveryDriverId?: string | null;
+      transitionPolicy?: OrderStatusTransitionPolicy;
+    },
+  ): Promise<OrderStatusTransitionResult> {
+    const order = await tx.order.findFirst({
+      where: { id: input.orderId, tenantId: input.tenantId },
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    const currentStatus = order.status as OrderStatus;
+    if (currentStatus !== input.expectedCurrentStatus) {
+      throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+    }
+    if (
+      input.expectedDeliveryDriverId !== undefined
+      && order.deliveryDriverId !== input.expectedDeliveryDriverId
+    ) {
+      throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+    }
+    const transitionPolicy = input.transitionPolicy ?? 'canonical';
+    const isAllowed = transitionPolicy === 'food99_authoritative'
+      ? isFood99AuthoritativeTransitionAllowed(currentStatus, input.targetStatus)
+      : ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(input.targetStatus);
+    if (!isAllowed) {
+      throw new BadRequestException(`Transição inválida de ${currentStatus} para ${input.targetStatus}`);
+    }
+
+    const transitionedAt = new Date();
+    const transition = await tx.order.updateMany({
+      where: {
+        id: input.orderId,
+        tenantId: input.tenantId,
+        status: currentStatus,
+        ...(input.expectedDeliveryDriverId !== undefined
+          ? { deliveryDriverId: input.expectedDeliveryDriverId }
+          : {}),
+      },
+      data: { status: input.targetStatus, updatedAt: transitionedAt },
+    });
+    if (transition.count !== 1) {
+      throw new ConflictException({ code: 'ORDER_STATUS_STALE', message: 'O pedido mudou de estado. Atualize os dados e tente novamente.' });
+    }
+
+    return {
+      orderBeforeTransition: order,
+      updatedOrder: { ...order, status: input.targetStatus, updatedAt: transitionedAt },
+      fromStatus: currentStatus,
+      toStatus: input.targetStatus,
+    };
+  }
+
+  async updateOrderStatus(
+    orderId: string,
+    tenantId: string,
+    dto: UpdateOrderStatusDTO,
+    actorId?: string,
+    options?: { marketplaceEvent?: boolean },
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
     });
@@ -938,27 +1421,64 @@ export class OrdersService {
       );
     }
 
+    if (!options?.marketplaceEvent) {
+      const marketplaceSync = await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+        tenantId,
+        orderId,
+        status: nextStatus,
+        reason: dto.marketplaceReasonCode ?? null,
+      });
+      if (marketplaceSync.deferred) {
+        return order;
+      }
+    }
+
     // Validation: if delivery and going out_for_delivery, must have driver
     if (order.fulfillmentType === 'delivery' && nextStatus === 'out_for_delivery' && !order.deliveryDriverId) {
       throw new BadRequestException('Não é possível despachar um pedido de entrega sem um entregador atribuído.');
     }
 
-    const shouldCreateProductionJobs = nextStatus === 'confirmed' || nextStatus === 'preparing';
+    const shouldCreateProductionJobs = nextStatus === 'preparing';
 
+    let tenantName: string | null = null;
     const updated = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: { status: nextStatus },
+      const transition = await this.applyOrderStatusTransitionInTransaction(tx, {
+        tenantId,
+        orderId,
+        expectedCurrentStatus: currentStatus,
+        targetStatus: nextStatus,
       });
 
       // Status side effects
       if (nextStatus === 'completed' || nextStatus === 'cancelled') {
+        await tx.dineInTable.updateMany({
+          where: { tenantId, activeOrderId: orderId },
+          data: { status: 'free', activeOrderId: null },
+        });
         if (order.deliveryDriverId) {
-          await tx.deliveryDriver.update({
-            where: { id: order.deliveryDriverId },
-            data: { status: 'available' },
+          const activeRunCount = await tx.deliveryRun.count({
+            where: {
+              tenantId,
+              driverId: order.deliveryDriverId,
+              status: { in: ['PENDING_ACCEPTANCE', 'ASSIGNED', 'IN_PROGRESS', 'RETURNING'] },
+            },
           });
+          if (activeRunCount === 0) {
+            await tx.deliveryDriver.update({
+              where: { id: order.deliveryDriverId },
+              data: { status: 'available' },
+            });
+          }
         }
+      }
+
+      if (nextStatus === 'cancelled' && order.isScheduled) {
+        await this.schedulingService.cancelByOrderInTransaction(
+          tx,
+          tenantId,
+          orderId,
+          dto.note,
+        );
       }
 
       await tx.orderTimeline.create({
@@ -984,48 +1504,33 @@ export class OrdersService {
         tx,
       });
 
-      // Emitir via Socket para o storefront (tempo real)
-      if (order.publicTrackingToken) {
-        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, order.orderNumber, nextStatus, dto.note);
-      }
+      await this.authoritativeOrderAnalyticsService?.recordOrderStatusEvent({
+        tenantId,
+        orderId,
+        orderStatus: nextStatus,
+        orderTotal: order.total,
+        occurredAt: new Date(),
+        tx,
+      });
 
+      // Emitir via Socket para o storefront (tempo real)
       // Se for cancelamento, emitir evento específico para o painel administrativo
       if (nextStatus === 'cancelled') {
-        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken || '', order.orderNumber, OrderStatus.cancelled, dto.note);
-        // Também emitimos para o tenant room caso o painel administrativo queira ouvir por lá
-        if (this.ordersGateway.server) {
-          this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderCancelled', { 
-            orderId, 
-            orderNumber: order.orderNumber 
-          });
-        }
-
+        // emitOrderCancelled cobre o room do tenant (painel)
+        // emitOrderStatusUpdated já foi enviado acima (linha 1171) para o storefront via publicTrackingToken
         // Reverter estoque teórico
-        await this.inventoryService.reverseOrderDepletion(tenantId, orderId).catch(e => {
-          this.logger.error(`Erro ao reverter estoque para pedido cancelado ${orderId}: ${e.message}`);
-        });
+        await this.inventoryService.reverseOrderDepletionInTransaction(tx, tenantId, orderId);
       }
 
       // Se pedido foi marcado como pronto, emitir notificação especial
-      if (nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery') {
-        this.ordersGateway.emitOrderReady(
-          tenantId,
-          order.orderNumber,
-          order.customerName || undefined,
-          order.fulfillmentType || undefined,
-        );
-      }
-
       // Disparar notificação WhatsApp (fire-and-forget, não bloqueia a transação)
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
-      if (order.customerPhone && tenant) {
-        this.whatsappService
-          .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, nextStatus, tenant.name)
-          .catch((err) => this.logger.warn(`WhatsApp notification failed: ${err.message}`));
-      }
+      tenantName = tenant?.name ?? null;
 
-      return updated;
+      return transition.updatedOrder;
     });
+
+    this.runOrderStatusPostCommitEffects(order, tenantId, orderId, nextStatus, dto.note, tenantName);
 
     if (shouldCreateProductionJobs) {
       const jobs = await this.kdsService.createProductionJobs(orderId, tenantId);
@@ -1041,6 +1546,9 @@ export class OrdersService {
           this.logger.error(`No active production jobs found for order ${orderId} after status ${nextStatus}`);
         }
       }
+
+      const orderDetail = await this.getOrderDetail(orderId, tenantId);
+      await this.printingService.createMainReceiptJobForOrder(tenantId, orderId, orderDetail);
     }
 
     if (nextStatus === 'completed') {
@@ -1049,18 +1557,213 @@ export class OrdersService {
         this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
       ]);
     }
+    const cancelledRun = nextStatus === 'cancelled'
+      ? await this.deliveryRunsService?.cancelStopFromOrderCancellation(
+          tenantId,
+          orderId,
+          dto.note ?? 'Pedido cancelado',
+        )
+      : null;
 
-    await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+    if (nextStatus === 'ready_for_delivery') {
+      const pendingStop = await this.prisma.deliveryStop.findFirst({
+        where: {
+          tenantId,
+          orderId,
+          status: 'PENDING',
+          run: { status: { in: ['PENDING_ACCEPTANCE', 'ASSIGNED'] } },
+        },
+        select: { id: true, run: { select: { id: true, driverId: true } } },
+      });
+      if (pendingStop) {
+        const occurredAt = new Date().toISOString();
+        this.deliveryTrackingGateway?.emitDriverRouteEvent(tenantId, pendingStop.run.driverId, {
+          eventId: `delivery.stop_updated:${pendingStop.run.id}:${pendingStop.id}:${occurredAt}`,
+          type: 'delivery.stop_updated',
+          change: 'updated',
+          runId: pendingStop.run.id,
+          stopId: pendingStop.id,
+          occurredAt,
+        });
+      }
+    }
+
+    if (order.deliveryDriverId) {
+      const event = this.createDriverDeliveryEvent(
+        nextStatus === 'cancelled' ? 'delivery.cancelled' : 'delivery.updated',
+        orderId,
+        order.orderNumber,
+        nextStatus,
+        updated.updatedAt,
+      );
+      this.deliveryTrackingGateway?.emitDriverDeliveryEvent(tenantId, order.deliveryDriverId, event);
+      if (nextStatus === 'cancelled') {
+        this.enqueueDriverDeliveryPush(tenantId, order.deliveryDriverId, event, {
+          title: 'Entrega cancelada',
+          body: `O pedido #${order.orderNumber} foi cancelado.`,
+        });
+        if (cancelledRun) {
+          const stop = cancelledRun.stops.find((item) => item.orderId === orderId);
+          const occurredAt = new Date().toISOString();
+          const routeEvent: DriverRouteEvent = {
+            eventId: `delivery.stop_updated:${cancelledRun.id}:${stop?.id ?? orderId}:${occurredAt}`,
+            type: 'delivery.stop_updated',
+            change: 'cancelled',
+            runId: cancelledRun.id,
+            ...(stop ? { stopId: stop.id } : {}),
+            occurredAt,
+          };
+          this.deliveryTrackingGateway?.emitDriverRouteEvent(
+            tenantId,
+            order.deliveryDriverId,
+            routeEvent,
+          );
+        }
+      }
+    }
+
+    return updated;
+  }
+
+  private runOrderStatusPostCommitEffects(
+    order: PrismaOrder,
+    tenantId: string,
+    orderId: string,
+    nextStatus: OrderStatus,
+    note: string | undefined,
+    tenantName: string | null,
+  ): void {
+    const reportRealtimeFailure = (effect: string, error: unknown) => {
+      this.logger.error(`Order status persisted but ${effect} failed for ${orderId}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    };
+
+    try {
+      if (order.publicTrackingToken) {
+        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, order.orderNumber, nextStatus, note);
+      }
+    } catch (error) {
+      reportRealtimeFailure('public tracking notification', error);
+    }
+    try {
+      if (nextStatus === 'cancelled') {
+        this.ordersGateway.emitOrderCancelled(tenantId, { orderId, orderNumber: order.orderNumber });
+      }
+    } catch (error) {
+      reportRealtimeFailure('cancellation notification', error);
+    }
+    try {
+      if (nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery') {
+        this.ordersGateway.emitOrderReady(
+          tenantId,
+          order.orderNumber,
+          order.customerName || undefined,
+          order.fulfillmentType || undefined,
+          orderId,
+        );
+      }
+    } catch (error) {
+      reportRealtimeFailure('ready notification', error);
+    }
+    try {
+      this.ordersGateway.emitOrderChanged(
+        tenantId,
+        orderId,
+        nextStatus === 'cancelled'
+          ? 'cancelled'
+          : nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery'
+            ? 'ready'
+            : 'status',
+      );
+    } catch (error) {
+      reportRealtimeFailure('order.changed notification', error);
+    }
+
+    if (order.customerPhone && tenantName) {
+      this.whatsappService
+        .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, nextStatus, tenantName)
+        .catch((error: unknown) => this.logger.warn(`WhatsApp notification failed: ${error instanceof Error ? error.message : 'unknown error'}`));
+    }
+  }
+
+  async confirmPosOrderInTransaction(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+    actorId: string,
+  ) {
+    const order = await tx.order.findFirst({ where: { id: orderId, tenantId } });
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    const currentStatus = order.status as OrderStatus;
+    if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(OrderStatus.confirmed)) {
+      throw new BadRequestException(`Transição inválida de ${currentStatus} para ${OrderStatus.confirmed}`);
+    }
+
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.confirmed },
+    });
+
+    await tx.orderTimeline.create({
+      data: {
+        orderId,
+        tenantId,
+        status: OrderStatus.confirmed,
+        note: 'Venda finalizada via PDV.',
+        actorId,
+      },
+    });
+
+    await this.revenueLedgerService.recordOrderStatusEvent({
       tenantId,
       orderId,
-      status: nextStatus,
-      reason: dto.note ?? null,
-    }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Unknown marketplace status sync error';
-      this.logger.warn(`Marketplace status sync failed for order ${orderId}: ${message}`);
+      orderStatus: OrderStatus.confirmed,
+      orderTotal: order.total,
+      sourceChannel: order.sourceChannel,
+      occurredAt: new Date(),
+      actorType: 'tenant_user',
+      actorId,
+      reason: 'Venda finalizada via PDV.',
+      tx,
+    });
+
+    await this.authoritativeOrderAnalyticsService?.recordOrderStatusEvent({
+      tenantId,
+      orderId,
+      orderStatus: OrderStatus.confirmed,
+      orderTotal: order.total,
+      occurredAt: new Date(),
+      tx,
     });
 
     return updated;
+  }
+
+  async runConfirmedOrderSideEffects(orderId: string, tenantId: string): Promise<void> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId, status: OrderStatus.confirmed },
+    });
+    if (!order) throw new NotFoundException('Pedido confirmado não encontrado.');
+
+    if (order.publicTrackingToken) {
+      this.ordersGateway.emitOrderStatusUpdated(
+        order.publicTrackingToken,
+        order.orderNumber,
+        OrderStatus.confirmed,
+        'Venda finalizada via PDV.',
+      );
+    }
+
+    const orderDetail = await this.getOrderDetail(orderId, tenantId);
+    await this.printingService.createMainReceiptJobForOrder(tenantId, orderId, orderDetail);
+
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (order.customerPhone && tenant) {
+      await this.whatsappService
+        .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, OrderStatus.confirmed, tenant.name)
+        .catch((error: Error) => this.logger.warn(`WhatsApp notification failed: ${error.message}`));
+    }
+    this.ordersGateway.emitOrderChanged(tenantId, orderId, 'status');
   }
 
   async updateOrderNotes(orderId: string, tenantId: string, dto: UpdateOrderNotesDTO, actorId?: string) {
@@ -1070,7 +1773,7 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { notes: dto.notes || null },
@@ -1092,6 +1795,8 @@ export class OrdersService {
 
       return updated;
     });
+    this.ordersGateway.emitOrderChanged(tenantId, orderId, 'edited');
+    return updated;
   }
 
   async editOrder(orderId: string, tenantId: string, dto: EditOrderDTO, actorId?: string) {
@@ -1246,6 +1951,7 @@ export class OrdersService {
           itemsSubtotal,
           discountTotal: discountTotal || 0,
           deliveryFee,
+          normalDeliveryFee: deliveryFee,
           total: total,
         },
       });
@@ -1292,11 +1998,7 @@ export class OrdersService {
       });
     }, { timeout: 20000 });
 
-    // Notify sockets
-    this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderUpdated', { 
-      orderId: order.id, 
-      orderNumber: order.orderNumber 
-    });
+    this.ordersGateway.emitOrderChanged(tenantId, order.id, 'edited');
 
     return this.getOrderDetail(order.id, tenantId);
   }
@@ -1412,13 +2114,20 @@ export class OrdersService {
   ): Promise<OrderDispatchItemDTO> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
-      include: { deliveryDriver: true },
+      include: {
+        deliveryDriver: true,
+        marketplaceOrders: { select: { provider: true, deliveryOwnership: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
     if (order.fulfillmentType !== 'delivery') {
       throw new BadRequestException('Somente pedidos de entrega podem receber entregador.');
+    }
+
+    if (driverId && !evaluateOwnFleetEligibility(order.marketplaceOrders).eligible) {
+      throw new BadRequestException('A logistica deste pedido pertence ao marketplace e nao pode receber entregador interno.');
     }
 
     const previousDriverId = order.deliveryDriverId;
@@ -1505,7 +2214,69 @@ export class OrdersService {
       orderNumber: refreshed.orderNumber,
     });
 
+    const eventType = driverId && previousDriverId !== driverId
+      ? 'delivery.assigned'
+      : 'delivery.updated';
+    const driverEvent = this.createDriverDeliveryEvent(
+      eventType,
+      orderId,
+      refreshed.orderNumber,
+      refreshed.status,
+      refreshed.updatedAt,
+    );
+
+    if (driverId && eventType === 'delivery.assigned') {
+      this.deliveryTrackingGateway?.emitDriverDeliveryEvent(tenantId, driverId, driverEvent);
+    }
+    if (previousDriverId && previousDriverId !== driverId) {
+      const removedEvent = { ...driverEvent, type: 'delivery.updated' as const };
+      this.deliveryTrackingGateway?.emitDriverDeliveryEvent(tenantId, previousDriverId, removedEvent);
+      this.enqueueDriverDeliveryPush(tenantId, previousDriverId, removedEvent, {
+        title: 'Entrega removida',
+        body: `O pedido #${refreshed.orderNumber} não está mais atribuído a você.`,
+      });
+    }
+
+    if (driverId && eventType === 'delivery.assigned') {
+      this.enqueueDriverDeliveryPush(tenantId, driverId, driverEvent, {
+        title: 'Nova Entrega Atribuída!',
+        body: `Você foi designado para o pedido #${refreshed.orderNumber}.`,
+      });
+    }
+
     return this.mapOrderToDispatchItem(refreshed);
+  }
+
+  private createDriverDeliveryEvent(
+    type: DriverDeliveryEvent['type'],
+    orderId: string,
+    orderNumber: string,
+    status: OrderStatus,
+    occurredAt: Date,
+  ): DriverDeliveryEvent {
+    const timestamp = occurredAt.toISOString();
+    return {
+      eventId: `${type}:${orderId}:${timestamp}`,
+      type,
+      orderId,
+      orderNumber,
+      status,
+      occurredAt: timestamp,
+    };
+  }
+
+  private enqueueDriverDeliveryPush(
+    tenantId: string,
+    driverId: string,
+    event: DriverDeliveryEvent,
+    message: { title: string; body: string },
+  ) {
+    this.pushService.enqueueDriverNotification(tenantId, driverId, {
+      ...message,
+      tag: `delivery-${event.orderId}`,
+      url: '/',
+      data: { ...event, url: '/' },
+    }).catch((error: unknown) => this.logger.error('Error enqueueing driver push', error));
   }
 
   async logPrint(orderId: string, tenantId: string, actorId?: string) {

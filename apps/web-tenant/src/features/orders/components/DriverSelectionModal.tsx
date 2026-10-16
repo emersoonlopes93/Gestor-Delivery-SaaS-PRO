@@ -30,8 +30,13 @@ export const DriverSelectionModal = memo(function DriverSelectionModal({
             <h2 className="text-lg font-black text-muted-foreground900 dark:text-white tracking-tight">Atribuir Entregador</h2>
             <p className="text-xs text-muted-foreground500 font-medium mt-0.5">Selecione quem fará a entrega</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-muted200 dark:hover:bg-muted700 rounded-xl transition-colors">
-            <X className="w-5 h-5 text-muted-foreground500" />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar atribuição de entregador"
+            className="rounded-xl p-2 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-background dark:text-slate-100 dark:hover:bg-slate-700 dark:hover:text-white dark:focus:ring-offset-slate-900"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
 

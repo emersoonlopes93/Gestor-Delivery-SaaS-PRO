@@ -4,7 +4,7 @@ import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
 import { TenantDefaultRole, TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
-import type { BusinessGroupRole, CreateBranchRequest, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
+import type { BusinessGroupRole, CreateBranchRequest, PlatformBrandingDTO, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
 import { 
   getStorefrontPresetById,
@@ -13,6 +13,32 @@ import {
 } from '@gestor/theme';
 import { StorefrontCustomizationPayload } from '@gestor/types';
 import { ensureDefaultTenantRoles } from './default-tenant-roles';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
+import { omitTenantFinancialSecrets } from '../payment-foundation/payment-secret-redaction';
+
+type TenantUserLookupClient = Pick<Prisma.TransactionClient, 'tenantUser'>;
+
+function prismaUniqueConstraintTargets(error: unknown): string[] {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return [];
+  }
+
+  const target = error.meta?.target;
+  if (Array.isArray(target)) {
+    return target.filter((item): item is string => typeof item === 'string');
+  }
+  return typeof target === 'string' ? [target] : [];
+}
+
+function isBranchSlugConflict(error: unknown): boolean {
+  return prismaUniqueConstraintTargets(error).some((target) => target.toLowerCase().includes('slug'));
+}
+
+function isTenantUserIdentityConflict(error: unknown): boolean {
+  const targets = prismaUniqueConstraintTargets(error).map((target) => target.toLowerCase());
+  return targets.some((target) => target.includes('tenant_id') || target.includes('tenantid'))
+    && targets.some((target) => target.includes('email'));
+}
 
 @Injectable()
 export class TenantService {
@@ -22,6 +48,25 @@ export class TenantService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  async getPlatformBranding(): Promise<PlatformBrandingDTO> {
+    const config = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: {
+        appName: true,
+        platformLogoMedia: {
+          select: {
+            publicUrl: true,
+          },
+        },
+      },
+    });
+
+    return {
+      systemName: config?.appName ?? 'PedeHub',
+      logoUrl: config?.platformLogoMedia?.publicUrl ?? null,
+    };
+  }
 
   private async invalidateStorefrontCacheByTenantId(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
@@ -36,8 +81,8 @@ export class TenantService {
     ]);
   }
 
-  private async findOwnerUser(tenantId: string) {
-    return this.prisma.tenantUser.findFirst({
+  private async findOwnerUser(tenantId: string, client: TenantUserLookupClient = this.prisma) {
+    return client.tenantUser.findFirst({
       where: {
         tenantId,
         isActive: true,
@@ -250,7 +295,10 @@ export class TenantService {
       }
     }
 
-    return tenant;
+    return {
+      ...tenant,
+      settings: tenant.settings ? omitTenantFinancialSecrets(tenant.settings) : null,
+    };
   }
 
   async getNetworkContext(tenantId: string) {
@@ -258,53 +306,6 @@ export class TenantService {
   }
 
   async createBranch(tenantId: string, currentUserId: string, dto: CreateBranchRequest) {
-    const currentUser = await this.prisma.tenantUser.findFirst({
-      where: {
-        id: currentUserId,
-        tenantId,
-        isActive: true,
-        userRoles: {
-          some: {
-            role: {
-              slug: TenantDefaultRole.TENANT_OWNER,
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!currentUser) {
-      throw new ForbiddenException('Apenas a conta dona da matriz pode criar filiais');
-    }
-
-    const currentTenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        status: true,
-        businessGroupId: true,
-        businessGroupRole: true,
-      },
-    });
-
-    if (!currentTenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    if (currentTenant.businessGroupId && currentTenant.businessGroupRole === 'branch') {
-      throw new ForbiddenException('Somente a matriz pode criar novas filiais');
-    }
-
-    const ownerUser = await this.findOwnerUser(tenantId);
-    if (!ownerUser) {
-      throw new BadRequestException('A loja precisa ter um dono ativo para criar filiais');
-    }
-
     const sanitizedName = dto.name.trim();
     if (!sanitizedName) {
       throw new BadRequestException('Nome da filial é obrigatório');
@@ -321,106 +322,199 @@ export class TenantService {
       throw new BadRequestException('Slug inválido para a filial');
     }
 
-    const existingTenant = await this.prisma.tenant.findUnique({
-      where: { slug: sanitizedSlugBase },
-      select: { id: true },
-    });
+    try {
+      await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx) => {
+          const currentUser = await tx.tenantUser.findFirst({
+            where: {
+              id: currentUserId,
+              tenantId,
+              isActive: true,
+              userRoles: {
+                some: {
+                  role: {
+                    slug: TenantDefaultRole.TENANT_OWNER,
+                  },
+                },
+              },
+            },
+            select: { id: true },
+          });
 
-    if (existingTenant) {
-      throw new ConflictException('Já existe uma loja com este slug');
-    }
+          if (!currentUser) {
+            throw new ForbiddenException('Apenas a conta dona da matriz pode criar filiais');
+          }
 
-    await this.prisma.$transaction(async (tx) => {
-      let businessGroupId = currentTenant.businessGroupId;
+          const currentTenant = await tx.tenant.findUnique({
+            where: { id: tenantId },
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              businessGroupId: true,
+              businessGroupRole: true,
+            },
+          });
 
-      if (!businessGroupId) {
-        const createdGroup = await tx.businessGroup.create({
-          data: {
-            name: `${currentTenant.name} Rede`,
-            ownerId: ownerUser.id,
-            headquartersTenantId: tenantId,
-          },
-        });
+          if (!currentTenant) {
+            throw new NotFoundException('Tenant not found');
+          }
+          if (currentTenant.businessGroupId && currentTenant.businessGroupRole === 'branch') {
+            throw new ForbiddenException('Somente a matriz pode criar novas filiais');
+          }
 
-        businessGroupId = createdGroup.id;
+          const ownerUser = await this.findOwnerUser(tenantId, tx);
+          if (!ownerUser) {
+            throw new BadRequestException('A loja precisa ter um dono ativo para criar filiais');
+          }
+          const normalizedOwnerEmail = ownerUser.email.trim().toLowerCase();
 
-        await tx.tenant.update({
-          where: { id: tenantId },
-          data: {
-            businessGroupId,
-            businessGroupRole: 'headquarters',
-          },
+          let businessGroupId = currentTenant.businessGroupId;
+          if (!businessGroupId) {
+            const createdGroup = await tx.businessGroup.create({
+              data: {
+                name: `${currentTenant.name} Rede`,
+                ownerId: ownerUser.id,
+                headquartersTenantId: tenantId,
+              },
+            });
+            businessGroupId = createdGroup.id;
+
+            await tx.tenant.update({
+              where: { id: tenantId },
+              data: {
+                businessGroupId,
+                businessGroupRole: 'headquarters',
+              },
+            });
+          }
+
+          const existingTenant = await tx.tenant.findUnique({
+            where: { slug: sanitizedSlugBase },
+            select: {
+              id: true,
+              name: true,
+              businessGroupId: true,
+              businessGroupRole: true,
+              users: {
+                where: {
+                  email: normalizedOwnerEmail,
+                  isActive: true,
+                },
+                select: {
+                  userRoles: {
+                    where: { role: { slug: TenantDefaultRole.TENANT_OWNER } },
+                    select: { id: true },
+                  },
+                },
+              },
+            },
+          });
+
+          if (existingTenant) {
+            const isSameCompletedAttempt =
+              existingTenant.name === sanitizedName
+              && existingTenant.businessGroupId === businessGroupId
+              && existingTenant.businessGroupRole === 'branch'
+              && existingTenant.users.some((user) => user.userRoles.length > 0);
+
+            if (isSameCompletedAttempt) {
+              return;
+            }
+
+            throw new ConflictException({
+              code: 'BRANCH_SLUG_CONFLICT',
+              message: 'Já existe uma loja incompatível com este slug.',
+            });
+          }
+
+          const createdTenant = await tx.tenant.create({
+            data: {
+              name: sanitizedName,
+              slug: sanitizedSlugBase,
+              status: currentTenant.status,
+              businessGroupId,
+              businessGroupRole: 'branch',
+              onboarding: {
+                create: {
+                  stepBasicInfo: false,
+                  stepOperatingHours: false,
+                  stepLogo: false,
+                  stepAddress: false,
+                  stepDelivery: false,
+                  stepPayments: false,
+                  stepWhatsapp: false,
+                  stepMenu: false,
+                  stepCatalog: false,
+                  stepFirstOrder: false,
+                },
+              },
+              settings: { create: {} },
+              aiAgentConfig: {
+                create: {
+                  isEnabled: false,
+                  useGlobalDefaults: true,
+                  humanInterventionEnabled: true,
+                  humanInterventionMinutes: 15,
+                  resumeAutomatically: true,
+                },
+              },
+              schedulingSettings: {
+                create: {
+                  enabled: false,
+                  maximumAdvanceDays: 7,
+                  timezone: 'America/Sao_Paulo',
+                },
+              },
+            },
+          });
+
+          const createdUser = await tx.tenantUser.create({
+            data: {
+              tenantId: createdTenant.id,
+              email: normalizedOwnerEmail,
+              name: ownerUser.name,
+              passwordHash: ownerUser.passwordHash,
+              isActive: true,
+            },
+          });
+
+          await ensureDefaultTenantRoles(tx, createdTenant.id);
+          const ownerRole = await tx.tenantRole.findFirstOrThrow({
+            where: {
+              tenantId: createdTenant.id,
+              slug: TenantDefaultRole.TENANT_OWNER,
+            },
+          });
+
+          await tx.tenantUserRole.create({
+            data: {
+              userId: createdUser.id,
+              roleId: ownerRole.id,
+            },
+          });
+        },
+        {
+          isAdditionalRetryableError: isBranchSlugConflict,
+          onRetry: (attempt) => this.logger.warn(`Retrying branch creation after a database conflict (attempt ${attempt})`),
+        },
+      );
+    } catch (error) {
+      if (isTenantUserIdentityConflict(error)) {
+        throw new ConflictException({
+          code: 'BRANCH_OWNER_LINK_CONFLICT',
+          message: 'A conta dona já possui um vínculo incompatível com a filial solicitada.',
         });
       }
-
-      const createdTenant = await tx.tenant.create({
-        data: {
-          name: sanitizedName,
-          slug: sanitizedSlugBase,
-          status: currentTenant.status,
-          businessGroupId,
-          businessGroupRole: 'branch',
-          onboarding: {
-            create: {
-              stepBasicInfo: false,
-              stepOperatingHours: false,
-              stepLogo: false,
-              stepAddress: false,
-              stepDelivery: false,
-              stepPayments: false,
-              stepWhatsapp: false,
-              stepMenu: false,
-              stepCatalog: false,
-              stepFirstOrder: false,
-            },
-          },
-          settings: {
-            create: {},
-          },
-          aiAgentConfig: {
-            create: {
-              isEnabled: false,
-              useGlobalDefaults: true,
-              humanInterventionEnabled: true,
-              humanInterventionMinutes: 15,
-              resumeAutomatically: true,
-            },
-          },
-          schedulingSettings: {
-            create: {
-              enabled: false,
-              maximumAdvanceDays: 7,
-              timezone: 'America/Sao_Paulo',
-            },
-          },
-        },
-      });
-
-      const createdUser = await tx.tenantUser.create({
-        data: {
-          tenantId: createdTenant.id,
-          email: ownerUser.email.toLowerCase(),
-          name: ownerUser.name,
-          passwordHash: ownerUser.passwordHash,
-          isActive: true,
-        },
-      });
-
-      await ensureDefaultTenantRoles(tx, createdTenant.id);
-      const ownerRole = await tx.tenantRole.findFirstOrThrow({
-        where: {
-          tenantId: createdTenant.id,
-          slug: TenantDefaultRole.TENANT_OWNER,
-        },
-      });
-
-      await tx.tenantUserRole.create({
-        data: {
-          userId: createdUser.id,
-          roleId: ownerRole.id,
-        },
-      });
-    });
+      if (isBranchSlugConflict(error)) {
+        throw new ConflictException({
+          code: 'BRANCH_SLUG_CONFLICT',
+          message: 'Já existe uma loja incompatível com este slug.',
+        });
+      }
+      throw error;
+    }
 
     return this.buildNetworkContextInternal(tenantId);
   }
@@ -434,7 +528,10 @@ export class TenantService {
       include: { settings: true },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
-    return tenant;
+    return {
+      ...tenant,
+      settings: tenant.settings ? omitTenantFinancialSecrets(tenant.settings) : null,
+    };
   }
 
   /**
@@ -495,7 +592,7 @@ export class TenantService {
 
     await this.invalidateStorefrontCacheByTenantId(tenantId);
 
-    return updated;
+    return omitTenantFinancialSecrets(updated);
   }
 
   /**
@@ -632,7 +729,24 @@ export class TenantService {
     }
 
     if (data.layout) {
-      updateData.storefrontLayoutJson = normalizeStorefrontLayout(data.layout) as Prisma.InputJsonValue;
+      const layoutSettings = normalizeStorefrontLayout(data.layout);
+      const configuredProductIds = layoutSettings.showcase.manualProductIds;
+
+      if (configuredProductIds.length > 0) {
+        const tenantProducts = await this.prisma.product.findMany({
+          where: {
+            tenantId,
+            id: { in: configuredProductIds },
+          },
+          select: { id: true },
+        });
+
+        if (tenantProducts.length !== configuredProductIds.length) {
+          throw new BadRequestException('Um ou mais produtos da vitrine são inválidos para esta loja.');
+        }
+      }
+
+      updateData.storefrontLayoutJson = layoutSettings as Prisma.InputJsonValue;
     }
 
     if (!updateData.storefrontThemeJson && !updateData.storefrontLayoutJson) {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { SupplierDTO, CreateSupplierDTO } from '@gestor/types';
 
@@ -14,6 +14,7 @@ import { Modal } from '../../components/Modal';
 
 export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: SupplierModalProps) {
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CreateSupplierDTO>();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingSupplier) {
@@ -35,6 +36,18 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
     }
   }, [editingSupplier, reset]);
 
+  const handleSave = async (data: CreateSupplierDTO) => {
+    setSubmitError(null);
+    try {
+      await onSave({
+        ...data,
+        cnpj: data.cnpj?.trim() || undefined,
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar o fornecedor.');
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -50,7 +63,7 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
             Cancelar
           </button>
           <button
-            onClick={handleSubmit(onSave)}
+            onClick={handleSubmit(handleSave)}
             disabled={isSubmitting}
             className="px-6 py-2 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-all shadow-md shadow-primary-500/20"
           >
@@ -59,7 +72,7 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
         </>
       }
     >
-      <form onSubmit={handleSubmit(onSave)} className="space-y-4 text-left">
+      <form onSubmit={handleSubmit(handleSave)} className="space-y-4 text-left">
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Nome / Razão Social</label>
@@ -70,6 +83,8 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
             />
             {errors.name && <span className="text-red-500 text-xs mt-1">{errors.name.message}</span>}
           </div>
+
+          {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">CNPJ / CPF</label>
