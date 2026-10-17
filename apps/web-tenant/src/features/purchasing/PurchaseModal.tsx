@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, FinancialAccountDTO, PaymentStatus } from '@gestor/types';
+import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, FinancialAccountDTO, PaymentStatus, PurchasePresentationDTO } from '@gestor/types';
 import { api } from '../../lib/api-client';
 import { Plus, Trash2, ChevronDown } from 'lucide-react';
 
@@ -16,6 +16,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
+  const [presentations, setPresentations] = useState<Record<string, PurchasePresentationDTO[]>>({});
 
   const createIdempotencyKey = () => typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
@@ -23,7 +24,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
 
   const { register, control, handleSubmit, watch, reset, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
     defaultValues: {
-      items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
+      items: [{ ingredientId: '', purchaseQuantity: 1, lineTotal: 0 }],
       paymentStatus: PaymentStatus.PAID,
       purchaseDate: new Date().toISOString().split('T')[0],
       idempotencyKey: createIdempotencyKey(),
@@ -36,12 +37,13 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   });
 
   const items = watch("items");
-  const totalValue = items.reduce((acc: number, item) => acc + (Number(item.quantity) * Number(item.unitCost)), 0);
+  const totalValue = items.reduce((acc: number, item) => acc + Number(item.lineTotal ?? 0), 0);
+  const ingredientIds = items.map((item) => item.ingredientId).filter(Boolean).sort().join(',');
 
   useEffect(() => {
     if (isOpen) {
       reset({
-        items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
+        items: [{ ingredientId: '', purchaseQuantity: 1, lineTotal: 0 }],
         paymentStatus: PaymentStatus.PAID,
         purchaseDate: new Date().toISOString().split('T')[0],
         idempotencyKey: createIdempotencyKey(),
@@ -49,6 +51,19 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
       loadData();
     }
   }, [isOpen, reset]);
+
+  useEffect(() => {
+    const ids = ingredientIds.split(',').filter(Boolean);
+    if (!ids.length) return;
+    let active = true;
+    void Promise.all(ids.map(async (ingredientId) => {
+      const response = await api.get<PurchasePresentationDTO[]>(`/inventory/ingredients/${ingredientId}/purchase-presentations`);
+      return [ingredientId, response.success ? response.data : []] as const;
+    })).then((entries) => {
+      if (active) setPresentations((current) => ({ ...current, ...Object.fromEntries(entries) }));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [ingredientIds]);
 
   const loadData = async () => {
     try {
@@ -156,7 +171,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Itens da Compra</h3>
             <button
               type="button"
-              onClick={() => append({ ingredientId: '', quantity: 1, unitCost: 0 })}
+              onClick={() => append({ ingredientId: '', purchaseQuantity: 1, lineTotal: 0 })}
               className="text-primary-600 hover:text-primary-700 font-bold text-sm flex items-center gap-1"
             >
               <Plus className="h-4 w-4" /> Adicionar Item
@@ -164,7 +179,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-950 rounded-2xl p-4 overflow-x-auto border border-gray-100 dark:border-gray-800">
-            <table className="w-full min-w-[600px] text-left border-collapse">
+            <table className="w-full min-w-[860px] text-left border-collapse">
               <thead>
                 <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   <th className="px-2 py-2">Insumo</th>
@@ -190,17 +205,29 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                     </td>
                     <td className="py-3 px-2">
                       <input
-                        {...register(`items.${index}.quantity` as const, { required: true, min: 0.0001 })}
+                        {...register(`items.${index}.purchaseQuantity` as const, { required: true, min: 0.0001 })}
                         type="number"
                         step="any"
                         className="input-premium text-sm py-1.5"
                       />
                     </td>
                     <td className="py-3 px-2">
+                      <select
+                        {...register(`items.${index}.purchasePresentationId` as const)}
+                        className="input-premium text-sm py-1.5"
+                        aria-label={`Unidade da compra para o item ${index + 1}`}
+                      >
+                        <option value="">Unidade base ({ingredients.find((ingredient) => ingredient.id === watch(`items.${index}.ingredientId`))?.unit ?? '—'})</option>
+                        {(presentations[watch(`items.${index}.ingredientId`)] ?? []).filter((presentation) => presentation.isActive).map((presentation) => (
+                          <option key={presentation.id} value={presentation.id}>{presentation.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-3 px-2">
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">R$</span>
                         <input
-                          {...register(`items.${index}.unitCost` as const, { required: true, min: 0 })}
+                          {...register(`items.${index}.lineTotal` as const, { required: true, min: 0 })}
                           type="number"
                           step="any"
                           className="input-premium text-sm py-1.5 pl-9"
@@ -209,7 +236,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                     </td>
                     <td className="py-3 px-2 text-right font-bold text-gray-900 dark:text-gray-100 text-sm">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                        (watch(`items.${index}.quantity`) || 0) * (watch(`items.${index}.unitCost`) || 0)
+                        Number(watch(`items.${index}.lineTotal`) ?? 0)
                       )}
                     </td>
                     <td className="py-3 px-2 text-right">

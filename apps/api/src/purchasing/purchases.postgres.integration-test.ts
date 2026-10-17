@@ -29,6 +29,7 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
   const prisma = new PrismaClient();
   const service = new PurchasesService(prisma as never);
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  let fixtureSequence = 0;
 
   beforeAll(async () => {
     assertLocalDatabase();
@@ -40,11 +41,12 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
   });
 
   async function fixtures(label: string) {
-    const tenant = await prisma.tenant.create({ data: { name: `Purchase ${label}`, slug: `purchase-${label}-${suffix}` } });
+    const fixtureId = `${fixtureSequence += 1}-${suffix}`;
+    const tenant = await prisma.tenant.create({ data: { name: `Purchase ${label}`, slug: `purchase-${fixtureId}` } });
     const [supplier, ingredient, account] = await Promise.all([
       prisma.supplier.create({ data: { tenantId: tenant.id, name: `Supplier ${label}` } }),
       prisma.ingredient.create({ data: {
-        tenantId: tenant.id, name: `Ingredient ${label}`, sku: `sku-${label}-${suffix}`, unit: UnitType.un,
+        tenantId: tenant.id, name: `Ingredient ${label}`, sku: `sku-${fixtureId}`, unit: UnitType.un,
         currentStock: 0, currentCost: 0,
       } }),
       prisma.financialAccount.create({ data: { tenantId: tenant.id, name: `Account ${label}`, balance: 1000, active: true } }),
@@ -130,6 +132,151 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
       .rejects.toThrow('Conta financeira ativa nao encontrada.');
     expect(await prisma.purchase.count({ where: { tenantId: tenant.id } })).toBe(1);
   }, 60_000);
+
+  it('derives immutable base-unit snapshots from an active purchase presentation', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('presentation');
+    const presentation = await prisma.purchasePresentation.create({
+      data: { tenantId: tenant.id, ingredientId: ingredient.id, label: 'Caixa com 50', conversionFactor: 50 },
+    });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id,
+      idempotencyKey: `purchase-presentation-${suffix}`,
+      paymentStatus: PaymentStatus.PENDING,
+      items: [{
+        ingredientId: ingredient.id,
+        purchasePresentationId: presentation.id,
+        purchaseQuantity: 1,
+        lineTotal: 12.99,
+      }],
+    });
+
+    const item = await prisma.purchaseItem.findFirstOrThrow({ where: { purchaseId: purchase.id } });
+    expect(Number(item.quantity)).toBe(50);
+    expect(Number(item.unitCost)).toBe(0.2598);
+    expect(Number(item.totalCost)).toBe(12.99);
+    expect(item.purchasePresentationId).toBe(presentation.id);
+    expect(Number(item.purchaseQuantity)).toBe(1);
+    expect(item.purchasePresentationLabel).toBe('Caixa com 50');
+    expect(Number(item.conversionFactorSnapshot)).toBe(50);
+
+    await prisma.purchasePresentation.update({
+      where: { id: presentation.id },
+      data: { label: 'Caixa alterada', conversionFactor: 100 },
+    });
+    const unchanged = await prisma.purchaseItem.findUniqueOrThrow({ where: { id: item.id } });
+    expect(unchanged.purchasePresentationLabel).toBe('Caixa com 50');
+    expect(Number(unchanged.conversionFactorSnapshot)).toBe(50);
+
+    await service.cancel(tenant.id, purchase.id);
+    const reversal = await prisma.stockMovement.findFirstOrThrow({
+      where: { tenantId: tenant.id, purchaseId: purchase.id, type: StockMovementType.purchase_reversal },
+    });
+    expect(Number(reversal.quantity)).toBe(50);
+    expect(Number((await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } })).currentStock)).toBe(0);
+  });
+
+  it('keeps each purchase snapshot when an ingredient has multiple presentations', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('multiple-presentations');
+    const [packageOfFifty, boxOfOneHundred] = await Promise.all([
+      prisma.purchasePresentation.create({
+        data: { tenantId: tenant.id, ingredientId: ingredient.id, label: 'Pacote 50', conversionFactor: 50 },
+      }),
+      prisma.purchasePresentation.create({
+        data: { tenantId: tenant.id, ingredientId: ingredient.id, label: 'Caixa 100', conversionFactor: 100 },
+      }),
+    ]);
+    const [first, second] = await Promise.all([
+      service.create(tenant.id, {
+        supplierId: supplier.id, idempotencyKey: `package-50-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+        items: [{ ingredientId: ingredient.id, purchasePresentationId: packageOfFifty.id, purchaseQuantity: 1, lineTotal: 12.99 }],
+      }),
+      service.create(tenant.id, {
+        supplierId: supplier.id, idempotencyKey: `box-100-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+        items: [{ ingredientId: ingredient.id, purchasePresentationId: boxOfOneHundred.id, purchaseQuantity: 1, lineTotal: 20 }],
+      }),
+    ]);
+    const items = await prisma.purchaseItem.findMany({ where: { purchaseId: { in: [first.id, second.id] } }, orderBy: { purchaseId: 'asc' } });
+    expect(items).toHaveLength(2);
+    expect(items.map((item) => Number(item.quantity)).sort((left, right) => left - right)).toEqual([50, 100]);
+    expect(items.map((item) => Number(item.conversionFactorSnapshot)).sort((left, right) => left - right)).toEqual([50, 100]);
+  });
+
+  it('rejects inactive or unrelated purchase presentations without persisting a purchase', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('presentation-rejection');
+    const foreignIngredient = await prisma.ingredient.create({
+      data: {
+        tenantId: tenant.id,
+        name: `Other ingredient ${suffix}`,
+        sku: `other-${suffix}`,
+        unit: UnitType.un,
+      },
+    });
+    const inactive = await prisma.purchasePresentation.create({
+      data: { tenantId: tenant.id, ingredientId: ingredient.id, label: 'Inativa', conversionFactor: 50, isActive: false },
+    });
+    const unrelated = await prisma.purchasePresentation.create({
+      data: { tenantId: tenant.id, ingredientId: foreignIngredient.id, label: 'Outra', conversionFactor: 50 },
+    });
+    const foreignTenant = await fixtures('presentation-foreign-tenant');
+    const crossTenant = await prisma.purchasePresentation.create({
+      data: { tenantId: foreignTenant.tenant.id, ingredientId: foreignTenant.ingredient.id, label: 'Externa', conversionFactor: 50 },
+    });
+    const createInput = (purchasePresentationId: string, idempotencyKey: string) => ({
+      supplierId: supplier.id,
+      idempotencyKey,
+      paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, purchasePresentationId, purchaseQuantity: 1, lineTotal: 12.99 }],
+    });
+
+    await expect(service.create(tenant.id, createInput(inactive.id, `purchase-inactive-${suffix}`)))
+      .rejects.toThrow('Apresentacao de compra ativa nao encontrada para este insumo.');
+    await expect(service.create(tenant.id, createInput(unrelated.id, `purchase-unrelated-${suffix}`)))
+      .rejects.toThrow('Apresentacao de compra ativa nao encontrada para este insumo.');
+    await expect(service.create(tenant.id, createInput(crossTenant.id, `purchase-cross-tenant-${suffix}`)))
+      .rejects.toThrow('Apresentacao de compra ativa nao encontrada para este insumo.');
+    expect(await prisma.purchase.count({ where: { tenantId: tenant.id } })).toBe(0);
+  });
+
+  it('preserves the legacy direct base-unit purchase contract without snapshots', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('legacy-direct');
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id,
+      idempotencyKey: `legacy-direct-${suffix}`,
+      paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 3, unitCost: 4.5 }],
+    });
+    const item = await prisma.purchaseItem.findFirstOrThrow({ where: { purchaseId: purchase.id } });
+    expect(Number(item.quantity)).toBe(3);
+    expect(Number(item.unitCost)).toBe(4.5);
+    expect(item.purchasePresentationId).toBeNull();
+    expect(item.purchaseQuantity).toBeNull();
+    expect(item.conversionFactorSnapshot).toBeNull();
+  });
+
+  it('rolls back a presentation purchase when entry persistence fails', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('presentation-create-rollback');
+    const presentation = await prisma.purchasePresentation.create({
+      data: { tenantId: tenant.id, ingredientId: ingredient.id, label: 'Fardo 50', conversionFactor: 50 },
+    });
+    await prisma.$executeRawUnsafe("CREATE OR REPLACE FUNCTION fail_purchase_entry_test() RETURNS trigger AS $$ BEGIN IF NEW.type = 'purchase_entry' THEN RAISE EXCEPTION 'injected purchase entry failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql");
+    await prisma.$executeRawUnsafe('CREATE TRIGGER fail_purchase_entry_test BEFORE INSERT ON stock_movements FOR EACH ROW EXECUTE FUNCTION fail_purchase_entry_test()');
+    try {
+      await expect(service.create(tenant.id, {
+        supplierId: supplier.id,
+        idempotencyKey: `purchase-entry-rollback-${suffix}`,
+        paymentStatus: PaymentStatus.PENDING,
+        items: [{ ingredientId: ingredient.id, purchasePresentationId: presentation.id, purchaseQuantity: 1, lineTotal: 12.99 }],
+      })).rejects.toThrow('injected purchase entry failure');
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_purchase_entry_test ON stock_movements');
+      await prisma.$executeRawUnsafe('DROP FUNCTION IF EXISTS fail_purchase_entry_test()');
+    }
+    expect(await prisma.purchase.count({ where: { tenantId: tenant.id } })).toBe(0);
+    expect(await prisma.purchaseItem.count({ where: { tenantId: tenant.id } })).toBe(0);
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id } })).toBe(0);
+    expect(await prisma.financialTransaction.count({ where: { tenantId: tenant.id } })).toBe(0);
+    expect(Number((await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } })).currentStock)).toBe(0);
+  });
 
   it('rolls back every cancellation effect when stock is insufficient', async () => {
     const { tenant, supplier, ingredient } = await fixtures('insufficient');

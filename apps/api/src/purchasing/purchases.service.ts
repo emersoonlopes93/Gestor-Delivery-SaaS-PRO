@@ -66,11 +66,22 @@ function validateCreateInput(dto: CreatePurchaseDTO): void {
     throw new BadRequestException('Chave de idempotencia invalida.');
   }
   if (!dto.items.length) throw new BadRequestException('A compra precisa ter ao menos um item.');
-  if (dto.items.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0)) {
+  if (dto.items.some((item) => {
+    const quantity = item.purchaseQuantity ?? item.quantity;
+    return !Number.isFinite(Number(quantity)) || Number(quantity) <= 0;
+  })) {
     throw new BadRequestException('Quantidade de item invalida.');
   }
-  if (dto.items.some((item) => !Number.isFinite(Number(item.unitCost)) || Number(item.unitCost) < 0)) {
-    throw new BadRequestException('Custo unitario invalido.');
+  if (dto.items.some((item) => {
+    const lineTotal = item.lineTotal ?? (item.quantity !== undefined && item.unitCost !== undefined
+      ? new Prisma.Decimal(item.quantity).mul(item.unitCost).toNumber()
+      : Number.NaN);
+    return !Number.isFinite(Number(lineTotal)) || Number(lineTotal) < 0;
+  })) {
+    throw new BadRequestException('Valor total do item invalido.');
+  }
+  if (dto.items.some((item) => item.purchasePresentationId && (item.purchaseQuantity === undefined || item.lineTotal === undefined))) {
+    throw new BadRequestException('Apresentacao exige quantidade comprada e valor total da linha.');
   }
   if (dto.paymentStatus === PaymentStatus.PARTIAL || dto.paymentStatus === PaymentStatus.CANCELLED) {
     throw new BadRequestException('Status de pagamento nao suportado para uma nova compra.');
@@ -86,12 +97,20 @@ function fingerprintCreate(dto: CreatePurchaseDTO, purchaseDate: Date, paymentSt
     accountId: dto.accountId ?? null,
     items: dto.items.map((item) => ({
       ingredientId: item.ingredientId,
-      quantity: Number(item.quantity),
-      unitCost: Number(item.unitCost),
+      purchasePresentationId: item.purchasePresentationId ?? null,
+      purchaseQuantity: item.purchaseQuantity ?? null,
+      lineTotal: item.lineTotal ?? null,
+      quantity: item.quantity ?? null,
+      unitCost: item.unitCost ?? null,
       expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString() : null,
     })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
   };
   return createHash('sha256').update(JSON.stringify(economicPayload)).digest('hex');
+}
+
+function lineTotalOf(item: CreatePurchaseDTO['items'][number]): Prisma.Decimal {
+  if (item.lineTotal !== undefined) return new Prisma.Decimal(item.lineTotal);
+  return new Prisma.Decimal(item.quantity as number).mul(item.unitCost as number);
 }
 
 @Injectable()
@@ -120,7 +139,7 @@ export class PurchasesService {
     }
     const fingerprint = fingerprintCreate(dto, purchaseDate, paymentStatus);
     const idempotencyKey = dto.idempotencyKey.trim();
-    const totalValue = dto.items.reduce((total, item) => total + Number(item.quantity) * Number(item.unitCost), 0);
+    const totalValue = dto.items.reduce((total, item) => total.plus(lineTotalOf(item)), new Prisma.Decimal(0));
 
     try {
       const purchaseId = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
@@ -147,7 +166,7 @@ export class PurchasesService {
             tenantId,
             supplierId: dto.supplierId,
             number: dto.number?.trim() || null,
-            totalValue,
+          totalValue,
             status: PrismaPurchaseStatus.received,
             paymentStatus: paymentStatus as PrismaPaymentStatus,
             purchaseDate,
@@ -160,15 +179,28 @@ export class PurchasesService {
         for (const inputItem of dto.items) {
           const ingredient = await tx.ingredient.findFirst({
             where: { id: inputItem.ingredientId, tenantId },
-            select: { id: true, currentStock: true, currentCost: true },
+            select: { id: true, unit: true, currentStock: true, currentCost: true },
           });
           if (!ingredient) throw new NotFoundException(`Insumo ${inputItem.ingredientId} nao encontrado`);
-          const quantity = Number(inputItem.quantity);
-          const unitCost = Number(inputItem.unitCost);
+          const presentation = inputItem.purchasePresentationId
+            ? await tx.purchasePresentation.findFirst({
+              where: { id: inputItem.purchasePresentationId, tenantId, ingredientId: ingredient.id, isActive: true },
+              select: { id: true, label: true, conversionFactor: true },
+            })
+            : null;
+          if (inputItem.purchasePresentationId && !presentation) {
+            throw new NotFoundException('Apresentacao de compra ativa nao encontrada para este insumo.');
+          }
+          const isNewContract = inputItem.purchaseQuantity !== undefined || inputItem.lineTotal !== undefined;
+          const purchaseQuantity = new Prisma.Decimal(inputItem.purchaseQuantity ?? inputItem.quantity as number);
+          const conversionFactor = presentation ? new Prisma.Decimal(presentation.conversionFactor) : new Prisma.Decimal(1);
+          const quantity = purchaseQuantity.mul(conversionFactor);
+          const totalCost = lineTotalOf(inputItem);
+          const unitCost = totalCost.div(quantity).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
           const oldStock = Number(ingredient.currentStock);
           const finalAverageCost = oldStock > 0
-            ? (oldStock * Number(ingredient.currentCost) + quantity * unitCost) / (oldStock + quantity)
-            : unitCost;
+            ? (oldStock * Number(ingredient.currentCost) + quantity.toNumber() * unitCost.toNumber()) / (oldStock + quantity.toNumber())
+            : unitCost.toNumber();
           const item = await tx.purchaseItem.create({
             data: {
               tenantId,
@@ -176,7 +208,11 @@ export class PurchasesService {
               ingredientId: inputItem.ingredientId,
               quantity,
               unitCost,
-              totalCost: quantity * unitCost,
+              totalCost,
+              purchasePresentationId: presentation?.id,
+              purchaseQuantity: isNewContract ? purchaseQuantity : null,
+              purchasePresentationLabel: isNewContract ? (presentation?.label ?? `Unidade base (${ingredient.unit})`) : null,
+              conversionFactorSnapshot: isNewContract ? conversionFactor : null,
               expiryDate: inputItem.expiryDate,
             },
             select: { id: true },
@@ -217,13 +253,13 @@ export class PurchasesService {
         });
 
         if (paymentStatus === PaymentStatus.PAID) {
-          await this.debitActiveAccount(tx, tenantId, dto.accountId as string, totalValue);
+          await this.debitActiveAccount(tx, tenantId, dto.accountId as string, totalValue.toNumber());
           await tx.purchaseSettlement.create({
             data: {
               tenantId,
               purchaseId: purchase.id,
               accountId: dto.accountId as string,
-              amount: totalValue,
+            amount: totalValue,
               financialTransactionId: transaction.id,
             },
           });
@@ -459,6 +495,10 @@ export class PurchasesService {
         quantity: Number(item.quantity),
         unitCost: Number(item.unitCost),
         totalCost: Number(item.totalCost),
+        purchasePresentationId: item.purchasePresentationId ?? undefined,
+        purchaseQuantity: item.purchaseQuantity === null ? undefined : Number(item.purchaseQuantity),
+        purchasePresentationLabel: item.purchasePresentationLabel ?? undefined,
+        conversionFactorSnapshot: item.conversionFactorSnapshot === null ? undefined : Number(item.conversionFactorSnapshot),
         expiryDate: item.expiryDate ?? undefined,
         ingredientName: item.ingredient?.name,
         ingredientUnit: item.ingredient?.unit ? this.mapUnit(item.ingredient.unit) : undefined,

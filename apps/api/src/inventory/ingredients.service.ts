@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
-import { UnitType as PrismaUnitType, Prisma } from '@prisma/client';
+import { UnitType as PrismaUnitType, Prisma, StockMovementType as PrismaStockMovementType } from '@prisma/client';
 
 type IngredientWithRelations = Prisma.IngredientGetPayload<Record<string, never>>;
 
@@ -72,7 +72,14 @@ export class IngredientsService {
       }
     }
 
-    const { initialPurchase, ...ingredientData } = dto;
+    const { initialPurchase, purchasePresentations = [], ...ingredientData } = dto;
+    const normalizedPresentations = purchasePresentations.map((presentation) => ({
+      label: presentation.label?.trim(), conversionFactor: Number(presentation.conversionFactor),
+    }));
+    if (normalizedPresentations.some((presentation) => !presentation.label || !Number.isFinite(presentation.conversionFactor) || presentation.conversionFactor <= 0)
+      || new Set(normalizedPresentations.map((presentation) => presentation.label?.toLocaleLowerCase())).size !== normalizedPresentations.length) {
+      throw new BadRequestException('Cada apresentacao precisa ter nome unico e conteudo maior que zero.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Create Ingredient
@@ -92,32 +99,19 @@ export class IngredientsService {
         },
       });
 
-      // 2. Handle Initial Purchase if provided
-      if (initialPurchase && initialPurchase.quantity > 0) {
-        const factor = Number(ingredient.conversionFactor);
-        const quantityBase = Number(initialPurchase.quantity) * factor;
-        const unitCostBase = Number(initialPurchase.totalCost) / quantityBase;
-
-        // Create Purchase record for history
-        const purchase = await tx.purchase.create({
-          data: {
-            tenantId,
-            supplierId: initialPurchase.supplierId || '', // Handle missing supplier
-            totalValue: initialPurchase.totalCost,
-            status: 'received',
-            purchaseDate: new Date(),
-            items: {
-              create: {
-                tenantId,
-                ingredientId: ingredient.id,
-                quantity: initialPurchase.quantity,
-                unitCost: Number(initialPurchase.totalCost) / Number(initialPurchase.quantity),
-                totalCost: initialPurchase.totalCost,
-              }
-            }
-          },
-          include: { items: { select: { id: true } } },
+      if (normalizedPresentations.length > 0) {
+        await tx.purchasePresentation.createMany({
+          data: normalizedPresentations.map((presentation) => ({
+            tenantId, ingredientId: ingredient.id, label: presentation.label as string, conversionFactor: presentation.conversionFactor,
+          })),
         });
+      }
+
+      // 2. Opening stock is not a purchase. It is always expressed in the
+      // ingredient's base stock unit and must not create supplier/financial data.
+      if (initialPurchase && initialPurchase.quantity > 0) {
+        const quantityBase = Number(initialPurchase.quantity);
+        const unitCostBase = Number(initialPurchase.totalCost) / quantityBase;
 
         // Update Ingredient with initial stock and cost
         await tx.ingredient.update({
@@ -133,12 +127,10 @@ export class IngredientsService {
           data: {
             tenantId,
             ingredientId: ingredient.id,
-            purchaseId: purchase.id,
-            purchaseItemId: purchase.items[0].id,
-            type: 'purchase_entry',
+            type: PrismaStockMovementType.in,
             quantity: quantityBase,
             unitCost: unitCostBase,
-            notes: `Entrada inicial via cadastro (Compra #${purchase.id})`,
+            notes: 'Saldo inicial informado no cadastro do insumo.',
           }
         });
       }
