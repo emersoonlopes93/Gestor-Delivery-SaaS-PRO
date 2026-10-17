@@ -87,6 +87,7 @@ model Tenant {
   financialTransactions          FinancialTransaction[]
   goals                          Goal[]
   ingredients                    Ingredient[]
+  purchasePresentations          PurchasePresentation[]
   inventoryCountItems            InventoryCountItem[]
   inventoryCounts                InventoryCount[]
   invoices                       Invoice[]
@@ -2757,11 +2758,30 @@ model Ingredient {
   inventoryCountItems InventoryCountItem[]
   productRecipes      ProductRecipeIngredient[]
   purchaseItems       PurchaseItem[]
+  purchasePresentations PurchasePresentation[]
   movements           StockMovement[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
   @@map("ingredients")
+}
+
+model PurchasePresentation {
+  id               String     @id @default(uuid())
+  tenantId         String     @map("tenant_id")
+  ingredientId     String     @map("ingredient_id")
+  label            String     @db.VarChar(120)
+  conversionFactor Decimal    @map("conversion_factor") @db.Decimal(14, 6)
+  isActive         Boolean    @default(true) @map("is_active")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  ingredient       Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseItems    PurchaseItem[]
+
+  @@index([tenantId, ingredientId])
+  @@index([tenantId, ingredientId, isActive])
+  @@map("purchase_presentations")
 }
 
 model StockMovement {
@@ -3245,14 +3265,20 @@ model PurchaseItem {
   quantity     Decimal    @db.Decimal(10, 4)
   unitCost     Decimal    @map("unit_cost") @db.Decimal(10, 4)
   totalCost    Decimal    @map("total_cost") @db.Decimal(10, 4)
+  purchasePresentationId String? @map("purchase_presentation_id")
+  purchaseQuantity Decimal? @map("purchase_quantity") @db.Decimal(14, 6)
+  purchasePresentationLabel String? @map("purchase_presentation_label") @db.VarChar(120)
+  conversionFactorSnapshot Decimal? @map("conversion_factor_snapshot") @db.Decimal(14, 6)
   expiryDate   DateTime?  @map("expiry_date")
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  purchasePresentation PurchasePresentation? @relation(fields: [purchasePresentationId], references: [id], onDelete: Restrict)
   purchase     Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   stockMovement StockMovement?
 
   @@index([purchaseId])
   @@index([ingredientId])
+  @@index([purchasePresentationId])
   @@map("purchase_items")
 }
 

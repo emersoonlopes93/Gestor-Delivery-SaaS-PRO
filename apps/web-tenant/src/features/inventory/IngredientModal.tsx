@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { IngredientDTO, CreateIngredientDTO, UnitType } from '@gestor/types';
+import { IngredientDTO, CreateIngredientDTO, PurchasePresentationDTO, UnitType } from '@gestor/types';
 import { CurrencyInput } from '@gestor/ui';
 import { Switch } from '../../components/ui/Switch';
+import { api } from '../../lib/api-client';
 
 interface IngredientModalProps {
   isOpen: boolean;
@@ -30,6 +31,9 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [presentations, setPresentations] = useState<PurchasePresentationDTO[]>([]);
+  const [presentationLabel, setPresentationLabel] = useState('');
+  const [presentationFactor, setPresentationFactor] = useState<number>(1);
 
   useEffect(() => {
     if (editingIngredient) {
@@ -63,6 +67,29 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
       });
     }
   }, [editingIngredient, isOpen]);
+
+  useEffect(() => {
+    if (!editingIngredient || !isOpen) {
+      setPresentations([]);
+      return;
+    }
+    void api.get<PurchasePresentationDTO[]>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations`)
+      .then((response) => { if (response.success) setPresentations(response.data); })
+      .catch(() => setPresentations([]));
+  }, [editingIngredient, isOpen]);
+
+  const addPresentation = async () => {
+    if (!editingIngredient || !presentationLabel.trim() || !Number.isFinite(presentationFactor) || presentationFactor <= 0) return;
+    const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations`, {
+      label: presentationLabel,
+      conversionFactor: presentationFactor,
+    });
+    if (response.success) {
+      setPresentations((current) => [...current, response.data]);
+      setPresentationLabel('');
+      setPresentationFactor(1);
+    }
+  };
 
   const calculatedValues = useMemo(() => {
     if (!formData.initialPurchaseActive || !formData.initialPurchase) return null;
@@ -215,6 +242,29 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                 />
               </div>
             </div>
+          </div>
+
+          <div className="mt-8 rounded-2xl border border-border bg-muted/30 p-5">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-foreground">Como voce costuma comprar este insumo?</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Cadastre embalagens comerciais. O estoque sempre continua na unidade base.</p>
+            </div>
+            {editingIngredient ? <>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_9rem_auto]">
+                <input value={presentationLabel} onChange={(event) => setPresentationLabel(event.target.value)} className="input-premium" placeholder="Ex.: Pacote com 50" aria-label="Nome da apresentacao de compra" />
+                <input value={presentationFactor} onChange={(event) => setPresentationFactor(Number(event.target.value))} min="0.000001" step="any" type="number" className="input-premium" aria-label="Conteudo em unidade base" />
+                <button type="button" onClick={() => void addPresentation()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Adicionar</button>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Resumo: 1 apresentacao = conteudo informado em {editingIngredient.unit}.</p>
+              <div className="mt-4 space-y-2">
+                {presentations.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma apresentacao cadastrada. Compras em unidade-base continuam disponiveis.</p> : presentations.map((presentation) => (
+                  <div key={presentation.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
+                    <span className="font-medium text-foreground">{presentation.label}</span>
+                    <span className="text-muted-foreground">1 = {presentation.conversionFactor} {editingIngredient.unit}{presentation.isActive ? '' : ' · inativa'}</span>
+                  </div>
+                ))}
+              </div>
+            </> : <p className="text-sm text-muted-foreground">Salve o insumo primeiro para cadastrar as apresentacoes usadas nas compras.</p>}
           </div>
 
           <hr className="my-8 border-border" />

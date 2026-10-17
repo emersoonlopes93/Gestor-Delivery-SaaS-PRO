@@ -59,6 +59,11 @@ export interface PurchaseItemDTO {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  /** Null for historical purchases that predate purchase presentations. */
+  purchasePresentationId?: string;
+  purchaseQuantity?: number;
+  purchasePresentationLabel?: string;
+  conversionFactorSnapshot?: number;
   expiryDate?: Date;
   ingredientName?: string; // Helpful for UI
 }
@@ -90,9 +95,40 @@ export interface PurchaseSettlementDTO {
 
 export interface CreatePurchaseItemDTO {
   ingredientId: string;
-  quantity: number;
-  unitCost: number;
+  /** Quantity in the supplier's commercial presentation. */
+  purchaseQuantity?: number;
+  /** Optional only for a direct unit-base purchase (factor = 1). */
+  purchasePresentationId?: string;
+  /** Total amount paid for this line; server derives all base-unit values. */
+  lineTotal?: number;
+  /** @deprecated Legacy unit-base input; retained only for compatible clients. */
+  quantity?: number;
+  /** @deprecated Legacy unit-base input; retained only for compatible clients. */
+  unitCost?: number;
   expiryDate?: Date;
+}
+
+export interface PurchasePresentationDTO {
+  id: string;
+  tenantId: string;
+  ingredientId: string;
+  label: string;
+  conversionFactor: number;
+  isActive: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreatePurchasePresentationDTO {
+  label: string;
+  conversionFactor: number;
+  isActive?: boolean;
+}
+
+export interface UpdatePurchasePresentationDTO {
+  label?: string;
+  conversionFactor?: number;
+  isActive?: boolean;
 }
 
 export interface UpdatePurchaseDTO {
