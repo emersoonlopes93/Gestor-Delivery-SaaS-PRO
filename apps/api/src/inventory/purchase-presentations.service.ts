@@ -19,8 +19,10 @@ export class PurchasePresentationsService {
     const presentation = await this.prisma.purchasePresentation.create({
       data: {
         ...this.validateCreate(dto),
-        ingredient: { connect: { id: ingredientId } },
-        tenant: { connect: { id: tenantId } },
+        // PrismaService injects tenantId for tenant-scoped creates. Do not mix
+        // relation connects with that scalar field, otherwise Prisma selects
+        // the checked relation input and rejects the injected tenantId.
+        ingredientId,
       },
     });
     return this.map(presentation);

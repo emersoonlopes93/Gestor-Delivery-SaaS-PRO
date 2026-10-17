@@ -28,7 +28,7 @@ describe('PurchasePresentationsService', () => {
     expect(prisma.purchasePresentation.create).toHaveBeenCalledWith({
       data: {
         label: 'Pacote com 50 un', conversionFactor: 50,
-        ingredient: { connect: { id: 'ingredient-a' } }, tenant: { connect: { id: 'tenant-a' } },
+        ingredientId: 'ingredient-a',
       },
     });
   });
