@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePurchasePresentationDTO, PurchasePresentationDTO, UpdatePurchasePresentationDTO } from '@gestor/types';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
@@ -16,15 +17,14 @@ export class PurchasePresentationsService {
 
   async create(tenantId: string, ingredientId: string, dto: CreatePurchasePresentationDTO): Promise<PurchasePresentationDTO> {
     await this.requireIngredient(tenantId, ingredientId);
-    const presentation = await this.prisma.purchasePresentation.create({
-      data: {
+    const data: Prisma.PurchasePresentationUncheckedCreateInput = {
         ...this.validateCreate(dto),
-        // PrismaService injects tenantId for tenant-scoped creates. Do not mix
-        // relation connects with that scalar field, otherwise Prisma selects
-        // the checked relation input and rejects the injected tenantId.
+        // PrismaService enforces the same tenantId at runtime. Keep both
+        // foreign keys scalar so Prisma selects the unchecked input.
+        tenantId,
         ingredientId,
-      },
-    });
+      };
+    const presentation = await this.prisma.purchasePresentation.create({ data });
     return this.map(presentation);
   }
 
