@@ -5,7 +5,7 @@ import { IngredientModal } from './IngredientModal';
 import { MovementsTable } from './SubComponents/MovementsTable';
 import { LossesPage } from './SubComponents/LossesPage';
 import { InventoryCountPage } from './SubComponents/InventoryCountPage';
-import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle } from 'lucide-react';
+import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle, Pencil } from 'lucide-react';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { PageHeader } from '../../components/ui/PageHeader';
 
@@ -176,7 +176,7 @@ export function InventoryPage() {
                   <tr>
                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Insumo</th>
                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Estoque</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Custo Unit.</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Custo médio</th>
                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
                   </tr>
@@ -190,14 +190,14 @@ export function InventoryPage() {
                       <tr key={ing.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="font-bold text-gray-900 dark:text-gray-100">{ing.name}</div>
-                          <div className="text-[10px] text-gray-400 font-mono mt-0.5">{ing.sku || 'SEM SKU'} • {unitLabels[ing.unit]}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">{ing.sku ? `SKU ${ing.sku}` : 'Sem SKU'} · {unitLabels[ing.unit]}</div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className={`text-sm font-black ${isOut ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-700 dark:text-gray-300'}`}>
                             {ing.currentStock} <span className="text-[10px] font-bold text-gray-400">{ing.unit}</span>
                           </div>
                           {ing.minStock && (
-                            <div className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Mín: {ing.minStock}</div>
+                            <div className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Mínimo: {ing.minStock} {ing.unit}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right text-sm font-bold text-gray-600 dark:text-gray-400">
@@ -221,7 +221,7 @@ export function InventoryPage() {
                             className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
                             aria-label={`Editar insumo ${ing.name}`}
                           >
-                            <Search size={16} aria-hidden />
+                            <Pencil size={16} aria-hidden />
                           </button>
                         </td>
                       </tr>
