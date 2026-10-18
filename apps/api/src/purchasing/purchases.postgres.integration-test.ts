@@ -1,12 +1,13 @@
 import 'reflect-metadata';
 import { ConflictException } from '@nestjs/common';
-import { PaymentStatus } from '@gestor/types';
+import { PaymentStatus, StockMovementType as SharedStockMovementType } from '@gestor/types';
 import {
   FinancialStatus,
   PrismaClient,
   StockMovementType,
   UnitType,
 } from '@prisma/client';
+import { StockMovementService } from '../inventory/stock-movement.service';
 import { PurchasesService } from './purchases.service';
 
 const allowedDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
@@ -381,5 +382,183 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
     expect((await prisma.purchase.findUniqueOrThrow({ where: { id: purchase.id } })).paymentStatus).toBe('paid');
     expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, type: 'purchase_reversal' } })).toBe(0);
     expect(await prisma.financialTransaction.count({ where: { tenantId: tenant.id, reversalOfTransactionId: { not: null } } })).toBe(0);
+  });
+
+  it('keeps Decimal weighted PMP and restores the prior cost on a reconcilable cancellation', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('weighted-reversal');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 3 } });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `weighted-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 1 }],
+    });
+    let stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('20.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('2.0000');
+    await service.cancel(tenant.id, purchase.id);
+    stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('10.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
+  });
+
+  it('blocks a cancellation that would make the remaining inventory value negative', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('unreconcilable-value');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 1 } });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `unreconcilable-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 9 }],
+    });
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 15 } });
+    await expect(service.cancel(tenant.id, purchase.id)).rejects.toBeInstanceOf(ConflictException);
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('15.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('5.0000');
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, type: StockMovementType.purchase_reversal } })).toBe(0);
+  });
+
+  it('preserves later purchase economics when cancelling an earlier purchase', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('historical-reversal');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 2 } });
+    const purchaseA = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `historical-a-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 4 }],
+    });
+    const purchaseB = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `historical-b-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 6 }],
+    });
+    expect((await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } })).currentCost.toFixed(4)).toBe('4.0000');
+
+    await service.cancel(tenant.id, purchaseA.id);
+
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('20.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('4.0000');
+    expect((await prisma.purchase.findUniqueOrThrow({ where: { id: purchaseA.id } })).status).toBe('cancelled');
+    expect((await prisma.purchase.findUniqueOrThrow({ where: { id: purchaseB.id } })).status).toBe('received');
+    expect(await prisma.stockMovement.count({ where: { purchaseId: purchaseA.id, type: StockMovementType.purchase_reversal } })).toBe(1);
+    expect(await prisma.stockMovement.count({ where: { purchaseId: purchaseB.id, type: StockMovementType.purchase_reversal } })).toBe(0);
+  });
+
+  it('aggregates multiple lines for one ingredient and reverses each entry atomically', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('same-ingredient-lines');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 3 } });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `same-ingredient-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [
+        { ingredientId: ingredient.id, quantity: 5, unitCost: 1 },
+        { ingredientId: ingredient.id, quantity: 5, unitCost: 5 },
+      ],
+    });
+    let stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('20.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
+
+    await service.cancel(tenant.id, purchase.id);
+
+    stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('10.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
+    const reversals = await prisma.stockMovement.findMany({
+      where: { tenantId: tenant.id, purchaseId: purchase.id, type: StockMovementType.purchase_reversal },
+    });
+    expect(reversals).toHaveLength(2);
+    expect(reversals.every((movement) => movement.reversalOfMovementId !== null)).toBe(true);
+  });
+
+  it('refuses a historical purchase entry with no stock cost without changing financial or inventory state', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('null-entry-cost');
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `null-cost-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 4 }],
+    });
+    const entry = await prisma.stockMovement.findFirstOrThrow({
+      where: { tenantId: tenant.id, purchaseId: purchase.id, type: StockMovementType.purchase_entry },
+    });
+    await prisma.stockMovement.update({ where: { id: entry.id }, data: { unitCost: null } });
+    const before = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+
+    await expect(service.cancel(tenant.id, purchase.id)).rejects.toBeInstanceOf(ConflictException);
+
+    const after = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(after.currentStock.toFixed(4)).toBe(before.currentStock.toFixed(4));
+    expect(after.currentCost.toFixed(4)).toBe(before.currentCost.toFixed(4));
+    expect((await prisma.purchase.findUniqueOrThrow({ where: { id: purchase.id } })).status).toBe('received');
+    expect((await prisma.financialTransaction.findFirstOrThrow({ where: { tenantId: tenant.id, referenceId: purchase.id } })).status).toBe('pending');
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, purchaseId: purchase.id, type: StockMovementType.purchase_reversal } })).toBe(0);
+    expect(await prisma.financialTransaction.count({ where: { tenantId: tenant.id, reversalOfTransactionId: { not: null } } })).toBe(0);
+  });
+
+  it('rolls back an impossible paid reversal before stock, purchase, or financial state changes', async () => {
+    const { tenant, supplier, ingredient, account } = await fixtures('impossible-paid-reversal');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 1 } });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `impossible-paid-${suffix}`, paymentStatus: PaymentStatus.PAID, accountId: account.id,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 9 }],
+    });
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 15 } });
+    const beforeIngredient = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    const beforeAccount = await prisma.financialAccount.findUniqueOrThrow({ where: { id: account.id } });
+
+    await expect(service.cancel(tenant.id, purchase.id)).rejects.toBeInstanceOf(ConflictException);
+
+    const afterIngredient = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(afterIngredient.currentStock.toFixed(4)).toBe(beforeIngredient.currentStock.toFixed(4));
+    expect(afterIngredient.currentCost.toFixed(4)).toBe(beforeIngredient.currentCost.toFixed(4));
+    expect(Number((await prisma.financialAccount.findUniqueOrThrow({ where: { id: account.id } })).balance)).toBe(Number(beforeAccount.balance));
+    expect((await prisma.purchase.findUniqueOrThrow({ where: { id: purchase.id } })).paymentStatus).toBe('paid');
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, purchaseId: purchase.id, type: StockMovementType.purchase_reversal } })).toBe(0);
+    expect(await prisma.financialTransaction.count({ where: { tenantId: tenant.id, reversalOfTransactionId: { not: null } } })).toBe(0);
+  });
+
+  it('serializes concurrent purchase and manual IN without a lost PMP update', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('purchase-manual-concurrency');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 3 } });
+    const movements = new StockMovementService(prisma as never);
+
+    await Promise.all([
+      service.create(tenant.id, {
+        supplierId: supplier.id, idempotencyKey: `concurrent-purchase-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+        items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 5 }],
+      }),
+      movements.createManual(tenant.id, 'manual-user', {
+        ingredientId: ingredient.id, type: SharedStockMovementType.IN, quantity: 10, unitCost: 1,
+      }),
+    ]);
+
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('30.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, type: StockMovementType.purchase_entry } })).toBe(1);
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, type: StockMovementType.in } })).toBe(1);
+  }, 60_000);
+
+  it('persists presentation unit cost with Decimal rounding only', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('decimal-presentation-cost');
+    const presentation = await prisma.purchasePresentation.create({
+      data: { tenantId: tenant.id, ingredientId: ingredient.id, label: 'Pacote 50', conversionFactor: 50 },
+    });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `decimal-presentation-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, purchasePresentationId: presentation.id, purchaseQuantity: 1, lineTotal: 12.99 }],
+    });
+    const entry = await prisma.stockMovement.findFirstOrThrow({
+      where: { tenantId: tenant.id, purchaseId: purchase.id, type: StockMovementType.purchase_entry },
+    });
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(entry.unitCost?.toFixed(4)).toBe('0.2598');
+    expect(stored.currentStock.toFixed(4)).toBe('50.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('0.2598');
+  });
+
+  it('preserves the last valid cost reference when a cancellation reaches zero stock', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('zero-stock-cost');
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `zero-cost-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 3 }],
+    });
+    await service.cancel(tenant.id, purchase.id);
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('0.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
   });
 });
