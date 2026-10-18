@@ -2813,3 +2813,23 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - BullMQ job IDs coalesce triggers by tenant and connection. A Redis lease shared by manual and automatic synchronization prevents concurrent fetches for the same tenant/connection across instances. A valid empty result is a successful freshness pass; technical faults use the existing bounded BullMQ retry policy. The manual POST endpoint and manual confirmation/posting behavior remain unchanged.
 - Focused local validation: auto-sync, financial reconciliation, financial client and order-ingestion suites passed (4 suites, 70 tests). API typecheck, API lint, API build, `check:no-any`, `check:boundaries`, `check:features` and `git diff --check` passed. CI, authenticated provider validation, remote database actions and deployment remain pending; no provider call, remote DB mutation or deploy occurred locally.
 - Runtime follow-up found that Bill Data succeeded but the subsequent Settlements fetch could return a successful zero-count page without the documented record-list key. The shared parser now accepts only a zero-count, internally consistent pagination envelope as `[]`; malformed and nonzero missing-list responses still fail closed and emit sanitized shape metadata. Focused client, reconciliation and auto-sync suites cover this boundary; fresh provider/deploy validation remains pending.
+
+## P0 - Integridade do inventário físico (2026-10-18)
+
+- Branch `fix/inventory-count-integrity`, baseada em `main-copy` / `dc59d07f0b866fc130d76ac09103053ceb56edd4`. O schema existente suporta o lifecycle necessário; não houve alteração Prisma nem migration.
+- A abertura cria um snapshot autoritativo do saldo no servidor. O fechamento serializável bloqueia a contagem e os insumos em ordem determinística, rejeita snapshot obsoleto com `409`, aplica o delta via predicado tenant/saldo e confirma `open -> closed` uma única vez.
+- O cliente envia somente IDs na abertura e estoque físico no fechamento. `theoreticalStock` legado está deprecated e não participa do cálculo. O movimento mantém quantidade absoluta por compatibilidade, enquanto `InventoryCountItem.adjustedQuantity` e as notas registram direção, teórico, físico, delta e custo vigente.
+- Prova PostgreSQL efêmera: 12/12 cenários, incluindo stale stock, dupla finalização concorrente, duplicidade, tenant isolation, rollback intermediário e Decimal(10,4). Regressões de Insumos, Apresentações, Compras, Perdas e baixa teórica: 70/70; contratos Web Tenant: 7/7; builds, typecheck, lint e checks arquiteturais passaram localmente.
+- `PurchasePresentation`, `PurchasesService`, saldo inicial/PMP, Orders, `TheoreticalStockService`, marketplace/99Food, pricing, Product.type, Option Groups, Pizza, POS, Storefront e Waiter não foram alterados. CI, Preview e QA permanecem pendentes após publicação da Draft PR.
+
+## P0 - Lifecycle explícito da sessão de inventário (2026-10-18)
+
+- A tela de inventário físico agora apenas carrega os insumos ao entrar, recarregar ou atualizar. A criação de uma sessão `OPEN` ocorre exclusivamente após a ação explícita **Iniciar contagem**.
+- Enquanto a sessão está ativa, a atualização da lista fica desabilitada para não abrir outra sessão e o botão de finalização tem proteção contra duplo envio. Fechar com sucesso limpa o ID local e recarrega somente os insumos; uma resposta `409` preserva a sessão e os valores para revisão, sem reinício automático.
+- O backend continua permitindo múltiplas sessões `OPEN` e não possui cancelamento; o fechamento aceita apenas `OPEN` e o conflito de estoque obsoleto ocorre antes da mudança para `CLOSED`. Esta correção limita-se ao cliente para impedir sessões órfãs criadas pela própria interface.
+
+## P0 - Descarte explícito de contagem stale (2026-10-18)
+
+- Uma contagem `OPEN` pode ser descartada explicitamente por `POST /inventory-counts/:id/cancel`, protegido por tenant, feature e `inventory.adjust`. A transição CAS aceita somente `OPEN → CANCELLED`; repetição ou contagem já fechada retorna conflito e outro tenant recebe `NotFound`.
+- O descarte não escreve `closedAt`, pois esse campo continua reservado ao fechamento que aplicou ajuste. Não muda saldo, itens, custos, movimentos ou financeiro.
+- Após `409` stale, a tela oferece **Descartar contagem e atualizar** mediante confirmação; o cancelamento recarrega apenas os insumos, não reabre sessão e retorna ao modo de iniciar. Há também descarte confirmado durante uma contagem normal. Recarregar o navegador ainda pode abandonar uma sessão OPEN, sem persistência automática nesta etapa.
