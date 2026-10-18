@@ -124,6 +124,23 @@ export class InventoryCountService {
     });
   }
 
+  async cancel(tenantId: string, id: string): Promise<InventoryCountDTO> {
+    const cancelled = await this.prisma.inventoryCount.updateMany({
+      where: { id, tenantId, status: InventoryCountStatus.OPEN },
+      data: { status: InventoryCountStatus.CANCELLED },
+    });
+
+    if (cancelled.count !== 1) {
+      const existing = await this.prisma.inventoryCount.findFirst({ where: { id, tenantId } });
+      if (!existing) throw new NotFoundException('Inventário não encontrado');
+      throw new ConflictException('Esta contagem já foi encerrada ou cancelada.');
+    }
+
+    const result = await this.prisma.inventoryCount.findFirst({ where: { id, tenantId }, include: countInclude });
+    if (!result) throw new NotFoundException('Inventário não encontrado');
+    return this.mapToDTO(result);
+  }
+
   private staleConflict(): ConflictException {
     return new ConflictException('O estoque deste insumo mudou enquanto a contagem estava em andamento. Atualize/revise a contagem antes de finalizar.');
   }

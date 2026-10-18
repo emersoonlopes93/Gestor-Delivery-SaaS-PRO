@@ -10,6 +10,7 @@ describe('inventory API contract', () => {
     expect(INVENTORY_API_PATHS.counts).toBe('/inventory-counts');
     expect(INVENTORY_API_PATHS.openCount).toBe('/inventory-counts/open');
     expect(INVENTORY_API_PATHS.closeCount('count-1')).toBe('/inventory-counts/count-1/close');
+    expect(INVENTORY_API_PATHS.cancelCount('count-1')).toBe('/inventory-counts/count-1/cancel');
     expect(INVENTORY_API_PATHS.losses).toBe('/losses');
   });
 

@@ -79,10 +79,12 @@ describe('InventoryCountPage OPEN lifecycle', () => {
   beforeEach(() => {
     apiMocks.get.mockResolvedValue(success([ingredient]));
     apiMocks.post.mockResolvedValue(success(openedCount));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('loads ingredients on mount without opening a count', async () => {
@@ -166,8 +168,71 @@ describe('InventoryCountPage OPEN lifecycle', () => {
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('O estoque mudou durante a contagem'));
     expect(screen.getByRole('button', { name: 'Finalizar contagem' }).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'Descartar contagem e atualizar' })).toBeDefined();
     expect(apiMocks.post.mock.calls.filter(([path]) => path === INVENTORY_API_PATHS.openCount)).toHaveLength(1);
+    expect(apiMocks.post.mock.calls.filter(([path]) => path === INVENTORY_API_PATHS.cancelCount(openedCount.id))).toHaveLength(0);
     expect(apiMocks.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards a stale count only after explicit confirmation and reloads without reopening', async () => {
+    const user = userEvent.setup();
+    apiMocks.post.mockImplementation((path: string) => {
+      if (path === INVENTORY_API_PATHS.openCount) return Promise.resolve(success(openedCount));
+      if (path === INVENTORY_API_PATHS.closeCount(openedCount.id)) return Promise.reject(new ApiError(409, 'Stale stock'));
+      return Promise.resolve(success({ id: openedCount.id, status: InventoryCountStatus.CANCELLED }));
+    });
+    renderPage();
+    await waitForIngredients();
+    await startCount(user);
+    await user.click(screen.getByRole('button', { name: 'Finalizar contagem' }));
+    await screen.findByRole('button', { name: 'Descartar contagem e atualizar' });
+
+    await user.click(screen.getByRole('button', { name: 'Descartar contagem e atualizar' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciar contagem' }).disabled).toBe(false));
+    expect(apiMocks.post.mock.calls.filter(([path]) => path === INVENTORY_API_PATHS.cancelCount(openedCount.id))).toHaveLength(1);
+    expect(apiMocks.post.mock.calls.filter(([path]) => path === INVENTORY_API_PATHS.openCount)).toHaveLength(1);
+    expect(apiMocks.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('protects against a double discard request during an active count', async () => {
+    const user = userEvent.setup();
+    let resolveCancel: (() => void) | undefined;
+    const cancelPromise = new Promise<ApiResponse<Record<string, never>>>((resolve) => {
+      resolveCancel = () => resolve(success({}));
+    });
+    apiMocks.post.mockImplementation((path: string) => (
+      path === INVENTORY_API_PATHS.openCount ? Promise.resolve(success(openedCount)) : cancelPromise
+    ));
+    renderPage();
+    await waitForIngredients();
+    await startCount(user);
+
+    const discardButton = screen.getByRole('button', { name: 'Descartar contagem' });
+    fireEvent.click(discardButton);
+    fireEvent.click(discardButton);
+
+    await waitFor(() => expect(apiMocks.post.mock.calls.filter(([path]) => path === INVENTORY_API_PATHS.cancelCount(openedCount.id))).toHaveLength(1));
+    resolveCancel?.();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciar contagem' }).disabled).toBe(false));
+  });
+
+  it('keeps the session active when discard fails', async () => {
+    const user = userEvent.setup();
+    apiMocks.post.mockImplementation((path: string) => (
+      path === INVENTORY_API_PATHS.openCount
+        ? Promise.resolve(success(openedCount))
+        : Promise.reject(new ApiError(500, 'Cancel failed'))
+    ));
+    renderPage();
+    await waitForIngredients();
+    await startCount(user);
+
+    await user.click(screen.getByRole('button', { name: 'Descartar contagem' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Não foi possível descartar a contagem'));
+    expect(screen.getByRole('button', { name: 'Finalizar contagem' }).disabled).toBe(false);
+    expect(apiMocks.post.mock.calls.filter(([path]) => path === INVENTORY_API_PATHS.openCount)).toHaveLength(1);
   });
 
   it('protects against a double close request', async () => {

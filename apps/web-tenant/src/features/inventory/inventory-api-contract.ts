@@ -3,6 +3,7 @@ export const INVENTORY_API_PATHS = {
   counts: '/inventory-counts',
   openCount: '/inventory-counts/open',
   closeCount: (countId: string) => `/inventory-counts/${countId}/close`,
+  cancelCount: (countId: string) => `/inventory-counts/${countId}/cancel`,
   losses: '/losses',
 } as const;
 

@@ -2827,3 +2827,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A tela de inventário físico agora apenas carrega os insumos ao entrar, recarregar ou atualizar. A criação de uma sessão `OPEN` ocorre exclusivamente após a ação explícita **Iniciar contagem**.
 - Enquanto a sessão está ativa, a atualização da lista fica desabilitada para não abrir outra sessão e o botão de finalização tem proteção contra duplo envio. Fechar com sucesso limpa o ID local e recarrega somente os insumos; uma resposta `409` preserva a sessão e os valores para revisão, sem reinício automático.
 - O backend continua permitindo múltiplas sessões `OPEN` e não possui cancelamento; o fechamento aceita apenas `OPEN` e o conflito de estoque obsoleto ocorre antes da mudança para `CLOSED`. Esta correção limita-se ao cliente para impedir sessões órfãs criadas pela própria interface.
+
+## P0 - Descarte explícito de contagem stale (2026-10-18)
+
+- Uma contagem `OPEN` pode ser descartada explicitamente por `POST /inventory-counts/:id/cancel`, protegido por tenant, feature e `inventory.adjust`. A transição CAS aceita somente `OPEN → CANCELLED`; repetição ou contagem já fechada retorna conflito e outro tenant recebe `NotFound`.
+- O descarte não escreve `closedAt`, pois esse campo continua reservado ao fechamento que aplicou ajuste. Não muda saldo, itens, custos, movimentos ou financeiro.
+- Após `409` stale, a tela oferece **Descartar contagem e atualizar** mediante confirmação; o cancelamento recarrega apenas os insumos, não reabre sessão e retorna ao modo de iniciar. Há também descarte confirmado durante uma contagem normal. Recarregar o navegador ainda pode abandonar uma sessão OPEN, sem persistência automática nesta etapa.

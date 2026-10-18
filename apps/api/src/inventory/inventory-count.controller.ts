@@ -45,4 +45,13 @@ export class InventoryCountController {
   ): Promise<InventoryCountDTO> {
     return this.inventoryCountService.close(tenantId, id, dto);
   }
+
+  @Post(':id/cancel')
+  @RequirePermissions('inventory.adjust')
+  async cancel(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+  ): Promise<InventoryCountDTO> {
+    return this.inventoryCountService.cancel(tenantId, id);
+  }
 }

@@ -5,6 +5,7 @@ describe('InventoryCountController', () => {
     findAll: jest.fn(),
     open: jest.fn(),
     close: jest.fn(),
+    cancel: jest.fn(),
   };
   const controller = new InventoryCountController(inventoryCountService as never);
 
@@ -33,5 +34,12 @@ describe('InventoryCountController', () => {
 
     await expect(controller.close('tenant-a', 'count-1', dto)).resolves.toEqual({ id: 'count-1', status: 'closed' });
     expect(inventoryCountService.close).toHaveBeenCalledWith('tenant-a', 'count-1', dto);
+  });
+
+  it('cancels an OPEN count within the authenticated tenant', async () => {
+    inventoryCountService.cancel.mockResolvedValue({ id: 'count-1', status: 'cancelled' });
+
+    await expect(controller.cancel('tenant-a', 'count-1')).resolves.toEqual({ id: 'count-1', status: 'cancelled' });
+    expect(inventoryCountService.cancel).toHaveBeenCalledWith('tenant-a', 'count-1');
   });
 });

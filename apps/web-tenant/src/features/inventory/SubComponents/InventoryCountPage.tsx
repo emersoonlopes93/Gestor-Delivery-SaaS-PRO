@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api-client';
 import { IngredientDTO, InventoryCountDTO, UnitType } from '@gestor/types';
 import { AlertTriangle, CheckCircle2, ClipboardList, RefreshCcw, Save } from 'lucide-react';
@@ -31,8 +31,11 @@ export function InventoryCountPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasStaleConflict, setHasStaleConflict] = useState(false);
+  const discardInProgressRef = useRef(false);
 
   const loadIngredients = async () => {
     setIsLoading(true);
@@ -56,6 +59,7 @@ export function InventoryCountPage() {
     setIsStarting(true);
     setSuccess(false);
     setErrorMessage(null);
+    setHasStaleConflict(false);
     try {
       const opening = await api.post<InventoryCountDTO>(
         INVENTORY_API_PATHS.openCount,
@@ -98,6 +102,7 @@ export function InventoryCountPage() {
     setIsSubmitting(true);
     setSuccess(false);
     setErrorMessage(null);
+    setHasStaleConflict(false);
     try {
       const hasInvalidStock = countItems.some((item) => {
         const value = Number(item.physicalStock);
@@ -125,11 +130,35 @@ export function InventoryCountPage() {
       console.error('Erro ao finalizar inventário:', error);
       if (error instanceof ApiError && error.status === 409) {
         setErrorMessage('O estoque mudou durante a contagem. Atualize a contagem, revise os valores e finalize novamente.');
+        setHasStaleConflict(true);
       } else {
         setErrorMessage('Não foi possível finalizar o inventário. Verifique os dados e tente novamente.');
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDiscardCount = async () => {
+    if (!inventoryCountId || isDiscarding || discardInProgressRef.current) return;
+    if (!window.confirm('Descartar esta contagem? Nenhum ajuste de estoque será aplicado.')) return;
+
+    discardInProgressRef.current = true;
+    setIsDiscarding(true);
+    try {
+      await api.post(INVENTORY_API_PATHS.cancelCount(inventoryCountId));
+      setInventoryCountId(null);
+      setCountItems([]);
+      setErrorMessage(null);
+      setHasStaleConflict(false);
+      await loadIngredients();
+    } catch (error) {
+      console.error('Erro ao descartar inventário:', error);
+      setHasStaleConflict(false);
+      setErrorMessage('Não foi possível descartar a contagem. Ela continua aberta; tente novamente.');
+    } finally {
+      discardInProgressRef.current = false;
+      setIsDiscarding(false);
     }
   };
 
@@ -162,9 +191,18 @@ export function InventoryCountPage() {
           >
             <RefreshCcw className="h-5 w-5" />
           </button>
+          {inventoryCountId && (
+            <button
+              onClick={() => void handleDiscardCount()}
+              disabled={isStarting || isSubmitting || isDiscarding}
+              className="px-4 py-2.5 rounded-xl font-semibold text-destructive border border-destructive/30 hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            >
+              {isDiscarding ? 'Descartando...' : 'Descartar contagem'}
+            </button>
+          )}
           <button
             onClick={() => void (inventoryCountId ? handleSubmit() : handleStart())}
-            disabled={isLoading || isStarting || isSubmitting || ingredients.length === 0}
+            disabled={isLoading || isStarting || isSubmitting || isDiscarding || ingredients.length === 0}
             className="bg-primary hover:opacity-90 text-primary-foreground px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
           >
             {isStarting || isSubmitting ? (
@@ -187,7 +225,18 @@ export function InventoryCountPage() {
       {errorMessage && (
         <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400" role="alert">
           <AlertTriangle className="h-5 w-5 shrink-0" />
-          <span className="font-semibold">{errorMessage}</span>
+          <div className="flex-1">
+            <span className="font-semibold">{errorMessage}</span>
+            {hasStaleConflict && inventoryCountId && (
+              <button
+                onClick={() => void handleDiscardCount()}
+                disabled={isDiscarding || isSubmitting}
+                className="mt-3 px-4 py-2 rounded-lg font-semibold border border-current/30 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                {isDiscarding ? 'Descartando...' : 'Descartar contagem e atualizar'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

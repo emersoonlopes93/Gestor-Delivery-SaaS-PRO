@@ -194,6 +194,65 @@ describe('Inventory count PostgreSQL integrity', () => {
     expect(movements).toBe(0);
   });
 
+  it('cancels an OPEN count without changing stock, movements, or count items', async () => {
+    const { tenant, ingredients } = await fixture('cancel');
+    const opened = await service.open(tenant.id, { ingredientIds: [ingredients[0].id] });
+    const beforeItem = await prisma.inventoryCountItem.findFirstOrThrow({ where: { inventoryCountId: opened.id } });
+
+    const cancelled = await service.cancel(tenant.id, opened.id);
+
+    const [ingredient, storedCount, storedItem, movements] = await Promise.all([
+      prisma.ingredient.findUniqueOrThrow({ where: { id: ingredients[0].id } }),
+      prisma.inventoryCount.findUniqueOrThrow({ where: { id: opened.id } }),
+      prisma.inventoryCountItem.findFirstOrThrow({ where: { inventoryCountId: opened.id } }),
+      prisma.stockMovement.count({ where: { tenantId: tenant.id, type: StockMovementType.inventory_adjustment } }),
+    ]);
+    expect(cancelled.status).toBe(InventoryCountStatus.cancelled);
+    expect(storedCount.status).toBe(InventoryCountStatus.cancelled);
+    expect(storedCount.closedAt).toBeNull();
+    expect(Number(ingredient.currentStock)).toBe(100);
+    expect(Number(storedItem.physicalStock)).toBe(Number(beforeItem.physicalStock));
+    expect(Number(storedItem.adjustedQuantity)).toBe(Number(beforeItem.adjustedQuantity));
+    expect(movements).toBe(0);
+  });
+
+  it('allows a stale OPEN count to be cancelled without applying its requested adjustment', async () => {
+    const { tenant, ingredients } = await fixture('cancel-stale');
+    const opened = await service.open(tenant.id, { ingredientIds: [ingredients[0].id] });
+    await prisma.ingredient.update({ where: { id: ingredients[0].id }, data: { currentStock: { decrement: 4 } } });
+
+    await expect(service.close(tenant.id, opened.id, {
+      items: [{ ingredientId: ingredients[0].id, physicalStock: 95 }],
+    })).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.cancel(tenant.id, opened.id)).resolves.toMatchObject({ status: InventoryCountStatus.cancelled });
+
+    const [ingredient, count, movements] = await Promise.all([
+      prisma.ingredient.findUniqueOrThrow({ where: { id: ingredients[0].id } }),
+      prisma.inventoryCount.findUniqueOrThrow({ where: { id: opened.id } }),
+      prisma.stockMovement.count({ where: { tenantId: tenant.id, type: StockMovementType.inventory_adjustment } }),
+    ]);
+    expect(Number(ingredient.currentStock)).toBe(96);
+    expect(count.status).toBe(InventoryCountStatus.cancelled);
+    expect(count.closedAt).toBeNull();
+    expect(movements).toBe(0);
+  });
+
+  it('rejects repeated, closed, cross-tenant, and missing count cancellations', async () => {
+    const first = await fixture('cancel-guards');
+    const second = await fixture('cancel-guards-other');
+    const opened = await service.open(first.tenant.id, { ingredientIds: [first.ingredients[0].id] });
+    await service.cancel(first.tenant.id, opened.id);
+    await expect(service.cancel(first.tenant.id, opened.id)).rejects.toBeInstanceOf(ConflictException);
+
+    const closed = await service.open(first.tenant.id, { ingredientIds: [first.ingredients[0].id] });
+    await service.close(first.tenant.id, closed.id, {
+      items: [{ ingredientId: first.ingredients[0].id, physicalStock: 100 }],
+    });
+    await expect(service.cancel(first.tenant.id, closed.id)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.cancel(second.tenant.id, closed.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.cancel(first.tenant.id, 'missing-count')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('rolls back earlier item writes when a later ingredient is stale', async () => {
     const { tenant, ingredients } = await fixture('rollback', [100, 50]);
     const opened = await service.open(tenant.id, { ingredientIds: ingredients.map((item) => item.id) });
