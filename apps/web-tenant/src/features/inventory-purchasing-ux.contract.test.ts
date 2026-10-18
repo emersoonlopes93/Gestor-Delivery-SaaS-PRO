@@ -25,7 +25,8 @@ describe('inventory and purchasing UX contract', () => {
     expect(inventory).toContain("api.get<InventorySummary>('/inventory/ingredients/summary')");
     expect(movements).toContain('/inventory/movements');
     expect(losses).toContain('INVENTORY_API_PATHS.losses');
-    expect(counts).toContain('createInventoryCountSubmission(items)');
+    expect(counts).toContain('createInventoryCountOpening');
+    expect(counts).toContain('createInventoryCountClosure');
     expect((inventory.match(/api\.get/g) ?? [])).toHaveLength(2);
     expect((movements.match(/api\.get/g) ?? [])).toHaveLength(1);
   });

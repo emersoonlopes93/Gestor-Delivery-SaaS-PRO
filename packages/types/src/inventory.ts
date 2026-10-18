@@ -121,6 +121,19 @@ export interface CreateInventoryCountDTO {
 
 export interface CreateInventoryCountItemDTO {
   ingredientId: string;
+  /** @deprecated O estoque teórico é definido pelo servidor. */
   theoreticalStock: number;
   physicalStock: number;
+}
+
+export interface OpenInventoryCountDTO {
+  note?: string;
+  ingredientIds: string[];
+}
+
+export interface CloseInventoryCountDTO {
+  items: Array<{
+    ingredientId: string;
+    physicalStock: number;
+  }>;
 }
