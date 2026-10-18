@@ -92,7 +92,7 @@ describe('PurchasesService settlement and cancellation', () => {
     tx.purchase.findFirst.mockResolvedValue({
       ...detail(PaymentStatus.PENDING), items: [{ id: 'item-a' }], stockMovements: [stockMovement], settlement: null,
     });
-    tx.ingredient.findFirst.mockResolvedValue({ currentStock: new Prisma.Decimal(10) });
+    tx.ingredient.findFirst.mockResolvedValue({ currentStock: new Prisma.Decimal(10), currentCost: new Prisma.Decimal(4) });
     tx.financialTransaction.findMany.mockResolvedValue([{ id: 'payable-a', status: 'pending' }]);
     prisma.purchase.findFirst.mockResolvedValue(detail(PaymentStatus.CANCELLED, PurchaseStatus.CANCELLED));
     await service.cancel('tenant-a', 'purchase-a');
@@ -101,7 +101,7 @@ describe('PurchasesService settlement and cancellation', () => {
     }) }));
     expect(tx.ingredient.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ tenantId: 'tenant-a', currentStock: { gte: new Prisma.Decimal(10) } }),
-      data: { currentStock: { decrement: new Prisma.Decimal(10) } },
+      data: expect.objectContaining({ currentStock: { decrement: new Prisma.Decimal(10) }, currentCost: new Prisma.Decimal(4) }),
     }));
     expect(tx.financialTransaction.update).toHaveBeenCalledWith({ where: { id: 'payable-a' }, data: { status: 'cancelled' } });
     expect(tx.purchase.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled', paymentStatus: 'cancelled' }) }));
@@ -116,7 +116,7 @@ describe('PurchasesService settlement and cancellation', () => {
         reversedAt: null, reversalTransactionId: null,
       },
     });
-    tx.ingredient.findFirst.mockResolvedValue({ currentStock: new Prisma.Decimal(10) });
+    tx.ingredient.findFirst.mockResolvedValue({ currentStock: new Prisma.Decimal(10), currentCost: new Prisma.Decimal(4) });
     tx.financialTransaction.findFirst.mockResolvedValue({
       id: 'expense-a', tenantId: 'tenant-a', accountId: 'account-a', status: 'paid', amount: new Prisma.Decimal(100),
     });

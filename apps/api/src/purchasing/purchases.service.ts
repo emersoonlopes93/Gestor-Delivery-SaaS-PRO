@@ -24,6 +24,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
+import { reversalAverageCost, weightedAverageCost } from '../inventory/weighted-average-cost';
 
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,100}$/;
@@ -197,10 +198,12 @@ export class PurchasesService {
           const quantity = purchaseQuantity.mul(conversionFactor);
           const totalCost = lineTotalOf(inputItem);
           const unitCost = totalCost.div(quantity).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
-          const oldStock = Number(ingredient.currentStock);
-          const finalAverageCost = oldStock > 0
-            ? (oldStock * Number(ingredient.currentCost) + quantity.toNumber() * unitCost.toNumber()) / (oldStock + quantity.toNumber())
-            : unitCost.toNumber();
+          const finalAverageCost = weightedAverageCost(
+            ingredient.currentStock,
+            ingredient.currentCost,
+            quantity,
+            unitCost,
+          );
           const item = await tx.purchaseItem.create({
             data: {
               tenantId,
@@ -347,15 +350,38 @@ export class PurchasesService {
         throw new ConflictException('Compra possui reversao parcial inconsistente; reconciliacao manual obrigatoria.');
       }
 
-      const requiredByIngredient = new Map<string, Prisma.Decimal>();
+      const requiredByIngredient = new Map<string, { quantity: Prisma.Decimal; value: Prisma.Decimal }>();
       for (const movement of purchase.stockMovements) {
-        const current = requiredByIngredient.get(movement.ingredientId) ?? new Prisma.Decimal(0);
-        requiredByIngredient.set(movement.ingredientId, current.plus(movement.quantity));
+        const current = requiredByIngredient.get(movement.ingredientId)
+          ?? { quantity: new Prisma.Decimal(0), value: new Prisma.Decimal(0) };
+        requiredByIngredient.set(movement.ingredientId, {
+          quantity: current.quantity.plus(movement.quantity),
+          value: current.value.plus(movement.quantity.mul(movement.unitCost ?? 0)),
+        });
       }
-      for (const [ingredientId, required] of requiredByIngredient) {
-        const ingredient = await tx.ingredient.findFirst({ where: { id: ingredientId, tenantId }, select: { currentStock: true } });
-        if (!ingredient || ingredient.currentStock.lessThan(required)) {
+      const nextCostByIngredient = new Map<string, Prisma.Decimal>();
+      for (const ingredientId of [...requiredByIngredient.keys()].sort()) {
+        await this.lockIngredient(tx, tenantId, ingredientId);
+        const required = requiredByIngredient.get(ingredientId) as { quantity: Prisma.Decimal; value: Prisma.Decimal };
+        const ingredient = await tx.ingredient.findFirst({
+          where: { id: ingredientId, tenantId },
+          select: { currentStock: true, currentCost: true },
+        });
+        if (!ingredient || ingredient.currentStock.lessThan(required.quantity)) {
           throw new ConflictException('Estoque insuficiente; reconciliacao de estoque obrigatoria antes do cancelamento.');
+        }
+        try {
+          nextCostByIngredient.set(ingredientId, reversalAverageCost(
+            ingredient.currentStock,
+            ingredient.currentCost,
+            required.quantity,
+            required.value,
+          ));
+        } catch (error) {
+          if (error instanceof Error && error.message === 'UNRECONCILABLE_REVERSAL_VALUE') {
+            throw new ConflictException('O custo da compra nao pode ser revertido sem gerar valor de estoque negativo.');
+          }
+          throw error;
         }
       }
       for (const movement of purchase.stockMovements) {
@@ -371,9 +397,14 @@ export class PurchasesService {
             notes: `Reversao da compra ${purchaseId}`,
           },
         });
+      }
+      for (const [ingredientId, required] of requiredByIngredient) {
         const decremented = await tx.ingredient.updateMany({
-          where: { id: movement.ingredientId, tenantId, currentStock: { gte: movement.quantity } },
-          data: { currentStock: { decrement: movement.quantity } },
+          where: { id: ingredientId, tenantId, currentStock: { gte: required.quantity } },
+          data: {
+            currentStock: { decrement: required.quantity },
+            currentCost: nextCostByIngredient.get(ingredientId) as Prisma.Decimal,
+          },
         });
         if (decremented.count !== 1) {
           throw new ConflictException('Estoque mudou durante o cancelamento; reconciliacao obrigatoria.');
@@ -434,6 +465,11 @@ export class PurchasesService {
 
   private async lockPurchase(tx: Prisma.TransactionClient, tenantId: string, purchaseId: string): Promise<void> {
     const lockKey = `${tenantId}:purchase:${purchaseId}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+  }
+
+  private async lockIngredient(tx: Prisma.TransactionClient, tenantId: string, ingredientId: string): Promise<void> {
+    const lockKey = `${tenantId}:ingredient:${ingredientId}`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
   }
 

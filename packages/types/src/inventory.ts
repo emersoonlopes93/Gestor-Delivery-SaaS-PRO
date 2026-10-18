@@ -55,7 +55,7 @@ export interface StockMovementDTO {
 
 export interface CreateStockMovementDTO {
   ingredientId: string;
-  type: Exclude<StockMovementType, StockMovementType.THEORETICAL_DEPLETION | StockMovementType.THEORETICAL_REVERSAL>;
+  type: StockMovementType.IN | StockMovementType.OUT | StockMovementType.WASTE;
   quantity: number;
   unitCost?: number;
   notes?: string;

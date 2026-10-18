@@ -382,4 +382,47 @@ describe('Purchase lifecycle PostgreSQL atomicity and concurrency', () => {
     expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, type: 'purchase_reversal' } })).toBe(0);
     expect(await prisma.financialTransaction.count({ where: { tenantId: tenant.id, reversalOfTransactionId: { not: null } } })).toBe(0);
   });
+
+  it('keeps Decimal weighted PMP and restores the prior cost on a reconcilable cancellation', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('weighted-reversal');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 3 } });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `weighted-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 1 }],
+    });
+    let stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('20.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('2.0000');
+    await service.cancel(tenant.id, purchase.id);
+    stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('10.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
+  });
+
+  it('blocks a cancellation that would make the remaining inventory value negative', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('unreconcilable-value');
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 10, currentCost: 1 } });
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `unreconcilable-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 9 }],
+    });
+    await prisma.ingredient.update({ where: { id: ingredient.id }, data: { currentStock: 15 } });
+    await expect(service.cancel(tenant.id, purchase.id)).rejects.toBeInstanceOf(ConflictException);
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('15.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('5.0000');
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id, type: StockMovementType.purchase_reversal } })).toBe(0);
+  });
+
+  it('preserves the last valid cost reference when a cancellation reaches zero stock', async () => {
+    const { tenant, supplier, ingredient } = await fixtures('zero-stock-cost');
+    const purchase = await service.create(tenant.id, {
+      supplierId: supplier.id, idempotencyKey: `zero-cost-${suffix}`, paymentStatus: PaymentStatus.PENDING,
+      items: [{ ingredientId: ingredient.id, quantity: 10, unitCost: 3 }],
+    });
+    await service.cancel(tenant.id, purchase.id);
+    const stored = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+    expect(stored.currentStock.toFixed(4)).toBe('0.0000');
+    expect(stored.currentCost.toFixed(4)).toBe('3.0000');
+  });
 });

@@ -2833,3 +2833,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Uma contagem `OPEN` pode ser descartada explicitamente por `POST /inventory-counts/:id/cancel`, protegido por tenant, feature e `inventory.adjust`. A transição CAS aceita somente `OPEN → CANCELLED`; repetição ou contagem já fechada retorna conflito e outro tenant recebe `NotFound`.
 - O descarte não escreve `closedAt`, pois esse campo continua reservado ao fechamento que aplicou ajuste. Não muda saldo, itens, custos, movimentos ou financeiro.
 - Após `409` stale, a tela oferece **Descartar contagem e atualizar** mediante confirmação; o cancelamento recarrega apenas os insumos, não reabre sessão e retorna ao modo de iniciar. Há também descarte confirmado durante uma contagem normal. Recarregar o navegador ainda pode abandonar uma sessão OPEN, sem persistência automática nesta etapa.
+
+## P1 - Integridade de custo medio e movimentos manuais (2026-10-18)
+
+- Compra e entrada manual usam PMP ponderado com `Prisma.Decimal`; saidas mantem o custo vigente e o registram como snapshot no movimento. Entrada manual sem custo herda o PMP atual.
+- Cancelamento de compra agrega as reversoes por insumo, reverte saldo e valor economico na mesma transacao serializavel e bloqueia o cancelamento se isso produzir valor restante negativo. Quando o saldo chega a zero, preserva o ultimo custo valido como referencia.
+- O endpoint manual aceita somente `IN`, `OUT` e `WASTE`; usa lock transacional por insumo, rejeita saldo insuficiente e nao expoe tipos reservados dos motores de compra, inventario ou baixa teorica. Nao houve alteracao Prisma, migration, Orders, marketplace, baixa teorica ou contratos de apresentacao/contagem.
