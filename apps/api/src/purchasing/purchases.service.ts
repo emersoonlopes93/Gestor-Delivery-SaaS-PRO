@@ -346,6 +346,9 @@ export class PurchasesService {
         || purchase.stockMovements.some((movement) => !movement.purchaseItemId)) {
         throw new ConflictException('Compra historica sem vinculo de estoque; reconciliacao manual obrigatoria.');
       }
+      if (purchase.stockMovements.some((movement) => movement.unitCost === null)) {
+        throw new ConflictException('Compra historica sem custo de estoque inequivoco; reconciliacao manual obrigatoria.');
+      }
       if (purchase.stockMovements.some((movement) => movement.reversal)) {
         throw new ConflictException('Compra possui reversao parcial inconsistente; reconciliacao manual obrigatoria.');
       }

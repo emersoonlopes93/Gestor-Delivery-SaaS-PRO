@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { ConflictException, BadRequestException } from '@nestjs/common';
+import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaClient, StockMovementType as PrismaStockMovementType, UnitType } from '@prisma/client';
 import { StockMovementType } from '@gestor/types';
 import { StockMovementService } from './stock-movement.service';
@@ -88,5 +88,41 @@ describe('Manual stock movement PostgreSQL integrity', () => {
     };
     await expect(Reflect.apply(service.createManual, service, [tenant.id, 'user-a', malicious])).rejects.toBeInstanceOf(BadRequestException);
     expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id } })).toBe(0);
+  });
+
+  it('returns BadRequest for malformed manual monetary values before opening a transaction', async () => {
+    const { tenant, ingredient } = await fixture();
+    const invalidRequests: Array<unknown> = [
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 0 },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: -1 },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: Number.NaN },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: Number.POSITIVE_INFINITY },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 1.00001 },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 1, unitCost: -1 },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 1, unitCost: Number.NaN },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 1, unitCost: Number.POSITIVE_INFINITY },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 1, unitCost: 1.00001 },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: undefined },
+      { ingredientId: ingredient.id, type: StockMovementType.IN, quantity: 1, unitCost: null },
+    ];
+
+    for (const invalid of invalidRequests) {
+      await expect(Reflect.apply(service.createManual, service, [tenant.id, 'user-a', invalid]))
+        .rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(await prisma.stockMovement.count({ where: { tenantId: tenant.id } })).toBe(0);
+  });
+
+  it('does not expose a foreign tenant ingredient to manual movement', async () => {
+    const owner = await fixture();
+    const foreign = await fixture();
+    await expect(service.createManual(
+      foreign.tenant.id,
+      'user-b',
+      { ingredientId: owner.ingredient.id, type: StockMovementType.IN, quantity: 1, unitCost: 1 },
+    )).rejects.toBeInstanceOf(NotFoundException);
+    expect((await prisma.ingredient.findUniqueOrThrow({ where: { id: owner.ingredient.id } })).currentStock.toFixed(4)).toBe('10.0000');
+    expect(await prisma.stockMovement.count({ where: { tenantId: owner.tenant.id } })).toBe(0);
+    expect(await prisma.stockMovement.count({ where: { tenantId: foreign.tenant.id } })).toBe(0);
   });
 });

@@ -88,7 +88,10 @@ export class StockMovementService {
     return movements.map((movement) => this.mapToDTO(movement));
   }
 
-  private positiveDecimal(value: number, label: string): Prisma.Decimal {
+  private positiveDecimal(value: unknown, label: string): Prisma.Decimal {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new BadRequestException(`${label} invalida.`);
+    }
     const decimal = new Prisma.Decimal(value);
     if (!decimal.isFinite() || decimal.lessThanOrEqualTo(0) || (decimal.decimalPlaces() ?? 0) > 4) {
       throw new BadRequestException(`${label} invalida.`);
@@ -96,7 +99,10 @@ export class StockMovementService {
     return decimal;
   }
 
-  private nonNegativeDecimal(value: number, label: string): Prisma.Decimal {
+  private nonNegativeDecimal(value: unknown, label: string): Prisma.Decimal {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new BadRequestException(`${label} invalido.`);
+    }
     const decimal = new Prisma.Decimal(value);
     if (!decimal.isFinite() || decimal.lessThan(0) || (decimal.decimalPlaces() ?? 0) > 4) {
       throw new BadRequestException(`${label} invalido.`);
