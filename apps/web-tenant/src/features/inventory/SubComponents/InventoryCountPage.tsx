@@ -29,6 +29,7 @@ export function InventoryCountPage() {
   const [countItems, setCountItems] = useState<CountItem[]>([]);
   const [inventoryCountId, setInventoryCountId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,17 +42,26 @@ export function InventoryCountPage() {
       if (!response.success) return;
 
       setIngredients(response.data);
-      if (response.data.length === 0) {
-        setInventoryCountId(null);
-        setCountItems([]);
-        return;
-      }
+    } catch (error) {
+      console.error('Erro ao carregar insumos:', error);
+      setErrorMessage('Não foi possível carregar os insumos para a contagem. Atualize a página e tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  const handleStart = async () => {
+    if (inventoryCountId || isStarting || ingredients.length === 0) return;
+
+    setIsStarting(true);
+    setSuccess(false);
+    setErrorMessage(null);
+    try {
       const opening = await api.post<InventoryCountDTO>(
         INVENTORY_API_PATHS.openCount,
-        createInventoryCountOpening(response.data.map((ingredient) => ingredient.id)),
+        createInventoryCountOpening(ingredients.map((ingredient) => ingredient.id)),
       );
-      const ingredientById = new Map(response.data.map((ingredient) => [ingredient.id, ingredient]));
+      const ingredientById = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
       const openedItems = opening.data.items ?? [];
       setInventoryCountId(opening.data.id);
       setCountItems(openedItems.map((item) => {
@@ -66,11 +76,9 @@ export function InventoryCountPage() {
       }));
     } catch (error) {
       console.error('Erro ao iniciar inventário:', error);
-      setInventoryCountId(null);
-      setCountItems([]);
-      setErrorMessage('Não foi possível iniciar a contagem. Atualize a página e tente novamente.');
+      setErrorMessage('Não foi possível iniciar a contagem. Tente novamente.');
     } finally {
-      setIsLoading(false);
+      setIsStarting(false);
     }
   };
 
@@ -85,14 +93,12 @@ export function InventoryCountPage() {
   };
 
   const handleSubmit = async () => {
+    if (!inventoryCountId || isSubmitting) return;
+
     setIsSubmitting(true);
     setSuccess(false);
     setErrorMessage(null);
     try {
-      if (!inventoryCountId) {
-        setErrorMessage('A contagem ainda não foi iniciada. Atualize o estoque antes de finalizar.');
-        return;
-      }
       const hasInvalidStock = countItems.some((item) => {
         const value = Number(item.physicalStock);
         return item.physicalStock.trim() === '' || !Number.isFinite(value) || value < 0;
@@ -110,6 +116,8 @@ export function InventoryCountPage() {
         INVENTORY_API_PATHS.closeCount(inventoryCountId),
         createInventoryCountClosure(items),
       );
+      setInventoryCountId(null);
+      setCountItems([]);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 5000);
       await loadIngredients();
@@ -125,6 +133,16 @@ export function InventoryCountPage() {
     }
   };
 
+  const displayedItems = inventoryCountId
+    ? countItems
+    : ingredients.map((ingredient) => ({
+      ingredientId: ingredient.id,
+      name: ingredient.name,
+      unit: ingredient.unit,
+      theoreticalStock: ingredient.currentStock,
+      physicalStock: ingredient.currentStock.toString(),
+    }));
+
   return (
     <div className="p-6 max-w-7xl mx-auto text-left bg-background min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -139,22 +157,22 @@ export function InventoryCountPage() {
           <button
             onClick={() => void loadIngredients()}
             className="p-2.5 text-muted-foreground hover:bg-muted rounded-xl transition-colors disabled:opacity-50"
-            title="Iniciar uma nova contagem com o estoque atualizado"
-            disabled={isLoading || isSubmitting}
+            title={inventoryCountId ? 'A atualização fica disponível após finalizar a contagem ativa' : 'Atualizar lista de insumos'}
+            disabled={isLoading || isStarting || isSubmitting || inventoryCountId !== null}
           >
             <RefreshCcw className="h-5 w-5" />
           </button>
           <button
-            onClick={() => void handleSubmit()}
-            disabled={isLoading || isSubmitting || ingredients.length === 0 || !inventoryCountId}
+            onClick={() => void (inventoryCountId ? handleSubmit() : handleStart())}
+            disabled={isLoading || isStarting || isSubmitting || ingredients.length === 0}
             className="bg-primary hover:opacity-90 text-primary-foreground px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
           >
-            {isSubmitting ? (
+            {isStarting || isSubmitting ? (
               <div className="h-5 w-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
             ) : (
-              <Save className="h-5 w-5" />
+              inventoryCountId ? <Save className="h-5 w-5" /> : <ClipboardList className="h-5 w-5" />
             )}
-            Finalizar contagem
+            {inventoryCountId ? 'Finalizar contagem' : 'Iniciar contagem'}
           </button>
         </div>
       </div>
@@ -192,7 +210,7 @@ export function InventoryCountPage() {
                     <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>
                   </td>
                 </tr>
-              ) : countItems.map((item) => {
+              ) : displayedItems.map((item) => {
                 const diff = Number(item.physicalStock) - item.theoreticalStock;
                 const hasDiff = Number.isFinite(diff) && diff !== 0;
                 return (
@@ -209,6 +227,7 @@ export function InventoryCountPage() {
                         step="0.0001"
                         value={item.physicalStock}
                         onChange={(event) => handleStockChange(item.ingredientId, event.target.value)}
+                        disabled={!inventoryCountId || isSubmitting}
                         className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-bold ${
                           hasDiff ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-input bg-input-bg text-foreground'
                         }`}
@@ -227,7 +246,7 @@ export function InventoryCountPage() {
                   </tr>
                 );
               })}
-              {!isLoading && countItems.length === 0 && (
+              {!isLoading && displayedItems.length === 0 && (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Nenhum insumo encontrado para inventário.</td></tr>
               )}
             </tbody>

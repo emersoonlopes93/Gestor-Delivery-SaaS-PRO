@@ -2821,3 +2821,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - O cliente envia somente IDs na abertura e estoque físico no fechamento. `theoreticalStock` legado está deprecated e não participa do cálculo. O movimento mantém quantidade absoluta por compatibilidade, enquanto `InventoryCountItem.adjustedQuantity` e as notas registram direção, teórico, físico, delta e custo vigente.
 - Prova PostgreSQL efêmera: 12/12 cenários, incluindo stale stock, dupla finalização concorrente, duplicidade, tenant isolation, rollback intermediário e Decimal(10,4). Regressões de Insumos, Apresentações, Compras, Perdas e baixa teórica: 70/70; contratos Web Tenant: 7/7; builds, typecheck, lint e checks arquiteturais passaram localmente.
 - `PurchasePresentation`, `PurchasesService`, saldo inicial/PMP, Orders, `TheoreticalStockService`, marketplace/99Food, pricing, Product.type, Option Groups, Pizza, POS, Storefront e Waiter não foram alterados. CI, Preview e QA permanecem pendentes após publicação da Draft PR.
+
+## P0 - Lifecycle explícito da sessão de inventário (2026-10-18)
+
+- A tela de inventário físico agora apenas carrega os insumos ao entrar, recarregar ou atualizar. A criação de uma sessão `OPEN` ocorre exclusivamente após a ação explícita **Iniciar contagem**.
+- Enquanto a sessão está ativa, a atualização da lista fica desabilitada para não abrir outra sessão e o botão de finalização tem proteção contra duplo envio. Fechar com sucesso limpa o ID local e recarrega somente os insumos; uma resposta `409` preserva a sessão e os valores para revisão, sem reinício automático.
+- O backend continua permitindo múltiplas sessões `OPEN` e não possui cancelamento; o fechamento aceita apenas `OPEN` e o conflito de estoque obsoleto ocorre antes da mudança para `CLOSED`. Esta correção limita-se ao cliente para impedir sessões órfãs criadas pela própria interface.
