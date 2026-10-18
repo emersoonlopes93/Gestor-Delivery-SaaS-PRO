@@ -7,11 +7,13 @@ const suppliersPage = read('./purchasing/SuppliersPage.tsx');
 const supplierModal = read('./purchasing/SupplierModal.tsx');
 
 describe('management quick fixes UI contract', () => {
-  it('keeps a typed conversion factor under user control and validates positive values', () => {
+  it('uses purchase presentations while keeping opening stock in the base unit', () => {
     expect(ingredientModal).not.toContain('Auto-detect conversion factor');
-    expect(ingredientModal).toContain("conversionFactor: e.target.value === '' ? undefined : Number(e.target.value)");
-    expect(ingredientModal).toContain('min="0.0001"');
-    expect(ingredientModal).toContain('Informe um fator de conversão maior que zero.');
+    expect(ingredientModal).not.toContain('Fator de Conversão');
+    expect(ingredientModal).toContain('Como você compra este insumo?');
+    expect(ingredientModal).toContain('purchasePresentations = presentationDrafts');
+    expect(ingredientModal).toContain('const quantityBase = Number(formData.initialPurchase.quantity);');
+    expect(ingredientModal).toContain('O saldo inicial não é uma compra');
   });
 
   it('normalizes an empty document and exposes only clear supplier actions', () => {

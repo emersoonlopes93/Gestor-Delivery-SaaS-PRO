@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { IngredientsController } from './ingredients.controller';
 import { IngredientsService } from './ingredients.service';
+import { PurchasePresentationsService } from './purchase-presentations.service';
+import { PurchasePresentationsController } from './purchase-presentations.controller';
 import { StockMovementService } from './stock-movement.service';
 import { RecipesService } from './recipes.service';
 import { RecipesController } from './recipes.controller';
@@ -17,8 +19,8 @@ import { StockMovementsController } from './stock-movements.controller';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [IngredientsController, RecipesController, InventoryCountController, LossesController, StockMovementsController],
-  providers: [IngredientsService, StockMovementService, RecipesService, TheoreticalStockService, InventoryCountService, LossesService],
+  controllers: [IngredientsController, PurchasePresentationsController, RecipesController, InventoryCountController, LossesController, StockMovementsController],
+  providers: [IngredientsService, PurchasePresentationsService, StockMovementService, RecipesService, TheoreticalStockService, InventoryCountService, LossesService],
   exports: [IngredientsService, StockMovementService, RecipesService, TheoreticalStockService, InventoryCountService, LossesService],
 })
 export class InventoryModule {}

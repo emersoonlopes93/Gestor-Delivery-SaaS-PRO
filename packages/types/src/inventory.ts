@@ -29,10 +29,11 @@ export interface CreateIngredientDTO {
   minStock?: number;
   initialPurchase?: {
     quantity: number;
-    unit: UnitType;
+    /** @deprecated saldo inicial sempre usa a unidade-base do insumo */
+    unit?: UnitType;
     totalCost: number;
-    supplierId?: string;
   };
+  purchasePresentations?: Array<{ label: string; conversionFactor: number }>;
 }
 
 export interface UpdateIngredientDTO extends Partial<CreateIngredientDTO> {

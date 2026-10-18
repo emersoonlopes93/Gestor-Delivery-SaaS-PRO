@@ -85,4 +85,20 @@ describe('inventory and purchasing UX contract', () => {
     expect(purchases).toContain('overflow-x-auto');
     expect(suppliers).toContain('overflow-x-auto');
   });
+
+  it('keeps purchase table cells aligned with their headers and actions last', () => {
+    const headerOrder = ['Compra / NF', 'Fornecedor', 'Data', 'Total', 'Recebimento', 'Pagamento', 'Acoes'];
+    let cursor = -1;
+    for (const header of headerOrder) {
+      const next = purchases.indexOf(header, cursor + 1);
+      expect(next).toBeGreaterThan(cursor);
+      cursor = next;
+    }
+    const supplierCell = purchases.indexOf("purchase.supplier?.name || 'Fornecedor não informado'");
+    const actionsCell = purchases.indexOf('aria-label={`Pagar compra ${purchase.number || purchase.id}`}');
+    expect(supplierCell).toBeGreaterThan(purchases.indexOf('filteredPurchases.map'));
+    expect(actionsCell).toBeGreaterThan(supplierCell);
+    expect(purchases).toContain("purchase.number ? `Compra #${purchase.number}` : `Compra · ${purchase.id.slice(0, 8)}`");
+    expect(purchases).toContain("searchTerm ? 'Nenhuma compra encontrada para esta busca.' : 'Nenhuma compra registrada.'");
+  });
 });

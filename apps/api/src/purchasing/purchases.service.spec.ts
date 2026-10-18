@@ -19,6 +19,7 @@ describe('PurchasesService create lifecycle', () => {
         create: jest.fn().mockResolvedValue({ id: 'purchase-a' }),
       },
       purchaseItem: { create: jest.fn().mockResolvedValue({ id: 'item-a' }) },
+      purchasePresentation: { findFirst: jest.fn().mockResolvedValue({ id: 'presentation-a', label: 'Pacote com 50 un', conversionFactor: new Prisma.Decimal(50) }) },
       supplier: { findFirst: jest.fn().mockResolvedValue({ id: 'supplier-a' }) },
       ingredient: {
         findFirst: jest.fn().mockResolvedValue({ id: 'ingredient-a', currentStock: new Prisma.Decimal(3), currentCost: new Prisma.Decimal(4) }),
@@ -54,11 +55,13 @@ describe('PurchasesService create lifecycle', () => {
     await service.create('tenant-a', createInput());
     expect(tx.purchase.create.mock.calls[0][0].data.purchaseDate.toISOString()).toBe('2026-09-07T12:00:00.000Z');
     expect(tx.ingredient.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'ingredient-a', tenantId: 'tenant-a' }, data: expect.objectContaining({ currentStock: { increment: 2 } }),
+      where: { id: 'ingredient-a', tenantId: 'tenant-a' }, data: expect.objectContaining({ currentStock: { increment: expect.anything() } }),
     }));
+    expect(tx.ingredient.updateMany.mock.calls[0][0].data.currentStock.increment.toString()).toBe('2');
     expect(tx.stockMovement.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ purchaseId: 'purchase-a', purchaseItemId: 'item-a', type: 'purchase_entry', unitCost: 5 }),
+      data: expect.objectContaining({ purchaseId: 'purchase-a', purchaseItemId: 'item-a', type: 'purchase_entry', unitCost: expect.anything() }),
     }));
+    expect(tx.stockMovement.create.mock.calls[0][0].data.unitCost.toString()).toBe('5');
     expect(prisma.purchase.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'purchase-a', tenantId: 'tenant-a' } }));
   });
 
@@ -123,5 +126,68 @@ describe('PurchasesService create lifecycle', () => {
     const ingredient = makeHarness();
     ingredient.tx.ingredient.findFirst.mockResolvedValue(null);
     await expect(ingredient.service.create('tenant-a', createInput())).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('derives base quantity, base cost and historical snapshots from the persisted presentation', async () => {
+    const { service, tx } = makeHarness();
+    await service.create('tenant-a', {
+      ...createInput(),
+      items: [{ ingredientId: 'ingredient-a', purchasePresentationId: 'presentation-a', purchaseQuantity: 1, lineTotal: 12.99 }],
+    });
+
+    expect(tx.purchasePresentation.findFirst).toHaveBeenCalledWith({
+      where: { id: 'presentation-a', tenantId: 'tenant-a', ingredientId: 'ingredient-a', isActive: true },
+      select: { id: true, label: true, conversionFactor: true },
+    });
+    expect(tx.purchaseItem.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      quantity: expect.objectContaining({ toString: expect.any(Function) }),
+      unitCost: expect.objectContaining({ toString: expect.any(Function) }),
+      totalCost: expect.objectContaining({ toString: expect.any(Function) }),
+      purchasePresentationId: 'presentation-a', purchaseQuantity: expect.anything(),
+      purchasePresentationLabel: 'Pacote com 50 un', conversionFactorSnapshot: expect.anything(),
+    }) }));
+    const itemData = tx.purchaseItem.create.mock.calls[0][0].data;
+    expect(itemData.quantity.toString()).toBe('50');
+    expect(itemData.unitCost.toString()).toBe('0.2598');
+    expect(itemData.totalCost.toString()).toBe('12.99');
+    expect(itemData.conversionFactorSnapshot.toString()).toBe('50');
+    expect(tx.ingredient.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ currentStock: { increment: expect.anything() } }),
+    }));
+    expect(tx.ingredient.updateMany.mock.calls[0][0].data.currentStock.increment.toString()).toBe('50');
+    expect(tx.financialTransaction.create.mock.calls[0][0].data.amount.toString()).toBe('12.99');
+  });
+
+  it('rejects a presentation that is inactive, cross-tenant, or belongs to another ingredient', async () => {
+    const { service, tx } = makeHarness();
+    tx.purchasePresentation.findFirst.mockResolvedValue(null);
+    await expect(service.create('tenant-a', {
+      ...createInput(),
+      items: [{ ingredientId: 'ingredient-a', purchasePresentationId: 'presentation-a', purchaseQuantity: 1, lineTotal: 12.99 }],
+    })).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.purchaseItem.create).not.toHaveBeenCalled();
+  });
+
+  it('uses the same server-side factor for multiple packages and keeps direct base-unit purchases compatible', async () => {
+    const packaged = makeHarness();
+    await packaged.service.create('tenant-a', {
+      ...createInput(),
+      items: [{ ingredientId: 'ingredient-a', purchasePresentationId: 'presentation-a', purchaseQuantity: 4, lineTotal: 47.6 }],
+    });
+    const packagedData = packaged.tx.purchaseItem.create.mock.calls[0][0].data;
+    expect(packagedData.quantity.toString()).toBe('200');
+    expect(packagedData.unitCost.toString()).toBe('0.238');
+    expect(packagedData.totalCost.toString()).toBe('47.6');
+
+    const direct = makeHarness();
+    await direct.service.create('tenant-a', {
+      ...createInput(),
+      items: [{ ingredientId: 'ingredient-a', purchaseQuantity: 2, lineTotal: 10 }],
+    });
+    const directData = direct.tx.purchaseItem.create.mock.calls[0][0].data;
+    expect(directData.quantity.toString()).toBe('2');
+    expect(directData.unitCost.toString()).toBe('5');
+    expect(directData.conversionFactorSnapshot.toString()).toBe('1');
+    expect(directData.purchasePresentationId).toBeUndefined();
   });
 });
