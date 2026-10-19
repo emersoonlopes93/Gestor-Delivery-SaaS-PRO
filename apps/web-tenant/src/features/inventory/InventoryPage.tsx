@@ -5,11 +5,12 @@ import { IngredientModal } from './IngredientModal';
 import { MovementsTable } from './SubComponents/MovementsTable';
 import { LossesPage } from './SubComponents/LossesPage';
 import { InventoryCountPage } from './SubComponents/InventoryCountPage';
+import { RecipeBasesPage } from './SubComponents/RecipeBasesPage';
 import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle, Pencil } from 'lucide-react';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { PageHeader } from '../../components/ui/PageHeader';
 
-type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts';
+type InventoryTab = 'ingredients' | 'bases' | 'movements' | 'losses' | 'counts';
 
 interface InventorySummary {
   totalValue: number;
@@ -78,7 +79,7 @@ export function InventoryPage() {
         title="Estoque"
         description="Gestão inteligente de insumos e movimentações."
         icon={Package}
-        action={(
+        action={activeTab === 'ingredients' ? (
           <button
           onClick={() => {
             setEditingIngredient(null);
@@ -88,10 +89,10 @@ export function InventoryPage() {
         >
           <span className="text-lg">+</span> Novo Insumo
           </button>
-        )}
+        ) : undefined}
       />
 
-      <button
+      {activeTab === 'ingredients' && <button
         type="button"
         onClick={() => {
           setEditingIngredient(null);
@@ -100,7 +101,7 @@ export function InventoryPage() {
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-md shadow-primary-500/20 transition-all hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hidden"
       >
         <span className="text-lg" aria-hidden>+</span> Novo Insumo
-      </button>
+      </button>}
 
       <ContextualNavigation itemIds={['management.purchases', 'management.suppliers']} />
 
@@ -133,6 +134,7 @@ export function InventoryPage() {
       <div role="tablist" aria-label="Áreas operacionais do estoque" className="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-border bg-muted/40 p-1">
         {[
           { id: 'ingredients', label: 'Insumos', icon: Package },
+          { id: 'bases', label: 'Bases e preparações', icon: Package },
           { id: 'movements', label: 'Movimentações', icon: RefreshCcw },
           { id: 'losses', label: 'Perdas', icon: TrendingDown },
           { id: 'counts', label: 'Inventário', icon: Filter },
@@ -234,6 +236,7 @@ export function InventoryPage() {
         )}
 
         {activeTab === 'movements' && <MovementsTable />}
+        {activeTab === 'bases' && <RecipeBasesPage />}
         
         {activeTab === 'losses' && <LossesPage />}
         

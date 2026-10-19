@@ -118,6 +118,27 @@ export interface ProductRecipeBaseDTO {
   quantity: number;
 }
 
+export interface CreateRecipeBaseDTO {
+  name: string;
+  description?: string | null;
+  outputUnit: UnitType;
+  yieldQuantity: number;
+}
+
+export interface UpdateRecipeBaseDTO extends CreateRecipeBaseDTO {}
+
+export type UpsertRecipeBaseComponentDTO =
+  | { type: 'ingredient'; ingredientId: string; quantity: number; sortOrder?: number }
+  | { type: 'base'; baseId: string; quantity: number; sortOrder?: number };
+
+export type RecipeBaseComponentDTO =
+  | { id: string; type: 'ingredient'; ingredientId: string; ingredientName: string; ingredientUnit: UnitType; quantity: number; sortOrder: number }
+  | { id: string; type: 'base'; baseId: string; baseName: string; outputUnit: UnitType; isActive: boolean; quantity: number; sortOrder: number };
+
+export interface RecipeBaseDetailDTO extends RecipeBaseDTO {
+  components: RecipeBaseComponentDTO[];
+}
+
 export interface IngredientStatsDTO {
   id: string;
   name: string;

@@ -16,11 +16,13 @@ import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
 
 import { StockMovementsController } from './stock-movements.controller';
+import { RecipeBasesController } from './recipe-bases.controller';
+import { RecipeBasesService } from './recipe-bases.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [IngredientsController, PurchasePresentationsController, RecipesController, InventoryCountController, LossesController, StockMovementsController],
-  providers: [IngredientsService, PurchasePresentationsService, StockMovementService, RecipesService, TheoreticalStockService, InventoryCountService, LossesService],
+  controllers: [IngredientsController, PurchasePresentationsController, RecipesController, RecipeBasesController, InventoryCountController, LossesController, StockMovementsController],
+  providers: [IngredientsService, PurchasePresentationsService, StockMovementService, RecipesService, RecipeBasesService, TheoreticalStockService, InventoryCountService, LossesService],
   exports: [IngredientsService, StockMovementService, RecipesService, TheoreticalStockService, InventoryCountService, LossesService],
 })
 export class InventoryModule {}

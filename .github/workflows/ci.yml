@@ -123,6 +123,13 @@ jobs:
           --runInBand
           src/marketplace/food99-financial-reconciliation.postgres.integration-test.ts
 
+      - name: Test recipe bases integrity with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/inventory/recipe-bases.postgres.integration-test.ts
+
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
 
