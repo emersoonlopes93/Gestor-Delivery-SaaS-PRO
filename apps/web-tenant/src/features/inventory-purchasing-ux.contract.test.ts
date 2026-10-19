@@ -14,8 +14,10 @@ describe('inventory and purchasing UX contract', () => {
   const registry = read('../navigation/navigationRegistry.ts');
   const app = read('../App.tsx');
 
-  it('keeps the four real inventory areas accessible without changing their data paths', () => {
-    expect(inventory).toContain("type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts'");
+  it('keeps the existing inventory areas accessible and adds reusable bases', () => {
+    for (const tab of ['ingredients', 'movements', 'losses', 'counts', 'bases']) {
+      expect(inventory).toContain(`id: '${tab}'`);
+    }
     expect(inventory).toContain('role="tablist"');
     expect(inventory).toContain('role="tab"');
     expect(inventory).toContain('role="tabpanel"');
