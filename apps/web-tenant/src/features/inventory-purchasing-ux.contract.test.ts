@@ -11,6 +11,7 @@ describe('inventory and purchasing UX contract', () => {
   const purchases = read('./purchasing/PurchasesPage.tsx');
   const purchaseModal = read('./purchasing/PurchaseModal.tsx');
   const suppliers = read('./purchasing/SuppliersPage.tsx');
+  const recipeBases = read('./inventory/SubComponents/RecipeBasesPage.tsx');
   const registry = read('../navigation/navigationRegistry.ts');
   const app = read('../App.tsx');
 
@@ -103,5 +104,13 @@ describe('inventory and purchasing UX contract', () => {
     expect(actionsCell).toBeGreaterThan(supplierCell);
     expect(purchases).toContain("purchase.number ? `Compra #${purchase.number}` : `Compra · ${purchase.id.slice(0, 8)}`");
     expect(purchases).toContain("searchTerm ? 'Nenhuma compra encontrada para esta busca.' : 'Nenhuma compra registrada.'");
+  });
+
+  it('closes the recipe-base editor only after its composition and list refresh succeed', () => {
+    expect(recipeBases).toContain('const composition = await api.put<RecipeBaseDetailDTO>');
+    expect(recipeBases).toContain('if (!composition.success) throw new Error(');
+    expect(recipeBases).toContain('await load(); setOpen(false);');
+    expect(recipeBases.indexOf('await load(); setOpen(false);')).toBeGreaterThan(recipeBases.indexOf('const composition = await api.put<RecipeBaseDetailDTO>'));
+    expect(recipeBases.lastIndexOf('catch (caught) { setError(')).toBeGreaterThan(recipeBases.indexOf('await load(); setOpen(false);'));
   });
 });

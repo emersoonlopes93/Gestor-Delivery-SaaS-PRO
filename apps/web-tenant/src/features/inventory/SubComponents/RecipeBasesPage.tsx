@@ -83,7 +83,7 @@ export function RecipeBasesPage() {
         : { type: 'base', baseId: component.baseId, quantity: component.quantity, sortOrder });
       const composition = await api.put<RecipeBaseDetailDTO>(`/inventory/recipe-bases/${base.id}/components`, payload);
       if (!composition.success) throw new Error('Não foi possível salvar a composição.');
-      setEditing(composition.data); setComponents(composition.data.components); await load();
+      setEditing(composition.data); setComponents(composition.data.components); await load(); setOpen(false);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível salvar a preparação.'); return; }
     finally { setSaving(false); }
   };
