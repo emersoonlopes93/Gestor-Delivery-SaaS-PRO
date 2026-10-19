@@ -81,6 +81,43 @@ export interface ProductRecipeDTO {
   totalEstimatedCost: number;
 }
 
+/**
+ * A reusable virtual preparation. It intentionally has no stock or persisted cost.
+ * CRUD and expansion semantics are introduced in later inventory phases.
+ */
+export interface RecipeBaseDTO {
+  id: string;
+  name: string;
+  description?: string | null;
+  outputUnit: UnitType;
+  yieldQuantity: number;
+  isActive: boolean;
+  archivedAt?: Date | null;
+}
+
+export interface RecipeBaseIngredientDTO {
+  id: string;
+  baseId: string;
+  ingredientId: string;
+  quantity: number;
+  sortOrder: number;
+}
+
+export interface RecipeBaseDependencyDTO {
+  id: string;
+  baseId: string;
+  componentBaseId: string;
+  quantity: number;
+  sortOrder: number;
+}
+
+export interface ProductRecipeBaseDTO {
+  id: string;
+  productId: string;
+  baseId: string;
+  quantity: number;
+}
+
 export interface IngredientStatsDTO {
   id: string;
   name: string;

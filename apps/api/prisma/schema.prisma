@@ -125,7 +125,11 @@ model Tenant {
   product_complement_items       product_complement_items[]
   productOptionGroupLinks        ProductOptionGroupLink[]
   productOptionItemPrices        ProductOptionItemPrice[]
+  productRecipeBases             ProductRecipeBase[]
   productRecipeIngredients       ProductRecipeIngredient[]
+  recipeBaseDependencies         RecipeBaseDependency[]         @relation("RecipeBaseDependencyTenant")
+  recipeBaseIngredients          RecipeBaseIngredient[]
+  recipeBases                    RecipeBase[]
   productUpsells                 ProductUpsell[]
   products                       Product[]
   purchaseItems                  PurchaseItem[]
@@ -973,6 +977,7 @@ model Product {
   optionGroupLinks               ProductOptionGroupLink[]
   optionItemPrices               ProductOptionItemPrice[]
   recipeIngredients              ProductRecipeIngredient[]
+  recipeBases                    ProductRecipeBase[]
   upsellLinks                    ProductUpsell[]
   category                       ProductCategory?                 @relation(fields: [categoryId], references: [id])
   mediaAsset                     MediaAsset?                      @relation(fields: [mediaAssetId], references: [id])
@@ -981,6 +986,7 @@ model Product {
   marketplaceCatalogMappings     MarketplaceCatalogMapping[]
 
   @@unique([tenantId, slug])
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([categoryId])
   @@index([mediaAssetId])
@@ -2757,11 +2763,13 @@ model Ingredient {
   tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   inventoryCountItems InventoryCountItem[]
   productRecipes      ProductRecipeIngredient[]
+  recipeBaseIngredients RecipeBaseIngredient[]
   purchaseItems       PurchaseItem[]
   purchasePresentations PurchasePresentation[]
   movements           StockMovement[]
 
   @@unique([tenantId, sku])
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@map("ingredients")
 }
@@ -2826,6 +2834,81 @@ model ProductRecipeIngredient {
   @@unique([productId, ingredientId])
   @@index([tenantId])
   @@map("product_recipe_ingredients")
+}
+
+/// A virtual, reusable preparation. It is neither physical inventory nor a sellable product.
+model RecipeBase {
+  id                    String                  @id @default(uuid())
+  tenantId              String                  @map("tenant_id")
+  name                  String                  @db.VarChar(150)
+  description           String?
+  outputUnit            UnitType                @map("output_unit")
+  yieldQuantity         Decimal                 @map("yield_quantity") @db.Decimal(14, 6)
+  isActive              Boolean                 @default(true) @map("is_active")
+  archivedAt            DateTime?               @map("archived_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ingredients           RecipeBaseIngredient[]  @relation("RecipeBaseIngredients")
+  childDependencies     RecipeBaseDependency[]  @relation("RecipeBaseParent")
+  parentDependencies    RecipeBaseDependency[]  @relation("RecipeBaseComponent")
+  productLinks          ProductRecipeBase[]
+
+  @@unique([tenantId, name])
+  @@unique([id, tenantId])
+  @@index([tenantId, isActive])
+  @@map("recipe_bases")
+}
+
+model RecipeBaseIngredient {
+  id           String     @id @default(uuid())
+  tenantId     String     @map("tenant_id")
+  baseId       String     @map("base_id")
+  ingredientId String     @map("ingredient_id")
+  quantity     Decimal    @db.Decimal(14, 6)
+  sortOrder    Int        @default(0) @map("sort_order")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  base         RecipeBase @relation("RecipeBaseIngredients", fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  ingredient   Ingredient @relation(fields: [ingredientId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([baseId, ingredientId])
+  @@index([tenantId, ingredientId])
+  @@map("recipe_base_ingredients")
+}
+
+model RecipeBaseDependency {
+  id              String     @id @default(uuid())
+  tenantId        String     @map("tenant_id")
+  baseId          String     @map("base_id")
+  componentBaseId String     @map("component_base_id")
+  quantity        Decimal    @db.Decimal(14, 6)
+  sortOrder       Int        @default(0) @map("sort_order")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  base            RecipeBase @relation("RecipeBaseParent", fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  componentBase   RecipeBase @relation("RecipeBaseComponent", fields: [componentBaseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant          Tenant     @relation("RecipeBaseDependencyTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([baseId, componentBaseId])
+  @@index([tenantId, componentBaseId])
+  @@map("recipe_base_dependencies")
+}
+
+model ProductRecipeBase {
+  id        String     @id @default(uuid())
+  tenantId  String     @map("tenant_id")
+  productId String     @map("product_id")
+  baseId    String     @map("base_id")
+  quantity  Decimal    @db.Decimal(14, 6)
+  createdAt DateTime   @default(now()) @map("created_at")
+  product   Product    @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  base      RecipeBase @relation(fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, baseId])
+  @@index([tenantId, productId])
+  @@index([tenantId, baseId])
+  @@map("product_recipe_bases")
 }
 
 model ComplementRecipeIngredient {
