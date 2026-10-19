@@ -5,11 +5,12 @@ import { IngredientModal } from './IngredientModal';
 import { MovementsTable } from './SubComponents/MovementsTable';
 import { LossesPage } from './SubComponents/LossesPage';
 import { InventoryCountPage } from './SubComponents/InventoryCountPage';
+import { RecipeBasesPage } from './SubComponents/RecipeBasesPage';
 import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle, Pencil } from 'lucide-react';
 import { ContextualNavigation } from '../navigation/NavigationHub';
 import { PageHeader } from '../../components/ui/PageHeader';
 
-type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts';
+type InventoryTab = 'ingredients' | 'bases' | 'movements' | 'losses' | 'counts';
 
 interface InventorySummary {
   totalValue: number;
@@ -133,6 +134,7 @@ export function InventoryPage() {
       <div role="tablist" aria-label="Áreas operacionais do estoque" className="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-border bg-muted/40 p-1">
         {[
           { id: 'ingredients', label: 'Insumos', icon: Package },
+          { id: 'bases', label: 'Bases e preparações', icon: Package },
           { id: 'movements', label: 'Movimentações', icon: RefreshCcw },
           { id: 'losses', label: 'Perdas', icon: TrendingDown },
           { id: 'counts', label: 'Inventário', icon: Filter },
@@ -234,6 +236,7 @@ export function InventoryPage() {
         )}
 
         {activeTab === 'movements' && <MovementsTable />}
+        {activeTab === 'bases' && <RecipeBasesPage />}
         
         {activeTab === 'losses' && <LossesPage />}
         
