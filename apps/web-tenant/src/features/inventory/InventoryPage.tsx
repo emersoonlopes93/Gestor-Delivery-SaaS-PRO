@@ -79,7 +79,7 @@ export function InventoryPage() {
         title="Estoque"
         description="Gestão inteligente de insumos e movimentações."
         icon={Package}
-        action={(
+        action={activeTab === 'ingredients' ? (
           <button
           onClick={() => {
             setEditingIngredient(null);
@@ -89,10 +89,10 @@ export function InventoryPage() {
         >
           <span className="text-lg">+</span> Novo Insumo
           </button>
-        )}
+        ) : undefined}
       />
 
-      <button
+      {activeTab === 'ingredients' && <button
         type="button"
         onClick={() => {
           setEditingIngredient(null);
@@ -101,7 +101,7 @@ export function InventoryPage() {
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-md shadow-primary-500/20 transition-all hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hidden"
       >
         <span className="text-lg" aria-hidden>+</span> Novo Insumo
-      </button>
+      </button>}
 
       <ContextualNavigation itemIds={['management.purchases', 'management.suppliers']} />
 
