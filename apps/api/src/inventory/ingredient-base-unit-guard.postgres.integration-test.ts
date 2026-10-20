@@ -114,4 +114,34 @@ describe('Ingredient base-unit guard PostgreSQL proof', () => {
     await expect(unitChange).rejects.toMatchObject({ status: 409 });
     expect((await prisma.ingredient.findUniqueOrThrow({ where: { id: data.ingredient.id } })).unit).toBe(UnitType.l);
   });
+
+  it('rechecks a stale same-unit request under the lock before allowing it to persist', async () => {
+    const data = await fixture();
+    let notifyInitialRead: (() => void) | undefined;
+    let releaseStaleRequest: (() => void) | undefined;
+    const initialRead = new Promise<void>((resolve) => { notifyInitialRead = resolve; });
+    const release = new Promise<void>((resolve) => { releaseStaleRequest = resolve; });
+
+    class DelayedIngredientsService extends IngredientsService {
+      override async findOne(tenantId: string, id: string) {
+        const initial = await super.findOne(tenantId, id);
+        notifyInitialRead?.();
+        await release;
+        return initial;
+      }
+    }
+
+    const staleRequestService = new DelayedIngredientsService(prisma as never, new IngredientBaseUnitGuardService());
+    const staleSameUnitRequest = staleRequestService.update(data.tenant.id, data.ingredient.id, { unit: UnitType.l as SharedUnitType });
+    await initialRead;
+
+    await service.update(data.tenant.id, data.ingredient.id, { unit: UnitType.ml as SharedUnitType });
+    await prisma.stockMovement.create({
+      data: { tenantId: data.tenant.id, ingredientId: data.ingredient.id, type: StockMovementType.in, quantity: '1' },
+    });
+    releaseStaleRequest?.();
+
+    await expect(staleSameUnitRequest).rejects.toMatchObject({ status: 409 });
+    expect((await prisma.ingredient.findUniqueOrThrow({ where: { id: data.ingredient.id } })).unit).toBe(UnitType.ml);
+  });
 });

@@ -167,9 +167,11 @@ export class IngredientsService {
 
     const { ...updateData } = dto;
     const requestedUnit = updateData.unit === undefined ? undefined : this.mapPrismaUnit(updateData.unit);
-    const changesBaseUnit = requestedUnit !== undefined && requestedUnit !== ingredient.unit;
 
-    if (!changesBaseUnit) {
+    // Only requests that omit unit altogether may skip the locked read. A unit
+    // that looked unchanged before the transaction can become a real change
+    // while another request updates the ingredient.
+    if (requestedUnit === undefined) {
       const updated = await this.prisma.ingredient.update({
         where: { id },
         data: this.updateData(updateData, requestedUnit),
