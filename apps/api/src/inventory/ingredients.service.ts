@@ -2,12 +2,16 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
 import { UnitType as PrismaUnitType, Prisma, StockMovementType as PrismaStockMovementType } from '@prisma/client';
+import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
 
 type IngredientWithRelations = Prisma.IngredientGetPayload<Record<string, never>>;
 
 @Injectable()
 export class IngredientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly baseUnitGuard: IngredientBaseUnitGuardService,
+  ) {}
 
   private mapUnit(unit: PrismaUnitType): UnitType {
     const map: Record<PrismaUnitType, UnitType> = {
@@ -162,25 +166,57 @@ export class IngredientsService {
     }
 
     const { ...updateData } = dto;
+    const requestedUnit = updateData.unit === undefined ? undefined : this.mapPrismaUnit(updateData.unit);
+    const changesBaseUnit = requestedUnit !== undefined && requestedUnit !== ingredient.unit;
 
-    const updated = await this.prisma.ingredient.update({
-      where: { id },
-      data: {
-        name: updateData.name,
-        sku: safeSku,
-        description: updateData.description,
-        unit: updateData.unit ? this.mapPrismaUnit(updateData.unit) : undefined,
-        purchaseUnit: updateData.purchaseUnit ? this.mapPrismaUnit(updateData.purchaseUnit) : undefined,
-        conversionFactor: updateData.conversionFactor === undefined
-          ? undefined
-          : this.resolveConversionFactor(updateData.conversionFactor),
-        category: updateData.category,
-        minStock: updateData.minStock,
-        isActive: updateData.isActive,
-      },
-    });
+    if (!changesBaseUnit) {
+      const updated = await this.prisma.ingredient.update({
+        where: { id },
+        data: this.updateData(updateData, requestedUnit),
+      });
+      return this.mapToDTO(updated);
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // The row lock conflicts with foreign-key key-share locks. READ COMMITTED
+      // deliberately refreshes the snapshot after a lock wait, so dependencies
+      // committed by a concurrent writer are visible before the guard runs.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM ingredients
+        WHERE id = ${id} AND tenant_id = ${tenantId}
+        FOR UPDATE
+      `;
+      if (locked.length !== 1) throw new NotFoundException('Insumo nao encontrado');
+
+      const current = await tx.ingredient.findFirst({ where: { id, tenantId } });
+      if (!current) throw new NotFoundException('Insumo nao encontrado');
+      if (requestedUnit !== current.unit) {
+        await this.baseUnitGuard.assertCanChange(tx, tenantId, id, current);
+      }
+
+      return tx.ingredient.update({
+        where: { id },
+        data: this.updateData(updateData, requestedUnit),
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 
     return this.mapToDTO(updated);
+  }
+
+  private updateData(updateData: UpdateIngredientDTO, requestedUnit: PrismaUnitType | undefined) {
+    return {
+      name: updateData.name,
+      sku: updateData.sku === undefined ? undefined : (updateData.sku && updateData.sku.trim() !== '' ? updateData.sku.trim() : null),
+      description: updateData.description,
+      unit: requestedUnit,
+      purchaseUnit: updateData.purchaseUnit ? this.mapPrismaUnit(updateData.purchaseUnit) : undefined,
+      conversionFactor: updateData.conversionFactor === undefined
+        ? undefined
+        : this.resolveConversionFactor(updateData.conversionFactor),
+      category: updateData.category,
+      minStock: updateData.minStock,
+      isActive: updateData.isActive,
+    };
   }
 
   async getSummary(tenantId: string) {
