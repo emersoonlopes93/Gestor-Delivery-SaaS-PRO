@@ -18,12 +18,13 @@ import { RbacModule } from '../rbac/rbac.module';
 import { StockMovementsController } from './stock-movements.controller';
 import { RecipeBasesController } from './recipe-bases.controller';
 import { RecipeBasesService } from './recipe-bases.service';
+import { RecipeExpansionService } from './recipe-expansion.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
   controllers: [IngredientsController, PurchasePresentationsController, RecipesController, RecipeBasesController, InventoryCountController, LossesController, StockMovementsController],
-  providers: [IngredientsService, PurchasePresentationsService, StockMovementService, RecipesService, RecipeBasesService, TheoreticalStockService, InventoryCountService, LossesService],
-  exports: [IngredientsService, StockMovementService, RecipesService, TheoreticalStockService, InventoryCountService, LossesService],
+  providers: [IngredientsService, PurchasePresentationsService, StockMovementService, RecipesService, RecipeBasesService, RecipeExpansionService, TheoreticalStockService, InventoryCountService, LossesService],
+  exports: [IngredientsService, StockMovementService, RecipesService, RecipeExpansionService, TheoreticalStockService, InventoryCountService, LossesService],
 })
 export class InventoryModule {}
 // Final environmental stabilization check
