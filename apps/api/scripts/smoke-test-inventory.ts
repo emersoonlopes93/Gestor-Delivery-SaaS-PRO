@@ -170,7 +170,7 @@ async function main() {
   const upsertRecipe = await api(
     'POST',
     `/inventory/recipes/product/${productId}`,
-    [{ ingredientId, quantity: recipeQuantity }],
+    [{ type: 'ingredient', ingredientId, inputQuantity: recipeQuantity, inputUnit: 'g' }],
     token,
   );
 
@@ -179,7 +179,8 @@ async function main() {
   const getRecipe = await api('GET', `/inventory/recipes/product/${productId}`, undefined, token);
   assert('get recipe status 200', getRecipe.status === 200, `Status=${getRecipe.status}`, getRecipe.raw);
 
-  const recipeItems = Array.isArray(getRecipe.data) ? getRecipe.data : [];
+  const recipeRecord = asRecord(getRecipe.data);
+  const recipeItems = recipeRecord && Array.isArray(recipeRecord.components) ? recipeRecord.components : [];
   const hasIngredient = recipeItems.some((ri) => {
     if (typeof ri !== 'object' || ri === null) return false;
     const rec = ri as Record<string, unknown>;
@@ -202,7 +203,10 @@ async function main() {
   assert('reject legacy complements payload', legacyPayload.status === 400, `Status=${legacyPayload.status}`, legacyPayload.raw);
 
   const recipeBeforeOrder = await api('GET', `/inventory/recipes/product/${productId}`, undefined, token);
-  const recipeBeforeOrderItems = Array.isArray(recipeBeforeOrder.data) ? recipeBeforeOrder.data : [];
+  const recipeBeforeOrderRecord = asRecord(recipeBeforeOrder.data);
+  const recipeBeforeOrderItems = recipeBeforeOrderRecord && Array.isArray(recipeBeforeOrderRecord.components)
+    ? recipeBeforeOrderRecord.components
+    : [];
   let observedStockBefore: number | null = null;
   let expectedConsumption = 0;
 

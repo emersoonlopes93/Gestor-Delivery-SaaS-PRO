@@ -1,4 +1,7 @@
 import { AnalyticsService } from './analytics.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
+
+const recipeExpansion = Object.create(RecipeExpansionService.prototype) as RecipeExpansionService;
 
 describe('AnalyticsService canonical financial account balance', () => {
   it('uses only persisted active account balances scoped to the tenant', async () => {
@@ -6,7 +9,7 @@ describe('AnalyticsService canonical financial account balance', () => {
       financialTransaction: { findMany: jest.fn().mockResolvedValue([]) },
       financialAccount: { aggregate: jest.fn().mockResolvedValue({ _sum: { balance: 125.5 } }) },
     };
-    const service = new AnalyticsService(prisma as never);
+    const service = new AnalyticsService(prisma as never, recipeExpansion);
 
     await expect(service.getFinancialMetrics('tenant-1', {
       startDate: '2026-09-09T00:00:00.000Z',
@@ -26,7 +29,7 @@ describe('AnalyticsService canonical financial account balance', () => {
       ]) },
       financialAccount: { aggregate: jest.fn().mockResolvedValue({ _sum: { balance: 40 } }) },
     };
-    const result = await new AnalyticsService(prisma as never).getFinancialMetrics('tenant-1', {
+    const result = await new AnalyticsService(prisma as never, recipeExpansion).getFinancialMetrics('tenant-1', {
       startDate: '2026-09-09T00:00:00.000Z',
       endDate: '2026-09-09T23:59:59.999Z',
     });

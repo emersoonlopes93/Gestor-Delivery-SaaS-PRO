@@ -507,6 +507,13 @@ export class ProductsService {
         comboBundleItems: true,
         publication: { include: { rules: true } },
         recipeIngredients: true,
+        recipeBases: {
+          include: {
+            base: {
+              select: { id: true, isActive: true, name: true },
+            },
+          },
+        },
 
         optionItemPrices: true,
         upsellLinks: true,
@@ -515,6 +522,13 @@ export class ProductsService {
 
     if (!source) {
       throw new NotFoundException('Produto base não encontrado');
+    }
+
+    const archivedRecipeBase = source.recipeBases.find((link) => !link.base.isActive);
+    if (archivedRecipeBase) {
+      throw new ConflictException(
+        `O produto possui a preparação arquivada "${archivedRecipeBase.base.name}" na ficha técnica. Restaure-a antes de duplicar o produto.`,
+      );
     }
 
     const newName = `${source.name} (Cópia)`;
@@ -547,7 +561,18 @@ export class ProductsService {
             create: (source.recipeIngredients || []).map((ri) => ({
               tenantId,
               ingredientId: ri.ingredientId,
+              inputQuantity: ri.inputQuantity,
+              inputUnit: ri.inputUnit,
               quantity: ri.quantity,
+            })),
+          },
+          recipeBases: {
+            create: (source.recipeBases || []).map((base) => ({
+              tenantId,
+              baseId: base.baseId,
+              inputQuantity: base.inputQuantity,
+              inputUnit: base.inputUnit,
+              quantity: base.quantity,
             })),
           },
         },

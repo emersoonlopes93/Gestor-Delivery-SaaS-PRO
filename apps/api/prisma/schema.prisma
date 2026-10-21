@@ -2827,14 +2827,19 @@ model StockMovement {
 }
 
 model ProductRecipeIngredient {
-  id           String     @id @default(uuid())
-  tenantId     String     @map("tenant_id")
-  productId    String     @map("product_id")
-  ingredientId String     @map("ingredient_id")
-  quantity     Decimal    @db.Decimal(10, 4)
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String     @id @default(uuid())
+  tenantId      String     @map("tenant_id")
+  productId     String     @map("product_id")
+  ingredientId  String     @map("ingredient_id")
+  /// Canonical quantity in Ingredient.unit, used by the expansion engine.
+  quantity      Decimal    @db.Decimal(14, 6)
+  /// Tenant-authored quantity before normalization.
+  inputQuantity Decimal    @map("input_quantity") @db.Decimal(14, 6)
+  /// Tenant-authored unit before normalization.
+  inputUnit     UnitType   @map("input_unit")
+  ingredient    Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  product       Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([productId, ingredientId])
   @@index([tenantId])
@@ -2866,16 +2871,18 @@ model RecipeBase {
 }
 
 model RecipeBaseIngredient {
-  id           String     @id @default(uuid())
-  tenantId     String     @map("tenant_id")
-  baseId       String     @map("base_id")
-  ingredientId String     @map("ingredient_id")
-  quantity     Decimal    @db.Decimal(14, 6)
-  sortOrder    Int        @default(0) @map("sort_order")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  base         RecipeBase @relation("RecipeBaseIngredients", fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  ingredient   Ingredient @relation(fields: [ingredientId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String     @id @default(uuid())
+  tenantId      String     @map("tenant_id")
+  baseId        String     @map("base_id")
+  ingredientId  String     @map("ingredient_id")
+  quantity      Decimal    @db.Decimal(14, 6)
+  inputQuantity Decimal    @map("input_quantity") @db.Decimal(14, 6)
+  inputUnit     UnitType   @map("input_unit")
+  sortOrder     Int        @default(0) @map("sort_order")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  base          RecipeBase @relation("RecipeBaseIngredients", fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  ingredient    Ingredient @relation(fields: [ingredientId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([baseId, ingredientId])
   @@index([tenantId, ingredientId])
@@ -2888,6 +2895,8 @@ model RecipeBaseDependency {
   baseId          String     @map("base_id")
   componentBaseId String     @map("component_base_id")
   quantity        Decimal    @db.Decimal(14, 6)
+  inputQuantity   Decimal    @map("input_quantity") @db.Decimal(14, 6)
+  inputUnit       UnitType   @map("input_unit")
   sortOrder       Int        @default(0) @map("sort_order")
   createdAt       DateTime   @default(now()) @map("created_at")
   base            RecipeBase @relation("RecipeBaseParent", fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
@@ -2900,15 +2909,17 @@ model RecipeBaseDependency {
 }
 
 model ProductRecipeBase {
-  id        String     @id @default(uuid())
-  tenantId  String     @map("tenant_id")
-  productId String     @map("product_id")
-  baseId    String     @map("base_id")
-  quantity  Decimal    @db.Decimal(14, 6)
-  createdAt DateTime   @default(now()) @map("created_at")
-  product   Product    @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  base      RecipeBase @relation(fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String     @id @default(uuid())
+  tenantId      String     @map("tenant_id")
+  productId     String     @map("product_id")
+  baseId        String     @map("base_id")
+  quantity      Decimal    @db.Decimal(14, 6)
+  inputQuantity Decimal    @map("input_quantity") @db.Decimal(14, 6)
+  inputUnit     UnitType   @map("input_unit")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  product       Product    @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  base          RecipeBase @relation(fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([productId, baseId])
   @@index([tenantId, productId])

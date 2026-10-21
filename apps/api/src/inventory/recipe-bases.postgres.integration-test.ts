@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaClient, UnitType } from '@prisma/client';
+import { UnitType as SharedUnitType } from '@gestor/types';
 import { RecipeBasesService } from './recipe-bases.service';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
@@ -38,18 +39,18 @@ describe('Recipe base PostgreSQL schema integrity', () => {
     const child = await prisma.recipeBase.create({ data: { tenantId: first.tenant.id, name: 'Caldo', outputUnit: UnitType.l, yieldQuantity: '2.000000' } });
     const stored = await prisma.recipeBase.findUniqueOrThrow({ where: { id: base.id } });
     expect(stored.yieldQuantity.toFixed(6)).toBe('1.123456');
-    await prisma.recipeBaseIngredient.create({ data: { tenantId: first.tenant.id, baseId: base.id, ingredientId: first.ingredient.id, quantity: '0.123456' } });
-    await prisma.recipeBaseDependency.create({ data: { tenantId: first.tenant.id, baseId: base.id, componentBaseId: child.id, quantity: '0.654321' } });
-    await prisma.productRecipeBase.create({ data: { tenantId: first.tenant.id, productId: first.product.id, baseId: base.id, quantity: '0.500000' } });
-    await prisma.productRecipeIngredient.create({ data: { tenantId: first.tenant.id, productId: first.product.id, ingredientId: first.ingredient.id, quantity: '1.0000' } });
+    await prisma.recipeBaseIngredient.create({ data: { tenantId: first.tenant.id, baseId: base.id, ingredientId: first.ingredient.id, inputQuantity: '0.123456', inputUnit: UnitType.un, quantity: '0.123456' } });
+    await prisma.recipeBaseDependency.create({ data: { tenantId: first.tenant.id, baseId: base.id, componentBaseId: child.id, inputQuantity: '0.654321', inputUnit: UnitType.l, quantity: '0.654321' } });
+    await prisma.productRecipeBase.create({ data: { tenantId: first.tenant.id, productId: first.product.id, baseId: base.id, inputQuantity: '0.500000', inputUnit: UnitType.kg, quantity: '0.500000' } });
+    await prisma.productRecipeIngredient.create({ data: { tenantId: first.tenant.id, productId: first.product.id, ingredientId: first.ingredient.id, inputQuantity: '1.0000', inputUnit: UnitType.un, quantity: '1.0000' } });
     await expect(prisma.recipeBase.create({ data: { tenantId: first.tenant.id, name: 'Molho', outputUnit: UnitType.kg, yieldQuantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
-    await expect(prisma.recipeBaseIngredient.create({ data: { tenantId: first.tenant.id, baseId: base.id, ingredientId: first.ingredient.id, quantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
-    await expect(prisma.recipeBaseDependency.create({ data: { tenantId: first.tenant.id, baseId: base.id, componentBaseId: child.id, quantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
-    await expect(prisma.productRecipeBase.create({ data: { tenantId: first.tenant.id, productId: first.product.id, baseId: base.id, quantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
-    await expect(prisma.recipeBaseIngredient.create({ data: { tenantId: first.tenant.id, baseId: base.id, ingredientId: second.ingredient.id, quantity: 1 } })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(prisma.recipeBaseIngredient.create({ data: { tenantId: first.tenant.id, baseId: base.id, ingredientId: first.ingredient.id, inputQuantity: 1, inputUnit: UnitType.un, quantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
+    await expect(prisma.recipeBaseDependency.create({ data: { tenantId: first.tenant.id, baseId: base.id, componentBaseId: child.id, inputQuantity: 1, inputUnit: UnitType.l, quantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
+    await expect(prisma.productRecipeBase.create({ data: { tenantId: first.tenant.id, productId: first.product.id, baseId: base.id, inputQuantity: 1, inputUnit: UnitType.kg, quantity: 1 } })).rejects.toMatchObject({ code: 'P2002' });
+    await expect(prisma.recipeBaseIngredient.create({ data: { tenantId: first.tenant.id, baseId: base.id, ingredientId: second.ingredient.id, inputQuantity: 1, inputUnit: UnitType.un, quantity: 1 } })).rejects.toMatchObject({ code: 'P2003' });
     const secondBase = await prisma.recipeBase.create({ data: { tenantId: second.tenant.id, name: 'Outro', outputUnit: UnitType.un, yieldQuantity: 1 } });
-    await expect(prisma.recipeBaseDependency.create({ data: { tenantId: first.tenant.id, baseId: base.id, componentBaseId: secondBase.id, quantity: 1 } })).rejects.toMatchObject({ code: 'P2003' });
-    await expect(prisma.productRecipeBase.create({ data: { tenantId: first.tenant.id, productId: first.product.id, baseId: secondBase.id, quantity: 1 } })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(prisma.recipeBaseDependency.create({ data: { tenantId: first.tenant.id, baseId: base.id, componentBaseId: secondBase.id, inputQuantity: 1, inputUnit: UnitType.un, quantity: 1 } })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(prisma.productRecipeBase.create({ data: { tenantId: first.tenant.id, productId: first.product.id, baseId: secondBase.id, inputQuantity: 1, inputUnit: UnitType.un, quantity: 1 } })).rejects.toMatchObject({ code: 'P2003' });
     expect(await prisma.productRecipeIngredient.count({ where: { productId: first.product.id } })).toBe(1);
   });
 
@@ -58,20 +59,20 @@ describe('Recipe base PostgreSQL schema integrity', () => {
     const service = new RecipeBasesService(prisma as never);
     const createBase = (name: string) => prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name, outputUnit: UnitType.un, yieldQuantity: 1 } });
     const [a, b, c] = await Promise.all([createBase('A'), createBase('B'), createBase('C')]);
-    await service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: b.id, quantity: 1 }]);
-    await service.replaceComponents(data.tenant.id, b.id, [{ type: 'base', baseId: c.id, quantity: 1 }]);
-    await expect(service.replaceComponents(data.tenant.id, c.id, [{ type: 'base', baseId: a.id, quantity: 1 }])).rejects.toThrow('direta ou indiretamente');
+    await service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: b.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]);
+    await service.replaceComponents(data.tenant.id, b.id, [{ type: 'base', baseId: c.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]);
+    await expect(service.replaceComponents(data.tenant.id, c.id, [{ type: 'base', baseId: a.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }])).rejects.toThrow('direta ou indiretamente');
     const chain = await Promise.all(Array.from({ length: 12 }, (_, index) => createBase(`Depth ${index}`)));
-    for (let index = 0; index < 10; index += 1) await service.replaceComponents(data.tenant.id, chain[index].id, [{ type: 'base', baseId: chain[index + 1].id, quantity: 1 }]);
-    await service.replaceComponents(data.tenant.id, chain[10].id, [{ type: 'base', baseId: chain[11].id, quantity: 1 }]);
-    await expect(service.replaceComponents(data.tenant.id, chain[0].id, [{ type: 'base', baseId: chain[1].id, quantity: 1 }])).rejects.toThrow('profundidade máxima');
+    for (let index = 0; index < 10; index += 1) await service.replaceComponents(data.tenant.id, chain[index].id, [{ type: 'base', baseId: chain[index + 1].id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]);
+    await service.replaceComponents(data.tenant.id, chain[10].id, [{ type: 'base', baseId: chain[11].id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]);
+    await expect(service.replaceComponents(data.tenant.id, chain[0].id, [{ type: 'base', baseId: chain[1].id, inputQuantity: 1, inputUnit: SharedUnitType.UN }])).rejects.toThrow('profundidade máxima');
     const child = await createBase('Archived child');
-    await service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: child.id, quantity: 2 }]);
+    await service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: child.id, inputQuantity: 2, inputUnit: SharedUnitType.UN }]);
     await service.archive(data.tenant.id, child.id);
-    await expect(service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: child.id, quantity: 3 }])).rejects.toThrow('arquivada');
-    await expect(service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: child.id, quantity: 2 }])).resolves.toMatchObject({ id: a.id });
+    await expect(service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: child.id, inputQuantity: 3, inputUnit: SharedUnitType.UN }])).rejects.toThrow('arquivada');
+    await expect(service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: child.id, inputQuantity: 2, inputUnit: SharedUnitType.UN }])).resolves.toMatchObject({ id: a.id });
     const ingredientBefore = await prisma.ingredient.findUniqueOrThrow({ where: { id: data.ingredient.id } });
-    await service.replaceComponents(data.tenant.id, a.id, [{ type: 'ingredient', ingredientId: data.ingredient.id, quantity: 1 }]);
+    await service.replaceComponents(data.tenant.id, a.id, [{ type: 'ingredient', ingredientId: data.ingredient.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]);
     const ingredientAfter = await prisma.ingredient.findUniqueOrThrow({ where: { id: data.ingredient.id } });
     expect(ingredientAfter.currentStock).toEqual(ingredientBefore.currentStock);
     expect(ingredientAfter.currentCost).toEqual(ingredientBefore.currentCost);
@@ -87,8 +88,8 @@ describe('Recipe base PostgreSQL schema integrity', () => {
       prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name: 'Concurrent B', outputUnit: UnitType.un, yieldQuantity: 1 } }),
     ]);
     const results = await Promise.allSettled([
-      service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: b.id, quantity: 1 }]),
-      service.replaceComponents(data.tenant.id, b.id, [{ type: 'base', baseId: a.id, quantity: 1 }]),
+      service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: b.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]),
+      service.replaceComponents(data.tenant.id, b.id, [{ type: 'base', baseId: a.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]),
     ]);
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     const edges = await prisma.recipeBaseDependency.findMany({ where: { tenantId: data.tenant.id, baseId: { in: [a.id, b.id] } } });

@@ -737,8 +737,8 @@ async function seedDemoTenant() {
     for (const [ingredient, quantity] of [[ingredients[0], 0.3], [ingredients[1], 0.25]] as const) {
       await prisma.productRecipeIngredient.upsert({
         where: { productId_ingredientId: { productId: pizza.id, ingredientId: ingredient.id } },
-        update: { quantity, tenantId: tenant.id },
-        create: { tenantId: tenant.id, productId: pizza.id, ingredientId: ingredient.id, quantity },
+        update: { quantity, inputQuantity: quantity, inputUnit: ingredient.unit, tenantId: tenant.id },
+        create: { tenantId: tenant.id, productId: pizza.id, ingredientId: ingredient.id, inputQuantity: quantity, inputUnit: ingredient.unit, quantity },
       });
     }
 

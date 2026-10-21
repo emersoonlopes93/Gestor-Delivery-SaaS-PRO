@@ -90,7 +90,7 @@ async function main() {
     });
 
     await prisma.productRecipeIngredient.create({
-      data: { tenantId: tenant.id, productId: refrigerante.id, ingredientId: ingrediente.id, quantity: 1 }
+      data: { tenantId: tenant.id, productId: refrigerante.id, ingredientId: ingrediente.id, inputQuantity: 1, inputUnit: 'un', quantity: 1 }
     });
 
     log('✅ Catálogo e Ingredientes de teste criados.');

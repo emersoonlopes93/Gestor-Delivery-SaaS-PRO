@@ -13,6 +13,7 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AdminModulesModule } from '../admin/modules/admin-modules.module';
 import { UpsellRecommendationEngine } from '../campaigns/services/upsell-recommendation.engine';
 import { BillingDomainModule } from '../billing/billing-domain.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 import { OpenAiProvider } from './providers/openai.provider';
 import { OpenAiImageProvider } from './providers/openai-image.provider';
@@ -47,6 +48,7 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     forwardRef(() => SchedulingModule),      // para agendamentos
     AdminModulesModule,                      // para verificar permissões de módulo
     BillingDomainModule,
+    InventoryModule,
   ],
   controllers: [AiAgentController],
   providers: [

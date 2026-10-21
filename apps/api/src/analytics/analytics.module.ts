@@ -22,12 +22,14 @@ import {
 import { isAnalyticsRollupQueueEnabled } from './analytics-rollup.config';
 import { AnalyticsRetentionService } from './analytics-retention.service';
 import { AnalyticsPerformanceService } from './analytics-performance.service';
+import { InventoryModule } from '../inventory/inventory.module';
 
 const enableAnalyticsRollupQueue = isAnalyticsRollupQueueEnabled();
 
 @Module({
   imports: [
     DatabaseModule,
+    InventoryModule,
     AuthModule,
     RbacModule,
     forwardRef(() => CrmModule),

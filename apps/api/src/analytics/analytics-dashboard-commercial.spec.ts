@@ -1,4 +1,5 @@
 import { OrderStatus } from '@prisma/client';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
 import { AnalyticsService } from './analytics.service';
 
 const filter = {
@@ -24,7 +25,13 @@ function makeService(orders: Array<Record<string, unknown>>) {
       },
     },
   };
-  return { prisma, service: new AnalyticsService(prisma as never) };
+  return {
+    prisma,
+    service: new AnalyticsService(
+      prisma as never,
+      Object.create(RecipeExpansionService.prototype) as RecipeExpansionService,
+    ),
+  };
 }
 
 describe('AnalyticsService dashboard commercial metrics', () => {

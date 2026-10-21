@@ -64,7 +64,7 @@ describe('Ingredient base-unit guard PostgreSQL proof', () => {
   it('blocks recipes and active or inactive purchase presentations', async () => {
     const recipe = await fixture();
     const product = await prisma.product.create({ data: { tenantId: recipe.tenant.id, name: `Product ${randomUUID()}`, slug: `product-${randomUUID()}`, basePrice: 1 } });
-    await prisma.productRecipeIngredient.create({ data: { tenantId: recipe.tenant.id, productId: product.id, ingredientId: recipe.ingredient.id, quantity: '1' } });
+    await prisma.productRecipeIngredient.create({ data: { tenantId: recipe.tenant.id, productId: product.id, ingredientId: recipe.ingredient.id, inputQuantity: '1', inputUnit: UnitType.l, quantity: '1' } });
     await expectLocked(recipe.tenant.id, recipe.ingredient.id);
 
     const presentation = await fixture();
@@ -75,7 +75,7 @@ describe('Ingredient base-unit guard PostgreSQL proof', () => {
   it('blocks recipe-base components and ignores cross-tenant references', async () => {
     const baseFixture = await fixture();
     const base = await prisma.recipeBase.create({ data: { tenantId: baseFixture.tenant.id, name: `Base ${randomUUID()}`, outputUnit: UnitType.l, yieldQuantity: '1' } });
-    await prisma.recipeBaseIngredient.create({ data: { tenantId: baseFixture.tenant.id, baseId: base.id, ingredientId: baseFixture.ingredient.id, quantity: '1' } });
+    await prisma.recipeBaseIngredient.create({ data: { tenantId: baseFixture.tenant.id, baseId: base.id, ingredientId: baseFixture.ingredient.id, inputQuantity: '1', inputUnit: UnitType.l, quantity: '1' } });
     await expectLocked(baseFixture.tenant.id, baseFixture.ingredient.id);
 
     const isolated = await fixture();
