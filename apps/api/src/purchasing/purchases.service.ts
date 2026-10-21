@@ -186,7 +186,7 @@ export class PurchasesService {
           const presentation = inputItem.purchasePresentationId
             ? await tx.purchasePresentation.findFirst({
               where: { id: inputItem.purchasePresentationId, tenantId, ingredientId: ingredient.id, isActive: true },
-              select: { id: true, label: true, conversionFactor: true },
+              select: { id: true, label: true, conversionFactor: true, contentQuantity: true, contentUnit: true },
             })
             : null;
           if (inputItem.purchasePresentationId && !presentation) {
@@ -216,6 +216,13 @@ export class PurchasesService {
               purchaseQuantity: isNewContract ? purchaseQuantity : null,
               purchasePresentationLabel: isNewContract ? (presentation?.label ?? `Unidade base (${ingredient.unit})`) : null,
               conversionFactorSnapshot: isNewContract ? conversionFactor : null,
+              purchasePresentationContentQuantitySnapshot: isNewContract && presentation?.contentQuantity !== null && presentation?.contentQuantity !== undefined
+                ? presentation.contentQuantity
+                : null,
+              purchasePresentationContentUnitSnapshot: isNewContract && presentation?.contentUnit !== null && presentation?.contentUnit !== undefined
+                ? presentation.contentUnit
+                : null,
+              ingredientBaseUnitSnapshot: isNewContract ? ingredient.unit : null,
               expiryDate: inputItem.expiryDate,
             },
             select: { id: true },
@@ -538,6 +545,15 @@ export class PurchasesService {
         purchaseQuantity: item.purchaseQuantity === null ? undefined : Number(item.purchaseQuantity),
         purchasePresentationLabel: item.purchasePresentationLabel ?? undefined,
         conversionFactorSnapshot: item.conversionFactorSnapshot === null ? undefined : Number(item.conversionFactorSnapshot),
+        purchasePresentationContentQuantitySnapshot: item.purchasePresentationContentQuantitySnapshot === null
+          ? undefined
+          : Number(item.purchasePresentationContentQuantitySnapshot),
+        purchasePresentationContentUnitSnapshot: item.purchasePresentationContentUnitSnapshot
+          ? this.mapUnit(item.purchasePresentationContentUnitSnapshot)
+          : undefined,
+        ingredientBaseUnitSnapshot: item.ingredientBaseUnitSnapshot
+          ? this.mapUnit(item.ingredientBaseUnitSnapshot)
+          : undefined,
         expiryDate: item.expiryDate ?? undefined,
         ingredientName: item.ingredient?.name,
         ingredientUnit: item.ingredient?.unit ? this.mapUnit(item.ingredient.unit) : undefined,

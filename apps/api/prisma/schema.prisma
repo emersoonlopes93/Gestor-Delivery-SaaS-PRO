@@ -2779,8 +2779,13 @@ model PurchasePresentation {
   tenantId         String     @map("tenant_id")
   ingredientId     String     @map("ingredient_id")
   label            String     @db.VarChar(120)
+  /// Server-derived quantity expressed in Ingredient.unit. Legacy records retain this value only.
   conversionFactor Decimal    @map("conversion_factor") @db.Decimal(14, 6)
+  /// Commercial quantity explicitly authored by the tenant. Null identifies an ambiguous legacy record.
+  contentQuantity  Decimal?   @map("content_quantity") @db.Decimal(14, 6)
+  contentUnit      UnitType?  @map("content_unit")
   isActive         Boolean    @default(true) @map("is_active")
+  archivedAt       DateTime?  @map("archived_at")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   ingredient       Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
@@ -3352,6 +3357,9 @@ model PurchaseItem {
   purchaseQuantity Decimal? @map("purchase_quantity") @db.Decimal(14, 6)
   purchasePresentationLabel String? @map("purchase_presentation_label") @db.VarChar(120)
   conversionFactorSnapshot Decimal? @map("conversion_factor_snapshot") @db.Decimal(14, 6)
+  purchasePresentationContentQuantitySnapshot Decimal? @map("purchase_presentation_content_quantity_snapshot") @db.Decimal(14, 6)
+  purchasePresentationContentUnitSnapshot UnitType? @map("purchase_presentation_content_unit_snapshot")
+  ingredientBaseUnitSnapshot UnitType? @map("ingredient_base_unit_snapshot")
   expiryDate   DateTime?  @map("expiry_date")
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   purchasePresentation PurchasePresentation? @relation(fields: [purchasePresentationId], references: [id], onDelete: Restrict)

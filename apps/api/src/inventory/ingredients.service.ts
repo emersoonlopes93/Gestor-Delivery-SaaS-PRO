@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
 import { UnitType as PrismaUnitType, Prisma, StockMovementType as PrismaStockMovementType } from '@prisma/client';
 import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
+import { convertUnitQuantity, UnitConversionError } from './unit-conversion';
 
 type IngredientWithRelations = Prisma.IngredientGetPayload<Record<string, never>>;
 
@@ -43,6 +44,31 @@ export class IngredientsService {
     return conversionFactor;
   }
 
+  private resolveCanonicalPresentation(
+    presentation: NonNullable<CreateIngredientDTO['purchasePresentations']>[number],
+    ingredientUnit: PrismaUnitType,
+  ): { label: string; contentQuantity: Prisma.Decimal; contentUnit: PrismaUnitType; conversionFactor: Prisma.Decimal } {
+    const label = presentation.label?.trim();
+    const contentQuantity = new Prisma.Decimal(presentation.contentQuantity);
+    if (!label || !contentQuantity.isFinite() || contentQuantity.lte(0) || contentQuantity.decimalPlaces() > 6) {
+      throw new BadRequestException('Cada apresentacao precisa ter nome unico e conteudo positivo de ate seis casas decimais.');
+    }
+    const contentUnit = this.mapPrismaUnit(presentation.contentUnit);
+    let conversionFactor: Prisma.Decimal;
+    try {
+      conversionFactor = convertUnitQuantity(contentQuantity, contentUnit, ingredientUnit);
+    } catch (error) {
+      if (error instanceof UnitConversionError) {
+        throw new BadRequestException({ code: error.code, message: 'A unidade da apresentacao deve ser compativel com a unidade-base do insumo.' });
+      }
+      throw error;
+    }
+    if (conversionFactor.decimalPlaces() > 6) {
+      throw new BadRequestException('O conteudo normalizado nao cabe na precisao da apresentacao.');
+    }
+    return { label, contentQuantity, contentUnit, conversionFactor };
+  }
+
   async findAll(tenantId: string): Promise<IngredientDTO[]> {
     const ingredients = await this.prisma.ingredient.findMany({
       where: { tenantId },
@@ -77,12 +103,10 @@ export class IngredientsService {
     }
 
     const { initialPurchase, purchasePresentations = [], ...ingredientData } = dto;
-    const normalizedPresentations = purchasePresentations.map((presentation) => ({
-      label: presentation.label?.trim(), conversionFactor: Number(presentation.conversionFactor),
-    }));
-    if (normalizedPresentations.some((presentation) => !presentation.label || !Number.isFinite(presentation.conversionFactor) || presentation.conversionFactor <= 0)
-      || new Set(normalizedPresentations.map((presentation) => presentation.label?.toLocaleLowerCase())).size !== normalizedPresentations.length) {
-      throw new BadRequestException('Cada apresentacao precisa ter nome unico e conteudo maior que zero.');
+    const ingredientUnit = this.mapPrismaUnit(ingredientData.unit);
+    const normalizedPresentations = purchasePresentations.map((presentation) => this.resolveCanonicalPresentation(presentation, ingredientUnit));
+    if (new Set(normalizedPresentations.map((presentation) => presentation.label.toLocaleLowerCase())).size !== normalizedPresentations.length) {
+      throw new BadRequestException('Cada apresentacao precisa ter nome unico.');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -92,7 +116,7 @@ export class IngredientsService {
           name: ingredientData.name,
           sku: safeSku,
           description: ingredientData.description,
-          unit: this.mapPrismaUnit(ingredientData.unit),
+          unit: ingredientUnit,
           purchaseUnit: ingredientData.purchaseUnit ? this.mapPrismaUnit(ingredientData.purchaseUnit) : this.mapPrismaUnit(ingredientData.unit),
           conversionFactor: this.resolveConversionFactor(ingredientData.conversionFactor),
           category: ingredientData.category,
@@ -106,7 +130,12 @@ export class IngredientsService {
       if (normalizedPresentations.length > 0) {
         await tx.purchasePresentation.createMany({
           data: normalizedPresentations.map((presentation) => ({
-            tenantId, ingredientId: ingredient.id, label: presentation.label as string, conversionFactor: presentation.conversionFactor,
+            tenantId,
+            ingredientId: ingredient.id,
+            label: presentation.label,
+            contentQuantity: presentation.contentQuantity,
+            contentUnit: presentation.contentUnit,
+            conversionFactor: presentation.conversionFactor,
           })),
         });
       }

@@ -1,4 +1,4 @@
-import { PurchaseStatus, PaymentStatus } from './enums';
+import { PurchaseStatus, PaymentStatus, UnitType } from './enums';
 
 export interface SupplierDTO {
   id: string;
@@ -64,6 +64,9 @@ export interface PurchaseItemDTO {
   purchaseQuantity?: number;
   purchasePresentationLabel?: string;
   conversionFactorSnapshot?: number;
+  purchasePresentationContentQuantitySnapshot?: number;
+  purchasePresentationContentUnitSnapshot?: UnitType;
+  ingredientBaseUnitSnapshot?: UnitType;
   expiryDate?: Date;
   ingredientName?: string; // Helpful for UI
 }
@@ -114,21 +117,28 @@ export interface PurchasePresentationDTO {
   ingredientId: string;
   label: string;
   conversionFactor: number;
+  /** Explicit commercial content. Null means a legacy presentation that needs review. */
+  contentQuantity?: number | null;
+  contentUnit?: UnitType | null;
+  /** Derived read status; never persisted independently. */
+  status: 'CANONICAL' | 'LEGACY_REQUIRES_REVIEW' | 'ARCHIVED';
   isActive: boolean;
+  archivedAt?: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
 
 export interface CreatePurchasePresentationDTO {
   label: string;
-  conversionFactor: number;
-  isActive?: boolean;
+  contentQuantity: number;
+  contentUnit: UnitType;
 }
 
 export interface UpdatePurchasePresentationDTO {
   label?: string;
-  conversionFactor?: number;
-  isActive?: boolean;
+  /** Both fields are required together when canonicalizing or changing content. */
+  contentQuantity?: number;
+  contentUnit?: UnitType;
 }
 
 export interface UpdatePurchaseDTO {

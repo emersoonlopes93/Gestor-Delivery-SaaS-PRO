@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UnitType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
 export enum UnitIntegrityIssueCode {
@@ -25,6 +25,8 @@ type LegacyPresentationRecord = {
   id: string;
   ingredientId: string;
   conversionFactor: Prisma.Decimal;
+  contentQuantity: Prisma.Decimal | null;
+  contentUnit: UnitType | null;
 };
 
 /**
@@ -45,6 +47,8 @@ export class UnitIntegrityAuditService {
         id: true,
         ingredientId: true,
         conversionFactor: true,
+        contentQuantity: true,
+        contentUnit: true,
       },
       orderBy: { id: 'asc' },
     }) as LegacyPresentationRecord[];
@@ -71,7 +75,9 @@ export class UnitIntegrityAuditService {
     if (!presentation.conversionFactor.isFinite() || presentation.conversionFactor.lte(0)) {
       return [{ ...subject, code: UnitIntegrityIssueCode.OBJECTIVE_INVALID_CONVERSION_FACTOR }];
     }
-
-    return [{ ...subject, code: UnitIntegrityIssueCode.LEGACY_PRESENTATION_REQUIRES_REVIEW }];
+    if (presentation.contentQuantity === null || presentation.contentUnit === null) {
+      return [{ ...subject, code: UnitIntegrityIssueCode.LEGACY_PRESENTATION_REQUIRES_REVIEW }];
+    }
+    return [];
   }
 }

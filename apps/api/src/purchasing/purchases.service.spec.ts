@@ -137,7 +137,7 @@ describe('PurchasesService create lifecycle', () => {
 
     expect(tx.purchasePresentation.findFirst).toHaveBeenCalledWith({
       where: { id: 'presentation-a', tenantId: 'tenant-a', ingredientId: 'ingredient-a', isActive: true },
-      select: { id: true, label: true, conversionFactor: true },
+      select: { id: true, label: true, conversionFactor: true, contentQuantity: true, contentUnit: true },
     });
     expect(tx.purchaseItem.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
       quantity: expect.objectContaining({ toString: expect.any(Function) }),

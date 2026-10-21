@@ -11,8 +11,8 @@ describe('UnitIntegrityAuditService', () => {
     const prisma = {
       purchasePresentation: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'presentation-a', ingredientId: 'ingredient-a', label: 'Caixa com 10 L', conversionFactor: decimal('10000') },
-          { id: 'presentation-b', ingredientId: 'ingredient-b', label: 'Pacote misterioso', conversionFactor: decimal('1') },
+          { id: 'presentation-a', ingredientId: 'ingredient-a', label: 'Caixa com 10 L', conversionFactor: decimal('10000'), contentQuantity: null, contentUnit: null },
+          { id: 'presentation-b', ingredientId: 'ingredient-b', label: 'Pacote misterioso', conversionFactor: decimal('1'), contentQuantity: null, contentUnit: null },
         ]),
       },
     };
@@ -30,7 +30,7 @@ describe('UnitIntegrityAuditService', () => {
     });
     expect(prisma.purchasePresentation.findMany).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-a' },
-      select: { id: true, ingredientId: true, conversionFactor: true },
+      select: { id: true, ingredientId: true, conversionFactor: true, contentQuantity: true, contentUnit: true },
       orderBy: { id: 'asc' },
     });
     expect(Object.keys(prisma.purchasePresentation)).toEqual(['findMany']);
@@ -40,7 +40,7 @@ describe('UnitIntegrityAuditService', () => {
     const prisma = {
       purchasePresentation: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'invalid', ingredientId: 'ingredient-a', conversionFactor: decimal('0') },
+          { id: 'invalid', ingredientId: 'ingredient-a', conversionFactor: decimal('0'), contentQuantity: null, contentUnit: null },
         ]),
       },
     };
