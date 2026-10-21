@@ -1,4 +1,7 @@
 import { AnalyticsService } from './analytics.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
+
+const recipeExpansion = Object.create(RecipeExpansionService.prototype) as RecipeExpansionService;
 
 describe('AnalyticsService cost margin COGS', () => {
   it('excludes theoretical depletion from cancelled orders while retaining the historical movement', async () => {
@@ -9,7 +12,7 @@ describe('AnalyticsService cost margin COGS', () => {
       stockMovement: { findMany: stockMovementFindMany },
       order: { aggregate: jest.fn().mockResolvedValue({ _sum: { total: 40 } }) },
     };
-    const service = new AnalyticsService(prisma as never);
+    const service = new AnalyticsService(prisma as never, recipeExpansion);
     Object.defineProperties(service, {
       getProductPerformance: { value: jest.fn().mockResolvedValue([]) },
       getCategoryPerformance: { value: jest.fn().mockResolvedValue([]) },

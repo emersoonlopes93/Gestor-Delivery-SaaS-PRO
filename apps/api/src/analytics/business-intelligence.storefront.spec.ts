@@ -3,6 +3,7 @@ import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
 import { CustomerIntelligenceService } from '../crm/customer-intelligence.service';
 import { CampaignsService } from '../campaigns/services/campaigns.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
 import { BusinessIntelligenceService } from './business-intelligence.service';
 
 describe('BusinessIntelligenceService storefront best sellers', () => {
@@ -22,12 +23,16 @@ describe('BusinessIntelligenceService storefront best sellers', () => {
       productRecipeIngredient: { findMany: jest.fn().mockResolvedValue([]) },
       product: { findMany: jest.fn().mockResolvedValue([]) },
     });
+    const recipeExpansion = Object.assign(Object.create(RecipeExpansionService.prototype) as RecipeExpansionService, {
+      calculateProductRecipeCosts: jest.fn().mockResolvedValue(new Map()),
+    });
     const service = new BusinessIntelligenceService(
       prisma,
       Object.create(AnalyticsService.prototype) as AnalyticsService,
       Object.create(BusinessInsightsService.prototype) as BusinessInsightsService,
       Object.create(CustomerIntelligenceService.prototype) as CustomerIntelligenceService,
       Object.create(CampaignsService.prototype) as CampaignsService,
+      recipeExpansion,
     );
 
     await expect(service.getStorefrontBestSellers('tenant-a', 30, 3)).resolves.toEqual(['a', 'b', 'c']);
