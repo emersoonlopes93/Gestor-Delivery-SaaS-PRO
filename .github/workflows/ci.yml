@@ -151,6 +151,13 @@ jobs:
           --runInBand
           src/inventory/ingredient-base-unit-guard.postgres.integration-test.ts
 
+      - name: Test canonical purchase presentations with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/inventory/purchase-presentation-units.postgres.integration-test.ts
+
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
 

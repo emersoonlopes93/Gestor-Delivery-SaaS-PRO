@@ -33,13 +33,15 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
   const [formError, setFormError] = useState<string | null>(null);
   const [presentations, setPresentations] = useState<PurchasePresentationDTO[]>([]);
   const [presentationLabel, setPresentationLabel] = useState('');
-  const [presentationFactor, setPresentationFactor] = useState<number>(1);
-  const [presentationDrafts, setPresentationDrafts] = useState<Array<{ label: string; conversionFactor: number }>>([]);
+  const [presentationQuantity, setPresentationQuantity] = useState<number>(1);
+  const [presentationUnit, setPresentationUnit] = useState<UnitType>(UnitType.G);
+  const [presentationDrafts, setPresentationDrafts] = useState<Array<{ label: string; contentQuantity: number; contentUnit: UnitType }>>([]);
 
   useEffect(() => {
     setPresentationDrafts([]);
     setPresentationLabel('');
-    setPresentationFactor(1);
+    setPresentationQuantity(1);
+    setPresentationUnit(editingIngredient?.unit ?? UnitType.G);
     setFormError(null);
     if (editingIngredient) {
       setFormData({
@@ -83,8 +85,19 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
       .catch(() => setPresentations([]));
   }, [editingIngredient, isOpen]);
 
+  const compatiblePresentationUnits = (baseUnit: UnitType): UnitType[] => {
+    if (baseUnit === UnitType.G || baseUnit === UnitType.KG) return [UnitType.G, UnitType.KG];
+    if (baseUnit === UnitType.ML || baseUnit === UnitType.L) return [UnitType.ML, UnitType.L];
+    return [UnitType.UN];
+  };
+
+  const presentationPreview = (quantity: number, unit: UnitType, baseUnit: UnitType) => {
+    const scale: Record<UnitType, number> = { [UnitType.UN]: 1, [UnitType.G]: 1, [UnitType.KG]: 1000, [UnitType.ML]: 1, [UnitType.L]: 1000 };
+    return quantity * scale[unit] / scale[baseUnit];
+  };
+
   const addPresentation = async () => {
-    if (!presentationLabel.trim() || !Number.isFinite(presentationFactor) || presentationFactor <= 0) {
+    if (!presentationLabel.trim() || !Number.isFinite(presentationQuantity) || presentationQuantity <= 0) {
       setFormError('Informe uma apresentacao e um conteudo maior que zero.');
       return;
     }
@@ -93,21 +106,40 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         setFormError('Essa apresentacao ja foi adicionada.');
         return;
       }
-      setPresentationDrafts((current) => [...current, { label: presentationLabel.trim(), conversionFactor: presentationFactor }]);
+      setPresentationDrafts((current) => [...current, { label: presentationLabel.trim(), contentQuantity: presentationQuantity, contentUnit: presentationUnit }]);
       setPresentationLabel('');
-      setPresentationFactor(1);
+      setPresentationQuantity(1);
       setFormError(null);
       return;
     }
     const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations`, {
       label: presentationLabel,
-      conversionFactor: presentationFactor,
+      contentQuantity: presentationQuantity,
+      contentUnit: presentationUnit,
     });
     if (response.success) {
       setPresentations((current) => [...current, response.data]);
       setPresentationLabel('');
-      setPresentationFactor(1);
+      setPresentationQuantity(1);
     }
+  };
+
+  const archivePresentation = async (presentation: PurchasePresentationDTO) => {
+    if (!editingIngredient) return;
+    const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${presentation.id}/archive`, {});
+    if (response.success) setPresentations((current) => current.map((item) => item.id === presentation.id ? response.data : item));
+  };
+
+  const restorePresentation = async (presentation: PurchasePresentationDTO) => {
+    if (!editingIngredient) return;
+    const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${presentation.id}/restore`, {});
+    if (response.success) setPresentations((current) => current.map((item) => item.id === presentation.id ? response.data : item));
+  };
+
+  const deletePresentation = async (presentation: PurchasePresentationDTO) => {
+    if (!editingIngredient) return;
+    const response = await api.delete(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${presentation.id}`);
+    if (response.success) setPresentations((current) => current.filter((item) => item.id !== presentation.id));
   };
 
   const calculatedValues = useMemo(() => {
@@ -246,23 +278,33 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
               <p className="mt-1 text-xs text-muted-foreground">Cadastre embalagens comerciais. O estoque continua na unidade de estoque.</p>
             </div>
             <>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_9rem_auto]">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_8rem_8rem_auto]">
                 <input value={presentationLabel} onChange={(event) => setPresentationLabel(event.target.value)} className="input-premium" placeholder="Ex.: Pacote com 50" aria-label="Nome da apresentacao de compra" />
-                <input value={presentationFactor} onChange={(event) => setPresentationFactor(Number(event.target.value))} min="0.000001" step="any" type="number" className="input-premium" aria-label="Conteudo em unidade base" />
+                <input value={presentationQuantity} onChange={(event) => setPresentationQuantity(Number(event.target.value))} min="0.000001" step="any" type="number" className="input-premium" aria-label="Quantidade do conteudo" />
+                <select value={presentationUnit} onChange={(event) => setPresentationUnit(event.target.value as UnitType)} className="input-premium" aria-label="Unidade do conteudo">
+                  {compatiblePresentationUnits(editingIngredient?.unit ?? formData.unit).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                </select>
                 <button type="button" onClick={() => void addPresentation()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Adicionar</button>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Exemplo: 1 pacote = 50 {formData.unit}.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Informe o conteudo comercial. O sistema converte para a unidade de estoque automaticamente.</p>
               <div className="mt-4 space-y-2">
                 {!editingIngredient && presentationDrafts.map((presentation, index) => (
                   <div key={`${presentation.label}-${index}`} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
                     <span className="font-medium text-foreground">{presentation.label}</span>
-                    <span className="flex items-center gap-3 text-muted-foreground">1 {presentation.label} = {presentation.conversionFactor} {formData.unit}<button type="button" onClick={() => setPresentationDrafts((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-destructive">Remover</button></span>
+                    <span className="flex items-center gap-3 text-muted-foreground">{presentation.contentQuantity} {presentation.contentUnit} = {presentationPreview(presentation.contentQuantity, presentation.contentUnit, formData.unit)} {formData.unit}<button type="button" onClick={() => setPresentationDrafts((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-destructive">Remover</button></span>
                   </div>
                 ))}
                 {editingIngredient && (presentations.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma apresentação cadastrada. Compras na unidade de estoque continuam disponíveis.</p> : presentations.map((presentation) => (
                   <div key={presentation.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
                     <span className="font-medium text-foreground">{presentation.label}</span>
-                    <span className="text-muted-foreground">1 {presentation.label} = {presentation.conversionFactor} {editingIngredient.unit}{presentation.isActive ? '' : ' · inativa'}</span>
+                    <span className="flex items-center gap-3 text-muted-foreground">
+                      {presentation.contentQuantity !== null && presentation.contentQuantity !== undefined && presentation.contentUnit
+                        ? `${presentation.contentQuantity} ${presentation.contentUnit} = ${presentation.conversionFactor} ${editingIngredient.unit}`
+                        : 'Legado — revisar unidade/conteúdo'}
+                      {presentation.isActive
+                        ? <><button type="button" onClick={() => void archivePresentation(presentation)} className="text-muted-foreground hover:text-foreground">Arquivar</button><button type="button" onClick={() => void deletePresentation(presentation)} className="text-destructive">Excluir</button></>
+                        : <button type="button" onClick={() => void restorePresentation(presentation)} className="text-primary">Restaurar</button>}
+                    </span>
                   </div>
                 )))}
               </div>

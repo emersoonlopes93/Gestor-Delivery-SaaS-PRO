@@ -33,7 +33,7 @@ export interface CreateIngredientDTO {
     unit?: UnitType;
     totalCost: number;
   };
-  purchasePresentations?: Array<{ label: string; conversionFactor: number }>;
+  purchasePresentations?: Array<{ label: string; contentQuantity: number; contentUnit: UnitType }>;
 }
 
 export interface UpdateIngredientDTO extends Partial<CreateIngredientDTO> {

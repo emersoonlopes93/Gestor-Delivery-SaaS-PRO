@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CreatePurchasePresentationDTO, PurchasePresentationDTO, UpdatePurchasePresentationDTO } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
@@ -25,5 +25,20 @@ export class PurchasePresentationsController {
   @Put(':id') @RequirePermissions('inventory.update')
   update(@CurrentTenant() tenantId: string, @Param('ingredientId') ingredientId: string, @Param('id') id: string, @Body() dto: UpdatePurchasePresentationDTO): Promise<PurchasePresentationDTO> {
     return this.service.update(tenantId, ingredientId, id, dto);
+  }
+
+  @Post(':id/archive') @RequirePermissions('inventory.update')
+  archive(@CurrentTenant() tenantId: string, @Param('ingredientId') ingredientId: string, @Param('id') id: string): Promise<PurchasePresentationDTO> {
+    return this.service.archive(tenantId, ingredientId, id);
+  }
+
+  @Post(':id/restore') @RequirePermissions('inventory.update')
+  restore(@CurrentTenant() tenantId: string, @Param('ingredientId') ingredientId: string, @Param('id') id: string): Promise<PurchasePresentationDTO> {
+    return this.service.restore(tenantId, ingredientId, id);
+  }
+
+  @Delete(':id') @HttpCode(204) @RequirePermissions('inventory.update')
+  async remove(@CurrentTenant() tenantId: string, @Param('ingredientId') ingredientId: string, @Param('id') id: string): Promise<void> {
+    await this.service.remove(tenantId, ingredientId, id);
   }
 }

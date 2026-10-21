@@ -114,24 +114,24 @@ describe('IngredientsService purchase presentations and opening stock', () => {
     await service.create('tenant-1', {
       name: 'Copo', unit: 'un' as UnitType,
       purchasePresentations: [
-        { label: 'Pacote com 50', conversionFactor: 50 },
-        { label: 'Caixa com 100', conversionFactor: 100 },
+        { label: 'Pacote com 50', contentQuantity: 50, contentUnit: 'un' as UnitType },
+        { label: 'Caixa com 100', contentQuantity: 100, contentUnit: 'un' as UnitType },
       ],
     });
 
     expect(transaction.purchasePresentation.createMany).toHaveBeenCalledWith({
       data: [
-        { tenantId: 'tenant-1', ingredientId: 'ingredient-1', label: 'Pacote com 50', conversionFactor: 50 },
-        { tenantId: 'tenant-1', ingredientId: 'ingredient-1', label: 'Caixa com 100', conversionFactor: 100 },
+        { tenantId: 'tenant-1', ingredientId: 'ingredient-1', label: 'Pacote com 50', contentQuantity: expect.anything(), contentUnit: 'un', conversionFactor: expect.anything() },
+        { tenantId: 'tenant-1', ingredientId: 'ingredient-1', label: 'Caixa com 100', contentQuantity: expect.anything(), contentUnit: 'un', conversionFactor: expect.anything() },
       ],
     });
   });
 
   it.each([
-    [[{ label: '', conversionFactor: 50 }]],
-    [[{ label: 'Pacote', conversionFactor: 0 }]],
-    [[{ label: 'Pacote', conversionFactor: -1 }]],
-    [[{ label: 'Pacote', conversionFactor: 50 }, { label: ' pacote ', conversionFactor: 100 }]],
+    [[{ label: '', contentQuantity: 50, contentUnit: 'un' as UnitType }]],
+    [[{ label: 'Pacote', contentQuantity: 0, contentUnit: 'un' as UnitType }]],
+    [[{ label: 'Pacote', contentQuantity: -1, contentUnit: 'un' as UnitType }]],
+    [[{ label: 'Pacote', contentQuantity: 50, contentUnit: 'un' as UnitType }, { label: ' pacote ', contentQuantity: 100, contentUnit: 'un' as UnitType }]],
   ])('rejects invalid or duplicate purchase presentations before opening a transaction', async (purchasePresentations) => {
     const { service, prisma } = await setup();
     prisma.ingredient.findFirst.mockResolvedValue(null);
@@ -149,7 +149,7 @@ describe('IngredientsService purchase presentations and opening stock', () => {
 
     await expect(service.create('tenant-1', {
       name: 'Ingrediente de teste', unit: 'un' as UnitType,
-      purchasePresentations: [{ label: 'Pacote', conversionFactor: 50 }],
+      purchasePresentations: [{ label: 'Pacote', contentQuantity: 50, contentUnit: 'un' as UnitType }],
       initialPurchase: { quantity: 50, totalCost: 12.99 },
     })).rejects.toThrow('database write failed');
 
