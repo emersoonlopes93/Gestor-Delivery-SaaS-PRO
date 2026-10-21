@@ -144,6 +144,13 @@ jobs:
           --runInBand
           src/inventory/unit-integrity-audit.postgres.integration-test.ts
 
+      - name: Test ingredient base unit guard with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/inventory/ingredient-base-unit-guard.postgres.integration-test.ts
+
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
 

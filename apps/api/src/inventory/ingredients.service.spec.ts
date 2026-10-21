@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { UnitType } from '@gestor/types';
 import { UnitType as PrismaUnitType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
 import { IngredientsService } from './ingredients.service';
 
 jest.mock('@gestor/types', () => ({
@@ -44,13 +45,15 @@ async function setup() {
     },
     $transaction: jest.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction)),
   };
+  const baseUnitGuard = { assertCanChange: jest.fn() };
   const module = await Test.createTestingModule({
     providers: [
       IngredientsService,
       { provide: PrismaService, useValue: prisma },
+      { provide: IngredientBaseUnitGuardService, useValue: baseUnitGuard },
     ],
   }).compile();
-  return { service: module.get(IngredientsService), prisma, transaction };
+  return { service: module.get(IngredientsService), prisma, transaction, baseUnitGuard };
 }
 
 describe('IngredientsService purchase presentations and opening stock', () => {

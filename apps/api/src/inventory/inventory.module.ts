@@ -20,11 +20,12 @@ import { RecipeBasesController } from './recipe-bases.controller';
 import { RecipeBasesService } from './recipe-bases.service';
 import { RecipeExpansionService } from './recipe-expansion.service';
 import { UnitIntegrityAuditService } from './unit-integrity-audit.service';
+import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
   controllers: [IngredientsController, PurchasePresentationsController, RecipesController, RecipeBasesController, InventoryCountController, LossesController, StockMovementsController],
-  providers: [IngredientsService, PurchasePresentationsService, StockMovementService, RecipesService, RecipeBasesService, RecipeExpansionService, UnitIntegrityAuditService, TheoreticalStockService, InventoryCountService, LossesService],
+  providers: [IngredientsService, IngredientBaseUnitGuardService, PurchasePresentationsService, StockMovementService, RecipesService, RecipeBasesService, RecipeExpansionService, UnitIntegrityAuditService, TheoreticalStockService, InventoryCountService, LossesService],
   exports: [IngredientsService, StockMovementService, RecipesService, RecipeExpansionService, TheoreticalStockService, InventoryCountService, LossesService],
 })
 export class InventoryModule {}
