@@ -66,4 +66,17 @@ describe('RecipeExpansionService', () => {
     const depthService = new RecipeExpansionService(depthReader as never);
     await expect(depthService.expandProductRecipeToIngredients(tenantId, 'product-a', decimal('1'))).rejects.toThrow('profundidade máxima');
   });
+
+  it('returns a derived cost only for products that actually have recipe components', async () => {
+    const batchReader = reader();
+    const directComponents = [{ ingredientId: 'tomato', quantity: decimal('1'), ingredient: { id: 'tomato', tenantId, currentCost: decimal('0.01') } }];
+    batchReader.productRecipeIngredient.findMany.mockImplementation(({ select }: { select?: unknown }) => Promise.resolve(select ? [{ productId: 'product-a' }] : directComponents));
+    batchReader.productRecipeBase.findMany.mockImplementation(({ select }: { select?: unknown }) => Promise.resolve(select ? [] : []));
+    const service = new RecipeExpansionService(batchReader as never);
+
+    const costs = await service.calculateProductRecipeCosts(tenantId, ['product-a', 'product-without-recipe']);
+
+    expect(costs.get('product-a')?.toString()).toBe('0.01');
+    expect(costs.has('product-without-recipe')).toBe(false);
+  });
 });

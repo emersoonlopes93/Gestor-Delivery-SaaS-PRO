@@ -130,4 +130,28 @@ export class RecipeExpansionService {
     });
     return { totalCost: breakdown.reduce((total, item) => total.plus(item.totalCost), new Prisma.Decimal(0)), ingredients: breakdown };
   }
+
+  /** Canonical bounded batch reader for reporting consumers. */
+  async calculateProductRecipeCosts(tenantId: string, productIds: readonly string[]): Promise<Map<string, Prisma.Decimal>> {
+    const uniqueIds = [...new Set(productIds)];
+    if (!uniqueIds.length) return new Map();
+    const reader = this.reader();
+    const [ingredientLinks, baseLinks] = await Promise.all([
+      reader.productRecipeIngredient.findMany({
+        where: { tenantId, productId: { in: uniqueIds } },
+        select: { productId: true },
+      }),
+      reader.productRecipeBase.findMany({
+        where: { tenantId, productId: { in: uniqueIds } },
+        select: { productId: true },
+      }),
+    ]);
+    const recipeProductIds = [...new Set([...ingredientLinks, ...baseLinks].map((link) => link.productId))];
+    const calculated = await Promise.all(recipeProductIds.map(async (productId) => {
+      const quantities = await this.expandProductRecipeToIngredients(tenantId, productId, new Prisma.Decimal(1));
+      const cost = await this.calculateExpandedIngredientCost(tenantId, quantities);
+      return [productId, cost.totalCost] as const;
+    }));
+    return new Map(calculated);
+  }
 }

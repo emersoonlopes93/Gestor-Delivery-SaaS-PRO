@@ -66,18 +66,38 @@ export interface RecipeIngredientDTO {
   ingredientId: string;
   ingredientName?: string;
   ingredientUnit?: UnitType;
+  inputQuantity: number;
+  inputUnit: UnitType;
   quantity: number;
+  normalizedUnit: UnitType;
   estimatedCost?: number;
 }
 
-export interface UpsertRecipeDTO {
-  ingredientId: string;
-  quantity: number;
-}
+export type ProductRecipeComponentInputDTO =
+  | { type: 'ingredient'; ingredientId: string; inputQuantity: number; inputUnit: UnitType }
+  | { type: 'base'; baseId: string; inputQuantity: number; inputUnit: UnitType };
+
+export type ProductRecipeComponentDTO =
+  | (RecipeIngredientDTO & { type: 'ingredient' })
+  | {
+      id: string;
+      type: 'base';
+      baseId: string;
+      baseName: string;
+      inputQuantity: number;
+      inputUnit: UnitType;
+      quantity: number;
+      normalizedUnit: UnitType;
+      isActive: boolean;
+      estimatedCost?: number;
+    };
+
+/** @deprecated Use ProductRecipeComponentInputDTO. */
+export type UpsertRecipeDTO = ProductRecipeComponentInputDTO;
 
 export interface ProductRecipeDTO {
   productId: string;
-  ingredients: RecipeIngredientDTO[];
+  components: ProductRecipeComponentDTO[];
   totalEstimatedCost: number;
 }
 
@@ -99,7 +119,10 @@ export interface RecipeBaseIngredientDTO {
   id: string;
   baseId: string;
   ingredientId: string;
+  inputQuantity: number;
+  inputUnit: UnitType;
   quantity: number;
+  normalizedUnit: UnitType;
   sortOrder: number;
 }
 
@@ -107,7 +130,10 @@ export interface RecipeBaseDependencyDTO {
   id: string;
   baseId: string;
   componentBaseId: string;
+  inputQuantity: number;
+  inputUnit: UnitType;
   quantity: number;
+  normalizedUnit: UnitType;
   sortOrder: number;
 }
 
@@ -115,7 +141,10 @@ export interface ProductRecipeBaseDTO {
   id: string;
   productId: string;
   baseId: string;
+  inputQuantity: number;
+  inputUnit: UnitType;
   quantity: number;
+  normalizedUnit: UnitType;
 }
 
 export interface CreateRecipeBaseDTO {
@@ -128,12 +157,12 @@ export interface CreateRecipeBaseDTO {
 export interface UpdateRecipeBaseDTO extends CreateRecipeBaseDTO {}
 
 export type UpsertRecipeBaseComponentDTO =
-  | { type: 'ingredient'; ingredientId: string; quantity: number; sortOrder?: number }
-  | { type: 'base'; baseId: string; quantity: number; sortOrder?: number };
+  | { type: 'ingredient'; ingredientId: string; inputQuantity: number; inputUnit: UnitType; sortOrder?: number }
+  | { type: 'base'; baseId: string; inputQuantity: number; inputUnit: UnitType; sortOrder?: number };
 
 export type RecipeBaseComponentDTO =
-  | { id: string; type: 'ingredient'; ingredientId: string; ingredientName: string; ingredientUnit: UnitType; quantity: number; sortOrder: number }
-  | { id: string; type: 'base'; baseId: string; baseName: string; outputUnit: UnitType; isActive: boolean; quantity: number; sortOrder: number };
+  | { id: string; type: 'ingredient'; ingredientId: string; ingredientName: string; ingredientUnit: UnitType; inputQuantity: number; inputUnit: UnitType; quantity: number; normalizedUnit: UnitType; sortOrder: number }
+  | { id: string; type: 'base'; baseId: string; baseName: string; outputUnit: UnitType; isActive: boolean; inputQuantity: number; inputUnit: UnitType; quantity: number; normalizedUnit: UnitType; sortOrder: number };
 
 export interface RecipeBaseDetailDTO extends RecipeBaseDTO {
   components: RecipeBaseComponentDTO[];

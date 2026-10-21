@@ -73,7 +73,7 @@ describe('POS PostgreSQL concurrent atomicity', () => {
       data: { tenantId, operatorId: operator.id, openingAmount: 0 },
     });
     await prisma.productRecipeIngredient.create({
-      data: { tenantId, productId: product.id, ingredientId: ingredient.id, quantity: 1 },
+      data: { tenantId, productId: product.id, ingredientId: ingredient.id, inputQuantity: 1, inputUnit: UnitType.un, quantity: 1 },
     });
 
     const before = await Promise.all([

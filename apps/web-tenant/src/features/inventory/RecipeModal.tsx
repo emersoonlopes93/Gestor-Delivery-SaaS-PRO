@@ -1,10 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api-client';
-import { 
-  IngredientDTO, 
-  RecipeIngredientDTO, 
-  UpsertRecipeDTO
-} from '@gestor/types';
+import { IngredientDTO, ProductRecipeComponentDTO, ProductRecipeComponentInputDTO, ProductRecipeDTO, RecipeBaseDTO, UnitType } from '@gestor/types';
 
 interface RecipeModalProps {
   isOpen: boolean;
@@ -14,206 +10,95 @@ interface RecipeModalProps {
   entityName: string;
 }
 
+const compatibleUnits = (unit: UnitType): UnitType[] => {
+  if (unit === UnitType.G || unit === UnitType.KG) return [UnitType.G, UnitType.KG];
+  if (unit === UnitType.ML || unit === UnitType.L) return [UnitType.ML, UnitType.L];
+  return [UnitType.UN];
+};
+
+const preview = (quantity: number, from: UnitType, target: UnitType): number => {
+  if (from === target) return quantity;
+  if (from === UnitType.G && target === UnitType.KG) return quantity / 1000;
+  if (from === UnitType.KG && target === UnitType.G) return quantity * 1000;
+  if (from === UnitType.ML && target === UnitType.L) return quantity / 1000;
+  if (from === UnitType.L && target === UnitType.ML) return quantity * 1000;
+  return quantity;
+};
+
 export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName }: RecipeModalProps) {
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
-  const [recipeItems, setRecipeItems] = useState<RecipeIngredientDTO[]>([]);
+  const [bases, setBases] = useState<RecipeBaseDTO[]>([]);
+  const [components, setComponents] = useState<ProductRecipeComponentDTO[]>([]);
+  const [totalCost, setTotalCost] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoading(true); setError(null);
     try {
-      const [ingRes, recipeRes] = await Promise.all([
+      const [ingredientsResult, basesResult, recipeResult] = await Promise.all([
         api.get<IngredientDTO[]>('/inventory/ingredients'),
-        api.get<RecipeIngredientDTO[]>(`/inventory/recipes/${entityType}/${entityId}`)
+        api.get<RecipeBaseDTO[]>('/inventory/recipe-bases'),
+        api.get<ProductRecipeDTO>(`/inventory/recipes/${entityType}/${entityId}`),
       ]);
+      if (!ingredientsResult.success || !basesResult.success || !recipeResult.success) throw new Error('Não foi possível carregar a ficha técnica.');
+      setIngredients(ingredientsResult.data); setBases(basesResult.data); setComponents(recipeResult.data.components); setTotalCost(recipeResult.data.totalEstimatedCost);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível carregar a ficha técnica.');
+    } finally { setIsLoading(false); }
+  }, [entityId, entityType]);
 
-      if (ingRes.success) setIngredients(ingRes.data);
-      if (recipeRes.success) setRecipeItems(recipeRes.data);
-    } catch (error) {
-      console.error('Erro ao carregar ficha técnica:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [entityType, entityId]);
+  useEffect(() => { if (isOpen) void loadData(); }, [isOpen, loadData]);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen, loadData]);
-
-  const handleAddItem = () => {
-    if (ingredients.length === 0) return;
-    const firstIng = ingredients[0];
-    setRecipeItems([
-      ...recipeItems,
-      {
-        id: Math.random().toString(), // Temp ID for list
-        ingredientId: firstIng.id,
-        ingredientName: firstIng.name,
-        ingredientUnit: firstIng.unit,
-        quantity: 0,
-        estimatedCost: 0
-      }
-    ]);
+  const availableIngredients = useMemo(() => ingredients.filter((ingredient) => ingredient.isActive), [ingredients]);
+  const availableBases = useMemo(() => bases.filter((base) => base.isActive), [bases]);
+  const addIngredient = () => {
+    const ingredient = availableIngredients.find((item) => !components.some((component) => component.type === 'ingredient' && component.ingredientId === item.id));
+    if (!ingredient) return;
+    setComponents((current) => [...current, { id: `ingredient-${ingredient.id}`, type: 'ingredient', ingredientId: ingredient.id, ingredientName: ingredient.name, ingredientUnit: ingredient.unit, inputQuantity: 1, inputUnit: ingredient.unit, quantity: 1, normalizedUnit: ingredient.unit, estimatedCost: ingredient.currentCost }]);
   };
-
-  const handleRemoveItem = (index: number) => {
-    setRecipeItems(recipeItems.filter((_, i) => i !== index));
+  const addBase = () => {
+    const base = availableBases.find((item) => !components.some((component) => component.type === 'base' && component.baseId === item.id));
+    if (!base) return;
+    setComponents((current) => [...current, { id: `base-${base.id}`, type: 'base', baseId: base.id, baseName: base.name, inputQuantity: 1, inputUnit: base.outputUnit, quantity: 1, normalizedUnit: base.outputUnit, isActive: base.isActive }]);
   };
-
-  const handleUpdateItem = (index: number, updates: Partial<RecipeIngredientDTO>) => {
-    const updated = [...recipeItems];
-    const item = { ...updated[index], ...updates };
-    
-    // If ingredient changed, update unit and name
-    if (updates.ingredientId) {
-      const ing = ingredients.find(i => i.id === updates.ingredientId);
-      if (ing) {
-        item.ingredientName = ing.name;
-        item.ingredientUnit = ing.unit;
-      }
-    }
-    
-    updated[index] = item;
-    setRecipeItems(updated);
+  const updateComponent = (index: number, field: 'inputQuantity' | 'inputUnit', value: number | UnitType) => {
+    setComponents((current) => current.map((component, componentIndex) => {
+      if (componentIndex !== index) return component;
+      const next = { ...component, [field]: value } as ProductRecipeComponentDTO;
+      const allowed = compatibleUnits(next.normalizedUnit);
+      if (!allowed.includes(next.inputUnit)) next.inputUnit = next.normalizedUnit;
+      next.quantity = preview(Number(next.inputQuantity) || 0, next.inputUnit, next.normalizedUnit);
+      return next;
+    }));
   };
-
-  const totalCost = (recipeItems || []).reduce((acc, item) => {
-    const ing = ingredients.find(i => i.id === item.ingredientId);
-    return acc + (Number(item.quantity) * (ing?.currentCost || 0));
-  }, 0);
-
-  const handleSave = async () => {
-    setIsSaving(true);
+  const remove = (index: number) => setComponents((current) => current.filter((_, componentIndex) => componentIndex !== index));
+  const save = async () => {
+    setError(null); setIsSaving(true);
     try {
-      const items: UpsertRecipeDTO[] = (recipeItems || []).map(item => ({
-        ingredientId: item.ingredientId,
-        quantity: Number(item.quantity)
-      }));
-
-      await api.post(`/inventory/recipes/${entityType}/${entityId}`, items);
-      onClose();
-    } catch (error) {
-      console.error('Erro ao salvar ficha técnica:', error);
-    } finally {
-      setIsSaving(false);
-    }
+      const payload: ProductRecipeComponentInputDTO[] = components.map((component) => component.type === 'ingredient'
+        ? { type: 'ingredient', ingredientId: component.ingredientId, inputQuantity: Number(component.inputQuantity), inputUnit: component.inputUnit }
+        : { type: 'base', baseId: component.baseId, inputQuantity: Number(component.inputQuantity), inputUnit: component.inputUnit });
+      const result = await api.post<ProductRecipeDTO>(`/inventory/recipes/${entityType}/${entityId}`, payload);
+      if (!result.success) throw new Error('Não foi possível salvar a ficha técnica.');
+      setComponents(result.data.components); setTotalCost(result.data.totalEstimatedCost); onClose();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível salvar a ficha técnica.'); }
+    finally { setIsSaving(false); }
   };
 
   if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-card rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] text-left border border-border">
-        <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/50">
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Ficha Técnica</h2>
-            <p className="text-sm text-muted-foreground">{entityName}</p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <span className="text-2xl">&times;</span>
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <>
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th className="pb-3 pr-4">Insumo</th>
-                    <th className="pb-3 pr-4 w-32">Quantidade</th>
-                    <th className="pb-3 text-right">Custo Est.</th>
-                    <th className="pb-3 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {recipeItems.map((item, index) => {
-                    const ing = ingredients.find(i => i.id === item.ingredientId);
-                    const itemCost = Number(item.quantity) * (ing?.currentCost || 0);
-                    
-                    return (
-                      <tr key={item.id} className="group">
-                        <td className="py-3 pr-4">
-                          <select
-                            value={item.ingredientId}
-                            onChange={(e) => handleUpdateItem(index, { ingredientId: e.target.value })}
-                            className="w-full bg-input-bg border border-input rounded-lg px-2 py-1 text-sm font-medium text-foreground cursor-pointer focus:ring-2 focus:ring-primary/30 outline-none transition-all"
-                          >
-                            {ingredients.map(ing => (
-                              <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              step="0.001"
-                              value={item.quantity}
-                              onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
-                              className="w-full px-2 py-1 rounded border border-input bg-input-bg text-foreground text-sm focus:ring-1 focus:ring-primary outline-none"
-                            />
-                            <span className="text-xs text-muted-foreground">{ing?.unit}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 text-right text-sm text-muted-foreground">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(itemCost)}
-                        </td>
-                        <td className="py-3 text-right">
-                          <button
-                            onClick={() => handleRemoveItem(index)}
-                            className="text-muted-foreground hover:text-destructive transition-colors text-lg"
-                          >
-                            &times;
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              <button
-                onClick={handleAddItem}
-                className="w-full py-2 border-2 border-dashed border-border rounded-xl text-muted-foreground text-sm font-medium hover:border-primary/55 hover:text-primary transition-all"
-              >
-                + Adicionar Insumo
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="px-6 py-4 border-t border-border bg-muted/50 flex items-center justify-between">
-          <div>
-            <span className="text-sm text-muted-foreground">Custo Teórico Total:</span>
-            <div className="text-xl font-bold text-primary">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCost)}
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Descartar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || recipeItems.length === 0}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all disabled:opacity-50 shadow-sm"
-            >
-              {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-            </button>
-          </div>
-        </div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-labelledby="recipe-title" className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-left shadow-xl">
+      <div className="flex items-center justify-between border-b border-border bg-muted/50 px-6 py-4"><div><h2 id="recipe-title" className="text-xl font-bold text-foreground">Ficha Técnica</h2><p className="text-sm text-muted-foreground">{entityName}</p></div><button type="button" onClick={onClose} className="text-2xl text-muted-foreground hover:text-foreground">×</button></div>
+      <div className="flex-1 space-y-4 overflow-y-auto p-6">
+        {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+        {isLoading ? <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" /></div> : <>
+          <div className="flex flex-wrap gap-2"><button type="button" onClick={addIngredient} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:border-primary">+ Adicionar insumo</button><button type="button" onClick={addBase} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:border-primary">+ Adicionar preparação</button></div>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground"><th className="py-2">Componente</th><th>Tipo</th><th>Quantidade</th><th>Unidade</th><th>Normalizado</th><th /></tr></thead><tbody>{components.map((component, index) => <tr key={`${component.type}-${component.id}-${index}`} className="border-b border-border/60"><td className="py-3 font-medium text-foreground">{component.type === 'ingredient' ? component.ingredientName : component.baseName}</td><td>{component.type === 'ingredient' ? 'Insumo' : 'Preparação'}</td><td><input aria-label={`Quantidade de ${component.type === 'ingredient' ? component.ingredientName : component.baseName}`} type="number" min="0.000001" step="0.000001" value={component.inputQuantity} onChange={(event) => updateComponent(index, 'inputQuantity', Number(event.target.value))} className="input-premium w-28" /></td><td><select value={component.inputUnit} onChange={(event) => updateComponent(index, 'inputUnit', event.target.value as UnitType)} className="input-premium w-20">{compatibleUnits(component.normalizedUnit).map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></td><td className="text-muted-foreground">= {component.quantity} {component.normalizedUnit}</td><td className="text-right"><button type="button" onClick={() => remove(index)} className="text-destructive">Remover</button></td></tr>)}</tbody></table>{components.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Sem ficha técnica. Salve vazio para manter o produto sem composição.</p>}</div>
+        </>}
       </div>
+      <div className="flex items-center justify-between border-t border-border bg-muted/50 px-6 py-4"><div><span className="text-sm text-muted-foreground">Custo teórico total</span><div className="text-xl font-bold text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCost)}</div></div><div className="flex gap-3"><button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground">Cancelar</button><button type="button" disabled={isSaving} onClick={() => void save()} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{isSaving ? 'Salvando…' : 'Salvar ficha técnica'}</button></div></div>
     </div>
-  );
+  </div>;
 }

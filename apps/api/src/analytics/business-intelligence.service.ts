@@ -5,6 +5,7 @@ import { CustomerIntelligenceService } from '../crm/customer-intelligence.servic
 import { PrismaService } from '../database/prisma.service';
 import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
 
 type DateRange = { startDate: string; endDate: string };
 
@@ -31,6 +32,7 @@ export class BusinessIntelligenceService {
     private readonly customerIntelligenceService: CustomerIntelligenceService,
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaignsService: CampaignsService,
+    private readonly recipeExpansion: RecipeExpansionService,
   ) {}
 
   async getDashboard(tenantId: string) {
@@ -390,11 +392,8 @@ export class BusinessIntelligenceService {
     });
 
     const productIds = items.map((item) => item.productId).filter((id): id is string => Boolean(id));
-    const [recipes, products] = await Promise.all([
-      this.prisma.productRecipeIngredient.findMany({
-        where: { tenantId, productId: { in: productIds } },
-        include: { ingredient: true },
-      }),
+    const [recipeCosts, products] = await Promise.all([
+      this.recipeExpansion.calculateProductRecipeCosts(tenantId, productIds),
       this.prisma.product.findMany({
         where: { tenantId, id: { in: productIds } },
         select: { id: true, costPrice: true },
@@ -405,14 +404,7 @@ export class BusinessIntelligenceService {
     for (const product of products) {
       if (product.costPrice !== null) unitCost.set(product.id, Number(product.costPrice));
     }
-    const recipeCosts = new Map<string, number>();
-    for (const recipe of recipes) {
-      recipeCosts.set(
-        recipe.productId,
-        (recipeCosts.get(recipe.productId) ?? 0) + Number(recipe.quantity) * Number(recipe.ingredient.currentCost),
-      );
-    }
-    for (const [productId, cost] of recipeCosts) unitCost.set(productId, cost);
+    for (const [productId, cost] of recipeCosts) unitCost.set(productId, Number(cost));
 
     return items.map((item) => {
       const id = item.productId ?? 'unknown';

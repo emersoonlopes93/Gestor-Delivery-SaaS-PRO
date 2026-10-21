@@ -36,13 +36,13 @@ describe('Recipe expansion PostgreSQL integrity', () => {
     const baseA = await prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name: 'Base sauce', outputUnit: UnitType.ml, yieldQuantity: '1000.000000' } });
     const baseB = await prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name: 'Special sauce', outputUnit: UnitType.ml, yieldQuantity: '500.000000', isActive: false, archivedAt: new Date() } });
     await prisma.recipeBaseIngredient.createMany({ data: [
-      { tenantId: data.tenant.id, baseId: baseA.id, ingredientId: data.tomato.id, quantity: '700.000000' },
-      { tenantId: data.tenant.id, baseId: baseA.id, ingredientId: data.oil.id, quantity: '100.000000' },
-      { tenantId: data.tenant.id, baseId: baseB.id, ingredientId: data.cheese.id, quantity: '50.000000' },
+      { tenantId: data.tenant.id, baseId: baseA.id, ingredientId: data.tomato.id, inputQuantity: '700.000000', inputUnit: UnitType.g, quantity: '700.000000' },
+      { tenantId: data.tenant.id, baseId: baseA.id, ingredientId: data.oil.id, inputQuantity: '100.000000', inputUnit: UnitType.ml, quantity: '100.000000' },
+      { tenantId: data.tenant.id, baseId: baseB.id, ingredientId: data.cheese.id, inputQuantity: '50.000000', inputUnit: UnitType.g, quantity: '50.000000' },
     ] });
-    await prisma.recipeBaseDependency.create({ data: { tenantId: data.tenant.id, baseId: baseB.id, componentBaseId: baseA.id, quantity: '200.000000' } });
-    await prisma.productRecipeIngredient.create({ data: { tenantId: data.tenant.id, productId: data.product.id, ingredientId: data.tomato.id, quantity: '1.0000' } });
-    await prisma.productRecipeBase.create({ data: { tenantId: data.tenant.id, productId: data.product.id, baseId: baseB.id, quantity: '100.000000' } });
+    await prisma.recipeBaseDependency.create({ data: { tenantId: data.tenant.id, baseId: baseB.id, componentBaseId: baseA.id, inputQuantity: '200.000000', inputUnit: UnitType.ml, quantity: '200.000000' } });
+    await prisma.productRecipeIngredient.create({ data: { tenantId: data.tenant.id, productId: data.product.id, ingredientId: data.tomato.id, inputQuantity: '1.0000', inputUnit: UnitType.g, quantity: '1.0000' } });
+    await prisma.productRecipeBase.create({ data: { tenantId: data.tenant.id, productId: data.product.id, baseId: baseB.id, inputQuantity: '100.000000', inputUnit: UnitType.ml, quantity: '100.000000' } });
 
     const service = new RecipeExpansionService(prisma as never);
     const quantities = await service.expandProductRecipeToIngredients(data.tenant.id, data.product.id, new Prisma.Decimal(2));

@@ -507,6 +507,7 @@ export class ProductsService {
         comboBundleItems: true,
         publication: { include: { rules: true } },
         recipeIngredients: true,
+        recipeBases: true,
 
         optionItemPrices: true,
         upsellLinks: true,
@@ -547,7 +548,18 @@ export class ProductsService {
             create: (source.recipeIngredients || []).map((ri) => ({
               tenantId,
               ingredientId: ri.ingredientId,
+              inputQuantity: ri.inputQuantity,
+              inputUnit: ri.inputUnit,
               quantity: ri.quantity,
+            })),
+          },
+          recipeBases: {
+            create: (source.recipeBases || []).map((base) => ({
+              tenantId,
+              baseId: base.baseId,
+              inputQuantity: base.inputQuantity,
+              inputUnit: base.inputUnit,
+              quantity: base.quantity,
             })),
           },
         },
