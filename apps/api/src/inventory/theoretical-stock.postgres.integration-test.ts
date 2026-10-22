@@ -7,7 +7,11 @@ import { OrdersService } from '../orders/orders.service';
 import { PosService } from '../pos/pos.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
+import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
+import { PizzaEngineService } from '../catalog/pizza-engine.service';
 import { TheoreticalStockService } from './theoretical-stock.service';
+import { ConfigurableRecipeCompositionService } from './configurable-recipe-composition.service';
+import { RecipeExpansionService } from './recipe-expansion.service';
 
 const allowedDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -110,14 +114,19 @@ describe('POS PostgreSQL concurrent atomicity', () => {
         await barrier;
         return {
           lines: [{
-            lineType: 'product' as const,
-            productId: product.id,
-            quantity: 2,
+          lineType: 'product' as const,
+          productId: product.id,
+          quantity: 2,
             unitPrice: 10,
             lineTotal: 20,
             name: product.name,
-            basePrice: 10,
-            extrasTotal: 0,
+          basePrice: 10,
+          extrasTotal: 0,
+          snapshotCatalogV2Json: {
+            version: 'catalog_v2_snapshot_v1',
+            lineType: 'product',
+            selections: [],
+          },
           }],
           itemsSubtotal: 20,
           discountTotal: 1,
@@ -130,7 +139,17 @@ describe('POS PostgreSQL concurrent atomicity', () => {
     const cashService = new CashService(prisma as never);
     const customerService = new CustomerService(prisma as never);
     const cashbackService = new CashbackService(prisma as never);
-    const stockService = new TheoreticalStockService(prisma as never);
+    const expansion = new RecipeExpansionService(prisma as never);
+    const composition = new ConfigurableRecipeCompositionService(
+      prisma as never,
+      expansion,
+      new PizzaEngineService({ tenantClient: prisma } as never),
+    );
+    const stockService = new TheoreticalStockService(
+      prisma as never,
+      composition,
+      new ComboComponentEligibilityService(prisma as never),
+    );
     const revenueLedgerService = new RevenueLedgerService(prisma as never);
     const ordersService = new OrdersService(
       prisma as never,
@@ -187,6 +206,7 @@ describe('POS PostgreSQL concurrent atomicity', () => {
 
     const finalOrder = await prisma.order.findUniqueOrThrow({
       where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: input.idempotencyKey } },
+      include: { items: true },
     });
     const [orders, movements, finalIngredient, cashMovements, cashbackTransactions, finalCoupon, ledgerEntries] = await Promise.all([
       prisma.order.count({ where: { tenantId, idempotencyKey: input.idempotencyKey } }),
@@ -199,6 +219,10 @@ describe('POS PostgreSQL concurrent atomicity', () => {
     ]);
 
     expect(orders).toBe(1);
+    expect(finalOrder.items[0]?.snapshotCatalogV2Json).toMatchObject({
+      version: 'catalog_v2_snapshot_v1',
+      selections: [],
+    });
     expect(movements).toHaveLength(1);
     expect(Number(movements[0].quantity)).toBe(2);
     expect(Number(finalIngredient.currentStock)).toBe(8);

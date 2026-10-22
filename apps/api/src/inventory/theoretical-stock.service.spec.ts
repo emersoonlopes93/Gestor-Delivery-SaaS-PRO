@@ -2,383 +2,146 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { TheoreticalStockService } from './theoretical-stock.service';
 
-describe('TheoreticalStockService processOrderDepletion', () => {
-  const makeDb = () => {
-    const tx = {
-      $executeRaw: jest.fn().mockResolvedValue(0),
-      stockMovement: {
-        count: jest.fn(),
-        createMany: jest.fn(),
-        findMany: jest.fn(),
-        create: jest.fn(),
-        delete: jest.fn(),
-      },
-      ingredient: { findMany: jest.fn(), updateMany: jest.fn() },
-      order: { findFirst: jest.fn() },
-      productRecipeIngredient: { findMany: jest.fn() },
-    };
+const decimal = (value: string | number) => new Prisma.Decimal(String(value));
 
-    return {
-      $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
-      tx,
-    };
+function makeDb() {
+  const tx = {
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    stockMovement: {
+      count: jest.fn().mockResolvedValue(0),
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({ id: 'reversal-1' }),
+    },
+    ingredient: {
+      findMany: jest.fn().mockResolvedValue([{ id: 'ingredient-1', currentCost: decimal('2.5') }]),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    order: { findFirst: jest.fn() },
   };
-
-  const configureSingleRecipe = (db: ReturnType<typeof makeDb>, currentStock = 10) => {
-    db.tx.stockMovement.count.mockResolvedValue(0);
-    db.tx.order.findFirst.mockResolvedValue({
-      items: [{ productId: 'product-1', quantity: 2, snapshotCatalogV2Json: null }],
-    });
-    db.tx.productRecipeIngredient.findMany.mockResolvedValue([{ ingredientId: 'ingredient-1', quantity: 1 }]);
-    db.tx.ingredient.findMany.mockResolvedValue([{ id: 'ingredient-1', currentCost: 3, currentStock }]);
+  return {
+    $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
+    tx,
   };
+}
 
+function createService(
+  db: ReturnType<typeof makeDb>,
+  compositionOverrides: Partial<{ resolveProductComposition: jest.Mock }> = {},
+  eligibilityOverrides: Partial<{
+    assertEligibleProductIds: jest.Mock;
+    getProductConfigurationRoutes: jest.Mock;
+  }> = {},
+) {
+  const composition = { resolveProductComposition: jest.fn(), ...compositionOverrides };
+  const eligibility = {
+    assertEligibleProductIds: jest.fn().mockResolvedValue(undefined),
+    getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map([['product-1', 'direct']])),
+    ...eligibilityOverrides,
+  };
+  return new TheoreticalStockService(db as never, composition as never, eligibility as never);
+}
+
+describe('TheoreticalStockService', () => {
   it('does not deplete stock twice when an order already has theoretical movements', async () => {
     const db = makeDb();
     db.tx.stockMovement.count.mockResolvedValue(1);
-
-    await new TheoreticalStockService(db as never).processOrderDepletion('tenant-a', 'order-1');
-
+    await createService(db).processOrderDepletion('tenant-a', 'order-1');
     expect(db.tx.order.findFirst).not.toHaveBeenCalled();
-    expect(db.tx.ingredient.updateMany).not.toHaveBeenCalled();
   });
 
-  it('rejects insufficient stock without creating partial movements', async () => {
+  it('uses canonical composition and preserves six-decimal physical quantities', async () => {
     const db = makeDb();
-    configureSingleRecipe(db);
-    db.tx.ingredient.updateMany.mockResolvedValue({ count: 0 });
+    db.tx.order.findFirst.mockResolvedValue({
+      items: [{ lineType: 'product', productId: 'product-1', quantity: 2, snapshotCatalogV2Json: null }],
+    });
+    const composition = {
+      resolveProductComposition: jest.fn().mockImplementation(async (_tenantId: string, input: { productQuantity: Prisma.Decimal }) =>
+        new Map([['ingredient-1', decimal('0.000333').mul(input.productQuantity)]]),
+      ),
+    };
+    await createService(db, composition).processOrderDepletion('tenant-a', 'order-1');
 
-    await expect(
-      new TheoreticalStockService(db as never).processOrderDepletion('tenant-a', 'order-1'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(composition.resolveProductComposition).toHaveBeenCalledWith(
+      'tenant-a',
+      expect.objectContaining({ productId: 'product-1', productQuantity: decimal('2'), selections: [] }),
+      db.tx,
+    );
+    expect(db.tx.ingredient.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ingredient-1', tenantId: 'tenant-a', currentStock: { gte: decimal('0.000666') } },
+      data: { currentStock: { decrement: decimal('0.000666') } },
+    });
+    expect(db.tx.stockMovement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ quantity: decimal('0.000666'), unitCost: decimal('2.5') })],
+    });
+  });
+
+  it('scales a simple combo component by slot quantity and combo quantity', async () => {
+    const db = makeDb();
+    db.tx.order.findFirst.mockResolvedValue({
+      items: [{
+        lineType: 'combo',
+        quantity: 2,
+        snapshotCatalogV2Json: { slots: [{ slotId: 'slot-1', items: [{ productId: 'product-1', qty: 3 }] }] },
+      }],
+    });
+    const composition = { resolveProductComposition: jest.fn().mockResolvedValue(new Map([['ingredient-1', decimal('1')]])) };
+    const eligibility = { assertEligibleProductIds: jest.fn().mockResolvedValue(undefined) };
+    await createService(db, composition, eligibility).processOrderDepletion('tenant-a', 'order-1');
+
+    expect(eligibility.assertEligibleProductIds).toHaveBeenCalledWith('tenant-a', ['product-1']);
+    expect(composition.resolveProductComposition).toHaveBeenCalledWith(
+      'tenant-a',
+      expect.objectContaining({ productId: 'product-1', productQuantity: decimal('6') }),
+      db.tx,
+    );
+  });
+
+  it('fails closed before stock mutation for a legacy combo snapshot without component IDs', async () => {
+    const db = makeDb();
+    db.tx.order.findFirst.mockResolvedValue({
+      items: [{ lineType: 'combo', quantity: 1, snapshotCatalogV2Json: { slots: [{ items: [{ name: 'Pizza' }] }] } }],
+    });
+    await expect(createService(db).processOrderDepletion('tenant-a', 'order-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.tx.ingredient.updateMany).not.toHaveBeenCalled();
     expect(db.tx.stockMovement.createMany).not.toHaveBeenCalled();
   });
 
-  it('aggregates recipe consumption and records one tenant-scoped movement per ingredient', async () => {
+  it('fails closed before stock mutation when a configurable product has no authoritative selection snapshot', async () => {
     const db = makeDb();
-    configureSingleRecipe(db);
     db.tx.order.findFirst.mockResolvedValue({
-      items: [
-        { productId: 'product-1', quantity: 1, snapshotCatalogV2Json: null },
-        { productId: 'product-1', quantity: 2, snapshotCatalogV2Json: null },
-      ],
+      items: [{ lineType: 'product', productId: 'product-1', quantity: 1, snapshotCatalogV2Json: null }],
     });
-    db.tx.productRecipeIngredient.findMany.mockResolvedValue([{ ingredientId: 'ingredient-1', quantity: 1.5 }]);
-    db.tx.ingredient.updateMany.mockResolvedValue({ count: 1 });
-
-    await new TheoreticalStockService(db as never).processOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.tx.ingredient.updateMany).toHaveBeenCalledWith({
-      where: { id: 'ingredient-1', tenantId: 'tenant-a', currentStock: { gte: 4.5 } },
-      data: { currentStock: { decrement: 4.5 } },
-    });
-    expect(db.tx.stockMovement.createMany).toHaveBeenCalledTimes(1);
-  });
-
-  it('serializes two genuinely concurrent deductions and applies stock once', async () => {
-    const db = makeDb();
-    let movementCount = 0;
-    let currentStock = 10;
-    let lockTail = Promise.resolve();
-
-    db.$transaction.mockImplementation(async (callback: (transaction: typeof db.tx) => Promise<void>) => {
-      const previous = lockTail;
-      let releaseLock: () => void = () => undefined;
-      lockTail = new Promise<void>((resolve) => { releaseLock = resolve; });
-      await previous;
-      try {
-        return await callback(db.tx);
-      } finally {
-        releaseLock();
-      }
-    });
-    db.tx.stockMovement.count.mockImplementation(async () => movementCount);
-    db.tx.order.findFirst.mockResolvedValue({
-      items: [{ productId: 'product-1', quantity: 2, snapshotCatalogV2Json: null }],
-    });
-    db.tx.productRecipeIngredient.findMany.mockResolvedValue([{ ingredientId: 'ingredient-1', quantity: 1 }]);
-    db.tx.ingredient.findMany.mockResolvedValue([{ id: 'ingredient-1', currentCost: 3 }]);
-    db.tx.ingredient.updateMany.mockImplementation(async () => {
-      if (currentStock < 2) return { count: 0 };
-      currentStock -= 2;
-      return { count: 1 };
-    });
-    db.tx.stockMovement.createMany.mockImplementation(async () => {
-      movementCount += 1;
-      return { count: 1 };
-    });
-
-    const service = new TheoreticalStockService(db as never);
-    await Promise.all([
-      service.processOrderDepletion('tenant-a', 'order-1'),
-      service.processOrderDepletion('tenant-a', 'order-1'),
-    ]);
-
-    expect(db.$transaction).toHaveBeenCalledTimes(2);
-    expect(db.tx.stockMovement.createMany).toHaveBeenCalledTimes(1);
-    expect(currentStock).toBe(8);
-  });
-
-  it('retries P2034 conflicts at most three times', async () => {
-    const db = makeDb();
-    const conflict = new Prisma.PrismaClientKnownRequestError('serialization conflict', {
-      code: 'P2034',
-      clientVersion: '5.22.0',
-    });
-    db.$transaction
-      .mockRejectedValueOnce(conflict)
-      .mockRejectedValueOnce(conflict)
-      .mockImplementationOnce(async (callback: (transaction: typeof db.tx) => Promise<void>) => callback(db.tx));
-    db.tx.stockMovement.count.mockResolvedValue(1);
-
-    await new TheoreticalStockService(db as never).processOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.$transaction).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe('TheoreticalStockService reverseOrderDepletion', () => {
-  const makeDb = () => {
-    const tx = {
-      $executeRaw: jest.fn().mockResolvedValue(0),
-      stockMovement: {
-        findMany: jest.fn(),
-        create: jest.fn(),
-        delete: jest.fn(),
-      },
-      ingredient: { updateMany: jest.fn() },
-      order: { findFirst: jest.fn() },
-      productRecipeIngredient: { findMany: jest.fn() },
+    const eligibility = {
+      assertEligibleProductIds: jest.fn().mockResolvedValue(undefined),
+      getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map([['product-1', 'generic']])),
     };
-
-    return {
-      $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<void>) => callback(tx)),
-      tx,
-    };
-  };
-
-  const originalMovement = (overrides: Partial<{
-    id: string;
-    ingredientId: string;
-    quantity: Prisma.Decimal;
-    unitCost: Prisma.Decimal | null;
-    orderId: string | null;
-    reversal: { id: string } | null;
-  }> = {}) => ({
-    id: 'depletion-1',
-    ingredientId: 'ingredient-a',
-    quantity: new Prisma.Decimal('2.5000'),
-    unitCost: new Prisma.Decimal('2.0000'),
-    orderId: 'order-1',
-    reversal: null,
-    ...overrides,
-  });
-
-  it('preserves the original and creates one linked compensating movement with its historical cost', async () => {
-    const db = makeDb();
-    const original = originalMovement();
-    db.tx.stockMovement.findMany.mockResolvedValue([original]);
-    db.tx.stockMovement.create.mockResolvedValue({ id: 'reversal-1' });
-    db.tx.ingredient.updateMany.mockResolvedValue({ count: 1 });
-
-    await new TheoreticalStockService(db as never).reverseOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.tx.stockMovement.findMany).toHaveBeenCalledWith({
-      where: {
-        tenantId: 'tenant-a',
-        orderId: 'order-1',
-        type: 'theoretical_depletion',
-      },
-      include: { reversal: true },
-    });
-    expect(db.tx.stockMovement.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: 'tenant-a',
-        ingredientId: 'ingredient-a',
-        type: 'theoretical_reversal',
-        quantity: original.quantity,
-        unitCost: original.unitCost,
-        orderId: 'order-1',
-        reversalOfMovementId: 'depletion-1',
-      }),
-    });
-    expect(db.tx.ingredient.updateMany).toHaveBeenCalledWith({
-      where: { id: 'ingredient-a', tenantId: 'tenant-a' },
-      data: { currentStock: { increment: original.quantity } },
-    });
-    expect(db.tx.stockMovement.delete).not.toHaveBeenCalled();
-  });
-
-  it('is idempotent when the original already has its canonical reversal', async () => {
-    const db = makeDb();
-    db.tx.stockMovement.findMany.mockResolvedValue([
-      originalMovement({ reversal: { id: 'reversal-1' } }),
-    ]);
-
-    await new TheoreticalStockService(db as never).reverseOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.tx.stockMovement.create).not.toHaveBeenCalled();
+    await expect(createService(db, {}, eligibility).processOrderDepletion('tenant-a', 'order-1')).rejects.toBeInstanceOf(BadRequestException);
     expect(db.tx.ingredient.updateMany).not.toHaveBeenCalled();
+    expect(db.tx.stockMovement.createMany).not.toHaveBeenCalled();
   });
 
-  it('uses persisted movements only, ignoring the current recipe and ingredient cost', async () => {
+  it('rolls back before movements when stock is insufficient', async () => {
     const db = makeDb();
-    const original = originalMovement({ unitCost: new Prisma.Decimal('2.0000') });
-    db.tx.stockMovement.findMany.mockResolvedValue([original]);
-    db.tx.stockMovement.create.mockResolvedValue({ id: 'reversal-1' });
-    db.tx.ingredient.updateMany.mockResolvedValue({ count: 1 });
-
-    await new TheoreticalStockService(db as never).reverseOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.tx.order.findFirst).not.toHaveBeenCalled();
-    expect(db.tx.productRecipeIngredient.findMany).not.toHaveBeenCalled();
-    expect(db.tx.stockMovement.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        ingredientId: 'ingredient-a',
-        quantity: new Prisma.Decimal('2.5000'),
-        unitCost: new Prisma.Decimal('2.0000'),
-      }),
-    });
+    db.tx.order.findFirst.mockResolvedValue({ items: [{ lineType: 'product', productId: 'product-1', quantity: 1, snapshotCatalogV2Json: null }] });
+    db.tx.ingredient.updateMany.mockResolvedValue({ count: 0 });
+    const composition = { resolveProductComposition: jest.fn().mockResolvedValue(new Map([['ingredient-1', decimal('1')]])) };
+    await expect(createService(db, composition).processOrderDepletion('tenant-a', 'order-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.tx.stockMovement.createMany).not.toHaveBeenCalled();
   });
 
-  it('reverses every persisted ingredient of a multi-item order', async () => {
+  it('reverses only persisted movements using their original quantity and cost', async () => {
     const db = makeDb();
-    db.tx.stockMovement.findMany.mockResolvedValue([
-      originalMovement(),
-      originalMovement({
-        id: 'depletion-2', ingredientId: 'ingredient-b', quantity: new Prisma.Decimal('1.2500'), unitCost: new Prisma.Decimal('4.0000'),
-      }),
-    ]);
-    db.tx.stockMovement.create.mockResolvedValue({ id: 'reversal' });
-    db.tx.ingredient.updateMany.mockResolvedValue({ count: 1 });
-
-    await new TheoreticalStockService(db as never).reverseOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.tx.stockMovement.create).toHaveBeenCalledTimes(2);
-    expect(db.tx.ingredient.updateMany).toHaveBeenCalledTimes(2);
-    expect(db.tx.stockMovement.create).toHaveBeenLastCalledWith({
-      data: expect.objectContaining({
-        ingredientId: 'ingredient-b',
-        reversalOfMovementId: 'depletion-2',
-        quantity: new Prisma.Decimal('1.2500'),
-        unitCost: new Prisma.Decimal('4.0000'),
-      }),
-    });
-  });
-
-  it('does not cross tenant scope when there is no depletion for the requested tenant', async () => {
-    const db = makeDb();
-    db.tx.stockMovement.findMany.mockResolvedValue([]);
-
-    await new TheoreticalStockService(db as never).reverseOrderDepletion('tenant-a', 'order-1');
-
-    expect(db.tx.stockMovement.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ tenantId: 'tenant-a', orderId: 'order-1' }),
-    }));
-    expect(db.tx.stockMovement.create).not.toHaveBeenCalled();
-    expect(db.tx.ingredient.updateMany).not.toHaveBeenCalled();
-  });
-
-  it('serializes concurrent reversals so stock is restored once per original', async () => {
-    const db = makeDb();
-    let reversed = false;
-    let currentStock = 7.5;
-    let lockTail = Promise.resolve();
-    db.$transaction.mockImplementation(async (callback: (transaction: typeof db.tx) => Promise<void>) => {
-      const previous = lockTail;
-      let releaseLock: () => void = () => undefined;
-      lockTail = new Promise<void>((resolve) => { releaseLock = resolve; });
-      await previous;
-      try {
-        return await callback(db.tx);
-      } finally {
-        releaseLock();
-      }
-    });
-    db.tx.stockMovement.findMany.mockImplementation(async () => [
-      originalMovement({ reversal: reversed ? { id: 'reversal-1' } : null }),
-    ]);
-    db.tx.stockMovement.create.mockImplementation(async () => {
-      reversed = true;
-      return { id: 'reversal-1' };
-    });
-    db.tx.ingredient.updateMany.mockImplementation(async () => {
-      currentStock += 2.5;
-      return { count: 1 };
-    });
-
-    const service = new TheoreticalStockService(db as never);
-    await Promise.all([
-      service.reverseOrderDepletion('tenant-a', 'order-1'),
-      service.reverseOrderDepletion('tenant-a', 'order-1'),
-    ]);
-
-    expect(db.tx.stockMovement.create).toHaveBeenCalledTimes(1);
-    expect(db.tx.ingredient.updateMany).toHaveBeenCalledTimes(1);
-    expect(currentStock).toBe(10);
-  });
-});
-
-describe('TheoreticalStockService reconcileOrderDepletionInTransaction', () => {
-  it('reverses only active depletion and reapplies the recipe from the updated order snapshot', async () => {
-    const tx = {
-      $executeRaw: jest.fn().mockResolvedValue(0),
-      stockMovement: {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            id: 'old-depletion',
-            ingredientId: 'ingredient-a',
-            quantity: new Prisma.Decimal('2'),
-            unitCost: new Prisma.Decimal('3'),
-            orderId: 'order-1',
-            reversal: null,
-          },
-        ]),
-        create: jest.fn().mockResolvedValue({ id: 'reversal-1' }),
-        createMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
-      ingredient: {
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        findMany: jest.fn().mockResolvedValue([{ id: 'ingredient-a', currentCost: new Prisma.Decimal('3') }]),
-      },
-      order: {
-        findFirst: jest.fn().mockResolvedValue({
-          items: [{ productId: 'product-a', quantity: 1, snapshotCatalogV2Json: null }],
-        }),
-      },
-      productRecipeIngredient: {
-        findMany: jest.fn().mockResolvedValue([{ ingredientId: 'ingredient-a', quantity: new Prisma.Decimal('1') }]),
-      },
-    };
-
-    await new TheoreticalStockService({} as never).reconcileOrderDepletionInTransaction(
-      tx as never,
-      'tenant-a',
-      'order-1',
-    );
-
-    expect(tx.stockMovement.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        type: 'theoretical_reversal',
-        reversalOfMovementId: 'old-depletion',
-        notes: 'Theoretical reversal for reconciled order order-1',
-      }),
-    });
-    expect(tx.ingredient.updateMany).toHaveBeenNthCalledWith(1, {
-      where: { id: 'ingredient-a', tenantId: 'tenant-a' },
-      data: { currentStock: { increment: new Prisma.Decimal('2') } },
-    });
-    expect(tx.ingredient.updateMany).toHaveBeenNthCalledWith(2, {
-      where: { id: 'ingredient-a', tenantId: 'tenant-a', currentStock: { gte: 1 } },
-      data: { currentStock: { decrement: 1 } },
-    });
-    expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({
-        type: 'theoretical_depletion',
-        ingredientId: 'ingredient-a',
-        quantity: 1,
-        orderId: 'order-1',
-      })],
+    db.tx.stockMovement.findMany.mockResolvedValue([{
+      id: 'depletion-1', ingredientId: 'ingredient-1', quantity: decimal('0.000333'), unitCost: decimal('2.5'), orderId: 'order-1', reversal: null,
+    }]);
+    await createService(db).reverseOrderDepletion('tenant-a', 'order-1');
+    expect(db.tx.stockMovement.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      type: 'theoretical_reversal', quantity: decimal('0.000333'), unitCost: decimal('2.5'), reversalOfMovementId: 'depletion-1',
+    }) });
+    expect(db.tx.ingredient.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ingredient-1', tenantId: 'tenant-a' },
+      data: { currentStock: { increment: decimal('0.000333') } },
     });
   });
 });

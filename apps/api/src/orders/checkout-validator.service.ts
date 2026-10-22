@@ -33,6 +33,7 @@ import { PizzaEngineService } from '../catalog/pizza-engine.service';
 import { validateCashChangeFor } from './public-checkout-guards.util';
 import { DateTime } from 'luxon';
 import { FeatureControlService } from '../feature-control/feature-control.service';
+import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
@@ -63,6 +64,7 @@ export class CheckoutValidatorService {
     private readonly pizzaEngine: PizzaEngineService,
     private readonly upsellsService: UpsellsService,
     private readonly featureControlService: FeatureControlService,
+    private readonly comboComponentEligibility: ComboComponentEligibilityService,
   ) {}
 
   async validate(
@@ -1072,7 +1074,8 @@ export class CheckoutValidatorService {
       });
 
       const basePrice = Number(typedCombo.basePrice);
-      const validatedSlots = this.validateComboSlots(
+      const validatedSlots = await this.validateComboSlots(
+        tenantId,
         item.slots || [],
         typedCombo.comboSlots,
         typedCombo.name,
@@ -1163,6 +1166,10 @@ export class CheckoutValidatorService {
         const comboMode = typedCombo.comboMode ?? 'bundle';
         if (comboMode === 'bundle') {
           const bundleItems = typedCombo.comboBundleItems ?? [];
+          await this.comboComponentEligibility.assertEligibleProductIds(
+            tenantId,
+            bundleItems.map((bundleItem) => bundleItem.productId),
+          );
           const subtotal = bundleItems.reduce((sum, bundleItem) => {
             const product = bundleItem.product;
             if (!product || !product.isActive || product.deletedAt != null) return sum;
@@ -1306,11 +1313,12 @@ export class CheckoutValidatorService {
     }));
   }
 
-  private validateComboSlots(
+  private async validateComboSlots(
+    tenantId: string,
     selected: CreateOrderItemComboSlotSelectionDTO[],
     slots: ComboSlotWithItems[],
     comboName: string,
-  ): Array<{
+  ): Promise<Array<{
     slotId: string;
     slotName: string;
     isRequired: boolean;
@@ -1320,7 +1328,7 @@ export class CheckoutValidatorService {
     productName: string;
     qty: number;
     additionalPrice: number;
-  }> {
+  }>> {
     const result: Array<{
       slotId: string;
       slotName: string;
@@ -1375,6 +1383,11 @@ export class CheckoutValidatorService {
       }
 
       const allowedItems = slot.allowedItems;
+
+      await this.comboComponentEligibility.assertEligibleProductIds(
+        tenantId,
+        Array.from(normalizedItems.keys()),
+      );
 
       for (const [productId, qty] of normalizedItems.entries()) {
         const allowed = allowedItems.find(

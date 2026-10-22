@@ -151,6 +151,13 @@ jobs:
           --runInBand
           src/inventory/configurable-recipe-composition.postgres.integration-test.ts
 
+      - name: Test canonical theoretical stock with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/inventory/theoretical-stock.postgres.integration-test.ts
+
       - name: Test unit integrity audit with ephemeral PostgreSQL
         run: >-
           pnpm --filter @gestor/api exec jest

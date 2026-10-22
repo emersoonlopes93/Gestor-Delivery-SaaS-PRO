@@ -26,6 +26,7 @@ import { UploadModule } from '../upload/upload.module';
 import { MenuImportService } from './menu-import/menu-import.service';
 import { MenuImportController } from './menu-import/menu-import.controller';
 import { FeatureControlModule } from '../feature-control/feature-control.module';
+import { ComboComponentEligibilityService } from './combo-component-eligibility.service';
 
 @Module({
   imports: [DatabaseModule, RbacModule, FeatureControlModule, forwardRef(() => UploadModule)],
@@ -54,7 +55,8 @@ import { FeatureControlModule } from '../feature-control/feature-control.module'
     AvailabilityService,
     MenuImportService,
     FractionalPricingEngine,
+    ComboComponentEligibilityService,
   ],
-  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService, AvailabilityService, FractionalPricingEngine],
+  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService, AvailabilityService, FractionalPricingEngine, ComboComponentEligibilityService],
 })
 export class CatalogModule {}

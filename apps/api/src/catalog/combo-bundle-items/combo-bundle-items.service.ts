@@ -4,6 +4,7 @@ import { TenantContextService } from '../../common/context/tenant-context.servic
 import { CreateComboBundleItemDto } from './dto/create-combo-bundle-item.dto';
 import { UpdateComboBundleItemDto } from './dto/update-combo-bundle-item.dto';
 import { ProductsService } from '../products/products.service';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 
 @Injectable()
 export class ComboBundleItemsService {
@@ -11,6 +12,7 @@ export class ComboBundleItemsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly productsService: ProductsService,
+    private readonly eligibility: ComboComponentEligibilityService,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -44,6 +46,7 @@ export class ComboBundleItemsService {
     if (!product) throw new NotFoundException('Produto não encontrado para vínculo.');
     if (!product.isActive) throw new BadRequestException('Produto inativo não pode ser vinculado.');
     if (product.type === 'combo') throw new BadRequestException('Não é permitido vincular outro combo no bundle.');
+    await this.eligibility.assertEligibleProductIds(tenantId, [productId]);
     return product;
   }
 
