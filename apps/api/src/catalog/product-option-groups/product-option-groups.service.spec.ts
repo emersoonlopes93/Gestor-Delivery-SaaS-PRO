@@ -40,6 +40,8 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
         delete: jest.fn().mockResolvedValue({ id: 'link-a' }),
       },
       productOptionItemPrice: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      productOptionItemRecipeIngredient: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      productOptionItemRecipeBase: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
     };
     const prisma = {
       $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
@@ -135,6 +137,12 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
     await service.unlink('link-a', actorId);
 
     expect(tx.productOptionItemPrice.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId, productId: dto.productId, optionItemId: { in: ['active-item', 'archived-item'] } },
+    });
+    expect(tx.productOptionItemRecipeIngredient.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId, productId: dto.productId, optionItemId: { in: ['active-item', 'archived-item'] } },
+    });
+    expect(tx.productOptionItemRecipeBase.deleteMany).toHaveBeenCalledWith({
       where: { tenantId, productId: dto.productId, optionItemId: { in: ['active-item', 'archived-item'] } },
     });
     expect(tx.productOptionGroupLink.delete).toHaveBeenCalledWith({ where: { id: 'link-a' } });
