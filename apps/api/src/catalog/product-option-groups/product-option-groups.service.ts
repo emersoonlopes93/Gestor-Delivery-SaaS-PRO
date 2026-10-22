@@ -374,6 +374,12 @@ export class ProductOptionGroupsService {
         await tx.productOptionItemPrice.deleteMany({
           where: { tenantId, productId: existing.productId, optionItemId: { in: itemIds } },
         });
+        await tx.productOptionItemRecipeIngredient.deleteMany({
+          where: { tenantId, productId: existing.productId, optionItemId: { in: itemIds } },
+        });
+        await tx.productOptionItemRecipeBase.deleteMany({
+          where: { tenantId, productId: existing.productId, optionItemId: { in: itemIds } },
+        });
       }
 
       await tx.productOptionGroupLink.delete({ where: { id: existing.id } });

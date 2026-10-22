@@ -514,6 +514,10 @@ export class ProductsService {
             },
           },
         },
+        optionItemRecipeIngredients: true,
+        optionItemRecipeBases: {
+          include: { base: { select: { id: true, isActive: true, name: true } } },
+        },
 
         optionItemPrices: true,
         upsellLinks: true,
@@ -525,9 +529,11 @@ export class ProductsService {
     }
 
     const archivedRecipeBase = source.recipeBases.find((link) => !link.base.isActive);
-    if (archivedRecipeBase) {
+    const archivedOptionRecipeBase = source.optionItemRecipeBases.find((link) => !link.base.isActive);
+    if (archivedRecipeBase || archivedOptionRecipeBase) {
+      const base = archivedRecipeBase?.base ?? archivedOptionRecipeBase?.base;
       throw new ConflictException(
-        `O produto possui a preparação arquivada "${archivedRecipeBase.base.name}" na ficha técnica. Restaure-a antes de duplicar o produto.`,
+        `O produto possui a preparação arquivada "${base?.name}" na ficha técnica. Restaure-a antes de duplicar o produto.`,
       );
     }
 
@@ -573,6 +579,18 @@ export class ProductsService {
               inputQuantity: base.inputQuantity,
               inputUnit: base.inputUnit,
               quantity: base.quantity,
+            })),
+          },
+          optionItemRecipeIngredients: {
+            create: source.optionItemRecipeIngredients.map((item) => ({
+              tenantId, optionItemId: item.optionItemId, ingredientId: item.ingredientId,
+              inputQuantity: item.inputQuantity, inputUnit: item.inputUnit, quantity: item.quantity,
+            })),
+          },
+          optionItemRecipeBases: {
+            create: source.optionItemRecipeBases.map((item) => ({
+              tenantId, optionItemId: item.optionItemId, baseId: item.baseId,
+              inputQuantity: item.inputQuantity, inputUnit: item.inputUnit, quantity: item.quantity,
             })),
           },
         },

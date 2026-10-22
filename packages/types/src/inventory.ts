@@ -101,6 +101,32 @@ export interface ProductRecipeDTO {
   totalEstimatedCost: number;
 }
 
+/** A physical recipe contribution that belongs to an OptionItem only within one product. */
+export type ProductOptionItemRecipeComponentInputDTO =
+  | { type: 'ingredient'; ingredientId: string; inputQuantity: number; inputUnit: UnitType }
+  | { type: 'base'; baseId: string; inputQuantity: number; inputUnit: UnitType };
+
+export type ProductOptionItemRecipeComponentDTO =
+  | (RecipeIngredientDTO & { type: 'ingredient' })
+  | {
+      id: string;
+      type: 'base';
+      baseId: string;
+      baseName: string;
+      inputQuantity: number;
+      inputUnit: UnitType;
+      quantity: number;
+      normalizedUnit: UnitType;
+      isActive: boolean;
+    };
+
+export interface ProductOptionItemRecipeDTO {
+  productId: string;
+  optionItemId: string;
+  components: ProductOptionItemRecipeComponentDTO[];
+  totalEstimatedCost: number;
+}
+
 /**
  * A reusable virtual preparation. It intentionally has no stock or persisted cost.
  * CRUD and expansion semantics are introduced in later inventory phases.

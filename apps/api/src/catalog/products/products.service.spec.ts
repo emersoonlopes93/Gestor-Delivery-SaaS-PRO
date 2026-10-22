@@ -33,6 +33,8 @@ function sourceProduct(baseActive: boolean) {
     upsellLinks: [],
     recipeIngredients: [{ ingredientId: 'ingredient-1', inputQuantity: 2, inputUnit: UnitType.g, quantity: 2 }],
     recipeBases: [{ baseId: 'base-1', inputQuantity: 250, inputUnit: UnitType.ml, quantity: 250, base: { id: 'base-1', isActive: baseActive, name: 'Molho da casa' } }],
+    optionItemRecipeIngredients: [{ optionItemId: 'item-1', ingredientId: 'ingredient-1', inputQuantity: 20, inputUnit: UnitType.g, quantity: 20 }],
+    optionItemRecipeBases: [],
   };
 }
 
@@ -89,6 +91,14 @@ describe('ProductsService.duplicate', () => {
       inputQuantity: 250,
       inputUnit: UnitType.ml,
       quantity: 250,
+    }]);
+    expect(createData.optionItemRecipeIngredients.create).toEqual([{
+      tenantId,
+      optionItemId: 'item-1',
+      ingredientId: 'ingredient-1',
+      inputQuantity: 20,
+      inputUnit: UnitType.g,
+      quantity: 20,
     }]);
   });
 

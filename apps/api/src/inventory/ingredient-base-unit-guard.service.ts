@@ -7,6 +7,7 @@ export enum IngredientBaseUnitLockReason {
   PURCHASE_HISTORY = 'PURCHASE_HISTORY',
   PURCHASE_PRESENTATION = 'PURCHASE_PRESENTATION',
   PRODUCT_RECIPE = 'PRODUCT_RECIPE',
+  PRODUCT_OPTION_RECIPE = 'PRODUCT_OPTION_RECIPE',
   RECIPE_BASE = 'RECIPE_BASE',
   COMBO_RECIPE = 'COMBO_RECIPE',
   COMPLEMENT_RECIPE = 'COMPLEMENT_RECIPE',
@@ -34,6 +35,7 @@ type IngredientBaseUnitGuardReader = Pick<Prisma.TransactionClient,
   | 'purchaseItem'
   | 'purchasePresentation'
   | 'productRecipeIngredient'
+  | 'productOptionItemRecipeIngredient'
   | 'recipeBaseIngredient'
   | 'comboRecipeIngredient'
   | 'complementRecipeIngredient'
@@ -57,6 +59,7 @@ export class IngredientBaseUnitGuardService {
       purchaseItem,
       presentation,
       productRecipe,
+      productOptionRecipe,
       recipeBaseIngredient,
       comboRecipe,
       complementRecipe,
@@ -66,6 +69,7 @@ export class IngredientBaseUnitGuardService {
       tx.purchaseItem.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
       tx.purchasePresentation.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
       tx.productRecipeIngredient.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
+      tx.productOptionItemRecipeIngredient.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
       tx.recipeBaseIngredient.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
       tx.comboRecipeIngredient.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
       tx.complementRecipeIngredient.findFirst({ where: { tenantId, ingredientId }, select: { id: true } }),
@@ -80,6 +84,7 @@ export class IngredientBaseUnitGuardService {
     if (purchaseItem) reasons.push(IngredientBaseUnitLockReason.PURCHASE_HISTORY);
     if (presentation) reasons.push(IngredientBaseUnitLockReason.PURCHASE_PRESENTATION);
     if (productRecipe) reasons.push(IngredientBaseUnitLockReason.PRODUCT_RECIPE);
+    if (productOptionRecipe) reasons.push(IngredientBaseUnitLockReason.PRODUCT_OPTION_RECIPE);
     if (recipeBaseIngredient) reasons.push(IngredientBaseUnitLockReason.RECIPE_BASE);
     if (comboRecipe) reasons.push(IngredientBaseUnitLockReason.COMBO_RECIPE);
     if (complementRecipe) reasons.push(IngredientBaseUnitLockReason.COMPLEMENT_RECIPE);

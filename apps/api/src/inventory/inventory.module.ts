@@ -21,12 +21,16 @@ import { RecipeBasesService } from './recipe-bases.service';
 import { RecipeExpansionService } from './recipe-expansion.service';
 import { UnitIntegrityAuditService } from './unit-integrity-audit.service';
 import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
+import { ProductOptionItemRecipesService } from './product-option-item-recipes.service';
+import { ProductOptionItemRecipesController } from './product-option-item-recipes.controller';
+import { ConfigurableRecipeCompositionService } from './configurable-recipe-composition.service';
+import { CatalogModule } from '../catalog/catalog.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [IngredientsController, PurchasePresentationsController, RecipesController, RecipeBasesController, InventoryCountController, LossesController, StockMovementsController],
-  providers: [IngredientsService, IngredientBaseUnitGuardService, PurchasePresentationsService, StockMovementService, RecipesService, RecipeBasesService, RecipeExpansionService, UnitIntegrityAuditService, TheoreticalStockService, InventoryCountService, LossesService],
-  exports: [IngredientsService, StockMovementService, RecipesService, RecipeExpansionService, TheoreticalStockService, InventoryCountService, LossesService],
+  imports: [DatabaseModule, AuthModule, RbacModule, CatalogModule],
+  controllers: [IngredientsController, PurchasePresentationsController, RecipesController, ProductOptionItemRecipesController, RecipeBasesController, InventoryCountController, LossesController, StockMovementsController],
+  providers: [IngredientsService, IngredientBaseUnitGuardService, PurchasePresentationsService, StockMovementService, RecipesService, ProductOptionItemRecipesService, RecipeBasesService, RecipeExpansionService, ConfigurableRecipeCompositionService, UnitIntegrityAuditService, TheoreticalStockService, InventoryCountService, LossesService],
+  exports: [IngredientsService, StockMovementService, RecipesService, RecipeExpansionService, ConfigurableRecipeCompositionService, TheoreticalStockService, InventoryCountService, LossesService],
 })
 export class InventoryModule {}
 // Final environmental stabilization check

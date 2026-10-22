@@ -112,6 +112,40 @@ export class RecipeExpansionService {
     return result;
   }
 
+  /** Expands an OptionItem contribution within its product context using the same base DFS. */
+  async expandProductOptionItemRecipeToIngredients(
+    tenantId: string,
+    productId: string,
+    optionItemId: string,
+    optionQuantity: Prisma.Decimal,
+    client?: Prisma.TransactionClient,
+  ): Promise<Map<string, Prisma.Decimal>> {
+    this.positive(optionQuantity, 'Quantidade da opção');
+    const reader = this.reader(client);
+    const [product, item] = await Promise.all([
+      reader.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } }),
+      reader.optionItem.findFirst({ where: { id: optionItemId, tenantId }, select: { id: true } }),
+    ]);
+    if (!product || !item) throw new NotFoundException('Contexto da opção não encontrado.');
+    const [directIngredients, baseLinks] = await Promise.all([
+      reader.productOptionItemRecipeIngredient.findMany({ where: { tenantId, productId, optionItemId }, include: { ingredient: true } }),
+      reader.productOptionItemRecipeBase.findMany({ where: { tenantId, productId, optionItemId }, include: { base: true } }),
+    ]);
+    const result = new Map<string, Prisma.Decimal>();
+    for (const component of directIngredients) {
+      if (component.ingredient.tenantId !== tenantId) throw new NotFoundException('Componente não encontrado.');
+      this.positive(component.quantity, 'Quantidade do ingrediente');
+      this.add(result, component.ingredientId, component.quantity.mul(optionQuantity));
+    }
+    const cache = new Map<string, LoadedRecipeBase | null>();
+    for (const component of baseLinks) {
+      if (component.base.tenantId !== tenantId) throw new NotFoundException('Preparação não encontrada.');
+      this.positive(component.quantity, 'Quantidade da preparação');
+      await this.expandBase(reader, tenantId, component.baseId, component.quantity.mul(optionQuantity), result, new Set(), 0, cache);
+    }
+    return result;
+  }
+
   async calculateExpandedIngredientCost(
     tenantId: string,
     quantities: ReadonlyMap<string, Prisma.Decimal>,

@@ -22,145 +22,147 @@ model BusinessGroup {
 }
 
 model Tenant {
-  id                             String                             @id @default(uuid())
-  businessGroupId                String?                            @map("business_group_id")
-  name                           String                             @db.VarChar(100)
-  slug                           String                             @unique @db.VarChar(60)
-  status                         TenantStatus                       @default(active)
-  createdAt                      DateTime                           @default(now()) @map("created_at")
-  updatedAt                      DateTime                           @updatedAt @map("updated_at")
-  orderSequence                  Int                                @default(0) @map("order_sequence")
-  businessGroupRole              BusinessGroupTenantRole?           @map("business_group_role")
-  paymentTransactions            PaymentTransaction[]
-  paymentRefunds                 PaymentRefund[]
-  paymentProviderConnections     PaymentProviderConnection[]
-  orderPaymentAttempts           OrderPaymentAttempt[]
-  platformFeeEntries             PlatformFeeEntry[]
-  tenantReceivables              TenantReceivable[]
-  onlinePaymentActivation        OnlinePaymentActivation?
-  TenantSubscription             TenantSubscription?
-  aiAgentConfig                  AiAgentConfig?
-  analyticsDailyAggregates       AnalyticsDailyAggregate[]
-  analyticsEvents                AnalyticsEvent[]
-  auditLogs                      AuditLog[]
-  baseMenuImportLogs             BaseMenuImportLog[]
-  billingCycles                  BillingCycleRecord[]
-  paymentMethods                 BillingPaymentMethod[]
-  billingUsageSnapshots          BillingUsageSnapshot[]
-  headquartersForGroup           BusinessGroup?                     @relation("BusinessGroupHeadquarters")
-  campaigns                      Campaign[]
-  cashMovements                  CashMovement[]
-  cashSessions                   CashSession[]
-  cashbackTransactions           CashbackTransaction[]
-  catalogAvailabilityRules       CatalogAvailabilityRule[]
-  catalogPublications            CatalogPublication[]
-  chatSessions                   ChatSession[]
-  comboBundleItems               ComboBundleItem[]
-  comboRecipeIngredients         ComboRecipeIngredient[]
-  comboSlotAllowedItems          ComboSlotAllowedItem[]
-  comboSlots                     ComboSlot[]
-  complementRecipeIngredients    ComplementRecipeIngredient[]
-  coupons                        Coupon[]
-  crmNotes                       CrmNote[]
-  crmPipelineEntries             CrmPipelineEntry[]
-  crmTasks                       CrmTask[]
-  customerAddresses              CustomerAddress[]
-  customerExternalIdentities     CustomerExternalIdentity[]
-  customerLoyaltyTransactions    CustomerLoyaltyTransaction[]
-  customerOptOuts                CustomerOptOut[]
-  customerOtps                   CustomerOTP[]
-  customerWalletTransactions     CustomerWalletTransaction[]
-  customers                      Customer[]
-  deliveryCoverageConfig         DeliveryCoverageConfig?
-  deliveryDriverLocations        DeliveryDriverLocation[]
-  deliveryDrivers                DeliveryDriver[]
-  driverShifts                   DriverShift[]
-  deliveryRuns                   DeliveryRun[]
-  deliveryStops                  DeliveryStop[]
-  driverLedgerEntries            DriverLedgerEntry[]
-  driverSettlements              DriverSettlement[]
-  driverSettlementItems          DriverSettlementItem[]
-  DeliveryRateDistanceTier       DeliveryRateDistanceTier[]
-  deliveryRateRules              DeliveryRateRule[]
-  dineInTables                   DineInTable[]
-  financialAccounts              FinancialAccount[]
-  financialTransactions          FinancialTransaction[]
-  goals                          Goal[]
-  ingredients                    Ingredient[]
-  purchasePresentations          PurchasePresentation[]
-  inventoryCountItems            InventoryCountItem[]
-  inventoryCounts                InventoryCount[]
-  invoices                       Invoice[]
-  marketingAutomations           MarketingAutomation[]
-  marketplaceConnections         MarketplaceConnection[]
-  marketplaceCatalogMappings     MarketplaceCatalogMapping[]
-  marketplaceEventInboxes        MarketplaceEventInbox[]
-  marketplaceOrders              MarketplaceOrder[]
-  marketplaceOperations          MarketplaceOperation[]
-  marketplaceDivergences         MarketplaceDivergence[]
-  marketplaceBillEntries         MarketplaceBillEntry[]
-  marketplaceSettlements         MarketplaceSettlement[]
-  mediaAssets                    MediaAsset[]
-  mediaCategories                MediaCategory[]
-  optionGroups                   OptionGroup[]
-  optionItems                    OptionItem[]
-  orderDeliveryAddresses         OrderDeliveryAddress[]
-  OrderFeedback                  OrderFeedback[]
-  order_item_combo_selections    order_item_combo_selections[]
-  order_item_complements         order_item_complements[]
-  orderItems                     OrderItem[]
-  orderSplits                    OrderSplit[]
-  orderTimelines                 OrderTimeline[]
-  orders                         Order[]
-  paymentAttempts                PaymentAttempt[]
-  printJobs                      PrintJob[]
-  printStations                  PrintStation[]
-  printerDevices                 PrinterDevice[]
-  categories                     ProductCategory[]
-  product_combo_block_items      product_combo_block_items[]
-  product_combo_blocks           product_combo_blocks[]
-  product_combos                 product_combos[]
-  product_complement_group_links product_complement_group_links[]
-  product_complement_groups      product_complement_groups[]
-  product_complement_items       product_complement_items[]
-  productOptionGroupLinks        ProductOptionGroupLink[]
-  productOptionItemPrices        ProductOptionItemPrice[]
-  productRecipeBases             ProductRecipeBase[]
-  productRecipeIngredients       ProductRecipeIngredient[]
-  recipeBaseDependencies         RecipeBaseDependency[]         @relation("RecipeBaseDependencyTenant")
-  recipeBaseIngredients          RecipeBaseIngredient[]
-  recipeBases                    RecipeBase[]
-  productUpsells                 ProductUpsell[]
-  products                       Product[]
-  purchaseItems                  PurchaseItem[]
-  purchases                      Purchase[]
-  purchaseSettlements            PurchaseSettlement[]
-  quickReplies                   QuickReply[]
-  revenueEvents                  RevenueEvent[]
-  financialProjections           FinancialProjection[]
-  scheduledOrders                ScheduledOrder[]
-  schedulingSettings             SchedulingSettings?
-  schedulingWindows              SchedulingWindow[]
-  splitPayments                  SplitPayment[]
-  stockMovements                 StockMovement[]
-  subscriptionStatusHistory      SubscriptionStatusHistory[]
-  suppliers                      Supplier[]
-  tenantAddons                   TenantAddon[]
-  billingSubscriptions           TenantBillingSubscription[]
-  featureEntitlementOverrides    TenantFeatureEntitlementOverride[]
-  featureTenantOverrides         FeatureTenantOverride[]
-  moduleAccess                   TenantModuleAccess[]
-  onboarding                     TenantOnboarding?
-  operatingHours                 TenantOperatingHours[]
-  roles                          TenantRole[]
-  settings                       TenantSettings?
-  users                          TenantUser[]
-  businessGroup                  BusinessGroup?                     @relation("TenantBusinessGroupMembers", fields: [businessGroupId], references: [id])
-  timeSlots                      TimeSlot[]
-  upsellItems                    UpsellItem[]
-  upsells                        Upsell[]
-  whatsappInstance               WhatsAppInstance?
-  pushSubscriptions              PushSubscription[]
+  id                                 String                              @id @default(uuid())
+  businessGroupId                    String?                             @map("business_group_id")
+  name                               String                              @db.VarChar(100)
+  slug                               String                              @unique @db.VarChar(60)
+  status                             TenantStatus                        @default(active)
+  createdAt                          DateTime                            @default(now()) @map("created_at")
+  updatedAt                          DateTime                            @updatedAt @map("updated_at")
+  orderSequence                      Int                                 @default(0) @map("order_sequence")
+  businessGroupRole                  BusinessGroupTenantRole?            @map("business_group_role")
+  paymentTransactions                PaymentTransaction[]
+  paymentRefunds                     PaymentRefund[]
+  paymentProviderConnections         PaymentProviderConnection[]
+  orderPaymentAttempts               OrderPaymentAttempt[]
+  platformFeeEntries                 PlatformFeeEntry[]
+  tenantReceivables                  TenantReceivable[]
+  onlinePaymentActivation            OnlinePaymentActivation?
+  TenantSubscription                 TenantSubscription?
+  aiAgentConfig                      AiAgentConfig?
+  analyticsDailyAggregates           AnalyticsDailyAggregate[]
+  analyticsEvents                    AnalyticsEvent[]
+  auditLogs                          AuditLog[]
+  baseMenuImportLogs                 BaseMenuImportLog[]
+  billingCycles                      BillingCycleRecord[]
+  paymentMethods                     BillingPaymentMethod[]
+  billingUsageSnapshots              BillingUsageSnapshot[]
+  headquartersForGroup               BusinessGroup?                      @relation("BusinessGroupHeadquarters")
+  campaigns                          Campaign[]
+  cashMovements                      CashMovement[]
+  cashSessions                       CashSession[]
+  cashbackTransactions               CashbackTransaction[]
+  catalogAvailabilityRules           CatalogAvailabilityRule[]
+  catalogPublications                CatalogPublication[]
+  chatSessions                       ChatSession[]
+  comboBundleItems                   ComboBundleItem[]
+  comboRecipeIngredients             ComboRecipeIngredient[]
+  comboSlotAllowedItems              ComboSlotAllowedItem[]
+  comboSlots                         ComboSlot[]
+  complementRecipeIngredients        ComplementRecipeIngredient[]
+  coupons                            Coupon[]
+  crmNotes                           CrmNote[]
+  crmPipelineEntries                 CrmPipelineEntry[]
+  crmTasks                           CrmTask[]
+  customerAddresses                  CustomerAddress[]
+  customerExternalIdentities         CustomerExternalIdentity[]
+  customerLoyaltyTransactions        CustomerLoyaltyTransaction[]
+  customerOptOuts                    CustomerOptOut[]
+  customerOtps                       CustomerOTP[]
+  customerWalletTransactions         CustomerWalletTransaction[]
+  customers                          Customer[]
+  deliveryCoverageConfig             DeliveryCoverageConfig?
+  deliveryDriverLocations            DeliveryDriverLocation[]
+  deliveryDrivers                    DeliveryDriver[]
+  driverShifts                       DriverShift[]
+  deliveryRuns                       DeliveryRun[]
+  deliveryStops                      DeliveryStop[]
+  driverLedgerEntries                DriverLedgerEntry[]
+  driverSettlements                  DriverSettlement[]
+  driverSettlementItems              DriverSettlementItem[]
+  DeliveryRateDistanceTier           DeliveryRateDistanceTier[]
+  deliveryRateRules                  DeliveryRateRule[]
+  dineInTables                       DineInTable[]
+  financialAccounts                  FinancialAccount[]
+  financialTransactions              FinancialTransaction[]
+  goals                              Goal[]
+  ingredients                        Ingredient[]
+  purchasePresentations              PurchasePresentation[]
+  inventoryCountItems                InventoryCountItem[]
+  inventoryCounts                    InventoryCount[]
+  invoices                           Invoice[]
+  marketingAutomations               MarketingAutomation[]
+  marketplaceConnections             MarketplaceConnection[]
+  marketplaceCatalogMappings         MarketplaceCatalogMapping[]
+  marketplaceEventInboxes            MarketplaceEventInbox[]
+  marketplaceOrders                  MarketplaceOrder[]
+  marketplaceOperations              MarketplaceOperation[]
+  marketplaceDivergences             MarketplaceDivergence[]
+  marketplaceBillEntries             MarketplaceBillEntry[]
+  marketplaceSettlements             MarketplaceSettlement[]
+  mediaAssets                        MediaAsset[]
+  mediaCategories                    MediaCategory[]
+  optionGroups                       OptionGroup[]
+  optionItems                        OptionItem[]
+  orderDeliveryAddresses             OrderDeliveryAddress[]
+  OrderFeedback                      OrderFeedback[]
+  order_item_combo_selections        order_item_combo_selections[]
+  order_item_complements             order_item_complements[]
+  orderItems                         OrderItem[]
+  orderSplits                        OrderSplit[]
+  orderTimelines                     OrderTimeline[]
+  orders                             Order[]
+  paymentAttempts                    PaymentAttempt[]
+  printJobs                          PrintJob[]
+  printStations                      PrintStation[]
+  printerDevices                     PrinterDevice[]
+  categories                         ProductCategory[]
+  product_combo_block_items          product_combo_block_items[]
+  product_combo_blocks               product_combo_blocks[]
+  product_combos                     product_combos[]
+  product_complement_group_links     product_complement_group_links[]
+  product_complement_groups          product_complement_groups[]
+  product_complement_items           product_complement_items[]
+  productOptionGroupLinks            ProductOptionGroupLink[]
+  productOptionItemPrices            ProductOptionItemPrice[]
+  productOptionItemRecipeIngredients ProductOptionItemRecipeIngredient[]
+  productOptionItemRecipeBases       ProductOptionItemRecipeBase[]
+  productRecipeBases                 ProductRecipeBase[]
+  productRecipeIngredients           ProductRecipeIngredient[]
+  recipeBaseDependencies             RecipeBaseDependency[]              @relation("RecipeBaseDependencyTenant")
+  recipeBaseIngredients              RecipeBaseIngredient[]
+  recipeBases                        RecipeBase[]
+  productUpsells                     ProductUpsell[]
+  products                           Product[]
+  purchaseItems                      PurchaseItem[]
+  purchases                          Purchase[]
+  purchaseSettlements                PurchaseSettlement[]
+  quickReplies                       QuickReply[]
+  revenueEvents                      RevenueEvent[]
+  financialProjections               FinancialProjection[]
+  scheduledOrders                    ScheduledOrder[]
+  schedulingSettings                 SchedulingSettings?
+  schedulingWindows                  SchedulingWindow[]
+  splitPayments                      SplitPayment[]
+  stockMovements                     StockMovement[]
+  subscriptionStatusHistory          SubscriptionStatusHistory[]
+  suppliers                          Supplier[]
+  tenantAddons                       TenantAddon[]
+  billingSubscriptions               TenantBillingSubscription[]
+  featureEntitlementOverrides        TenantFeatureEntitlementOverride[]
+  featureTenantOverrides             FeatureTenantOverride[]
+  moduleAccess                       TenantModuleAccess[]
+  onboarding                         TenantOnboarding?
+  operatingHours                     TenantOperatingHours[]
+  roles                              TenantRole[]
+  settings                           TenantSettings?
+  users                              TenantUser[]
+  businessGroup                      BusinessGroup?                      @relation("TenantBusinessGroupMembers", fields: [businessGroupId], references: [id])
+  timeSlots                          TimeSlot[]
+  upsellItems                        UpsellItem[]
+  upsells                            Upsell[]
+  whatsappInstance                   WhatsAppInstance?
+  pushSubscriptions                  PushSubscription[]
 
   @@map("tenants")
 }
@@ -359,26 +361,29 @@ model OptionGroup {
 }
 
 model OptionItem {
-  id               String                   @id @default(uuid())
-  tenantId         String                   @map("tenant_id")
-  optionGroupId    String                   @map("option_group_id")
-  name             String
-  description      String?
-  sku              String?
-  isActive         Boolean                  @default(true) @map("is_active")
-  deletedAt        DateTime?                @map("deleted_at")
-  order            Int                      @default(0)
-  priceImpactType  PriceImpactType          @default(none) @map("price_impact_type")
-  priceImpactValue Decimal                  @default(0) @map("price_impact_value") @db.Decimal(10, 2)
-  allowQuantity    Boolean                  @default(false) @map("allow_quantity")
-  minQty           Int?                     @map("min_qty")
-  maxQty           Int?                     @map("max_qty")
-  createdAt        DateTime                 @default(now()) @map("created_at")
-  updatedAt        DateTime                 @updatedAt @map("updated_at")
-  optionGroup      OptionGroup              @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
-  tenant           Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  productPrices    ProductOptionItemPrice[]
+  id                String                              @id @default(uuid())
+  tenantId          String                              @map("tenant_id")
+  optionGroupId     String                              @map("option_group_id")
+  name              String
+  description       String?
+  sku               String?
+  isActive          Boolean                             @default(true) @map("is_active")
+  deletedAt         DateTime?                           @map("deleted_at")
+  order             Int                                 @default(0)
+  priceImpactType   PriceImpactType                     @default(none) @map("price_impact_type")
+  priceImpactValue  Decimal                             @default(0) @map("price_impact_value") @db.Decimal(10, 2)
+  allowQuantity     Boolean                             @default(false) @map("allow_quantity")
+  minQty            Int?                                @map("min_qty")
+  maxQty            Int?                                @map("max_qty")
+  createdAt         DateTime                            @default(now()) @map("created_at")
+  updatedAt         DateTime                            @updatedAt @map("updated_at")
+  optionGroup       OptionGroup                         @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  tenant            Tenant                              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productPrices     ProductOptionItemPrice[]
+  recipeIngredients ProductOptionItemRecipeIngredient[]
+  recipeBases       ProductOptionItemRecipeBase[]
 
+  @@unique([id, tenantId])
   @@index([tenantId, deletedAt])
   @@index([optionGroupId])
   @@map("option_items")
@@ -940,35 +945,35 @@ model ProductCategory {
 }
 
 model Product {
-  id                             String                           @id @default(uuid())
-  tenantId                       String                           @map("tenant_id")
-  categoryId                     String?                          @map("category_id")
+  id                             String                              @id @default(uuid())
+  tenantId                       String                              @map("tenant_id")
+  categoryId                     String?                             @map("category_id")
   name                           String
   slug                           String
-  shortDescription               String?                          @map("short_description")
-  longDescription                String?                          @map("long_description")
-  basePrice                      Decimal                          @map("base_price") @db.Decimal(10, 2)
+  shortDescription               String?                             @map("short_description")
+  longDescription                String?                             @map("long_description")
+  basePrice                      Decimal                             @map("base_price") @db.Decimal(10, 2)
   image                          String?
-  isActive                       Boolean                          @default(true) @map("is_active")
-  isFeatured                     Boolean                          @default(false) @map("is_featured")
-  isAvailable                    Boolean                          @default(true) @map("is_available")
-  sellableOnline                 Boolean                          @default(true) @map("sellable_online")
-  costPrice                      Decimal?                         @map("cost_price") @db.Decimal(10, 2)
+  isActive                       Boolean                             @default(true) @map("is_active")
+  isFeatured                     Boolean                             @default(false) @map("is_featured")
+  isAvailable                    Boolean                             @default(true) @map("is_available")
+  sellableOnline                 Boolean                             @default(true) @map("sellable_online")
+  costPrice                      Decimal?                            @map("cost_price") @db.Decimal(10, 2)
   sku                            String?
-  order                          Int                              @default(0)
-  createdAt                      DateTime                         @default(now()) @map("created_at")
-  updatedAt                      DateTime                         @updatedAt @map("updated_at")
-  deletedAt                      DateTime?                        @map("deleted_at")
-  type                           CatalogProductType               @default(simple) @map("type")
-  comboMode                      ComboMode?                       @map("combo_mode")
-  comboPricingType               ComboPricingType?                @map("combo_pricing_type")
-  comboPricingValue              Decimal?                         @map("combo_pricing_value") @db.Decimal(10, 2)
-  mediaAssetId                   String?                          @map("media_asset_id")
-  fractionalPricingRule          FractionalPricingRule?           @map("fractional_pricing_rule")
-  compareAtPrice                 Decimal?                         @map("compare_at_price") @db.Decimal(10, 2)
+  order                          Int                                 @default(0)
+  createdAt                      DateTime                            @default(now()) @map("created_at")
+  updatedAt                      DateTime                            @updatedAt @map("updated_at")
+  deletedAt                      DateTime?                           @map("deleted_at")
+  type                           CatalogProductType                  @default(simple) @map("type")
+  comboMode                      ComboMode?                          @map("combo_mode")
+  comboPricingType               ComboPricingType?                   @map("combo_pricing_type")
+  comboPricingValue              Decimal?                            @map("combo_pricing_value") @db.Decimal(10, 2)
+  mediaAssetId                   String?                             @map("media_asset_id")
+  fractionalPricingRule          FractionalPricingRule?              @map("fractional_pricing_rule")
+  compareAtPrice                 Decimal?                            @map("compare_at_price") @db.Decimal(10, 2)
   publication                    CatalogPublication?
-  comboBundleItems               ComboBundleItem[]                @relation("ComboBundleProduct")
-  usedInComboBundles             ComboBundleItem[]                @relation("ComboBundleLinkedProduct")
+  comboBundleItems               ComboBundleItem[]                   @relation("ComboBundleProduct")
+  usedInComboBundles             ComboBundleItem[]                   @relation("ComboBundleLinkedProduct")
   allowedInComboSlots            ComboSlotAllowedItem[]
   comboSlots                     ComboSlot[]
   orderItems                     OrderItem[]
@@ -976,12 +981,14 @@ model Product {
   product_complement_group_links product_complement_group_links[]
   optionGroupLinks               ProductOptionGroupLink[]
   optionItemPrices               ProductOptionItemPrice[]
+  optionItemRecipeIngredients    ProductOptionItemRecipeIngredient[]
+  optionItemRecipeBases          ProductOptionItemRecipeBase[]
   recipeIngredients              ProductRecipeIngredient[]
   recipeBases                    ProductRecipeBase[]
   upsellLinks                    ProductUpsell[]
-  category                       ProductCategory?                 @relation(fields: [categoryId], references: [id])
-  mediaAsset                     MediaAsset?                      @relation(fields: [mediaAssetId], references: [id])
-  tenant                         Tenant                           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category                       ProductCategory?                    @relation(fields: [categoryId], references: [id])
+  mediaAsset                     MediaAsset?                         @relation(fields: [mediaAssetId], references: [id])
+  tenant                         Tenant                              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   upsellItemEntries              UpsellItem[]
   marketplaceCatalogMappings     MarketplaceCatalogMapping[]
 
@@ -1143,25 +1150,25 @@ model Order {
 }
 
 model OrderAlert {
-  id                 String             @id @default(uuid())
-  tenantId           String             @map("tenant_id")
-  orderId            String?            @map("order_id")
-  ruleKey            String             @map("rule_key") @db.VarChar(80)
-  severity           OrderAlertSeverity
-  state              OrderAlertState    @default(ACTIVE)
-  fingerprint        String             @db.VarChar(300)
-  occurrence         Int                @default(1)
-  title              String             @db.VarChar(180)
-  message            String             @db.VarChar(500)
-  metadata           Json?
-  firstSeenAt        DateTime           @default(now()) @map("first_seen_at")
-  lastSeenAt         DateTime           @default(now()) @map("last_seen_at")
-  acknowledgedAt     DateTime?          @map("acknowledged_at")
-  acknowledgedById   String?            @map("acknowledged_by_id")
-  recoveredAt        DateTime?          @map("recovered_at")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
-  order              Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  id               String             @id @default(uuid())
+  tenantId         String             @map("tenant_id")
+  orderId          String?            @map("order_id")
+  ruleKey          String             @map("rule_key") @db.VarChar(80)
+  severity         OrderAlertSeverity
+  state            OrderAlertState    @default(ACTIVE)
+  fingerprint      String             @db.VarChar(300)
+  occurrence       Int                @default(1)
+  title            String             @db.VarChar(180)
+  message          String             @db.VarChar(500)
+  metadata         Json?
+  firstSeenAt      DateTime           @default(now()) @map("first_seen_at")
+  lastSeenAt       DateTime           @default(now()) @map("last_seen_at")
+  acknowledgedAt   DateTime?          @map("acknowledged_at")
+  acknowledgedById String?            @map("acknowledged_by_id")
+  recoveredAt      DateTime?          @map("recovered_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  order            Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, state, severity, lastSeenAt])
   @@index([tenantId, orderId, ruleKey, state])
@@ -1240,35 +1247,35 @@ model OrderTimeline {
 }
 
 model DeliveryDriver {
-  id                 String                   @id @default(uuid())
-  tenantId           String                   @map("tenant_id")
-  name               String                   @db.VarChar(150)
-  phone              String                   @db.VarChar(30)
-  pin                String?                  @db.VarChar(60)
-  isActive           Boolean                  @default(true) @map("is_active")
-  status             DriverStatus             @default(offline)
-  vehicleType        DriverVehicleType        @default(motorcycle) @map("vehicle_type")
-  notes              String?
-  createdAt          DateTime                 @default(now()) @map("created_at")
-  updatedAt          DateTime                 @updatedAt @map("updated_at")
-  currentLat         Float?                   @map("current_lat")
-  currentLng         Float?                   @map("current_lng")
-  lastLocationAt     DateTime?                @map("last_location_at")
-  dispatchQueueJoinedAt DateTime?             @map("dispatch_queue_joined_at")
-  payOverrideEnabled Boolean                  @default(false) @map("pay_override_enabled")
-  payMode            DriverPayMode?           @map("pay_mode")
-  dailyRate          Decimal?                 @map("daily_rate") @db.Decimal(10, 2)
-  payFixedAmount     Decimal?                 @map("pay_fixed_amount") @db.Decimal(10, 2)
-  payPercentage      Decimal?                 @map("pay_percentage") @db.Decimal(5, 2)
-  payRateTable       Json?                    @map("pay_rate_table")
-  payFailedAttempt   Boolean?                 @map("pay_failed_attempt")
-  locations          DeliveryDriverLocation[]
-  shifts             DriverShift[]
-  deliveryRuns       DeliveryRun[]
-  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  orders             Order[]
-  ledgerEntries      DriverLedgerEntry[]
-  settlements        DriverSettlement[]
+  id                    String                   @id @default(uuid())
+  tenantId              String                   @map("tenant_id")
+  name                  String                   @db.VarChar(150)
+  phone                 String                   @db.VarChar(30)
+  pin                   String?                  @db.VarChar(60)
+  isActive              Boolean                  @default(true) @map("is_active")
+  status                DriverStatus             @default(offline)
+  vehicleType           DriverVehicleType        @default(motorcycle) @map("vehicle_type")
+  notes                 String?
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  currentLat            Float?                   @map("current_lat")
+  currentLng            Float?                   @map("current_lng")
+  lastLocationAt        DateTime?                @map("last_location_at")
+  dispatchQueueJoinedAt DateTime?                @map("dispatch_queue_joined_at")
+  payOverrideEnabled    Boolean                  @default(false) @map("pay_override_enabled")
+  payMode               DriverPayMode?           @map("pay_mode")
+  dailyRate             Decimal?                 @map("daily_rate") @db.Decimal(10, 2)
+  payFixedAmount        Decimal?                 @map("pay_fixed_amount") @db.Decimal(10, 2)
+  payPercentage         Decimal?                 @map("pay_percentage") @db.Decimal(5, 2)
+  payRateTable          Json?                    @map("pay_rate_table")
+  payFailedAttempt      Boolean?                 @map("pay_failed_attempt")
+  locations             DeliveryDriverLocation[]
+  shifts                DriverShift[]
+  deliveryRuns          DeliveryRun[]
+  tenant                Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders                Order[]
+  ledgerEntries         DriverLedgerEntry[]
+  settlements           DriverSettlement[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -1302,39 +1309,39 @@ model DriverShift {
 }
 
 model DeliveryRun {
-  id              String                   @id @default(uuid())
-  tenantId        String                   @map("tenant_id")
-  driverId        String                   @map("driver_id")
-  shiftId         String                   @map("shift_id")
-  status          DeliveryRunStatus        @default(PENDING_ACCEPTANCE)
-  version         Int                      @default(1)
-  history         Json                     @default("[]")
-  assignedAt      DateTime?                @map("assigned_at")
-  acceptedAt      DateTime?                @map("accepted_at")
-  rejectedAt      DateTime?                @map("rejected_at")
-  rejectionReason String?                  @map("rejection_reason") @db.VarChar(255)
-  startedAt       DateTime?                @map("started_at")
-  returningAt     DateTime?                @map("returning_at")
-  completedAt     DateTime?                @map("completed_at")
-  cancelledAt     DateTime?                @map("cancelled_at")
-  kdsOverrideAt   DateTime?                @map("kds_override_at")
-  kdsOverrideBy   String?                  @map("kds_override_by") @db.VarChar(100)
-  kdsOverrideReason String?                @map("kds_override_reason") @db.VarChar(255)
-  routeProvider    String?                  @map("route_provider") @db.VarChar(40)
-  routeQuality     String?                  @map("route_quality") @db.VarChar(20)
-  routeGeometry    Json?                    @map("route_geometry")
-  routeVersion     Int                      @default(0) @map("route_version")
-  routeDistanceMeters Int?                  @map("route_distance_meters")
-  routeDurationSeconds Int?                 @map("route_duration_seconds")
-  routeCalculatedAt DateTime?               @map("route_calculated_at")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
-  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  driver          DeliveryDriver           @relation(fields: [driverId], references: [id], onDelete: Restrict)
-  shift           DriverShift              @relation(fields: [shiftId], references: [id], onDelete: Restrict)
-  stops           DeliveryStop[]
-  locations       DeliveryDriverLocation[]
-  ledgerEntries   DriverLedgerEntry[]
+  id                   String                   @id @default(uuid())
+  tenantId             String                   @map("tenant_id")
+  driverId             String                   @map("driver_id")
+  shiftId              String                   @map("shift_id")
+  status               DeliveryRunStatus        @default(PENDING_ACCEPTANCE)
+  version              Int                      @default(1)
+  history              Json                     @default("[]")
+  assignedAt           DateTime?                @map("assigned_at")
+  acceptedAt           DateTime?                @map("accepted_at")
+  rejectedAt           DateTime?                @map("rejected_at")
+  rejectionReason      String?                  @map("rejection_reason") @db.VarChar(255)
+  startedAt            DateTime?                @map("started_at")
+  returningAt          DateTime?                @map("returning_at")
+  completedAt          DateTime?                @map("completed_at")
+  cancelledAt          DateTime?                @map("cancelled_at")
+  kdsOverrideAt        DateTime?                @map("kds_override_at")
+  kdsOverrideBy        String?                  @map("kds_override_by") @db.VarChar(100)
+  kdsOverrideReason    String?                  @map("kds_override_reason") @db.VarChar(255)
+  routeProvider        String?                  @map("route_provider") @db.VarChar(40)
+  routeQuality         String?                  @map("route_quality") @db.VarChar(20)
+  routeGeometry        Json?                    @map("route_geometry")
+  routeVersion         Int                      @default(0) @map("route_version")
+  routeDistanceMeters  Int?                     @map("route_distance_meters")
+  routeDurationSeconds Int?                     @map("route_duration_seconds")
+  routeCalculatedAt    DateTime?                @map("route_calculated_at")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driver               DeliveryDriver           @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  shift                DriverShift              @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  stops                DeliveryStop[]
+  locations            DeliveryDriverLocation[]
+  ledgerEntries        DriverLedgerEntry[]
 
   @@index([tenantId, driverId, status])
   @@index([tenantId, shiftId])
@@ -1363,7 +1370,7 @@ model DeliveryStop {
   cancellationReason    String?             @map("cancellation_reason") @db.VarChar(255)
   routeDistanceMeters   Int?                @map("route_distance_meters")
   routeDurationSeconds  Int?                @map("route_duration_seconds")
-  estimatedArrivalAt    DateTime?            @map("estimated_arrival_at")
+  estimatedArrivalAt    DateTime?           @map("estimated_arrival_at")
   payModeSnapshot       DriverPayMode?      @map("pay_mode_snapshot")
   payBaseSnapshot       Decimal?            @map("pay_base_snapshot") @db.Decimal(10, 2)
   payPercentageSnapshot Decimal?            @map("pay_percentage_snapshot") @db.Decimal(5, 2)
@@ -1784,44 +1791,44 @@ model RevenueEvent {
 }
 
 model FinancialProjection {
-  id                       String                          @id @default(uuid())
-  tenantId                 String                          @map("tenant_id")
-  orderId                  String                          @map("order_id")
-  source                   FinancialProjectionSource
-  projectionVersion        Int                             @default(1) @map("projection_version")
-  occurredAt               DateTime                        @map("occurred_at")
-  recognizedAt             DateTime?                       @map("recognized_at")
-  paymentObservedAt        DateTime?                       @map("payment_observed_at")
-  saleGross                Decimal?                        @map("sale_gross") @db.Decimal(12, 2)
-  saleGrossState           FinancialProjectionValueState   @map("sale_gross_state")
-  discountTotal            Decimal?                        @map("discount_total") @db.Decimal(12, 2)
-  discountTotalState       FinancialProjectionValueState   @map("discount_total_state")
-  discountMerchant         Decimal?                        @map("discount_merchant") @db.Decimal(12, 2)
-  discountMerchantState    FinancialProjectionValueState   @map("discount_merchant_state")
-  discountPlatform         Decimal?                        @map("discount_platform") @db.Decimal(12, 2)
-  discountPlatformState    FinancialProjectionValueState   @map("discount_platform_state")
-  deliveryCharged          Decimal?                        @map("delivery_charged") @db.Decimal(12, 2)
-  deliveryChargedState     FinancialProjectionValueState   @map("delivery_charged_state")
-  serviceCharged           Decimal?                        @map("service_charged") @db.Decimal(12, 2)
-  serviceChargedState      FinancialProjectionValueState   @map("service_charged_state")
-  customerPaid             Decimal?                        @map("customer_paid") @db.Decimal(12, 2)
-  customerPaidState        FinancialProjectionValueState   @map("customer_paid_state")
-  paymentMethod            PaymentMethod?                  @map("payment_method")
-  paymentChannel           String?                         @map("payment_channel") @db.VarChar(80)
-  marketplaceFee           Decimal?                        @map("marketplace_fee") @db.Decimal(12, 2)
-  marketplaceFeeState      FinancialProjectionValueState   @map("marketplace_fee_state")
-  merchantReceivable       Decimal?                        @map("merchant_receivable") @db.Decimal(12, 2)
-  merchantReceivableState  FinancialProjectionValueState   @map("merchant_receivable_state")
-  refundAmount             Decimal?                        @map("refund_amount") @db.Decimal(12, 2)
-  refundState              FinancialProjectionValueState   @map("refund_state")
-  cogsSnapshot             Decimal?                        @map("cogs_snapshot") @db.Decimal(12, 2)
-  cogsState                FinancialProjectionValueState   @map("cogs_state")
-  sourceFieldProvenance    Json                            @map("source_field_provenance")
-  sourcePayloadReference   String?                         @map("source_payload_reference") @db.VarChar(160)
-  createdAt                DateTime                        @default(now()) @map("created_at")
-  updatedAt                DateTime                        @updatedAt @map("updated_at")
-  tenant                   Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order                    Order                           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id                      String                        @id @default(uuid())
+  tenantId                String                        @map("tenant_id")
+  orderId                 String                        @map("order_id")
+  source                  FinancialProjectionSource
+  projectionVersion       Int                           @default(1) @map("projection_version")
+  occurredAt              DateTime                      @map("occurred_at")
+  recognizedAt            DateTime?                     @map("recognized_at")
+  paymentObservedAt       DateTime?                     @map("payment_observed_at")
+  saleGross               Decimal?                      @map("sale_gross") @db.Decimal(12, 2)
+  saleGrossState          FinancialProjectionValueState @map("sale_gross_state")
+  discountTotal           Decimal?                      @map("discount_total") @db.Decimal(12, 2)
+  discountTotalState      FinancialProjectionValueState @map("discount_total_state")
+  discountMerchant        Decimal?                      @map("discount_merchant") @db.Decimal(12, 2)
+  discountMerchantState   FinancialProjectionValueState @map("discount_merchant_state")
+  discountPlatform        Decimal?                      @map("discount_platform") @db.Decimal(12, 2)
+  discountPlatformState   FinancialProjectionValueState @map("discount_platform_state")
+  deliveryCharged         Decimal?                      @map("delivery_charged") @db.Decimal(12, 2)
+  deliveryChargedState    FinancialProjectionValueState @map("delivery_charged_state")
+  serviceCharged          Decimal?                      @map("service_charged") @db.Decimal(12, 2)
+  serviceChargedState     FinancialProjectionValueState @map("service_charged_state")
+  customerPaid            Decimal?                      @map("customer_paid") @db.Decimal(12, 2)
+  customerPaidState       FinancialProjectionValueState @map("customer_paid_state")
+  paymentMethod           PaymentMethod?                @map("payment_method")
+  paymentChannel          String?                       @map("payment_channel") @db.VarChar(80)
+  marketplaceFee          Decimal?                      @map("marketplace_fee") @db.Decimal(12, 2)
+  marketplaceFeeState     FinancialProjectionValueState @map("marketplace_fee_state")
+  merchantReceivable      Decimal?                      @map("merchant_receivable") @db.Decimal(12, 2)
+  merchantReceivableState FinancialProjectionValueState @map("merchant_receivable_state")
+  refundAmount            Decimal?                      @map("refund_amount") @db.Decimal(12, 2)
+  refundState             FinancialProjectionValueState @map("refund_state")
+  cogsSnapshot            Decimal?                      @map("cogs_snapshot") @db.Decimal(12, 2)
+  cogsState               FinancialProjectionValueState @map("cogs_state")
+  sourceFieldProvenance   Json                          @map("source_field_provenance")
+  sourcePayloadReference  String?                       @map("source_payload_reference") @db.VarChar(160)
+  createdAt               DateTime                      @default(now()) @map("created_at")
+  updatedAt               DateTime                      @updatedAt @map("updated_at")
+  tenant                  Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order                   Order                         @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, orderId, projectionVersion])
   @@index([tenantId, source, occurredAt])
@@ -2001,20 +2008,20 @@ model MarketplaceConnection {
 }
 
 model MarketplaceCatalogMapping {
-  id           String                      @id @default(uuid())
-  tenantId     String                      @map("tenant_id")
-  connectionId String                      @map("connection_id")
-  provider     MarketplaceProvider
-  externalItemId String                    @map("external_item_id") @db.VarChar(180)
-  externalItemName String?                 @map("external_item_name") @db.VarChar(255)
-  externalReferenceId String?              @map("external_reference_id") @db.VarChar(500)
-  productId    String                      @map("product_id")
-  status       MarketplaceCatalogMappingStatus @default(ACTIVE)
-  createdAt    DateTime                    @default(now()) @map("created_at")
-  updatedAt    DateTime                    @updatedAt @map("updated_at")
-  tenant       Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  connection   MarketplaceConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  product      Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  id                  String                          @id @default(uuid())
+  tenantId            String                          @map("tenant_id")
+  connectionId        String                          @map("connection_id")
+  provider            MarketplaceProvider
+  externalItemId      String                          @map("external_item_id") @db.VarChar(180)
+  externalItemName    String?                         @map("external_item_name") @db.VarChar(255)
+  externalReferenceId String?                         @map("external_reference_id") @db.VarChar(500)
+  productId           String                          @map("product_id")
+  status              MarketplaceCatalogMappingStatus @default(ACTIVE)
+  createdAt           DateTime                        @default(now()) @map("created_at")
+  updatedAt           DateTime                        @updatedAt @map("updated_at")
+  tenant              Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection          MarketplaceConnection           @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  product             Product                         @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@unique([connectionId, provider, externalItemId])
   @@index([tenantId, provider, status])
@@ -2023,44 +2030,44 @@ model MarketplaceCatalogMapping {
 }
 
 model MarketplaceBillEntry {
-  id                    String                @id @default(uuid())
-  tenantId              String                @map("tenant_id")
-  provider              MarketplaceProvider
-  connectionId          String                @map("connection_id")
-  orderId               String                @map("order_id") @db.VarChar(120)
-  orderIndex            String?               @map("order_index") @db.VarChar(120)
-  orderType             Int                   @map("order_type")
-  deliveryType          Int?                  @map("delivery_type")
-  businessTs            String                @map("business_ts") @db.VarChar(120)
-  businessAt            DateTime?             @map("business_at")
-  dayPaymentId          String                @map("day_payment_id") @db.VarChar(120)
-  commissionAmount      BigInt                @map("commission_amount")
-  mealOriginalAmount    BigInt?               @map("meal_original_amount")
-  shopDeliveryAmount    BigInt?               @map("shop_delivery_amount")
-  shopPreTips           BigInt?               @map("shop_pre_tips")
-  freeDeliveryOutcome   BigInt?               @map("free_delivery_outcome")
-  freeDeliverySubsidy   BigInt?               @map("free_delivery_subsidy")
-  commissionBaseAmount  BigInt?               @map("commission_base_amount")
-  commissionSubsidyAmount BigInt?             @map("commission_subsidy_amount")
-  b2pDeliveryAmount     BigInt?               @map("b2p_delivery_amount")
-  payCommissionAmount   BigInt?               @map("pay_commission_amount")
-  minValueDifferenceAmount BigInt?            @map("min_value_difference_amount")
-  settlementAmount      BigInt                @map("settlement_amount")
-  orderAmount           BigInt                @map("order_amount")
-  shopActivityOutcome   BigInt                @map("shop_activity_outcome")
-  shopActivitySubsidy   BigInt                @map("shop_activity_subsidy")
-  mealLossDeductAmount  BigInt?               @map("meal_loss_deduct_amount")
-  vatAmount             BigInt?               @map("vat_amount")
-  merchantAppealAmount  BigInt?               @map("merchant_appeal_amount")
-  monthlyServicePrice   BigInt?               @map("monthly_service_price")
-  gmv                   BigInt?               @map("gmv")
-  monthlyServiceBasePrice BigInt?             @map("monthly_service_base_price")
-  expectSettleDate      DateTime?             @map("expect_settle_date")
-  rawPayload            Json?                 @map("raw_payload")
-  createdAt             DateTime              @default(now()) @map("created_at")
-  updatedAt             DateTime              @updatedAt @map("updated_at")
-  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  connection            MarketplaceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  id                       String                @id @default(uuid())
+  tenantId                 String                @map("tenant_id")
+  provider                 MarketplaceProvider
+  connectionId             String                @map("connection_id")
+  orderId                  String                @map("order_id") @db.VarChar(120)
+  orderIndex               String?               @map("order_index") @db.VarChar(120)
+  orderType                Int                   @map("order_type")
+  deliveryType             Int?                  @map("delivery_type")
+  businessTs               String                @map("business_ts") @db.VarChar(120)
+  businessAt               DateTime?             @map("business_at")
+  dayPaymentId             String                @map("day_payment_id") @db.VarChar(120)
+  commissionAmount         BigInt                @map("commission_amount")
+  mealOriginalAmount       BigInt?               @map("meal_original_amount")
+  shopDeliveryAmount       BigInt?               @map("shop_delivery_amount")
+  shopPreTips              BigInt?               @map("shop_pre_tips")
+  freeDeliveryOutcome      BigInt?               @map("free_delivery_outcome")
+  freeDeliverySubsidy      BigInt?               @map("free_delivery_subsidy")
+  commissionBaseAmount     BigInt?               @map("commission_base_amount")
+  commissionSubsidyAmount  BigInt?               @map("commission_subsidy_amount")
+  b2pDeliveryAmount        BigInt?               @map("b2p_delivery_amount")
+  payCommissionAmount      BigInt?               @map("pay_commission_amount")
+  minValueDifferenceAmount BigInt?               @map("min_value_difference_amount")
+  settlementAmount         BigInt                @map("settlement_amount")
+  orderAmount              BigInt                @map("order_amount")
+  shopActivityOutcome      BigInt                @map("shop_activity_outcome")
+  shopActivitySubsidy      BigInt                @map("shop_activity_subsidy")
+  mealLossDeductAmount     BigInt?               @map("meal_loss_deduct_amount")
+  vatAmount                BigInt?               @map("vat_amount")
+  merchantAppealAmount     BigInt?               @map("merchant_appeal_amount")
+  monthlyServicePrice      BigInt?               @map("monthly_service_price")
+  gmv                      BigInt?               @map("gmv")
+  monthlyServiceBasePrice  BigInt?               @map("monthly_service_base_price")
+  expectSettleDate         DateTime?             @map("expect_settle_date")
+  rawPayload               Json?                 @map("raw_payload")
+  createdAt                DateTime              @default(now()) @map("created_at")
+  updatedAt                DateTime              @updatedAt @map("updated_at")
+  tenant                   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection               MarketplaceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, provider, connectionId, orderId, orderType, businessTs], map: "marketplace_bill_entry_identity_key")
   @@index([tenantId, provider, connectionId, dayPaymentId], map: "marketplace_bill_entry_day_payment_idx")
@@ -2069,34 +2076,34 @@ model MarketplaceBillEntry {
 }
 
 model MarketplaceSettlement {
-  id                     String                      @id @default(uuid())
-  tenantId               String                      @map("tenant_id")
+  id                     String                            @id @default(uuid())
+  tenantId               String                            @map("tenant_id")
   provider               MarketplaceProvider
-  connectionId           String                      @map("connection_id")
-  weekPaymentId          String                      @map("week_payment_id") @db.VarChar(120)
-  withdrawAmount         BigInt                      @map("withdraw_amount")
-  withdrawDate           DateTime                    @map("withdraw_date")
+  connectionId           String                            @map("connection_id")
+  weekPaymentId          String                            @map("week_payment_id") @db.VarChar(120)
+  withdrawAmount         BigInt                            @map("withdraw_amount")
+  withdrawDate           DateTime                          @map("withdraw_date")
   liability              BigInt?
-  liabilityParty         String?                     @map("liability_party") @db.VarChar(160)
-  shopId                 String                      @map("shop_id") @db.VarChar(120)
-  settleStartDate        DateTime                    @map("settle_start_date")
-  settleEndDate          DateTime                    @map("settle_end_date")
-  currency               String                      @db.VarChar(12)
-  payeeCnpj              String?                     @map("payee_cnpj") @db.VarChar(32)
-  payerCnpj              String?                     @map("payer_cnpj") @db.VarChar(32)
-  cnpjWithdrawAmount     BigInt?                     @map("cnpj_withdraw_amount")
-  cercAmount             BigInt?                     @map("cerc_amount")
-  status                 MarketplaceSettlementStatus @default(LIQUIDATED_UNPOSTED)
-  financialTransactionId String?                     @unique @map("financial_transaction_id")
-  postedAt               DateTime?                   @map("posted_at")
-  compositionDifference  BigInt?                     @map("composition_difference")
-  discrepancyDetails     Json?                       @map("discrepancy_details")
-  rawPayload             Json?                       @map("raw_payload")
-  createdAt              DateTime                    @default(now()) @map("created_at")
-  updatedAt              DateTime                    @updatedAt @map("updated_at")
-  tenant                 Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  connection             MarketplaceConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  financialTransaction   FinancialTransaction?       @relation("MarketplaceSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  liabilityParty         String?                           @map("liability_party") @db.VarChar(160)
+  shopId                 String                            @map("shop_id") @db.VarChar(120)
+  settleStartDate        DateTime                          @map("settle_start_date")
+  settleEndDate          DateTime                          @map("settle_end_date")
+  currency               String                            @db.VarChar(12)
+  payeeCnpj              String?                           @map("payee_cnpj") @db.VarChar(32)
+  payerCnpj              String?                           @map("payer_cnpj") @db.VarChar(32)
+  cnpjWithdrawAmount     BigInt?                           @map("cnpj_withdraw_amount")
+  cercAmount             BigInt?                           @map("cerc_amount")
+  status                 MarketplaceSettlementStatus       @default(LIQUIDATED_UNPOSTED)
+  financialTransactionId String?                           @unique @map("financial_transaction_id")
+  postedAt               DateTime?                         @map("posted_at")
+  compositionDifference  BigInt?                           @map("composition_difference")
+  discrepancyDetails     Json?                             @map("discrepancy_details")
+  rawPayload             Json?                             @map("raw_payload")
+  createdAt              DateTime                          @default(now()) @map("created_at")
+  updatedAt              DateTime                          @updatedAt @map("updated_at")
+  tenant                 Tenant                            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection             MarketplaceConnection             @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  financialTransaction   FinancialTransaction?             @relation("MarketplaceSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
   dayPayments            MarketplaceSettlementDayPayment[]
 
   @@unique([tenantId, provider, connectionId, weekPaymentId], map: "marketplace_settlement_identity_key")
@@ -2106,10 +2113,10 @@ model MarketplaceSettlement {
 }
 
 model MarketplaceSettlementDayPayment {
-  id            String                @id @default(uuid())
-  settlementId  String                @map("settlement_id")
-  dayPaymentId  String                @map("day_payment_id") @db.VarChar(120)
-  settlement    MarketplaceSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  id           String                @id @default(uuid())
+  settlementId String                @map("settlement_id")
+  dayPaymentId String                @map("day_payment_id") @db.VarChar(120)
+  settlement   MarketplaceSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@unique([settlementId, dayPaymentId], map: "marketplace_settlement_day_payment_key")
   @@index([dayPaymentId], map: "marketplace_settlement_day_payment_idx")
@@ -2139,37 +2146,37 @@ model PaymentProviderConnection {
 }
 
 model OrderPaymentAttempt {
-  id                   String                     @id @default(uuid())
-  tenantId             String                     @map("tenant_id")
-  orderId              String                     @map("order_id")
-  provider             PaymentProvider
-  providerConnectionId String?                    @map("provider_connection_id")
-  status               OrderPaymentAttemptStatus  @default(CREATED)
-  amount               Decimal                    @db.Decimal(12, 2)
-  currency             String                     @default("BRL") @db.VarChar(10)
-  externalPaymentId    String?                    @map("external_payment_id") @db.VarChar(255)
-  idempotencyKey       String                     @map("idempotency_key") @db.VarChar(160)
-  expiresAt            DateTime?                  @map("expires_at")
-  paidAt               DateTime?                  @map("paid_at")
-  failedAt             DateTime?                  @map("failed_at")
-  failureCode          String?                    @map("failure_code") @db.VarChar(120)
-  failureReason        String?                    @map("failure_reason") @db.VarChar(500)
-  metadataJson         Json?                      @map("metadata_json")
-  platformFeePolicyId  String?                    @map("platform_fee_policy_id")
-  platformFeePolicyVersion Int?                   @map("platform_fee_policy_version")
-  platformFeeType      PlatformFeeType?           @map("platform_fee_type")
-  platformFeeExpectedAmount Decimal?              @map("platform_fee_expected_amount") @db.Decimal(12, 2)
-  platformFeeCurrency  String?                    @map("platform_fee_currency") @db.VarChar(3)
-  tenantPlanSnapshot   String?                    @map("tenant_plan_snapshot") @db.VarChar(180)
-  createdAt            DateTime                   @default(now()) @map("created_at")
-  updatedAt            DateTime                   @updatedAt @map("updated_at")
-  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order                Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  providerConnection   PaymentProviderConnection? @relation(fields: [providerConnectionId], references: [id], onDelete: Restrict)
-  paymentTransaction   PaymentTransaction?
-  webhookEvents        ExternalWebhookEvent[]
-  platformFeePolicy    PlatformFeePolicy?         @relation(fields: [platformFeePolicyId], references: [id], onDelete: Restrict)
-  platformFeeEntry     PlatformFeeEntry?
+  id                        String                     @id @default(uuid())
+  tenantId                  String                     @map("tenant_id")
+  orderId                   String                     @map("order_id")
+  provider                  PaymentProvider
+  providerConnectionId      String?                    @map("provider_connection_id")
+  status                    OrderPaymentAttemptStatus  @default(CREATED)
+  amount                    Decimal                    @db.Decimal(12, 2)
+  currency                  String                     @default("BRL") @db.VarChar(10)
+  externalPaymentId         String?                    @map("external_payment_id") @db.VarChar(255)
+  idempotencyKey            String                     @map("idempotency_key") @db.VarChar(160)
+  expiresAt                 DateTime?                  @map("expires_at")
+  paidAt                    DateTime?                  @map("paid_at")
+  failedAt                  DateTime?                  @map("failed_at")
+  failureCode               String?                    @map("failure_code") @db.VarChar(120)
+  failureReason             String?                    @map("failure_reason") @db.VarChar(500)
+  metadataJson              Json?                      @map("metadata_json")
+  platformFeePolicyId       String?                    @map("platform_fee_policy_id")
+  platformFeePolicyVersion  Int?                       @map("platform_fee_policy_version")
+  platformFeeType           PlatformFeeType?           @map("platform_fee_type")
+  platformFeeExpectedAmount Decimal?                   @map("platform_fee_expected_amount") @db.Decimal(12, 2)
+  platformFeeCurrency       String?                    @map("platform_fee_currency") @db.VarChar(3)
+  tenantPlanSnapshot        String?                    @map("tenant_plan_snapshot") @db.VarChar(180)
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  updatedAt                 DateTime                   @updatedAt @map("updated_at")
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order                     Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  providerConnection        PaymentProviderConnection? @relation(fields: [providerConnectionId], references: [id], onDelete: Restrict)
+  paymentTransaction        PaymentTransaction?
+  webhookEvents             ExternalWebhookEvent[]
+  platformFeePolicy         PlatformFeePolicy?         @relation(fields: [platformFeePolicyId], references: [id], onDelete: Restrict)
+  platformFeeEntry          PlatformFeeEntry?
 
   @@unique([tenantId, orderId, idempotencyKey])
   @@unique([providerConnectionId, externalPaymentId])
@@ -2180,20 +2187,20 @@ model OrderPaymentAttempt {
 }
 
 model PlatformFeePolicy {
-  id             String              @id @default(uuid())
-  selectorKey    String              @map("selector_key") @db.VarChar(180)
-  scope          PlatformFeePolicyScope
-  billingPlanId  String?             @map("billing_plan_id")
-  feeType        PlatformFeeType     @default(FIXED) @map("fee_type")
-  fixedAmount    Decimal             @map("fixed_amount") @db.Decimal(12, 2)
-  currency       String              @default("BRL") @db.VarChar(3)
-  version        Int
-  effectiveFrom  DateTime            @map("effective_from")
-  effectiveUntil DateTime?           @map("effective_until")
-  active         Boolean             @default(true)
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
-  billingPlan    BillingPlan?        @relation(fields: [billingPlanId], references: [id], onDelete: Restrict)
+  id              String                 @id @default(uuid())
+  selectorKey     String                 @map("selector_key") @db.VarChar(180)
+  scope           PlatformFeePolicyScope
+  billingPlanId   String?                @map("billing_plan_id")
+  feeType         PlatformFeeType        @default(FIXED) @map("fee_type")
+  fixedAmount     Decimal                @map("fixed_amount") @db.Decimal(12, 2)
+  currency        String                 @default("BRL") @db.VarChar(3)
+  version         Int
+  effectiveFrom   DateTime               @map("effective_from")
+  effectiveUntil  DateTime?              @map("effective_until")
+  active          Boolean                @default(true)
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  billingPlan     BillingPlan?           @relation(fields: [billingPlanId], references: [id], onDelete: Restrict)
   paymentAttempts OrderPaymentAttempt[]
 
   @@unique([selectorKey, version])
@@ -2203,21 +2210,21 @@ model PlatformFeePolicy {
 }
 
 model PlatformFeeEntry {
-  id                        String           @id @default(uuid())
-  tenantId                  String           @map("tenant_id")
-  orderPaymentAttemptId     String           @unique @map("order_payment_attempt_id")
-  state                     PlatformFeeState @default(PENDING)
-  expectedAmount            Decimal          @map("expected_amount") @db.Decimal(12, 2)
-  actualCollectedAmount     Decimal          @default(0) @map("actual_collected_amount") @db.Decimal(12, 2)
-  currency                  String           @default("BRL") @db.VarChar(3)
-  providerSplitAllocationId String?          @map("provider_split_allocation_id") @db.VarChar(255)
-  externalReference         String?          @map("external_reference") @db.VarChar(255)
-  earnedAt                  DateTime?        @map("earned_at")
-  settledAt                 DateTime?        @map("settled_at")
-  reversedAt                DateTime?        @map("reversed_at")
-  createdAt                 DateTime         @default(now()) @map("created_at")
-  updatedAt                 DateTime         @updatedAt @map("updated_at")
-  tenant                    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                        String              @id @default(uuid())
+  tenantId                  String              @map("tenant_id")
+  orderPaymentAttemptId     String              @unique @map("order_payment_attempt_id")
+  state                     PlatformFeeState    @default(PENDING)
+  expectedAmount            Decimal             @map("expected_amount") @db.Decimal(12, 2)
+  actualCollectedAmount     Decimal             @default(0) @map("actual_collected_amount") @db.Decimal(12, 2)
+  currency                  String              @default("BRL") @db.VarChar(3)
+  providerSplitAllocationId String?             @map("provider_split_allocation_id") @db.VarChar(255)
+  externalReference         String?             @map("external_reference") @db.VarChar(255)
+  earnedAt                  DateTime?           @map("earned_at")
+  settledAt                 DateTime?           @map("settled_at")
+  reversedAt                DateTime?           @map("reversed_at")
+  createdAt                 DateTime            @default(now()) @map("created_at")
+  updatedAt                 DateTime            @updatedAt @map("updated_at")
+  tenant                    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orderPaymentAttempt       OrderPaymentAttempt @relation(fields: [orderPaymentAttemptId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, state])
@@ -2225,18 +2232,18 @@ model PlatformFeeEntry {
 }
 
 model TenantReceivable {
-  id         String                       @id @default(uuid())
-  tenantId   String                       @map("tenant_id")
-  sourceType TenantReceivableSourceType   @map("source_type")
-  sourceId   String                       @map("source_id") @db.VarChar(160)
-  amount     Decimal                      @db.Decimal(12, 2)
-  currency   String                       @default("BRL") @db.VarChar(3)
-  status     TenantReceivableStatus       @default(OPEN)
-  reason     String                       @db.VarChar(255)
-  createdAt  DateTime                     @default(now()) @map("created_at")
-  updatedAt  DateTime                     @updatedAt @map("updated_at")
-  settledAt  DateTime?                    @map("settled_at")
-  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id         String                     @id @default(uuid())
+  tenantId   String                     @map("tenant_id")
+  sourceType TenantReceivableSourceType @map("source_type")
+  sourceId   String                     @map("source_id") @db.VarChar(160)
+  amount     Decimal                    @db.Decimal(12, 2)
+  currency   String                     @default("BRL") @db.VarChar(3)
+  status     TenantReceivableStatus     @default(OPEN)
+  reason     String                     @db.VarChar(255)
+  createdAt  DateTime                   @default(now()) @map("created_at")
+  updatedAt  DateTime                   @updatedAt @map("updated_at")
+  settledAt  DateTime?                  @map("settled_at")
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, sourceType, sourceId])
   @@index([tenantId, status])
@@ -2305,32 +2312,32 @@ model MarketplaceEventInbox {
 }
 
 model MarketplaceOrder {
-  id                        String                  @id @default(uuid())
-  tenantId                  String                  @map("tenant_id")
-  connectionId              String                  @map("connection_id")
+  id                        String                       @id @default(uuid())
+  tenantId                  String                       @map("tenant_id")
+  connectionId              String                       @map("connection_id")
   provider                  MarketplaceProvider
   deliveryOwnership         MarketplaceDeliveryOwnership @default(UNKNOWN) @map("delivery_ownership")
-  externalOrderId           String                  @map("external_order_id") @db.VarChar(120)
-  externalDisplayId         String?                 @map("external_display_id") @db.VarChar(120)
-  internalOrderId           String?                 @map("internal_order_id")
-  statusExternal            String?                 @map("status_external") @db.VarChar(60)
-  statusInternal            String?                 @map("status_internal") @db.VarChar(60)
-  externalCreatedAt         DateTime?               @map("external_created_at")
-  preparationStartAt        DateTime?               @map("preparation_start_at")
-  confirmationDeadlineAt    DateTime?               @map("confirmation_deadline_at")
-  lastExternalEventAt       DateTime?               @map("last_external_event_at")
-  lastExternalEventId       String?                 @map("last_external_event_id") @db.VarChar(180)
-  lastExternalEventSequence BigInt?                 @map("last_external_event_sequence")
-  lastExternalEventTopic    String?                 @map("last_external_event_topic") @db.VarChar(120)
-  rawPayload                Json                    @map("raw_payload")
-  normalizedPayload         Json?                   @map("normalized_payload")
-  importedAt                DateTime?               @map("imported_at")
-  lastSyncedAt              DateTime?               @map("last_synced_at")
-  createdAt                 DateTime                @default(now()) @map("created_at")
-  updatedAt                 DateTime                @updatedAt @map("updated_at")
-  connection                MarketplaceConnection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  internalOrder             Order?                  @relation(fields: [internalOrderId], references: [id])
-  tenant                    Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalOrderId           String                       @map("external_order_id") @db.VarChar(120)
+  externalDisplayId         String?                      @map("external_display_id") @db.VarChar(120)
+  internalOrderId           String?                      @map("internal_order_id")
+  statusExternal            String?                      @map("status_external") @db.VarChar(60)
+  statusInternal            String?                      @map("status_internal") @db.VarChar(60)
+  externalCreatedAt         DateTime?                    @map("external_created_at")
+  preparationStartAt        DateTime?                    @map("preparation_start_at")
+  confirmationDeadlineAt    DateTime?                    @map("confirmation_deadline_at")
+  lastExternalEventAt       DateTime?                    @map("last_external_event_at")
+  lastExternalEventId       String?                      @map("last_external_event_id") @db.VarChar(180)
+  lastExternalEventSequence BigInt?                      @map("last_external_event_sequence")
+  lastExternalEventTopic    String?                      @map("last_external_event_topic") @db.VarChar(120)
+  rawPayload                Json                         @map("raw_payload")
+  normalizedPayload         Json?                        @map("normalized_payload")
+  importedAt                DateTime?                    @map("imported_at")
+  lastSyncedAt              DateTime?                    @map("last_synced_at")
+  createdAt                 DateTime                     @default(now()) @map("created_at")
+  updatedAt                 DateTime                     @updatedAt @map("updated_at")
+  connection                MarketplaceConnection        @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  internalOrder             Order?                       @relation(fields: [internalOrderId], references: [id])
+  tenant                    Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   operations                MarketplaceOperation[]
   divergences               MarketplaceDivergence[]
 
@@ -2743,30 +2750,31 @@ model CrmNote {
 }
 
 model Ingredient {
-  id                  String                       @id @default(uuid())
-  tenantId            String                       @map("tenant_id")
-  name                String                       @db.VarChar(150)
-  sku                 String?                      @db.VarChar(50)
-  description         String?
-  unit                UnitType
-  purchaseUnit        UnitType?                    @map("purchase_unit")
-  conversionFactor    Decimal                      @default(1) @map("conversion_factor") @db.Decimal(10, 4)
-  category            String?                      @db.VarChar(50)
-  currentCost         Decimal                      @default(0) @map("current_cost") @db.Decimal(10, 4)
-  currentStock        Decimal                      @default(0) @map("current_stock") @db.Decimal(10, 4)
-  minStock            Decimal?                     @map("min_stock") @db.Decimal(10, 4)
-  isActive            Boolean                      @default(true) @map("is_active")
-  createdAt           DateTime                     @default(now()) @map("created_at")
-  updatedAt           DateTime                     @updatedAt @map("updated_at")
-  comboRecipes        ComboRecipeIngredient[]
-  complementRecipes   ComplementRecipeIngredient[]
-  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  inventoryCountItems InventoryCountItem[]
-  productRecipes      ProductRecipeIngredient[]
+  id                    String                              @id @default(uuid())
+  tenantId              String                              @map("tenant_id")
+  name                  String                              @db.VarChar(150)
+  sku                   String?                             @db.VarChar(50)
+  description           String?
+  unit                  UnitType
+  purchaseUnit          UnitType?                           @map("purchase_unit")
+  conversionFactor      Decimal                             @default(1) @map("conversion_factor") @db.Decimal(10, 4)
+  category              String?                             @db.VarChar(50)
+  currentCost           Decimal                             @default(0) @map("current_cost") @db.Decimal(10, 4)
+  currentStock          Decimal                             @default(0) @map("current_stock") @db.Decimal(10, 4)
+  minStock              Decimal?                            @map("min_stock") @db.Decimal(10, 4)
+  isActive              Boolean                             @default(true) @map("is_active")
+  createdAt             DateTime                            @default(now()) @map("created_at")
+  updatedAt             DateTime                            @updatedAt @map("updated_at")
+  comboRecipes          ComboRecipeIngredient[]
+  complementRecipes     ComplementRecipeIngredient[]
+  tenant                Tenant                              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryCountItems   InventoryCountItem[]
+  productRecipes        ProductRecipeIngredient[]
+  optionItemRecipes     ProductOptionItemRecipeIngredient[]
   recipeBaseIngredients RecipeBaseIngredient[]
-  purchaseItems       PurchaseItem[]
+  purchaseItems         PurchaseItem[]
   purchasePresentations PurchasePresentation[]
-  movements           StockMovement[]
+  movements             StockMovement[]
 
   @@unique([tenantId, sku])
   @@unique([id, tenantId])
@@ -2775,21 +2783,21 @@ model Ingredient {
 }
 
 model PurchasePresentation {
-  id               String     @id @default(uuid())
-  tenantId         String     @map("tenant_id")
-  ingredientId     String     @map("ingredient_id")
-  label            String     @db.VarChar(120)
+  id               String         @id @default(uuid())
+  tenantId         String         @map("tenant_id")
+  ingredientId     String         @map("ingredient_id")
+  label            String         @db.VarChar(120)
   /// Server-derived quantity expressed in Ingredient.unit. Legacy records retain this value only.
-  conversionFactor Decimal    @map("conversion_factor") @db.Decimal(14, 6)
+  conversionFactor Decimal        @map("conversion_factor") @db.Decimal(14, 6)
   /// Commercial quantity explicitly authored by the tenant. Null identifies an ambiguous legacy record.
-  contentQuantity  Decimal?   @map("content_quantity") @db.Decimal(14, 6)
-  contentUnit      UnitType?  @map("content_unit")
-  isActive         Boolean    @default(true) @map("is_active")
-  archivedAt       DateTime?  @map("archived_at")
-  createdAt        DateTime   @default(now()) @map("created_at")
-  updatedAt        DateTime   @updatedAt @map("updated_at")
-  ingredient       Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
-  tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contentQuantity  Decimal?       @map("content_quantity") @db.Decimal(14, 6)
+  contentUnit      UnitType?      @map("content_unit")
+  isActive         Boolean        @default(true) @map("is_active")
+  archivedAt       DateTime?      @map("archived_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  ingredient       Ingredient     @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   purchaseItems    PurchaseItem[]
 
   @@index([tenantId, ingredientId])
@@ -2848,21 +2856,22 @@ model ProductRecipeIngredient {
 
 /// A virtual, reusable preparation. It is neither physical inventory nor a sellable product.
 model RecipeBase {
-  id                    String                  @id @default(uuid())
-  tenantId              String                  @map("tenant_id")
-  name                  String                  @db.VarChar(150)
-  description           String?
-  outputUnit            UnitType                @map("output_unit")
-  yieldQuantity         Decimal                 @map("yield_quantity") @db.Decimal(14, 6)
-  isActive              Boolean                 @default(true) @map("is_active")
-  archivedAt            DateTime?               @map("archived_at")
-  createdAt             DateTime                @default(now()) @map("created_at")
-  updatedAt             DateTime                @updatedAt @map("updated_at")
-  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  ingredients           RecipeBaseIngredient[]  @relation("RecipeBaseIngredients")
-  childDependencies     RecipeBaseDependency[]  @relation("RecipeBaseParent")
-  parentDependencies    RecipeBaseDependency[]  @relation("RecipeBaseComponent")
-  productLinks          ProductRecipeBase[]
+  id                 String                        @id @default(uuid())
+  tenantId           String                        @map("tenant_id")
+  name               String                        @db.VarChar(150)
+  description        String?
+  outputUnit         UnitType                      @map("output_unit")
+  yieldQuantity      Decimal                       @map("yield_quantity") @db.Decimal(14, 6)
+  isActive           Boolean                       @default(true) @map("is_active")
+  archivedAt         DateTime?                     @map("archived_at")
+  createdAt          DateTime                      @default(now()) @map("created_at")
+  updatedAt          DateTime                      @updatedAt @map("updated_at")
+  tenant             Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ingredients        RecipeBaseIngredient[]        @relation("RecipeBaseIngredients")
+  childDependencies  RecipeBaseDependency[]        @relation("RecipeBaseParent")
+  parentDependencies RecipeBaseDependency[]        @relation("RecipeBaseComponent")
+  productLinks       ProductRecipeBase[]
+  optionItemLinks    ProductOptionItemRecipeBase[]
 
   @@unique([tenantId, name])
   @@unique([id, tenantId])
@@ -2925,6 +2934,52 @@ model ProductRecipeBase {
   @@index([tenantId, productId])
   @@index([tenantId, baseId])
   @@map("product_recipe_bases")
+}
+
+/// A physical ingredient contribution of an OptionItem in one product context.
+model ProductOptionItemRecipeIngredient {
+  id            String     @id @default(uuid())
+  tenantId      String     @map("tenant_id")
+  productId     String     @map("product_id")
+  optionItemId  String     @map("option_item_id")
+  ingredientId  String     @map("ingredient_id")
+  quantity      Decimal    @db.Decimal(14, 6)
+  inputQuantity Decimal    @map("input_quantity") @db.Decimal(14, 6)
+  inputUnit     UnitType   @map("input_unit")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  product       Product    @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  optionItem    OptionItem @relation(fields: [optionItemId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  ingredient    Ingredient @relation(fields: [ingredientId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, optionItemId, ingredientId])
+  @@index([tenantId, productId, optionItemId])
+  @@index([tenantId, ingredientId])
+  @@map("product_option_item_recipe_ingredients")
+}
+
+/// A reusable-base contribution of an OptionItem in one product context.
+model ProductOptionItemRecipeBase {
+  id            String     @id @default(uuid())
+  tenantId      String     @map("tenant_id")
+  productId     String     @map("product_id")
+  optionItemId  String     @map("option_item_id")
+  baseId        String     @map("base_id")
+  quantity      Decimal    @db.Decimal(14, 6)
+  inputQuantity Decimal    @map("input_quantity") @db.Decimal(14, 6)
+  inputUnit     UnitType   @map("input_unit")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  product       Product    @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  optionItem    OptionItem @relation(fields: [optionItemId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  base          RecipeBase @relation(fields: [baseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, optionItemId, baseId])
+  @@index([tenantId, productId, optionItemId])
+  @@index([tenantId, baseId])
+  @@map("product_option_item_recipe_bases")
 }
 
 model ComplementRecipeIngredient {
@@ -3331,24 +3386,24 @@ model Supplier {
 }
 
 model Purchase {
-  id            String         @id @default(uuid())
-  tenantId      String         @map("tenant_id")
-  supplierId    String         @map("supplier_id")
-  number        String?        @db.VarChar(50)
-  totalValue    Decimal        @map("total_value") @db.Decimal(10, 2)
-  status        PurchaseStatus @default(draft)
-  paymentStatus PaymentStatus  @default(pending) @map("payment_status")
-  purchaseDate  DateTime       @default(now()) @map("purchase_date")
-  idempotencyKey String?        @map("idempotency_key") @db.VarChar(100)
-  idempotencyFingerprint String? @map("idempotency_fingerprint") @db.VarChar(64)
-  cancelledAt   DateTime?      @map("cancelled_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  items         PurchaseItem[]
-  stockMovements StockMovement[]
-  settlement    PurchaseSettlement?
-  supplier      Supplier       @relation(fields: [supplierId], references: [id])
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                     String              @id @default(uuid())
+  tenantId               String              @map("tenant_id")
+  supplierId             String              @map("supplier_id")
+  number                 String?             @db.VarChar(50)
+  totalValue             Decimal             @map("total_value") @db.Decimal(10, 2)
+  status                 PurchaseStatus      @default(draft)
+  paymentStatus          PaymentStatus       @default(pending) @map("payment_status")
+  purchaseDate           DateTime            @default(now()) @map("purchase_date")
+  idempotencyKey         String?             @map("idempotency_key") @db.VarChar(100)
+  idempotencyFingerprint String?             @map("idempotency_fingerprint") @db.VarChar(64)
+  cancelledAt            DateTime?           @map("cancelled_at")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+  items                  PurchaseItem[]
+  stockMovements         StockMovement[]
+  settlement             PurchaseSettlement?
+  supplier               Supplier            @relation(fields: [supplierId], references: [id])
+  tenant                 Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([supplierId])
@@ -3357,26 +3412,26 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id           String     @id @default(uuid())
-  tenantId     String     @map("tenant_id")
-  purchaseId   String     @map("purchase_id")
-  ingredientId String     @map("ingredient_id")
-  quantity     Decimal    @db.Decimal(10, 4)
-  unitCost     Decimal    @map("unit_cost") @db.Decimal(10, 4)
-  totalCost    Decimal    @map("total_cost") @db.Decimal(10, 4)
-  purchasePresentationId String? @map("purchase_presentation_id")
-  purchaseQuantity Decimal? @map("purchase_quantity") @db.Decimal(14, 6)
-  purchasePresentationLabel String? @map("purchase_presentation_label") @db.VarChar(120)
-  conversionFactorSnapshot Decimal? @map("conversion_factor_snapshot") @db.Decimal(14, 6)
-  purchasePresentationContentQuantitySnapshot Decimal? @map("purchase_presentation_content_quantity_snapshot") @db.Decimal(14, 6)
-  purchasePresentationContentUnitSnapshot UnitType? @map("purchase_presentation_content_unit_snapshot")
-  ingredientBaseUnitSnapshot UnitType? @map("ingredient_base_unit_snapshot")
-  expiryDate   DateTime?  @map("expiry_date")
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
-  purchasePresentation PurchasePresentation? @relation(fields: [purchasePresentationId], references: [id], onDelete: Restrict)
-  purchase     Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  stockMovement StockMovement?
+  id                                          String                @id @default(uuid())
+  tenantId                                    String                @map("tenant_id")
+  purchaseId                                  String                @map("purchase_id")
+  ingredientId                                String                @map("ingredient_id")
+  quantity                                    Decimal               @db.Decimal(10, 4)
+  unitCost                                    Decimal               @map("unit_cost") @db.Decimal(10, 4)
+  totalCost                                   Decimal               @map("total_cost") @db.Decimal(10, 4)
+  purchasePresentationId                      String?               @map("purchase_presentation_id")
+  purchaseQuantity                            Decimal?              @map("purchase_quantity") @db.Decimal(14, 6)
+  purchasePresentationLabel                   String?               @map("purchase_presentation_label") @db.VarChar(120)
+  conversionFactorSnapshot                    Decimal?              @map("conversion_factor_snapshot") @db.Decimal(14, 6)
+  purchasePresentationContentQuantitySnapshot Decimal?              @map("purchase_presentation_content_quantity_snapshot") @db.Decimal(14, 6)
+  purchasePresentationContentUnitSnapshot     UnitType?             @map("purchase_presentation_content_unit_snapshot")
+  ingredientBaseUnitSnapshot                  UnitType?             @map("ingredient_base_unit_snapshot")
+  expiryDate                                  DateTime?             @map("expiry_date")
+  ingredient                                  Ingredient            @relation(fields: [ingredientId], references: [id])
+  purchasePresentation                        PurchasePresentation? @relation(fields: [purchasePresentationId], references: [id], onDelete: Restrict)
+  purchase                                    Purchase              @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  tenant                                      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockMovement                               StockMovement?
 
   @@index([purchaseId])
   @@index([ingredientId])
@@ -3418,17 +3473,17 @@ model InventoryCountItem {
 }
 
 model FinancialAccount {
-  id           String                 @id @default(uuid())
-  tenantId     String                 @map("tenant_id")
-  name         String                 @db.VarChar(100)
-  type         FinancialAccountType   @default(cash)
-  balance      Decimal                @default(0) @db.Decimal(10, 2)
-  active       Boolean                @default(true)
-  createdAt    DateTime               @default(now()) @map("created_at")
-  updatedAt    DateTime               @updatedAt @map("updated_at")
-  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  transactions FinancialTransaction[]
-  purchaseSettlements PurchaseSettlement[]
+  id                               String                  @id @default(uuid())
+  tenantId                         String                  @map("tenant_id")
+  name                             String                  @db.VarChar(100)
+  type                             FinancialAccountType    @default(cash)
+  balance                          Decimal                 @default(0) @db.Decimal(10, 2)
+  active                           Boolean                 @default(true)
+  createdAt                        DateTime                @default(now()) @map("created_at")
+  updatedAt                        DateTime                @updatedAt @map("updated_at")
+  tenant                           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions                     FinancialTransaction[]
+  purchaseSettlements              PurchaseSettlement[]
   marketplaceSettlementConnections MarketplaceConnection[] @relation("MarketplaceSettlementAccount")
 
   @@index([tenantId])
@@ -3436,29 +3491,29 @@ model FinancialAccount {
 }
 
 model FinancialTransaction {
-  id            String                   @id @default(uuid())
-  tenantId      String                   @map("tenant_id")
-  accountId     String?                  @map("account_id")
-  type          FinancialTransactionType
-  category      String                   @db.VarChar(50)
-  amount        Decimal                  @db.Decimal(10, 2)
-  status        FinancialStatus          @default(pending)
-  dueDate       DateTime?                @map("due_date")
-  paymentDate   DateTime?                @map("payment_date")
-  description   String?
-  referenceId   String?                  @map("reference_id")
-  referenceType String?                  @map("reference_type")
-  idempotencyKey String?                 @map("idempotency_key") @db.VarChar(120)
-  reversalOfTransactionId String?        @unique @map("reversal_of_transaction_id")
-  createdAt     DateTime                 @default(now()) @map("created_at")
-  updatedAt     DateTime                 @updatedAt @map("updated_at")
-  account       FinancialAccount?        @relation(fields: [accountId], references: [id])
-  reversalOfTransaction FinancialTransaction? @relation("FinancialTransactionReversal", fields: [reversalOfTransactionId], references: [id], onDelete: Restrict)
-  reversal      FinancialTransaction?    @relation("FinancialTransactionReversal")
-  purchaseSettlement PurchaseSettlement? @relation("PurchaseSettlementTransaction")
-  purchaseSettlementReversal PurchaseSettlement? @relation("PurchaseSettlementReversal")
-  marketplaceSettlement MarketplaceSettlement? @relation("MarketplaceSettlementTransaction")
-  tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                         String                   @id @default(uuid())
+  tenantId                   String                   @map("tenant_id")
+  accountId                  String?                  @map("account_id")
+  type                       FinancialTransactionType
+  category                   String                   @db.VarChar(50)
+  amount                     Decimal                  @db.Decimal(10, 2)
+  status                     FinancialStatus          @default(pending)
+  dueDate                    DateTime?                @map("due_date")
+  paymentDate                DateTime?                @map("payment_date")
+  description                String?
+  referenceId                String?                  @map("reference_id")
+  referenceType              String?                  @map("reference_type")
+  idempotencyKey             String?                  @map("idempotency_key") @db.VarChar(120)
+  reversalOfTransactionId    String?                  @unique @map("reversal_of_transaction_id")
+  createdAt                  DateTime                 @default(now()) @map("created_at")
+  updatedAt                  DateTime                 @updatedAt @map("updated_at")
+  account                    FinancialAccount?        @relation(fields: [accountId], references: [id])
+  reversalOfTransaction      FinancialTransaction?    @relation("FinancialTransactionReversal", fields: [reversalOfTransactionId], references: [id], onDelete: Restrict)
+  reversal                   FinancialTransaction?    @relation("FinancialTransactionReversal")
+  purchaseSettlement         PurchaseSettlement?      @relation("PurchaseSettlementTransaction")
+  purchaseSettlementReversal PurchaseSettlement?      @relation("PurchaseSettlementReversal")
+  marketplaceSettlement      MarketplaceSettlement?   @relation("MarketplaceSettlementTransaction")
+  tenant                     Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([accountId])
@@ -3468,22 +3523,22 @@ model FinancialTransaction {
 }
 
 model PurchaseSettlement {
-  id                       String               @id @default(uuid())
-  tenantId                 String               @map("tenant_id")
-  purchaseId               String               @unique @map("purchase_id")
-  accountId                String               @map("account_id")
-  amount                   Decimal              @db.Decimal(10, 2)
-  financialTransactionId   String               @unique @map("financial_transaction_id")
-  paidAt                   DateTime             @default(now()) @map("paid_at")
-  reversedAt               DateTime?            @map("reversed_at")
-  reversalTransactionId    String?              @unique @map("reversal_transaction_id")
-  createdAt                DateTime             @default(now()) @map("created_at")
-  updatedAt                DateTime             @updatedAt @map("updated_at")
-  tenant                   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  purchase                 Purchase             @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
-  account                  FinancialAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  financialTransaction     FinancialTransaction @relation("PurchaseSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
-  reversalTransaction      FinancialTransaction? @relation("PurchaseSettlementReversal", fields: [reversalTransactionId], references: [id], onDelete: Restrict)
+  id                     String                @id @default(uuid())
+  tenantId               String                @map("tenant_id")
+  purchaseId             String                @unique @map("purchase_id")
+  accountId              String                @map("account_id")
+  amount                 Decimal               @db.Decimal(10, 2)
+  financialTransactionId String                @unique @map("financial_transaction_id")
+  paidAt                 DateTime              @default(now()) @map("paid_at")
+  reversedAt             DateTime?             @map("reversed_at")
+  reversalTransactionId  String?               @unique @map("reversal_transaction_id")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchase               Purchase              @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  account                FinancialAccount      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  financialTransaction   FinancialTransaction  @relation("PurchaseSettlementTransaction", fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  reversalTransaction    FinancialTransaction? @relation("PurchaseSettlementReversal", fields: [reversalTransactionId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([tenantId, accountId])

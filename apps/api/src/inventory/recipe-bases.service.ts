@@ -49,11 +49,12 @@ export class RecipeBasesService {
       if (!base.isActive) throw new ConflictException('Preparação arquivada deve ser restaurada antes da edição.');
       const metadata = this.metadata(dto);
       if (metadata.outputUnit !== base.outputUnit) {
-        const [parentDependency, productLink] = await Promise.all([
+        const [parentDependency, productLink, contextualProductOptionItemLink] = await Promise.all([
           tx.recipeBaseDependency.findFirst({ where: { tenantId, componentBaseId: id }, select: { id: true } }),
           tx.productRecipeBase.findFirst({ where: { tenantId, baseId: id }, select: { id: true } }),
+          tx.productOptionItemRecipeBase.findFirst({ where: { tenantId, baseId: id }, select: { id: true } }),
         ]);
-        if (parentDependency || productLink) throw new ConflictException({ code: 'RECIPE_BASE_OUTPUT_UNIT_LOCKED', message: 'A unidade de rendimento não pode mudar enquanto a preparação estiver em uso.' });
+        if (parentDependency || productLink || contextualProductOptionItemLink) throw new ConflictException({ code: 'RECIPE_BASE_OUTPUT_UNIT_LOCKED', message: 'A unidade de rendimento não pode mudar enquanto a preparação estiver em uso.' });
       }
       return tx.recipeBase.update({ where: { id }, data: metadata });
     });
