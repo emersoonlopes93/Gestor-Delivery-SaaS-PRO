@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api-client';
-import { IngredientDTO, ProductRecipeComponentDTO, ProductRecipeComponentInputDTO, ProductRecipeDTO, RecipeBaseDTO, UnitType } from '@gestor/types';
+import { IngredientDTO, ProductOptionItemRecipeDTO, ProductRecipeComponentDTO, ProductRecipeComponentInputDTO, ProductRecipeDTO, RecipeBaseDTO, UnitType } from '@gestor/types';
 
 interface RecipeModalProps {
   isOpen: boolean;
@@ -8,6 +8,8 @@ interface RecipeModalProps {
   entityType: 'product' | 'complement' | 'combo';
   entityId: string;
   entityName: string;
+  optionItemId?: string;
+  optionItemName?: string;
 }
 
 const compatibleUnits = (unit: UnitType): UnitType[] => {
@@ -25,7 +27,7 @@ const preview = (quantity: number, from: UnitType, target: UnitType): number => 
   return quantity;
 };
 
-export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName }: RecipeModalProps) {
+export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName, optionItemId, optionItemName }: RecipeModalProps) {
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
   const [bases, setBases] = useState<RecipeBaseDTO[]>([]);
   const [components, setComponents] = useState<ProductRecipeComponentDTO[]>([]);
@@ -37,17 +39,20 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
   const loadData = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
+      const recipePath = optionItemId
+        ? `/inventory/recipes/product/${entityId}/option-item/${optionItemId}`
+        : `/inventory/recipes/${entityType}/${entityId}`;
       const [ingredientsResult, basesResult, recipeResult] = await Promise.all([
         api.get<IngredientDTO[]>('/inventory/ingredients'),
         api.get<RecipeBaseDTO[]>('/inventory/recipe-bases'),
-        api.get<ProductRecipeDTO>(`/inventory/recipes/${entityType}/${entityId}`),
+        api.get<ProductRecipeDTO | ProductOptionItemRecipeDTO>(recipePath),
       ]);
       if (!ingredientsResult.success || !basesResult.success || !recipeResult.success) throw new Error('Não foi possível carregar a ficha técnica.');
       setIngredients(ingredientsResult.data); setBases(basesResult.data); setComponents(recipeResult.data.components); setTotalCost(recipeResult.data.totalEstimatedCost);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível carregar a ficha técnica.');
     } finally { setIsLoading(false); }
-  }, [entityId, entityType]);
+  }, [entityId, entityType, optionItemId]);
 
   useEffect(() => { if (isOpen) void loadData(); }, [isOpen, loadData]);
 
@@ -80,7 +85,12 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
       const payload: ProductRecipeComponentInputDTO[] = components.map((component) => component.type === 'ingredient'
         ? { type: 'ingredient', ingredientId: component.ingredientId, inputQuantity: Number(component.inputQuantity), inputUnit: component.inputUnit }
         : { type: 'base', baseId: component.baseId, inputQuantity: Number(component.inputQuantity), inputUnit: component.inputUnit });
-      const result = await api.post<ProductRecipeDTO>(`/inventory/recipes/${entityType}/${entityId}`, payload);
+      const recipePath = optionItemId
+        ? `/inventory/recipes/product/${entityId}/option-item/${optionItemId}`
+        : `/inventory/recipes/${entityType}/${entityId}`;
+      const result = optionItemId
+        ? await api.put<ProductOptionItemRecipeDTO>(recipePath, payload)
+        : await api.post<ProductRecipeDTO>(recipePath, payload);
       if (!result.success) throw new Error('Não foi possível salvar a ficha técnica.');
       setComponents(result.data.components); setTotalCost(result.data.totalEstimatedCost); onClose();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível salvar a ficha técnica.'); }
@@ -90,7 +100,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
   if (!isOpen) return null;
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
     <div role="dialog" aria-modal="true" aria-labelledby="recipe-title" className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-left shadow-xl">
-      <div className="flex items-center justify-between border-b border-border bg-muted/50 px-6 py-4"><div><h2 id="recipe-title" className="text-xl font-bold text-foreground">Ficha Técnica</h2><p className="text-sm text-muted-foreground">{entityName}</p></div><button type="button" onClick={onClose} className="text-2xl text-muted-foreground hover:text-foreground">×</button></div>
+      <div className="flex items-center justify-between border-b border-border bg-muted/50 px-6 py-4"><div><h2 id="recipe-title" className="text-xl font-bold text-foreground">Ficha Técnica</h2><p className="text-sm text-muted-foreground">{entityName}{optionItemName ? ` · ${optionItemName}` : ''}</p></div><button type="button" onClick={onClose} className="text-2xl text-muted-foreground hover:text-foreground">×</button></div>
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
         {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
         {isLoading ? <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" /></div> : <>

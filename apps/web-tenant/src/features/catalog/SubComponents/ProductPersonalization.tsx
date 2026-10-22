@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useCatalogEditor } from '../CatalogEditorContext';
 import { formatSelectionRules, formatSelectionType } from '../utils/optionGroupHelpers';
+import { RecipeModal } from '../../inventory/RecipeModal';
 
 export const ProductPersonalization: React.FC = () => {
   const {
@@ -16,7 +17,9 @@ export const ProductPersonalization: React.FC = () => {
     isProductWizard,
     goPrevWizardStep,
     goNextWizardStep,
+    productId,
   } = useCatalogEditor();
+  const [recipeItem, setRecipeItem] = useState<{ id: string; name: string } | null>(null);
 
   if (isComboMode) return null;
 
@@ -110,6 +113,17 @@ export const ProductPersonalization: React.FC = () => {
                 >
                   Configurar neste produto
                 </button>
+                {(l.optionGroup?.items || []).map((item) => (
+                  <button
+                    key={`recipe-${item.id}`}
+                    type="button"
+                    disabled={item.effectiveIsActive === false || item.override?.isActive === false || !item.isActive}
+                    onClick={() => setRecipeItem({ id: item.id, name: item.name })}
+                    className="px-3 py-2 text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 rounded-xl transition-all col-span-2 disabled:opacity-50"
+                  >
+                    Ficha técnica: {item.name}
+                  </button>
+                ))}
                 {l.optionGroup && (
                   <button
                     type="button"
@@ -233,6 +247,17 @@ export const ProductPersonalization: React.FC = () => {
                       >
                         Configurar neste produto
                       </button>
+                      {(l.optionGroup?.items || []).map((item) => (
+                        <button
+                          key={`recipe-${item.id}`}
+                          type="button"
+                          disabled={item.effectiveIsActive === false || item.override?.isActive === false || !item.isActive}
+                          onClick={() => setRecipeItem({ id: item.id, name: item.name })}
+                          className="px-3 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded transition-all disabled:opacity-50"
+                        >
+                          Ficha: {item.name}
+                        </button>
+                      ))}
                       {l.optionGroup && (
                         <button
                           type="button"
@@ -293,6 +318,17 @@ export const ProductPersonalization: React.FC = () => {
             Próximo
           </button>
         </div>
+      )}
+      {recipeItem && productId && (
+        <RecipeModal
+          isOpen={Boolean(recipeItem)}
+          onClose={() => setRecipeItem(null)}
+          entityType="product"
+          entityId={productId}
+          entityName="Composição física local"
+          optionItemId={recipeItem.id}
+          optionItemName={recipeItem.name}
+        />
       )}
     </section>
   );
