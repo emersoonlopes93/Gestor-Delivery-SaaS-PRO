@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { OptionGroupsService } from '../option-groups/option-groups.service';
 import { ProductOptionGroupsService } from './product-option-groups.service';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 
 const allowedDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -39,13 +40,19 @@ describe('ProductOptionGroupLink PostgreSQL atomicity', () => {
   function serviceFor(currentTenantId: string): ProductOptionGroupsService {
     const cacheManager = { del: async () => undefined };
     const tenantContext = { getTenantId: () => currentTenantId };
-    return Reflect.construct(ProductOptionGroupsService, [prisma, tenantContext, cacheManager]) as ProductOptionGroupsService;
+    return Reflect.construct(
+      ProductOptionGroupsService,
+      [prisma, tenantContext, new ComboComponentEligibilityService(prisma as never), cacheManager],
+    ) as ProductOptionGroupsService;
   }
 
   function optionGroupsServiceFor(currentTenantId: string): OptionGroupsService {
     const cacheManager = { del: async () => undefined };
     const tenantContext = { getTenantId: () => currentTenantId };
-    return Reflect.construct(OptionGroupsService, [prisma, tenantContext, cacheManager]) as OptionGroupsService;
+    return Reflect.construct(
+      OptionGroupsService,
+      [prisma, tenantContext, new ComboComponentEligibilityService(prisma as never), cacheManager],
+    ) as OptionGroupsService;
   }
 
   it('keeps one primary replace link when concurrent mutations race', async () => {
