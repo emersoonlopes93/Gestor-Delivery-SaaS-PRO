@@ -45,6 +45,7 @@ describe('OptionGroupsService pricing invariants', () => {
       },
       productOptionGroupLink: {
         findFirst: jest.fn().mockResolvedValue(options.secondaryLink ? { id: 'link-secondary' } : null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
     const prisma = {
@@ -54,7 +55,11 @@ describe('OptionGroupsService pricing invariants', () => {
     };
     const cacheManager = { del: jest.fn().mockResolvedValue(undefined) };
     const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) };
-    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext, cacheManager]) as OptionGroupsService;
+    const eligibility = {
+      getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map()),
+      assertDoesNotInvalidateExistingComboComponents: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext, eligibility, cacheManager]) as OptionGroupsService;
     return { prisma, tx, cacheManager, service };
   }
 

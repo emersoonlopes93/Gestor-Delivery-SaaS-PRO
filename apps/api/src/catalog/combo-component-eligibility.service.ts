@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { getProductConfigurationRoute, type ProductConfigurationRoute } from '@gestor/utils';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
 export const COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED = 'COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED';
@@ -20,11 +21,13 @@ export class ComboComponentEligibilityService {
     tenantId: string,
     productIds: readonly string[],
     options: { requireActive?: boolean } = {},
+    tx?: Prisma.TransactionClient,
   ): Promise<Map<string, ProductConfigurationRoute>> {
+    const reader = tx ?? this.prisma;
     const ids = [...new Set(productIds)];
     if (!ids.length) return new Map();
 
-    const products = await this.prisma.product.findMany({
+    const products = await reader.product.findMany({
       where: { tenantId, id: { in: ids }, deletedAt: null },
       select: {
         id: true,
@@ -56,7 +59,7 @@ export class ComboComponentEligibilityService {
 
     if (products.length !== ids.length) throw new NotFoundException('Produto não encontrado para vínculo.');
 
-    const disabledOverrides = await this.prisma.productOptionItemPrice.findMany({
+    const disabledOverrides = await reader.productOptionItemPrice.findMany({
       where: { tenantId, productId: { in: ids }, isActive: false },
       select: { productId: true, optionItemId: true },
     });
@@ -86,8 +89,12 @@ export class ComboComponentEligibilityService {
     return routes;
   }
 
-  async assertEligibleProductIds(tenantId: string, productIds: readonly string[]): Promise<void> {
-    const routes = await this.getProductConfigurationRoutes(tenantId, productIds);
+  async assertEligibleProductIds(
+    tenantId: string,
+    productIds: readonly string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const routes = await this.getProductConfigurationRoutes(tenantId, productIds, {}, tx);
     for (const route of routes.values()) {
       if (route !== 'direct') {
         throw new BadRequestException({
@@ -95,6 +102,46 @@ export class ComboComponentEligibilityService {
           message: this.unsupportedMessage,
         });
       }
+    }
+  }
+
+  /**
+   * A combo component may be edited normally while it remains direct. This
+   * guard only rejects a direct -> configurable/pizza/combo transition, so
+   * legacy incompatible components do not turn unrelated authoring edits into
+   * a dead end. It must run through the same transaction that wrote the new
+   * catalog state.
+   */
+  async assertDoesNotInvalidateExistingComboComponents(
+    tenantId: string,
+    productIds: readonly string[],
+    routesBefore: ReadonlyMap<string, ProductConfigurationRoute>,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const ids = [...new Set(productIds)];
+    if (!ids.length) return;
+
+    const routesAfter = await this.getProductConfigurationRoutes(tenantId, ids, { requireActive: false }, tx);
+    const newlyUnsupported = ids.filter(
+      (productId) => routesBefore.get(productId) === 'direct' && routesAfter.get(productId) !== 'direct',
+    );
+    if (!newlyUnsupported.length) return;
+
+    const [bundleReference, slotReference] = await Promise.all([
+      tx.comboBundleItem.findFirst({
+        where: { tenantId, productId: { in: newlyUnsupported } },
+        select: { id: true },
+      }),
+      tx.comboSlotAllowedItem.findFirst({
+        where: { tenantId, productId: { in: newlyUnsupported } },
+        select: { id: true },
+      }),
+    ]);
+    if (bundleReference || slotReference) {
+      throw new BadRequestException({
+        code: COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED,
+        message: this.unsupportedMessage,
+      });
     }
   }
 }

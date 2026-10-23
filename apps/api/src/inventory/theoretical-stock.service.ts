@@ -30,6 +30,27 @@ function positiveIntegerString(value: Prisma.JsonValue | undefined, label: strin
   return decimal.toString();
 }
 
+const PHYSICAL_QUANTITY_SCALE = 6;
+const PHYSICAL_QUANTITY_MAX_INTEGER_DIGITS = 8;
+const PHYSICAL_QUANTITY_MAX = new Prisma.Decimal(10).pow(PHYSICAL_QUANTITY_MAX_INTEGER_DIGITS);
+
+export function quantizePhysicalStockQuantity(quantity: Prisma.Decimal): Prisma.Decimal {
+  if (!quantity.isFinite() || quantity.lte(0)) {
+    throw new BadRequestException('Quantidade física expandida deve ser finita e positiva.');
+  }
+  if (quantity.gte(PHYSICAL_QUANTITY_MAX)) {
+    throw new BadRequestException('Quantidade física excede a faixa suportada pelo estoque.');
+  }
+  const persisted = quantity.toDecimalPlaces(PHYSICAL_QUANTITY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+  if (!persisted.isFinite() || persisted.lte(0)) {
+    throw new BadRequestException('Quantidade física é menor que a precisão mínima suportada pelo estoque.');
+  }
+  if (persisted.gte(PHYSICAL_QUANTITY_MAX) || persisted.decimalPlaces() > PHYSICAL_QUANTITY_SCALE) {
+    throw new BadRequestException('Quantidade física não pode ser persistida com segurança no estoque.');
+  }
+  return persisted;
+}
+
 /**
  * Canonical physical stock ledger. It reads only persisted order snapshots and
  * delegates all recipe expansion to ConfigurableRecipeCompositionService.
@@ -215,12 +236,17 @@ export class TheoreticalStockService {
     }
     if (!consumptionByIngredient.size) return;
 
-    const ingredientIds = [...consumptionByIngredient.keys()];
+    const persistedConsumptionByIngredient = new Map<string, Prisma.Decimal>();
+    for (const [ingredientId, expandedQuantity] of consumptionByIngredient) {
+      persistedConsumptionByIngredient.set(ingredientId, quantizePhysicalStockQuantity(expandedQuantity));
+    }
+
+    const ingredientIds = [...persistedConsumptionByIngredient.keys()];
     const ingredients = await tx.ingredient.findMany({ where: { tenantId, id: { in: ingredientIds } }, select: { id: true, currentCost: true } });
     if (ingredients.length !== ingredientIds.length) throw new BadRequestException('Ingrediente da receita não encontrado para este tenant.');
     const costByIngredient = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient.currentCost]));
 
-    for (const [ingredientId, quantity] of consumptionByIngredient) {
+    for (const [ingredientId, quantity] of persistedConsumptionByIngredient) {
       const updated = await tx.ingredient.updateMany({
         where: { id: ingredientId, tenantId, currentStock: { gte: quantity } },
         data: { currentStock: { decrement: quantity } },
@@ -228,7 +254,7 @@ export class TheoreticalStockService {
       if (updated.count !== 1) throw new BadRequestException('Estoque insuficiente para confirmar este pedido.');
     }
     await tx.stockMovement.createMany({
-      data: [...consumptionByIngredient].map(([ingredientId, quantity]) => ({
+      data: [...persistedConsumptionByIngredient].map(([ingredientId, quantity]) => ({
         tenantId,
         ingredientId,
         type: StockMovementType.THEORETICAL_DEPLETION,

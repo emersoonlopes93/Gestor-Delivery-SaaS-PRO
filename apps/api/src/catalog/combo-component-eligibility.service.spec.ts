@@ -19,6 +19,8 @@ describe('ComboComponentEligibilityService', () => {
     const prisma = {
       product: { findMany: jest.fn().mockResolvedValue(products) },
       productOptionItemPrice: { findMany: jest.fn().mockResolvedValue(disabled) },
+      comboBundleItem: { findFirst: jest.fn().mockResolvedValue(null) },
+      comboSlotAllowedItem: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     return { service: new ComboComponentEligibilityService(prisma as never), prisma };
   }
@@ -45,5 +47,34 @@ describe('ComboComponentEligibilityService', () => {
   it('rejects an inactive component before it can enter the simplified combo contract', async () => {
     const subject = service([product({ isActive: false })]);
     await expect(subject.service.assertEligibleProductIds('tenant-a', ['product-1'])).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a direct component becoming generic after it was already referenced by a combo', async () => {
+    const before = service([product()]);
+    const tx = {
+      product: { findMany: jest.fn().mockResolvedValue([product({ groups: [['item-1']] })]) },
+      productOptionItemPrice: { findMany: jest.fn().mockResolvedValue([]) },
+      comboBundleItem: { findFirst: jest.fn().mockResolvedValue({ id: 'bundle-link-1' }) },
+      comboSlotAllowedItem: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const routesBefore = await before.service.getProductConfigurationRoutes('tenant-a', ['product-1']);
+    await expect(
+      before.service.assertDoesNotInvalidateExistingComboComponents('tenant-a', ['product-1'], routesBefore, tx as never),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ code: COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED }) });
+  });
+
+  it('allows an unrelated edit when a legacy combo component was already non-direct', async () => {
+    const subject = service([product({ groups: [['item-1']] })]);
+    const tx = {
+      product: { findMany: jest.fn().mockResolvedValue([product({ groups: [['item-1']] })]) },
+      productOptionItemPrice: { findMany: jest.fn().mockResolvedValue([]) },
+      comboBundleItem: { findFirst: jest.fn() },
+      comboSlotAllowedItem: { findFirst: jest.fn() },
+    };
+    const routesBefore = await subject.service.getProductConfigurationRoutes('tenant-a', ['product-1']);
+    await expect(
+      subject.service.assertDoesNotInvalidateExistingComboComponents('tenant-a', ['product-1'], routesBefore, tx as never),
+    ).resolves.toBeUndefined();
+    expect(tx.comboBundleItem.findFirst).not.toHaveBeenCalled();
   });
 });

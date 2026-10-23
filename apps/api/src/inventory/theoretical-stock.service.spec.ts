@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { TheoreticalStockService } from './theoretical-stock.service';
+import { quantizePhysicalStockQuantity, TheoreticalStockService } from './theoretical-stock.service';
 
 const decimal = (value: string | number) => new Prisma.Decimal(String(value));
 
@@ -43,6 +43,17 @@ function createService(
 }
 
 describe('TheoreticalStockService', () => {
+  it('quantizes the final physical quantity once with HALF_UP at six decimals', () => {
+    expect(quantizePhysicalStockQuantity(decimal('0.0000005')).toString()).toBe('0.000001');
+    expect(quantizePhysicalStockQuantity(decimal('0.0000003').plus('0.0000003')).toString()).toBe('0.000001');
+    expect(quantizePhysicalStockQuantity(decimal('0.000666')).toString()).toBe('0.000666');
+  });
+
+  it('rejects positive subquantum and out-of-range physical quantities before persistence', () => {
+    expect(() => quantizePhysicalStockQuantity(decimal('0.0000004'))).toThrow(BadRequestException);
+    expect(() => quantizePhysicalStockQuantity(decimal('100000000'))).toThrow(BadRequestException);
+  });
+
   it('does not deplete stock twice when an order already has theoretical movements', async () => {
     const db = makeDb();
     db.tx.stockMovement.count.mockResolvedValue(1);
@@ -74,6 +85,44 @@ describe('TheoreticalStockService', () => {
     expect(db.tx.stockMovement.createMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({ quantity: decimal('0.000666'), unitCost: decimal('2.5') })],
     });
+  });
+
+  it('aggregates every path before one final rounding and reuses the exact persisted quantity', async () => {
+    const db = makeDb();
+    db.tx.order.findFirst.mockResolvedValue({
+      items: [
+        { lineType: 'product', productId: 'product-1', quantity: 1, snapshotCatalogV2Json: null },
+        { lineType: 'product', productId: 'product-2', quantity: 1, snapshotCatalogV2Json: null },
+      ],
+    });
+    const composition = {
+      resolveProductComposition: jest.fn().mockResolvedValue(new Map([['ingredient-1', decimal('0.0000003')]])),
+    };
+    const eligibility = {
+      assertEligibleProductIds: jest.fn().mockResolvedValue(undefined),
+      getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map([['product-1', 'direct'], ['product-2', 'direct']])),
+    };
+    await createService(db, composition, eligibility).processOrderDepletion('tenant-a', 'order-1');
+
+    const persisted = decimal('0.000001');
+    expect(db.tx.ingredient.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ingredient-1', tenantId: 'tenant-a', currentStock: { gte: persisted } },
+      data: { currentStock: { decrement: persisted } },
+    });
+    expect(db.tx.stockMovement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ quantity: persisted })],
+    });
+  });
+
+  it('fails closed before every stock write when a positive aggregate rounds to zero', async () => {
+    const db = makeDb();
+    db.tx.order.findFirst.mockResolvedValue({
+      items: [{ lineType: 'product', productId: 'product-1', quantity: 1, snapshotCatalogV2Json: null }],
+    });
+    const composition = { resolveProductComposition: jest.fn().mockResolvedValue(new Map([['ingredient-1', decimal('0.0000004')]])) };
+    await expect(createService(db, composition).processOrderDepletion('tenant-a', 'order-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.tx.ingredient.updateMany).not.toHaveBeenCalled();
+    expect(db.tx.stockMovement.createMany).not.toHaveBeenCalled();
   });
 
   it('scales a simple combo component by slot quantity and combo quantity', async () => {

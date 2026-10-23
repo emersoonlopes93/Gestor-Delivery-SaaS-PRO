@@ -8,12 +8,15 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from '@gestor/utils';
 import { CategoryActiveDay, Prisma } from '@prisma/client';
 import { BulkSetCategoryActiveDto } from './dto/bulk-set-category-active.dto';
+import { runSerializableTransactionWithRetry } from '../../database/serializable-transaction';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly comboEligibility: ComboComponentEligibilityService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -154,27 +157,38 @@ export class CategoriesService {
   }
 
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {
-    // Check if exists
-    await this.findOne(id);
-
     const slug = updateCategoryDto.name ? slugify(updateCategoryDto.name) : undefined;
-
-    const category = await this.prisma.tenantClient.productCategory.update({
-      where: { id },
-      data: {
-        name: updateCategoryDto.name,
-        description: updateCategoryDto.description ?? undefined,
-        image: updateCategoryDto.image ?? undefined,
-        isActive: updateCategoryDto.isActive,
-        activeDays: this.normalizeActiveDays(updateCategoryDto.activeDays),
-        isFeatured: updateCategoryDto.isFeatured,
-        order: updateCategoryDto.order,
-        templateType: updateCategoryDto.templateType,
-        templateConfig: updateCategoryDto.templateConfig as Prisma.InputJsonValue,
-        ...(slug ? { slug } : {}),
-      },
+    const tenantId = this.getRequiredTenantId();
+    const category = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const existing = await tx.productCategory.findFirst({ where: { id, tenantId, deletedAt: null }, select: { templateType: true } });
+      if (!existing) throw new NotFoundException('Categoria não encontrada.');
+      const productIds = updateCategoryDto.templateType === undefined
+        ? []
+        : (await tx.product.findMany({ where: { tenantId, categoryId: id, deletedAt: null }, select: { id: true } })).map((product) => product.id);
+      const routesBefore = productIds.length
+        ? await this.comboEligibility.getProductConfigurationRoutes(tenantId, productIds, { requireActive: false }, tx)
+        : new Map();
+      const category = await tx.productCategory.update({
+        where: { id },
+        data: {
+          name: updateCategoryDto.name,
+          description: updateCategoryDto.description ?? undefined,
+          image: updateCategoryDto.image ?? undefined,
+          isActive: updateCategoryDto.isActive,
+          activeDays: this.normalizeActiveDays(updateCategoryDto.activeDays),
+          isFeatured: updateCategoryDto.isFeatured,
+          order: updateCategoryDto.order,
+          templateType: updateCategoryDto.templateType,
+          templateConfig: updateCategoryDto.templateConfig as Prisma.InputJsonValue,
+          ...(slug ? { slug } : {}),
+        },
+      });
+      if (productIds.length) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, productIds, routesBefore, tx);
+      }
+      return category;
     });
-    await this.invalidateStorefrontCache(this.getRequiredTenantId());
+    await this.invalidateStorefrontCache(tenantId);
     return category;
   }
 

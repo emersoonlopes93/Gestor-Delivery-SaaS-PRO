@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { PaymentMethod as PrismaPaymentMethod, Prisma, PrismaClient, UnitType } from '@prisma/client';
+import { FulfillmentType, OrderLineType, PaymentMethod as PrismaPaymentMethod, Prisma, PrismaClient, UnitType } from '@prisma/client';
 import { PaymentMethod, PosFulfillmentType } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
@@ -248,5 +248,101 @@ describe('POS PostgreSQL concurrent atomicity', () => {
       couponUsage: finalCoupon.usedCount,
       revenueEvents: ledgerEntries.length,
     }));
+  });
+
+  it('aggregates recurring base fractions before one persisted HALF_UP stock quantity', async () => {
+    if (!tenantId) throw new Error('Tenant fixture was not initialized.');
+    const precisionSuffix = `p${Date.now().toString().slice(-8)}${Math.random().toString(16).slice(2, 6)}`;
+    const [ingredient, base, product] = await Promise.all([
+      prisma.ingredient.create({
+        data: {
+          tenantId,
+          name: `Ingrediente preciso ${precisionSuffix}`,
+          sku: `precision-ingredient-${precisionSuffix}`,
+          unit: UnitType.un,
+          currentStock: new Prisma.Decimal('0.000001'),
+          currentCost: new Prisma.Decimal('7.25'),
+        },
+      }),
+      prisma.recipeBase.create({
+        data: {
+          tenantId,
+          name: `Base precisa ${precisionSuffix}`,
+          outputUnit: UnitType.un,
+          yieldQuantity: new Prisma.Decimal('3'),
+        },
+      }),
+      prisma.product.create({
+        data: { tenantId, name: `Produto preciso ${precisionSuffix}`, slug: `precision-product-${precisionSuffix}`, basePrice: 1 },
+      }),
+    ]);
+    await prisma.recipeBaseIngredient.create({
+      data: {
+        tenantId,
+        baseId: base.id,
+        ingredientId: ingredient.id,
+        quantity: new Prisma.Decimal('0.000001'),
+        inputQuantity: new Prisma.Decimal('0.000001'),
+        inputUnit: UnitType.un,
+      },
+    });
+    await prisma.productRecipeBase.create({
+      data: {
+        tenantId,
+        productId: product.id,
+        baseId: base.id,
+        quantity: new Prisma.Decimal('1'),
+        inputQuantity: new Prisma.Decimal('1'),
+        inputUnit: UnitType.un,
+      },
+    });
+    const order = await prisma.order.create({
+      data: {
+        tenantId,
+        orderNumber: `PREC-${precisionSuffix}`.slice(0, 20),
+        fulfillmentType: FulfillmentType.pickup,
+        customerName: 'Precision customer',
+        customerPhone: `118${Date.now().toString().slice(-8)}`,
+        itemsSubtotal: 2,
+        total: 2,
+        idempotencyKey: `precision-${precisionSuffix}`,
+        publicTrackingToken: `precision-${precisionSuffix}`,
+      },
+    });
+    await prisma.orderItem.createMany({
+      data: [1, 2].map((index) => ({
+        tenantId,
+        orderId: order.id,
+        lineType: OrderLineType.product,
+        productId: product.id,
+        quantity: 1,
+        unitPrice: 1,
+        lineTotal: 1,
+        snapshotName: `Produto preciso ${index}`,
+        snapshotBasePrice: 1,
+        snapshotExtrasTotal: 0,
+      })),
+    });
+
+    const expansion = new RecipeExpansionService(prisma as never);
+    const composition = new ConfigurableRecipeCompositionService(
+      prisma as never,
+      expansion,
+      new PizzaEngineService({ tenantClient: prisma } as never),
+    );
+    const stockService = new TheoreticalStockService(
+      prisma as never,
+      composition,
+      new ComboComponentEligibilityService(prisma as never),
+    );
+    await stockService.processOrderDepletion(tenantId, order.id);
+
+    const [persistedIngredient, movement] = await Promise.all([
+      prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } }),
+      prisma.stockMovement.findFirstOrThrow({ where: { tenantId, orderId: order.id } }),
+    ]);
+    expect(persistedIngredient.currentStock.toString()).toBe('0');
+    expect(movement.quantity.toString()).toBe('0.000001');
+    expect(movement.unitCost.toString()).toBe('7.25');
   });
 });

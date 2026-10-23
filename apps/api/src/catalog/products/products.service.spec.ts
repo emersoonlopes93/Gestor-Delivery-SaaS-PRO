@@ -56,6 +56,7 @@ describe('ProductsService.duplicate', () => {
     undefined!,
     undefined!,
     undefined!,
+    undefined!,
     cacheManager as never,
   );
 

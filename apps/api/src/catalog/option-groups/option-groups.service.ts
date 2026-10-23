@@ -9,12 +9,14 @@ import { CreateOptionGroupDto } from './dto/create-option-group.dto';
 import { UpdateOptionGroupDto } from './dto/update-option-group.dto';
 import { CreateOptionItemDto } from './dto/create-option-item.dto';
 import { UpdateOptionItemDto } from './dto/update-option-item.dto';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 
 @Injectable()
 export class OptionGroupsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly comboEligibility: ComboComponentEligibilityService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -172,6 +174,14 @@ export class OptionGroupsService {
     }
   }
 
+  private async linkedProductIds(tx: Prisma.TransactionClient, tenantId: string, optionGroupId: string): Promise<string[]> {
+    const links = await tx.productOptionGroupLink.findMany({
+      where: { tenantId, optionGroupId },
+      select: { productId: true },
+    });
+    return links.map((link) => link.productId);
+  }
+
   async createGroup(dto: CreateOptionGroupDto, actorId?: string) {
     const tenantId = this.getRequiredTenantId();
 
@@ -258,8 +268,12 @@ export class OptionGroupsService {
       };
       this.validateGroupRules(next);
       await this.assertGroupLinkedPricingInvariants(tx, tenantId, id, next.isActive);
+      const productIds = dto.isActive === undefined ? [] : await this.linkedProductIds(tx, tenantId, id);
+      const routesBefore = productIds.length
+        ? await this.comboEligibility.getProductConfigurationRoutes(tenantId, productIds, { requireActive: false }, tx)
+        : new Map();
 
-      return tx.optionGroup.update({
+      const updated = await tx.optionGroup.update({
         where: { id },
         data: {
           name: dto.name,
@@ -274,6 +288,10 @@ export class OptionGroupsService {
         },
         include: { items: { orderBy: { order: 'asc' } } },
       });
+      if (productIds.length) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, productIds, routesBefore, tx);
+      }
+      return updated;
     });
     await this.audit(tenantId, actorId, 'catalog.option_group.updated', 'option_group', { optionGroupId: id });
     await this.invalidateStorefrontCache(tenantId);
@@ -290,10 +308,21 @@ export class OptionGroupsService {
   }
 
   async restoreGroup(id: string, actorId?: string) {
-    const group = await this.getGroup(id, true);
-    if (!group.deletedAt) throw new BadRequestException('Grupo não está arquivado.');
-    const restored = await this.prisma.tenantClient.optionGroup.update({ where: { id }, data: { deletedAt: null } });
     const tenantId = this.getRequiredTenantId();
+    const restored = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const group = await tx.optionGroup.findFirst({ where: { id, tenantId }, select: { deletedAt: true } });
+      if (!group) throw new NotFoundException('Grupo não encontrado.');
+      if (!group.deletedAt) throw new BadRequestException('Grupo não está arquivado.');
+      const productIds = await this.linkedProductIds(tx, tenantId, id);
+      const routesBefore = productIds.length
+        ? await this.comboEligibility.getProductConfigurationRoutes(tenantId, productIds, { requireActive: false }, tx)
+        : new Map();
+      const restored = await tx.optionGroup.update({ where: { id }, data: { deletedAt: null } });
+      if (productIds.length) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, productIds, routesBefore, tx);
+      }
+      return restored;
+    });
     await this.audit(tenantId, actorId, 'catalog.option_group.restored', 'option_group', { optionGroupId: id });
     await this.invalidateStorefrontCache(tenantId);
     return restored;
@@ -326,8 +355,12 @@ export class OptionGroupsService {
       };
       this.validateItemRules({ ...nextItem, priceImpactValue: dto.priceImpactValue ?? 0 });
       await this.assertLinkedReplacePricingInvariants(tx, tenantId, group.id, group.isActive, nextItem);
+      const productIds = group.isActive && nextItem.isActive ? await this.linkedProductIds(tx, tenantId, group.id) : [];
+      const routesBefore = productIds.length
+        ? await this.comboEligibility.getProductConfigurationRoutes(tenantId, productIds, { requireActive: false }, tx)
+        : new Map();
 
-      return tx.optionItem.create({
+      const created = await tx.optionItem.create({
         data: {
           tenantId,
           optionGroupId: dto.optionGroupId,
@@ -343,6 +376,10 @@ export class OptionGroupsService {
           maxQty: nextItem.maxQty,
         } satisfies Prisma.OptionItemUncheckedCreateInput,
       });
+      if (productIds.length) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, productIds, routesBefore, tx);
+      }
+      return created;
     });
     await this.audit(tenantId, actorId, 'catalog.option_item.created', 'option_item', { optionItemId: item.id, optionGroupId: dto.optionGroupId });
     await this.invalidateStorefrontCache(tenantId);
@@ -367,6 +404,12 @@ export class OptionGroupsService {
       };
       this.validateItemRules({ ...nextItem, priceImpactValue: dto.priceImpactValue ?? Number(item.priceImpactValue) });
       await this.assertLinkedReplacePricingInvariants(tx, tenantId, item.optionGroup.id, item.optionGroup.isActive, nextItem);
+      const productIds = item.optionGroup.isActive && dto.isActive !== undefined
+        ? await this.linkedProductIds(tx, tenantId, item.optionGroup.id)
+        : [];
+      const routesBefore = productIds.length
+        ? await this.comboEligibility.getProductConfigurationRoutes(tenantId, productIds, { requireActive: false }, tx)
+        : new Map();
 
       const updated = await tx.optionItem.update({
         where: { id },
@@ -383,6 +426,9 @@ export class OptionGroupsService {
           maxQty: dto.maxQty ?? undefined,
         },
       });
+      if (productIds.length) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, productIds, routesBefore, tx);
+      }
       return { updated, optionGroupId: item.optionGroupId };
     });
     await this.audit(tenantId, actorId, 'catalog.option_item.updated', 'option_item', { optionItemId: id, optionGroupId: updated.optionGroupId });
@@ -405,12 +451,27 @@ export class OptionGroupsService {
   }
 
   async restoreItem(id: string, actorId?: string) {
-    const item = await this.prisma.tenantClient.optionItem.findFirst({ where: { id }, select: { id: true, optionGroupId: true, deletedAt: true } });
-    if (!item) throw new NotFoundException('Item não encontrado.');
-    if (!item.deletedAt) throw new BadRequestException('Item não está arquivado.');
-    const restored = await this.prisma.tenantClient.optionItem.update({ where: { id }, data: { deletedAt: null } });
     const tenantId = this.getRequiredTenantId();
-    await this.audit(tenantId, actorId, 'catalog.option_item.restored', 'option_item', { optionItemId: id, optionGroupId: item.optionGroupId });
+    const { restored, optionGroupId } = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const item = await tx.optionItem.findFirst({
+        where: { id, tenantId },
+        include: { optionGroup: { select: { isActive: true } } },
+      });
+      if (!item) throw new NotFoundException('Item não encontrado.');
+      if (!item.deletedAt) throw new BadRequestException('Item não está arquivado.');
+      const productIds = item.optionGroup.isActive && item.isActive
+        ? await this.linkedProductIds(tx, tenantId, item.optionGroupId)
+        : [];
+      const routesBefore = productIds.length
+        ? await this.comboEligibility.getProductConfigurationRoutes(tenantId, productIds, { requireActive: false }, tx)
+        : new Map();
+      const restored = await tx.optionItem.update({ where: { id }, data: { deletedAt: null } });
+      if (productIds.length) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, productIds, routesBefore, tx);
+      }
+      return { restored, optionGroupId: item.optionGroupId };
+    });
+    await this.audit(tenantId, actorId, 'catalog.option_item.restored', 'option_item', { optionItemId: id, optionGroupId });
     await this.invalidateStorefrontCache(tenantId);
     return restored;
   }

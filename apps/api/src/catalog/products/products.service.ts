@@ -11,6 +11,8 @@ import { AvailabilityService, SalesChannel } from '../publication/availability.s
 import type { Upsell } from '@gestor/types';
 import { MediaLibraryService } from '../../upload/media-library.service';
 import { BulkSetProductActiveDto } from './dto/bulk-set-product-active.dto';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
+import { runSerializableTransactionWithRetry } from '../../database/serializable-transaction';
 
 @Injectable()
 export class ProductsService {
@@ -20,6 +22,7 @@ export class ProductsService {
     private readonly catalogTemplates: CatalogTemplatesService,
     private readonly availabilityService: AvailabilityService,
     private readonly mediaLibrary: MediaLibraryService,
+    private readonly comboEligibility: ComboComponentEligibilityService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -380,9 +383,14 @@ export class ProductsService {
       nextBasePrice = nextPricingType === 'fixed_price' ? nextPricingValue ?? 0 : 0;
     }
 
-    const product = await this.prisma.tenantClient.product.update({
-      where: { id },
-      data: {
+    const tenantId = this.getRequiredTenantId();
+    const product = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const routesBefore = (updateProductDto.categoryId === undefined && updateProductDto.type === undefined)
+        ? new Map()
+        : await this.comboEligibility.getProductConfigurationRoutes(tenantId, [id], { requireActive: false }, tx);
+      const product = await tx.product.update({
+        where: { id },
+        data: {
         name: updateProductDto.name,
         type: nextType,
         comboMode: nextType === 'combo' ? nextComboMode : null,
@@ -406,7 +414,12 @@ export class ProductsService {
         order: updateProductDto.order,
         costPrice: updateProductDto.costPrice,
         ...(slug ? { slug } : {}),
-      },
+        },
+      });
+      if (routesBefore.size) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, [id], routesBefore, tx);
+      }
+      return product;
     });
 
     if (nextType === 'combo' && nextComboMode === 'bundle') {

@@ -42,6 +42,8 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
       productOptionItemPrice: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
       productOptionItemRecipeIngredient: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
       productOptionItemRecipeBase: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      comboBundleItem: { findFirst: jest.fn().mockResolvedValue(null) },
+      comboSlotAllowedItem: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = {
       $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
@@ -50,8 +52,12 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
     };
     const cacheManager = { del: jest.fn().mockResolvedValue(undefined) };
     const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) };
-    const service = Reflect.construct(ProductOptionGroupsService, [prisma, tenantContext, cacheManager]) as ProductOptionGroupsService;
-    return { prisma, tx, cacheManager, service };
+    const eligibility = {
+      getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map([[dto.productId, 'direct']])),
+      assertDoesNotInvalidateExistingComboComponents: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = Reflect.construct(ProductOptionGroupsService, [prisma, tenantContext, eligibility, cacheManager]) as ProductOptionGroupsService;
+    return { prisma, tx, cacheManager, eligibility, service };
   }
 
   it('commits a valid link and promotion in one serializable transaction', async () => {
@@ -166,5 +172,15 @@ describe('ProductOptionGroupsService atomic link mutations', () => {
     await service.link(dto, actorId);
 
     expect(tx.product.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rolls back a direct-to-generic link when the component is already referenced by a combo', async () => {
+    const { tx, eligibility, service } = makeService();
+    eligibility.assertDoesNotInvalidateExistingComboComponents.mockRejectedValue(new BadRequestException({
+      code: 'COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED',
+    }));
+
+    await expect(service.link(dto, actorId)).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.productOptionGroupLink.create).toHaveBeenCalled();
   });
 });

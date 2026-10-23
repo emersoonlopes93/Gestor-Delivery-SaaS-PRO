@@ -21,7 +21,11 @@ describe('OptionGroupsService archive lifecycle', () => {
     };
     const cacheManager = { del: jest.fn().mockResolvedValue(undefined) };
     const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) };
-    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext, cacheManager]) as OptionGroupsService;
+    const eligibility = {
+      getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map()),
+      assertDoesNotInvalidateExistingComboComponents: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = Reflect.construct(OptionGroupsService, [prisma, tenantContext, eligibility, cacheManager]) as OptionGroupsService;
     return { prisma, service, cacheManager };
   }
 

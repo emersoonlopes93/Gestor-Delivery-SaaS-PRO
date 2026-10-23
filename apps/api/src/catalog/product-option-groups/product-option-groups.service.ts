@@ -8,12 +8,14 @@ import { runSerializableTransactionWithRetry } from '../../database/serializable
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';
 import { UpdateProductOptionGroupLinkDto } from './dto/update-product-option-group-link.dto';
 import { UpdateProductOptionItemOverrideDto } from './dto/update-product-option-item-override.dto';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 
 @Injectable()
 export class ProductOptionGroupsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly comboEligibility: ComboComponentEligibilityService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -173,6 +175,12 @@ export class ProductOptionGroupsService {
           });
           if (!group) throw new NotFoundException('Grupo não encontrado.');
 
+          const routesBefore = await this.comboEligibility.getProductConfigurationRoutes(
+            tenantId,
+            [product.id],
+            { requireActive: false },
+            tx,
+          );
           const isRequired = dto.overrideIsRequired ?? group.isRequired;
           const minSelect = dto.overrideMinSelect ?? group.minSelect;
           const maxSelect = dto.overrideMaxSelect ?? group.maxSelect;
@@ -204,6 +212,12 @@ export class ProductOptionGroupsService {
             })
             : { count: 0 };
 
+          await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(
+            tenantId,
+            [product.id],
+            routesBefore,
+            tx,
+          );
           return { created, promotedToConfigurable: promotion.count > 0 };
         },
       );
@@ -290,6 +304,9 @@ export class ProductOptionGroupsService {
     const tenantId = this.getRequiredTenantId();
     const result = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       const item = await this.findOverrideTarget(tx, tenantId, productId, optionItemId);
+      const routesBefore = dto.isActive === undefined
+        ? null
+        : await this.comboEligibility.getProductConfigurationRoutes(tenantId, [productId], { requireActive: false }, tx);
       const existing = await tx.productOptionItemPrice.findUnique({
         where: { productId_optionItemId: { productId, optionItemId } },
       });
@@ -304,6 +321,9 @@ export class ProductOptionGroupsService {
       if (nextIsActive === null && normalizedPrice === null && nextCostPrice === null) {
         if (existing) {
           await tx.productOptionItemPrice.delete({ where: { productId_optionItemId: { productId, optionItemId } } });
+        }
+        if (routesBefore) {
+          await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, [productId], routesBefore, tx);
         }
         return { cleared: Boolean(existing), response: this.overrideResponse(item, null) };
       }
@@ -324,6 +344,9 @@ export class ProductOptionGroupsService {
           costPrice: nextCostPrice,
         },
       });
+      if (routesBefore) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, [productId], routesBefore, tx);
+      }
       return { cleared: false, response: this.overrideResponse(item, override) };
     });
 
@@ -342,9 +365,11 @@ export class ProductOptionGroupsService {
     const tenantId = this.getRequiredTenantId();
     const result = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
       const item = await this.findOverrideTarget(tx, tenantId, productId, optionItemId);
+      const routesBefore = await this.comboEligibility.getProductConfigurationRoutes(tenantId, [productId], { requireActive: false }, tx);
       const deleted = await tx.productOptionItemPrice.deleteMany({
         where: { tenantId, productId, optionItemId },
       });
+      await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, [productId], routesBefore, tx);
       return { deleted: deleted.count > 0, response: this.overrideResponse(item, null) };
     });
 

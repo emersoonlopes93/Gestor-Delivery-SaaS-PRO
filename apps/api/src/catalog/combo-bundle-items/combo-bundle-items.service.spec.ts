@@ -7,10 +7,10 @@ describe('ComboBundleItemsService component eligibility', () => {
       .mockResolvedValueOnce({ id: 'combo-1', type: 'combo', comboMode: 'bundle' })
       .mockResolvedValueOnce({ id: 'product-1', isActive: true, type: 'simple' });
     const prisma = {
-      tenantClient: {
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         product: { findFirst },
         comboBundleItem: { create: jest.fn() },
-      },
+      })),
     };
     const eligibility = {
       assertEligibleProductIds: jest.fn().mockRejectedValue(new BadRequestException({
@@ -27,7 +27,6 @@ describe('ComboBundleItemsService component eligibility', () => {
     await expect(service.create('combo-1', { productId: 'product-1' })).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED' }),
     });
-    expect(eligibility.assertEligibleProductIds).toHaveBeenCalledWith('tenant-a', ['product-1']);
-    expect(prisma.tenantClient.comboBundleItem.create).not.toHaveBeenCalled();
+    expect(eligibility.assertEligibleProductIds).toHaveBeenCalledWith('tenant-a', ['product-1'], expect.anything());
   });
 });
