@@ -194,6 +194,28 @@ export interface RecipeBaseDetailDTO extends RecipeBaseDTO {
   components: RecipeBaseComponentDTO[];
 }
 
+/**
+ * Read-only estimate derived from the persisted recipe and current ingredient
+ * costs. It is not a historical cost and never represents physical stock.
+ */
+export type RecipeBaseCostCoverage = 'KNOWN' | 'PARTIAL' | 'UNKNOWN';
+
+export interface RecipeBaseCostProjectionDTO {
+  baseId: string;
+  yieldQuantity: number;
+  outputUnit: UnitType;
+  coverage: RecipeBaseCostCoverage;
+  /** Present only when every physical component has a trustworthy current cost. */
+  estimatedTotalCost: number | null;
+  estimatedCostPerYieldUnit: number | null;
+  /** A labelled subtotal for known components when coverage is partial. */
+  partialEstimatedTotalCost: number | null;
+  partialEstimatedCostPerYieldUnit: number | null;
+  knownIngredientCount: number;
+  unknownIngredientCount: number;
+  basis: 'CURRENT_INGREDIENT_COSTS';
+}
+
 export interface IngredientStatsDTO {
   id: string;
   name: string;
