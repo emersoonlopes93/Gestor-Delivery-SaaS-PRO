@@ -52,6 +52,7 @@ describe('TheoreticalStockService', () => {
   it('rejects positive subquantum and out-of-range physical quantities before persistence', () => {
     expect(() => quantizePhysicalStockQuantity(decimal('0.0000004'))).toThrow(BadRequestException);
     expect(() => quantizePhysicalStockQuantity(decimal('100000000'))).toThrow(BadRequestException);
+    expect(() => quantizePhysicalStockQuantity(decimal('99999999.9999995'))).toThrow(BadRequestException);
   });
 
   it('does not deplete stock twice when an order already has theoretical movements', async () => {
@@ -111,6 +112,30 @@ describe('TheoreticalStockService', () => {
     });
     expect(db.tx.stockMovement.createMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({ quantity: persisted })],
+    });
+  });
+
+  it('aggregates repeated half-and-half pizza flavor ingredients before one final rounding', async () => {
+    const db = makeDb();
+    db.tx.order.findFirst.mockResolvedValue({
+      items: [{
+        lineType: 'product', productId: 'pizza-root', quantity: 1,
+        snapshotCatalogV2Json: {
+          pizzaComposition: { sizeId: 'large', flavors: [{ productId: 'flavor-a', fraction: 0.5 }, { productId: 'flavor-b', fraction: 0.5 }] },
+        },
+      }],
+    });
+    const composition = {
+      // The canonical composition has already combined both 1/2 flavor
+      // contributions before the physical ledger performs its single round.
+      resolveProductComposition: jest.fn().mockResolvedValue(new Map([['shared-cheese', decimal('0.0000006')]])),
+    };
+    await createService(db, composition, {
+      getProductConfigurationRoutes: jest.fn().mockResolvedValue(new Map([['pizza-root', 'direct']])),
+    }).processOrderDepletion('tenant-a', 'order-1');
+
+    expect(db.tx.stockMovement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ ingredientId: 'shared-cheese', quantity: decimal('0.000001') })],
     });
   });
 

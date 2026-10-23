@@ -2760,6 +2760,9 @@ model Ingredient {
   conversionFactor      Decimal                             @default(1) @map("conversion_factor") @db.Decimal(10, 4)
   category              String?                             @db.VarChar(50)
   currentCost           Decimal                             @default(0) @map("current_cost") @db.Decimal(10, 4)
+  /// Whether currentCost has an explicit, auditable origin. Existing rows are
+  /// intentionally UNKNOWN instead of treating the legacy default zero as cost.
+  currentCostEvidence   HistoricalCostEvidence              @default(unknown) @map("current_cost_evidence")
   currentStock          Decimal                             @default(0) @map("current_stock") @db.Decimal(14, 6)
   minStock              Decimal?                            @map("min_stock") @db.Decimal(14, 6)
   isActive              Boolean                             @default(true) @map("is_active")
@@ -2812,6 +2815,12 @@ model StockMovement {
   type                 StockMovementType
   quantity             Decimal           @db.Decimal(14, 6)
   unitCost             Decimal?          @map("unit_cost") @db.Decimal(10, 4)
+  /// Null is legacy/ambiguous. New theoretical movements snapshot this from
+  /// the ingredient at the physical depletion event.
+  costEvidence         HistoricalCostEvidence? @map("cost_evidence")
+  /// Null is legacy. New theoretical movements persist whether all order lines
+  /// were covered by the canonical physical composition at event time.
+  orderCmvCoverage     HistoricalCmvCoverage? @map("order_cmv_coverage")
   orderId              String?           @map("order_id")
   purchaseId           String?           @map("purchase_id")
   purchaseItemId       String?           @unique @map("purchase_item_id")
@@ -4727,6 +4736,20 @@ enum StockMovementType {
   purchase_entry
   purchase_reversal
   inventory_adjustment
+}
+
+/// Provenance for a historical unit cost. UNKNOWN is deliberately distinct
+/// from a numeric zero because Ingredient.currentCost has a legacy default.
+enum HistoricalCostEvidence {
+  known
+  unknown
+}
+
+/// Coverage is captured only for new theoretical order movements. Existing
+/// movements stay null so historical ambiguity is never backfilled by guesswork.
+enum HistoricalCmvCoverage {
+  known
+  partial
 }
 
 enum RateType {

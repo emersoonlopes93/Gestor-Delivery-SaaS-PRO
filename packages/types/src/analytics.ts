@@ -1,5 +1,37 @@
 import { OrderStatus, FulfillmentType } from './order';
 
+/**
+ * Historical CMV coverage is intentionally explicit: a partial subtotal must
+ * never be consumed as a complete cost or margin figure.
+ */
+export type HistoricalCmvCoverageStatus = 'KNOWN' | 'PARTIAL' | 'UNKNOWN';
+
+export interface HistoricalCmvIngredientLineDTO {
+  ingredientId: string;
+  /** Quantity is serialized as Decimal text in the ingredient base unit. */
+  quantity: string;
+  unitCost: string | null;
+  lineCost: string | null;
+  movementId: string;
+  isActive: boolean;
+  reversalMovementId?: string;
+  costEvidence: 'KNOWN' | 'UNKNOWN';
+}
+
+/**
+ * Read-only historical CMV derived from persisted theoretical stock facts.
+ * `totalCmv` is usable only for KNOWN coverage; `knownSubtotal` is never a
+ * substitute for a complete order cost.
+ */
+export interface HistoricalOrderCmvDTO {
+  orderId: string;
+  coverageStatus: HistoricalCmvCoverageStatus;
+  knownSubtotal: string;
+  totalCmv: string | null;
+  coverageReasons: string[];
+  ingredients: HistoricalCmvIngredientLineDTO[];
+}
+
 export interface OperationalMetricsDTO {
   totalOrders: number;
   ordersByStatus: Record<OrderStatus, number>;

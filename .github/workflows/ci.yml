@@ -158,6 +158,13 @@ jobs:
           --runInBand
           src/inventory/theoretical-stock.postgres.integration-test.ts
 
+      - name: Test historical CMV with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/analytics/historical-cmv.postgres.integration-test.ts
+
       - name: Test unit integrity audit with ephemeral PostgreSQL
         run: >-
           pnpm --filter @gestor/api exec jest

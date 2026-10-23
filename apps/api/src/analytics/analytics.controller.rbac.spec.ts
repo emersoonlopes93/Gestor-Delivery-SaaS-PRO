@@ -7,6 +7,7 @@ import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
 import { BusinessIntelligenceService } from './business-intelligence.service';
 import { RbacService } from '../rbac/rbac.service';
+import { HistoricalCmvService } from './historical-cmv.service';
 
 describe('AnalyticsController sensitive data authorization', () => {
   const filter = { startDate: '2026-10-01T00:00:00.000Z', endDate: '2026-10-02T00:00:00.000Z' };
@@ -39,6 +40,7 @@ describe('AnalyticsController sensitive data authorization', () => {
       Object.create(BusinessInsightsService.prototype) as BusinessInsightsService,
       businessIntelligence,
       Object.create(AnalyticsPerformanceService.prototype) as AnalyticsPerformanceService,
+      Object.create(HistoricalCmvService.prototype) as HistoricalCmvService,
       rbac,
     );
 
@@ -108,5 +110,6 @@ describe('AnalyticsController sensitive data authorization', () => {
     expect(Reflect.getMetadata(PERMISSIONS_KEY, AnalyticsController.prototype.getBusinessIntelligence)).toEqual(['reports.read']);
     expect(Reflect.getMetadata(REQUIRES_FEATURE_KEY, AnalyticsController.prototype.getBusinessIntelligence)).toBe('bi_advanced');
     expect(Reflect.getMetadata(PERMISSIONS_KEY, AnalyticsController.prototype.getCosts)).toEqual(['reports.view_costs']);
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, AnalyticsController.prototype.getHistoricalOrderCmv)).toEqual(['reports.view_costs']);
   });
 });

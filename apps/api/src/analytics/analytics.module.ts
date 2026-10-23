@@ -22,6 +22,7 @@ import {
 import { isAnalyticsRollupQueueEnabled } from './analytics-rollup.config';
 import { AnalyticsRetentionService } from './analytics-retention.service';
 import { AnalyticsPerformanceService } from './analytics-performance.service';
+import { HistoricalCmvService } from './historical-cmv.service';
 import { InventoryModule } from '../inventory/inventory.module';
 
 const enableAnalyticsRollupQueue = isAnalyticsRollupQueueEnabled();
@@ -58,6 +59,7 @@ const enableAnalyticsRollupQueue = isAnalyticsRollupQueueEnabled();
     AnalyticsRollupService,
     AnalyticsRetentionService,
     AnalyticsPerformanceService,
+    HistoricalCmvService,
     ...(enableAnalyticsRollupQueue
       ? [AnalyticsRollupQueueService, AnalyticsRollupSchedulerService, AnalyticsRollupProcessor]
       : []),

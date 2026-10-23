@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, StockMovementType as PrismaStockMovementType, type StockMovement } from '@prisma/client';
+import { HistoricalCostEvidence, Prisma, StockMovementType as PrismaStockMovementType, type StockMovement } from '@prisma/client';
 import { CreateStockMovementDTO, StockMovementDTO, StockMovementType } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
@@ -42,7 +42,7 @@ export class StockMovementService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
       const ingredient = await tx.ingredient.findFirst({
         where: { id: dto.ingredientId, tenantId },
-        select: { id: true, currentStock: true, currentCost: true },
+        select: { id: true, currentStock: true, currentCost: true, currentCostEvidence: true },
       });
       if (!ingredient) throw new NotFoundException('Insumo nao encontrado');
 
@@ -54,13 +54,20 @@ export class StockMovementService {
       const nextCost = dto.type === StockMovementType.IN
         ? weightedAverageCost(ingredient.currentStock, ingredient.currentCost, quantity, effectiveUnitCost)
         : ingredient.currentCost;
+      const movementCostEvidence = isOutgoing
+        ? ingredient.currentCostEvidence
+        : suppliedCost === undefined
+          ? ingredient.currentCostEvidence
+          : ingredient.currentStock.isZero() || ingredient.currentCostEvidence === HistoricalCostEvidence.known
+            ? HistoricalCostEvidence.known
+            : HistoricalCostEvidence.unknown;
       const updated = await tx.ingredient.updateMany({
         where: isOutgoing
           ? { id: ingredient.id, tenantId, currentStock: { gte: quantity } }
           : { id: ingredient.id, tenantId },
         data: isOutgoing
           ? { currentStock: { decrement: quantity } }
-          : { currentStock: { increment: quantity }, currentCost: nextCost },
+          : { currentStock: { increment: quantity }, currentCost: nextCost, currentCostEvidence: movementCostEvidence },
       });
       if (updated.count !== 1) throw new ConflictException('Estoque mudou durante o movimento; tente novamente.');
       const movement = await tx.stockMovement.create({
@@ -70,6 +77,7 @@ export class StockMovementService {
           type: dto.type,
           quantity,
           unitCost: effectiveUnitCost,
+          costEvidence: movementCostEvidence,
           notes: dto.notes,
           userId,
         },

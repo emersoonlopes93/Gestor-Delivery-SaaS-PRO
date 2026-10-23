@@ -102,7 +102,7 @@ export class InventoryCountService {
           await tx.stockMovement.create({ data: {
             tenantId, ingredientId: item.ingredientId,
             type: StockMovementType.INVENTORY_ADJUSTMENT,
-            quantity: adjustment.abs(), unitCost: ingredient.currentCost,
+            quantity: adjustment.abs(), unitCost: ingredient.currentCost, costEvidence: ingredient.currentCostEvidence,
             notes: `Inventário #${id}: teórico=${item.theoreticalStock.toFixed(4)}; físico=${physicalStock.toFixed(4)}; delta=${adjustment.toFixed(4)}`,
           } });
         }
