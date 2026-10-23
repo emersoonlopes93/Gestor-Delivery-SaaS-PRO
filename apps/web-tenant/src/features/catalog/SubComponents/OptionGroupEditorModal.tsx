@@ -23,6 +23,8 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [usageCount, setUsageCount] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
 
   const [groupForm, setGroupForm] = useState<CreateOptionGroupDto>({
     name: '',
@@ -79,9 +81,12 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setSaveError(null);
       if (groupId) {
+        setCreatedGroupId(null);
         loadGroup(groupId);
       } else {
+        setCreatedGroupId(null);
         setUsageCount(0);
         setGroupForm({
           name: '',
@@ -128,32 +133,40 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
 
   const handleSave = async () => {
     if (!groupForm.name) {
-      alert('Preencha o nome do grupo.');
+      setSaveError('Preencha o nome do grupo.');
       return;
     }
+    setSaveError(null);
     setIsSaving(true);
     try {
       let savedGroup: GroupWithItems;
+      const effectiveGroupId = groupId ?? createdGroupId;
 
-      if (groupId) {
-        const res = await api.patch<OptionGroup>(`/catalog/option-groups/${groupId}`, groupForm);
+      if (effectiveGroupId) {
+        const res = await api.patch<OptionGroup>(`/catalog/option-groups/${effectiveGroupId}`, groupForm);
         savedGroup = res.data as GroupWithItems;
       } else {
         const res = await api.post<OptionGroup>('/catalog/option-groups', groupForm);
         savedGroup = res.data as GroupWithItems;
+        setCreatedGroupId(savedGroup.id);
       }
 
       const gid = savedGroup.id;
 
-      // 1. Delete removed items
-      for (const delId of deletedItemIds) {
+      // 1. Delete removed items. Persist progress so a retry does not repeat a successful delete.
+      const remainingDeletedItemIds = [...deletedItemIds];
+      for (const delId of [...remainingDeletedItemIds]) {
         await api.delete(`/catalog/option-groups/items/${delId}`);
+        remainingDeletedItemIds.splice(remainingDeletedItemIds.indexOf(delId), 1);
+        setDeletedItemIds([...remainingDeletedItemIds]);
       }
 
-      // 2. Upsert items
-      const validItems = items.filter(it => it.name && it.name.trim() !== '');
+      // 2. Upsert items. Keep IDs returned by successful creates so retrying after
+      // a later request fails updates the same item instead of creating a duplicate.
+      const nextItems = [...items];
+      const validItems = nextItems.map((item, index) => ({ item, index })).filter(({ item }) => item.name && item.name.trim() !== '');
       for (let i = 0; i < validItems.length; i++) {
-        const it = validItems[i];
+        const { item: it, index } = validItems[i];
         const payload: Record<string, unknown> = {
           name: it.name,
           description: it.description,
@@ -171,18 +184,19 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
           await api.patch(`/catalog/option-groups/items/${it.id}`, payload);
         } else {
           payload.optionGroupId = gid;
-          await api.post('/catalog/option-groups/items', payload);
+          const created = await api.post<OptionItem>('/catalog/option-groups/items', payload);
+          nextItems[index] = { ...it, id: created.data.id };
+          setItems([...nextItems]);
         }
       }
 
       // Refresh final state to return
       const finalRes = await api.get<GroupWithItems>(`/catalog/option-groups/${gid}`);
-      if (finalRes.success) {
-        onSaved(finalRes.data);
-      }
+      if (!finalRes.success) throw new Error('O grupo foi salvo, mas não foi possível confirmar os itens. Tente novamente.');
+      onSaved(finalRes.data);
     } catch (e) {
       console.error(e);
-      alert('Erro ao salvar o grupo de opções.');
+      setSaveError(e instanceof Error ? e.message : 'Erro ao salvar o grupo de opções. Revise os dados e tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -212,6 +226,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
         </div>
       ) : (
         <div className="space-y-6">
+          {saveError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{saveError}{createdGroupId && <span className="mt-1 block text-xs">O grupo já foi criado; ao tentar novamente, os itens serão salvos nele sem duplicar o grupo.</span>}</div>}
           {/* Guardrail Usage Banner */}
           {groupId && usageCount !== null && usageCount > 1 && (
             <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-600 dark:text-amber-400">

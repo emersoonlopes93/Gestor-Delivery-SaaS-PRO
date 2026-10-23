@@ -172,6 +172,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   const [allGroups, setAllGroups] = useState<OptionGroup[]>([]);
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
   const [isCreateComplementModalOpen, setIsCreateComplementModalOpen] = useState(false);
+  const [newGroupPricingAxis, setNewGroupPricingAxis] = useState<'primary' | 'secondary'>('secondary');
 
   const [globalGroupToEdit, setGlobalGroupToEdit] = useState<OptionGroup | null>(null);
   const [isGlobalGroupModalOpen, setIsGlobalGroupModalOpen] = useState(false);
@@ -435,6 +436,10 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   // -------------------- Personalização handlers --------------------
 
   const openAddGroupModal = async () => {
+    if (!productId) {
+      setAlertModal({ isOpen: true, title: 'Salve o produto primeiro', message: 'Salve os dados básicos do produto antes de vincular grupos de opções.' });
+      return;
+    }
     setIsAddGroupModalOpen(true);
   };
 
@@ -448,10 +453,12 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
       await api.post(`/catalog/products/${productId}/option-groups`, {
         optionGroupId: created.id,
         order: links.length,
-        pricingAxis: 'secondary',
+        pricingAxis: newGroupPricingAxis,
       });
       setIsCreateComplementModalOpen(false);
       await loadAll();
+    } catch (caught) {
+      setAlertModal({ isOpen: true, title: 'Não foi possível vincular o grupo', message: caught instanceof Error ? caught.message : 'O grupo foi criado, mas não foi vinculado ao produto. Tente vinculá-lo novamente pela biblioteca.' });
     } finally {
       setSavingStates((p) => ({ ...p, createComplementAndLink: false }));
     }
@@ -875,24 +882,27 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         isOpen={isAddGroupModalOpen}
         onClose={() => setIsAddGroupModalOpen(false)}
         availableGroups={availableGroupsToAdd}
-        onLinkGroup={async (groupId: string) => {
+        onLinkGroup={async (groupId: string, pricingAxis: 'primary' | 'secondary') => {
           if (!productId) return;
           setSavingStates((p) => ({ ...p, addGroupLink: true }));
           try {
             await api.post(`/catalog/products/${productId}/option-groups`, {
               optionGroupId: groupId,
               order: links.length,
-              pricingAxis: 'secondary',
+              pricingAxis,
             });
             setIsAddGroupModalOpen(false);
             await loadAll();
+          } catch (caught) {
+            setAlertModal({ isOpen: true, title: 'Não foi possível vincular o grupo', message: caught instanceof Error ? caught.message : 'Revise as regras do grupo e tente novamente.' });
           } finally {
             setSavingStates((p) => ({ ...p, addGroupLink: false }));
           }
         }}
         isLinking={Boolean(savingStates.addGroupLink)}
-        onOpenCreateGroup={() => {
+        onOpenCreateGroup={(pricingAxis) => {
           setIsAddGroupModalOpen(false);
+          setNewGroupPricingAxis(pricingAxis);
           setIsCreateComplementModalOpen(true);
         }}
       />
