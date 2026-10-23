@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { PaymentMethod as PrismaPaymentMethod, Prisma, PrismaClient, UnitType } from '@prisma/client';
+import { FulfillmentType, OrderLineType, PaymentMethod as PrismaPaymentMethod, Prisma, PrismaClient, UnitType } from '@prisma/client';
 import { PaymentMethod, PosFulfillmentType } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
@@ -7,7 +7,11 @@ import { OrdersService } from '../orders/orders.service';
 import { PosService } from '../pos/pos.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
+import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
+import { PizzaEngineService } from '../catalog/pizza-engine.service';
 import { TheoreticalStockService } from './theoretical-stock.service';
+import { ConfigurableRecipeCompositionService } from './configurable-recipe-composition.service';
+import { RecipeExpansionService } from './recipe-expansion.service';
 
 const allowedDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -110,14 +114,19 @@ describe('POS PostgreSQL concurrent atomicity', () => {
         await barrier;
         return {
           lines: [{
-            lineType: 'product' as const,
-            productId: product.id,
-            quantity: 2,
+          lineType: 'product' as const,
+          productId: product.id,
+          quantity: 2,
             unitPrice: 10,
             lineTotal: 20,
             name: product.name,
-            basePrice: 10,
-            extrasTotal: 0,
+          basePrice: 10,
+          extrasTotal: 0,
+          snapshotCatalogV2Json: {
+            version: 'catalog_v2_snapshot_v1',
+            lineType: 'product',
+            selections: [],
+          },
           }],
           itemsSubtotal: 20,
           discountTotal: 1,
@@ -130,7 +139,17 @@ describe('POS PostgreSQL concurrent atomicity', () => {
     const cashService = new CashService(prisma as never);
     const customerService = new CustomerService(prisma as never);
     const cashbackService = new CashbackService(prisma as never);
-    const stockService = new TheoreticalStockService(prisma as never);
+    const expansion = new RecipeExpansionService(prisma as never);
+    const composition = new ConfigurableRecipeCompositionService(
+      prisma as never,
+      expansion,
+      new PizzaEngineService({ tenantClient: prisma } as never),
+    );
+    const stockService = new TheoreticalStockService(
+      prisma as never,
+      composition,
+      new ComboComponentEligibilityService(prisma as never),
+    );
     const revenueLedgerService = new RevenueLedgerService(prisma as never);
     const ordersService = new OrdersService(
       prisma as never,
@@ -187,6 +206,7 @@ describe('POS PostgreSQL concurrent atomicity', () => {
 
     const finalOrder = await prisma.order.findUniqueOrThrow({
       where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: input.idempotencyKey } },
+      include: { items: true },
     });
     const [orders, movements, finalIngredient, cashMovements, cashbackTransactions, finalCoupon, ledgerEntries] = await Promise.all([
       prisma.order.count({ where: { tenantId, idempotencyKey: input.idempotencyKey } }),
@@ -199,6 +219,10 @@ describe('POS PostgreSQL concurrent atomicity', () => {
     ]);
 
     expect(orders).toBe(1);
+    expect(finalOrder.items[0]?.snapshotCatalogV2Json).toMatchObject({
+      version: 'catalog_v2_snapshot_v1',
+      selections: [],
+    });
     expect(movements).toHaveLength(1);
     expect(Number(movements[0].quantity)).toBe(2);
     expect(Number(finalIngredient.currentStock)).toBe(8);
@@ -224,5 +248,101 @@ describe('POS PostgreSQL concurrent atomicity', () => {
       couponUsage: finalCoupon.usedCount,
       revenueEvents: ledgerEntries.length,
     }));
+  });
+
+  it('aggregates recurring base fractions before one persisted HALF_UP stock quantity', async () => {
+    if (!tenantId) throw new Error('Tenant fixture was not initialized.');
+    const precisionSuffix = `p${Date.now().toString().slice(-8)}${Math.random().toString(16).slice(2, 6)}`;
+    const [ingredient, base, product] = await Promise.all([
+      prisma.ingredient.create({
+        data: {
+          tenantId,
+          name: `Ingrediente preciso ${precisionSuffix}`,
+          sku: `precision-ingredient-${precisionSuffix}`,
+          unit: UnitType.un,
+          currentStock: new Prisma.Decimal('0.000001'),
+          currentCost: new Prisma.Decimal('7.25'),
+        },
+      }),
+      prisma.recipeBase.create({
+        data: {
+          tenantId,
+          name: `Base precisa ${precisionSuffix}`,
+          outputUnit: UnitType.un,
+          yieldQuantity: new Prisma.Decimal('3'),
+        },
+      }),
+      prisma.product.create({
+        data: { tenantId, name: `Produto preciso ${precisionSuffix}`, slug: `precision-product-${precisionSuffix}`, basePrice: 1 },
+      }),
+    ]);
+    await prisma.recipeBaseIngredient.create({
+      data: {
+        tenantId,
+        baseId: base.id,
+        ingredientId: ingredient.id,
+        quantity: new Prisma.Decimal('0.000001'),
+        inputQuantity: new Prisma.Decimal('0.000001'),
+        inputUnit: UnitType.un,
+      },
+    });
+    await prisma.productRecipeBase.create({
+      data: {
+        tenantId,
+        productId: product.id,
+        baseId: base.id,
+        quantity: new Prisma.Decimal('1'),
+        inputQuantity: new Prisma.Decimal('1'),
+        inputUnit: UnitType.un,
+      },
+    });
+    const order = await prisma.order.create({
+      data: {
+        tenantId,
+        orderNumber: `PREC-${precisionSuffix}`.slice(0, 20),
+        fulfillmentType: FulfillmentType.pickup,
+        customerName: 'Precision customer',
+        customerPhone: `118${Date.now().toString().slice(-8)}`,
+        itemsSubtotal: 2,
+        total: 2,
+        idempotencyKey: `precision-${precisionSuffix}`,
+        publicTrackingToken: `precision-${precisionSuffix}`,
+      },
+    });
+    await prisma.orderItem.createMany({
+      data: [1, 2].map((index) => ({
+        tenantId,
+        orderId: order.id,
+        lineType: OrderLineType.product,
+        productId: product.id,
+        quantity: 1,
+        unitPrice: 1,
+        lineTotal: 1,
+        snapshotName: `Produto preciso ${index}`,
+        snapshotBasePrice: 1,
+        snapshotExtrasTotal: 0,
+      })),
+    });
+
+    const expansion = new RecipeExpansionService(prisma as never);
+    const composition = new ConfigurableRecipeCompositionService(
+      prisma as never,
+      expansion,
+      new PizzaEngineService({ tenantClient: prisma } as never),
+    );
+    const stockService = new TheoreticalStockService(
+      prisma as never,
+      composition,
+      new ComboComponentEligibilityService(prisma as never),
+    );
+    await stockService.processOrderDepletion(tenantId, order.id);
+
+    const [persistedIngredient, movement] = await Promise.all([
+      prisma.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } }),
+      prisma.stockMovement.findFirstOrThrow({ where: { tenantId, orderId: order.id } }),
+    ]);
+    expect(persistedIngredient.currentStock.toString()).toBe('0');
+    expect(movement.quantity.toString()).toBe('0.000001');
+    expect(movement.unitCost.toString()).toBe('7.25');
   });
 });

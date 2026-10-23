@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 import { ProductOptionGroupsService } from './product-option-groups.service';
 
 describe('ProductOptionGroupsService item override integrity', () => {
@@ -19,11 +20,21 @@ describe('ProductOptionGroupsService item override integrity', () => {
       : options.item;
     const link = options.link === undefined ? { id: 'link-a' } : options.link;
     const tx = {
-      product: { findFirst: jest.fn().mockResolvedValue(product) },
+      product: {
+        findFirst: jest.fn().mockResolvedValue(product),
+        findMany: jest.fn().mockResolvedValue([{
+          id: productId,
+          type: 'simple',
+          isActive: true,
+          category: null,
+          optionGroupLinks: [],
+        }]),
+      },
       optionItem: { findFirst: jest.fn().mockResolvedValue(item), update: jest.fn() },
       productOptionGroupLink: { findFirst: jest.fn().mockResolvedValue(link) },
       productOptionItemPrice: {
         findUnique: jest.fn().mockResolvedValue(options.existing ?? null),
+        findMany: jest.fn().mockResolvedValue([]),
         upsert: jest.fn().mockResolvedValue({
           id: 'override-a',
           isActive: null,
@@ -33,6 +44,8 @@ describe('ProductOptionGroupsService item override integrity', () => {
         delete: jest.fn().mockResolvedValue(undefined),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      comboBundleItem: { findFirst: jest.fn().mockResolvedValue(null) },
+      comboSlotAllowedItem: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = {
       $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx)),
@@ -41,7 +54,13 @@ describe('ProductOptionGroupsService item override integrity', () => {
     };
     const cacheManager = { del: jest.fn().mockResolvedValue(undefined) };
     const tenantContext = { getTenantId: jest.fn().mockReturnValue(tenantId) };
-    const service = Reflect.construct(ProductOptionGroupsService, [prisma, tenantContext, cacheManager]) as ProductOptionGroupsService;
+    const comboEligibility = new ComboComponentEligibilityService(prisma as never);
+    const service = Reflect.construct(ProductOptionGroupsService, [
+      prisma,
+      tenantContext,
+      comboEligibility,
+      cacheManager,
+    ]) as ProductOptionGroupsService;
     return { tx, prisma, cacheManager, service };
   }
 

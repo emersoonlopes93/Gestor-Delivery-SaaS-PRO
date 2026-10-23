@@ -7,7 +7,7 @@ import { RecipeExpansionService } from './recipe-expansion.service';
 
 export interface ConfigurableRecipeSelection {
   optionGroupId: string;
-  items: Array<{ optionItemId: string; qty?: number }>;
+  items: Array<{ optionItemId: string; qty?: number | string | Prisma.Decimal }>;
 }
 
 export interface ConfigurableRecipeCompositionInput {

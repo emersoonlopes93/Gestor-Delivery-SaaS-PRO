@@ -4,6 +4,8 @@ import { TenantContextService } from '../../common/context/tenant-context.servic
 import { CreateComboBundleItemDto } from './dto/create-combo-bundle-item.dto';
 import { UpdateComboBundleItemDto } from './dto/update-combo-bundle-item.dto';
 import { ProductsService } from '../products/products.service';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
+import { runSerializableTransactionWithRetry } from '../../database/serializable-transaction';
 
 @Injectable()
 export class ComboBundleItemsService {
@@ -11,6 +13,7 @@ export class ComboBundleItemsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly productsService: ProductsService,
+    private readonly eligibility: ComboComponentEligibilityService,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -44,6 +47,7 @@ export class ComboBundleItemsService {
     if (!product) throw new NotFoundException('Produto não encontrado para vínculo.');
     if (!product.isActive) throw new BadRequestException('Produto inativo não pode ser vinculado.');
     if (product.type === 'combo') throw new BadRequestException('Não é permitido vincular outro combo no bundle.');
+    await this.eligibility.assertEligibleProductIds(tenantId, [productId]);
     return product;
   }
 
@@ -59,18 +63,33 @@ export class ComboBundleItemsService {
 
   async create(comboProductId: string, dto: CreateComboBundleItemDto) {
     const tenantId = this.getRequiredTenantId();
-    await this.ensureComboProduct(tenantId, comboProductId);
-    await this.assertProductCanBeLinked(tenantId, comboProductId, dto.productId);
-
-    const item = await this.prisma.tenantClient.comboBundleItem.create({
-      data: {
-        tenantId,
-        comboProductId,
-        productId: dto.productId,
-        qty: Math.max(1, dto.qty ?? 1),
-        sortOrder: dto.sortOrder ?? 0,
-      },
-      include: { product: true },
+    const item = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const combo = await tx.product.findFirst({
+        where: { id: comboProductId, tenantId, deletedAt: null },
+        select: { id: true, type: true, comboMode: true },
+      });
+      if (!combo) throw new NotFoundException('Combo não encontrado.');
+      if (combo.type !== 'combo') throw new BadRequestException('Produto informado não é combo.');
+      if (combo.comboMode !== 'bundle') throw new BadRequestException('Este combo não está em modo bundle.');
+      if (dto.productId === comboProductId) throw new BadRequestException('Um combo não pode vincular ele mesmo.');
+      const product = await tx.product.findFirst({
+        where: { id: dto.productId, tenantId, deletedAt: null },
+        select: { id: true, isActive: true, type: true },
+      });
+      if (!product) throw new NotFoundException('Produto não encontrado para vínculo.');
+      if (!product.isActive) throw new BadRequestException('Produto inativo não pode ser vinculado.');
+      if (product.type === 'combo') throw new BadRequestException('Não é permitido vincular outro combo no bundle.');
+      await this.eligibility.assertEligibleProductIds(tenantId, [dto.productId], tx);
+      return tx.comboBundleItem.create({
+        data: {
+          tenantId,
+          comboProductId,
+          productId: dto.productId,
+          qty: Math.max(1, dto.qty ?? 1),
+          sortOrder: dto.sortOrder ?? 0,
+        },
+        include: { product: true },
+      });
     });
 
     await this.productsService.recalculateComboBundlePrice(comboProductId);

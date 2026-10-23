@@ -5,7 +5,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod, Prisma } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod, OrderStatus as SharedOrderStatus } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
@@ -392,6 +392,8 @@ export class PosService {
       for (const line of lines) {
         const productId = line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null;
         const comboId = line.lineType === 'combo' ? (line as ValidatedLine & { comboId: string }).comboId : null;
+        const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
+          .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
 
         await tx.orderItem.create({
           data: {
@@ -409,6 +411,7 @@ export class PosService {
             snapshotBasePrice: line.basePrice,
             snapshotExtrasTotal: line.extrasTotal,
             snapshotComposition: line.composition || null,
+            snapshotCatalogV2Json,
           },
         });
       }
