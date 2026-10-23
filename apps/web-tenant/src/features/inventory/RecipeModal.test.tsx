@@ -8,6 +8,7 @@ import { RecipeModal } from './RecipeModal';
 const apiMocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 
 vi.mock('../../lib/api-client', () => ({ api: apiMocks }));
+vi.mock('../../hooks/use-tenant-auth', () => ({ useTenantAuth: () => ({ user: { permissions: [], roles: [] } }) }));
 
 const success = <T,>(data: T): ApiResponse<T> => ({ success: true, data });
 
@@ -48,5 +49,15 @@ describe('RecipeModal explicit component picker', () => {
     await waitFor(() => expect(screen.getByText('Base dois')).toBeDefined());
     expect(screen.queryByText('Base um')).toBeNull();
     expect(apiMocks.post).not.toHaveBeenCalled();
+  });
+
+  it('renders the picker in a portal and lets Escape close it without closing the recipe', async () => {
+    const user = userEvent.setup();
+    render(<RecipeModal isOpen onClose={vi.fn()} entityType="product" entityId="product-1" entityName="Produto" />);
+    await user.click(await screen.findByRole('button', { name: '+ Adicionar insumo' }));
+    expect(screen.getByRole('dialog', { name: 'Selecionar insumo' })).toBeDefined();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Selecionar insumo' })).toBeNull());
+    expect(screen.getByRole('dialog', { name: 'Ficha Técnica' })).toBeDefined();
   });
 });

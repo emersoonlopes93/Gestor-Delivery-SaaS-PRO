@@ -173,6 +173,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
   const [isCreateComplementModalOpen, setIsCreateComplementModalOpen] = useState(false);
   const [newGroupPricingAxis, setNewGroupPricingAxis] = useState<'primary' | 'secondary'>('secondary');
+  const [newGroupLinkOverrides, setNewGroupLinkOverrides] = useState<Pick<UpdateProductOptionGroupLinkDto, 'overrideName' | 'overrideDescription' | 'overrideIsRequired' | 'overrideMinSelect' | 'overrideMaxSelect'>>({});
 
   const [globalGroupToEdit, setGlobalGroupToEdit] = useState<OptionGroup | null>(null);
   const [isGlobalGroupModalOpen, setIsGlobalGroupModalOpen] = useState(false);
@@ -454,6 +455,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         optionGroupId: created.id,
         order: links.length,
         pricingAxis: newGroupPricingAxis,
+        ...newGroupLinkOverrides,
       });
       setIsCreateComplementModalOpen(false);
       await loadAll();
@@ -903,6 +905,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         onOpenCreateGroup={(pricingAxis) => {
           setIsAddGroupModalOpen(false);
           setNewGroupPricingAxis(pricingAxis);
+          setNewGroupLinkOverrides({});
           setIsCreateComplementModalOpen(true);
         }}
       />
@@ -912,6 +915,12 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         onClose={() => setIsCreateComplementModalOpen(false)}
         groupId={null}
         onSaved={handleComplementCreated}
+        contextualLink={{
+          pricingAxis: newGroupPricingAxis,
+          overrides: newGroupLinkOverrides,
+          onPricingAxisChange: setNewGroupPricingAxis,
+          onOverridesChange: setNewGroupLinkOverrides,
+        }}
       />
 
       {isGlobalGroupModalOpen && globalGroupToEdit && (

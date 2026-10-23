@@ -101,6 +101,19 @@ export interface ProductRecipeDTO {
   totalEstimatedCost: number;
 }
 
+/**
+ * Read-only cost calculated from an unsaved recipe draft and the current
+ * tenant-scoped ingredient costs. It is not stock or historical CMV.
+ */
+export interface ProductRecipeDraftCostPreviewDTO {
+  coverage: 'KNOWN' | 'PARTIAL' | 'UNKNOWN';
+  estimatedTotalCost: number | null;
+  partialEstimatedTotalCost: number | null;
+  knownIngredientCount: number;
+  unknownIngredientCount: number;
+  basis: 'CURRENT_INGREDIENT_COSTS';
+}
+
 /** A physical recipe contribution that belongs to an OptionItem only within one product. */
 export type ProductOptionItemRecipeComponentInputDTO =
   | { type: 'ingredient'; ingredientId: string; inputQuantity: number; inputUnit: UnitType }

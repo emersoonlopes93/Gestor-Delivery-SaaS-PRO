@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { CreateOptionGroupDto, OptionGroup, OptionItem } from '@gestor/types';
+import { CreateOptionGroupDto, OptionGroup, OptionItem, UpdateProductOptionGroupLinkDto } from '@gestor/types';
 import { Modal } from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
 import { Plus, Trash2, Globe, Info } from 'lucide-react';
@@ -12,6 +12,12 @@ interface OptionGroupEditorModalProps {
   onClose: () => void;
   groupId: string | null;
   onSaved: (group: GroupWithItems) => void;
+  contextualLink?: {
+    pricingAxis: 'primary' | 'secondary';
+    overrides: Pick<UpdateProductOptionGroupLinkDto, 'overrideName' | 'overrideDescription' | 'overrideIsRequired' | 'overrideMinSelect' | 'overrideMaxSelect'>;
+    onPricingAxisChange: (axis: 'primary' | 'secondary') => void;
+    onOverridesChange: (overrides: Pick<UpdateProductOptionGroupLinkDto, 'overrideName' | 'overrideDescription' | 'overrideIsRequired' | 'overrideMinSelect' | 'overrideMaxSelect'>) => void;
+  };
 }
 
 export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
@@ -19,6 +25,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
   onClose,
   groupId,
   onSaved,
+  contextualLink,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -257,6 +264,15 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
               <Info className="w-4 h-4 shrink-0" />
               <span>Este grupo ainda não está vinculado a nenhum produto.</span>
             </div>
+          )}
+
+          {contextualLink && !groupId && (
+            <section className="space-y-4 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+              <div><h4 className="font-bold text-foreground">Configurações neste produto</h4><p className="text-xs text-muted-foreground">Este novo grupo será vinculado ao produto ao salvar. Essas opções não alteram outros produtos.</p></div>
+              <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground">Eixo de precificação<select value={contextualLink.pricingAxis} onChange={(event) => contextualLink.onPricingAxisChange(event.target.value as 'primary' | 'secondary')} className="input-premium mt-1"><option value="secondary">Secundário — adicionais e preferências</option><option value="primary">Primário — tamanho/preço principal</option></select></label>
+              <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Nome neste produto<input value={contextualLink.overrides.overrideName ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideName: event.target.value || undefined })} className="input-premium mt-1" placeholder="Usar nome do grupo" /></label><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Descrição neste produto<input value={contextualLink.overrides.overrideDescription ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideDescription: event.target.value || undefined })} className="input-premium mt-1" placeholder="Usar descrição do grupo" /></label></div>
+              <div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Obrigatório<select value={contextualLink.overrides.overrideIsRequired === undefined ? 'default' : String(contextualLink.overrides.overrideIsRequired)} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideIsRequired: event.target.value === 'default' ? undefined : event.target.value === 'true' })} className="input-premium mt-1"><option value="default">Padrão do grupo</option><option value="true">Obrigatório</option><option value="false">Opcional</option></select></label><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Mínimo local<input type="number" min="0" value={contextualLink.overrides.overrideMinSelect ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideMinSelect: event.target.value === '' ? undefined : Number(event.target.value) })} className="input-premium mt-1" placeholder="Padrão" /></label><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Máximo local<input type="number" min="1" value={contextualLink.overrides.overrideMaxSelect ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideMaxSelect: event.target.value === '' ? undefined : Number(event.target.value) })} className="input-premium mt-1" placeholder="Padrão" /></label></div>
+            </section>
           )}
 
           {/* Grupo de Opções - Informações Básicas */}
