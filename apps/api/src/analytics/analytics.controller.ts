@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, ForbiddenException, Get, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
@@ -10,6 +10,7 @@ import { RequiresFeature } from '../common/decorators/requires-feature.decorator
 import { RbacService } from '../rbac/rbac.service';
 import { MetricFilterDTO, DashboardStatsDTO } from '@gestor/types';
 import { AnalyticsPerformanceService, type AcquisitionQuery, type PerformanceQuery, type ProductsQuery } from './analytics-performance.service';
+import { HistoricalCmvService } from './historical-cmv.service';
 
 const performanceQuerySchema = z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), compare: z.enum(['true', 'false']).optional() }).strict();
 const productsQuerySchema = performanceQuerySchema.extend({ limit: z.coerce.number().int().min(1).max(100).optional(), page: z.coerce.number().int().min(1).max(10000).optional(), sort: z.enum(['views', 'addToCart', 'ordersCompleted', 'quantityCompleted', 'realizedRevenue']).optional() }).strict();
@@ -24,6 +25,7 @@ export class AnalyticsController {
     private readonly businessInsightsService: BusinessInsightsService,
     private readonly businessIntelligenceService: BusinessIntelligenceService,
     private readonly performanceService: AnalyticsPerformanceService,
+    private readonly historicalCmvService: HistoricalCmvService,
     private readonly rbacService: RbacService,
   ) {}
 
@@ -104,6 +106,16 @@ export class AnalyticsController {
     @Query() filter: MetricFilterDTO
   ) {
     return this.analyticsService.getCostMarginMetrics(tenantId, filter);
+  }
+
+  /** Historical, order-level CMV. The dashboard's legacy estimated metrics stay unchanged. */
+  @Get('orders/:orderId/historical-cmv')
+  @RequirePermissions('reports.view_costs')
+  getHistoricalOrderCmv(
+    @CurrentTenant() tenantId: string,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.historicalCmvService.getOrderCmv(tenantId, orderId);
   }
 
   @Get('financial-metrics')

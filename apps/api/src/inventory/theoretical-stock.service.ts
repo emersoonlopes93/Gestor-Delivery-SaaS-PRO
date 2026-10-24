@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { HistoricalCmvCoverage, Prisma } from '@prisma/client';
 import { StockMovementType } from '@gestor/types';
 import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
 import { PrismaService } from '../database/prisma.service';
@@ -224,14 +224,24 @@ export class TheoreticalStockService {
     if (!order) return;
 
     const consumptionByIngredient = new Map<string, Prisma.Decimal>();
+    let hasIncompleteCoverage = false;
     for (const item of order.items) {
       if (item.lineType === 'product') {
-        if (!item.productId) continue; // Unmapped marketplace item: no inferred recipe or stock.
-        this.add(consumptionByIngredient, await this.resolveProductItem(tx, tenantId, item.productId, item.quantity, item.snapshotCatalogV2Json));
+        if (!item.productId) {
+          // Unmapped marketplace items must never receive an inferred recipe.
+          // Persist PARTIAL coverage on any resolved sibling consumption.
+          hasIncompleteCoverage = true;
+          continue;
+        }
+        const resolved = await this.resolveProductItem(tx, tenantId, item.productId, item.quantity, item.snapshotCatalogV2Json);
+        if (!resolved.size) hasIncompleteCoverage = true;
+        this.add(consumptionByIngredient, resolved);
         continue;
       }
       if (item.lineType === 'combo') {
-        this.add(consumptionByIngredient, await this.resolveComboComponents(tx, tenantId, item.quantity, item.snapshotCatalogV2Json));
+        const resolved = await this.resolveComboComponents(tx, tenantId, item.quantity, item.snapshotCatalogV2Json);
+        if (!resolved.size) hasIncompleteCoverage = true;
+        this.add(consumptionByIngredient, resolved);
       }
     }
     if (!consumptionByIngredient.size) return;
@@ -242,9 +252,13 @@ export class TheoreticalStockService {
     }
 
     const ingredientIds = [...persistedConsumptionByIngredient.keys()];
-    const ingredients = await tx.ingredient.findMany({ where: { tenantId, id: { in: ingredientIds } }, select: { id: true, currentCost: true } });
+    const ingredients = await tx.ingredient.findMany({
+      where: { tenantId, id: { in: ingredientIds } },
+      select: { id: true, currentCost: true, currentCostEvidence: true },
+    });
     if (ingredients.length !== ingredientIds.length) throw new BadRequestException('Ingrediente da receita não encontrado para este tenant.');
-    const costByIngredient = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient.currentCost]));
+    const costByIngredient = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
+    const orderCmvCoverage = hasIncompleteCoverage ? HistoricalCmvCoverage.partial : HistoricalCmvCoverage.known;
 
     for (const [ingredientId, quantity] of persistedConsumptionByIngredient) {
       const updated = await tx.ingredient.updateMany({
@@ -259,7 +273,9 @@ export class TheoreticalStockService {
         ingredientId,
         type: StockMovementType.THEORETICAL_DEPLETION,
         quantity,
-        unitCost: costByIngredient.get(ingredientId) ?? new Prisma.Decimal(0),
+        unitCost: costByIngredient.get(ingredientId)?.currentCost ?? new Prisma.Decimal(0),
+        costEvidence: costByIngredient.get(ingredientId)?.currentCostEvidence,
+        orderCmvCoverage,
         orderId,
         notes: `Baixa teórica via pedido ${orderId}`,
       })),
@@ -275,7 +291,8 @@ export class TheoreticalStockService {
       if (move.reversal) continue;
       await tx.stockMovement.create({ data: {
         tenantId, ingredientId: move.ingredientId, type: StockMovementType.THEORETICAL_REVERSAL,
-        quantity: move.quantity, unitCost: move.unitCost, orderId: move.orderId,
+        quantity: move.quantity, unitCost: move.unitCost, costEvidence: move.costEvidence,
+        orderCmvCoverage: move.orderCmvCoverage, orderId: move.orderId,
         reversalOfMovementId: move.id, notes: note,
       } });
       const restored = await tx.ingredient.updateMany({ where: { id: move.ingredientId, tenantId }, data: { currentStock: { increment: move.quantity } } });

@@ -2851,3 +2851,10 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - For this phase, combo slots and fixed bundles support only true direct products. Pizza, nested combos, and products with effective option groups are rejected with `COMBO_COMPONENT_CONFIGURATION_UNSUPPORTED` because the component snapshot currently stores only `productId` and `qty`. The Checkout revalidates this at sale time, and the stock reader repeats it for replay/POS/marketplace safety.
 - Future `FUTURE_COMBO_NESTED_CONFIG`: introduce nested selections/pizza composition DTOs, individual validation, immutable component snapshots, and Storefront/POS/AI flows before allowing configurable components in combos. No default selection or recipe inference is permitted.
 - The POS now persists `snapshotCatalogV2Json` supplied by Checkout, so the stock reader has the same canonical selection snapshot as other order channels. Reversal remains movement-based and preserves original quantity/cost. Historical CMV ledger and order-edit delta are deliberately not introduced in this phase.
+
+## P1.5 - historical CMV core (2026-10-23)
+
+- Historical CMV is a read-only, tenant-scoped interpretation of canonical `StockMovement` facts, exposed only behind `reports.view_costs`. It never writes a financial transaction or a second stock ledger.
+- New theoretical depletions persist explicit cost evidence and order coverage alongside the existing physical quantity and unit-cost snapshot. Existing movements remain nullable/ambiguous: zero/default cost, null cost, and absence of movements are never promoted to known CMV.
+- The per-order read model returns `KNOWN`, `PARTIAL`, or `UNKNOWN`; `totalCmv` is null unless coverage is `KNOWN`, while `knownSubtotal` remains visibly separate. Reversal facts are immutable and net only their linked original depletion.
+- Order-item allocation, BI/dashboard replacement, historical backfill, and edit-order economic deltas remain intentionally out of scope. See `docs/contracts/historical-cmv.md`.

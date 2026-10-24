@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ApiResponse, RecipeBaseCostProjectionDTO, RecipeBaseDTO, RecipeBaseDetailDTO, UnitType } from '@gestor/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,7 +33,10 @@ describe('RecipeBasesPage cost projection', () => {
     });
   });
 
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
 
   it('shows a persisted canonical projection and labels the editor value as saved data', async () => {
     const user = userEvent.setup();

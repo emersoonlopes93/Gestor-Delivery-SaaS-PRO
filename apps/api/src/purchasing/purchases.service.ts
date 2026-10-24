@@ -16,6 +16,7 @@ import {
 import {
   FinancialStatus as PrismaFinancialStatus,
   FinancialTransactionType as PrismaFinancialTransactionType,
+  HistoricalCostEvidence,
   PaymentStatus as PrismaPaymentStatus,
   Prisma,
   PurchaseStatus as PrismaPurchaseStatus,
@@ -180,7 +181,7 @@ export class PurchasesService {
         for (const inputItem of dto.items) {
           const ingredient = await tx.ingredient.findFirst({
             where: { id: inputItem.ingredientId, tenantId },
-            select: { id: true, unit: true, currentStock: true, currentCost: true },
+            select: { id: true, unit: true, currentStock: true, currentCost: true, currentCostEvidence: true },
           });
           if (!ingredient) throw new NotFoundException(`Insumo ${inputItem.ingredientId} nao encontrado`);
           const presentation = inputItem.purchasePresentationId
@@ -204,6 +205,9 @@ export class PurchasesService {
             quantity,
             unitCost,
           );
+          const nextCostEvidence = ingredient.currentStock.isZero() || ingredient.currentCostEvidence === HistoricalCostEvidence.known
+            ? HistoricalCostEvidence.known
+            : HistoricalCostEvidence.unknown;
           const item = await tx.purchaseItem.create({
             data: {
               tenantId,
@@ -229,7 +233,7 @@ export class PurchasesService {
           });
           const updatedIngredient = await tx.ingredient.updateMany({
             where: { id: inputItem.ingredientId, tenantId },
-            data: { currentStock: { increment: quantity }, currentCost: finalAverageCost },
+            data: { currentStock: { increment: quantity }, currentCost: finalAverageCost, currentCostEvidence: nextCostEvidence },
           });
           if (updatedIngredient.count !== 1) throw new NotFoundException('Insumo nao encontrado');
           await tx.stockMovement.create({
@@ -241,6 +245,7 @@ export class PurchasesService {
               type: PrismaStockMovementType.purchase_entry,
               quantity,
               unitCost,
+              costEvidence: HistoricalCostEvidence.known,
               notes: `Entrada via compra ${purchase.id}`,
             },
           });
@@ -370,12 +375,13 @@ export class PurchasesService {
         });
       }
       const nextCostByIngredient = new Map<string, Prisma.Decimal>();
+      const nextCostEvidenceByIngredient = new Map<string, HistoricalCostEvidence>();
       for (const ingredientId of [...requiredByIngredient.keys()].sort()) {
         await this.lockIngredient(tx, tenantId, ingredientId);
         const required = requiredByIngredient.get(ingredientId) as { quantity: Prisma.Decimal; value: Prisma.Decimal };
         const ingredient = await tx.ingredient.findFirst({
           where: { id: ingredientId, tenantId },
-          select: { currentStock: true, currentCost: true },
+          select: { currentStock: true, currentCost: true, currentCostEvidence: true },
         });
         if (!ingredient || ingredient.currentStock.lessThan(required.quantity)) {
           throw new ConflictException('Estoque insuficiente; reconciliacao de estoque obrigatoria antes do cancelamento.');
@@ -387,6 +393,7 @@ export class PurchasesService {
             required.quantity,
             required.value,
           ));
+          nextCostEvidenceByIngredient.set(ingredientId, ingredient.currentCostEvidence);
         } catch (error) {
           if (error instanceof Error && error.message === 'UNRECONCILABLE_REVERSAL_VALUE') {
             throw new ConflictException('O custo da compra nao pode ser revertido sem gerar valor de estoque negativo.');
@@ -403,6 +410,7 @@ export class PurchasesService {
             type: PrismaStockMovementType.purchase_reversal,
             quantity: movement.quantity,
             unitCost: movement.unitCost,
+            costEvidence: movement.costEvidence,
             reversalOfMovementId: movement.id,
             notes: `Reversao da compra ${purchaseId}`,
           },
@@ -414,6 +422,7 @@ export class PurchasesService {
           data: {
             currentStock: { decrement: required.quantity },
             currentCost: nextCostByIngredient.get(ingredientId) as Prisma.Decimal,
+            currentCostEvidence: nextCostEvidenceByIngredient.get(ingredientId) as HistoricalCostEvidence,
           },
         });
         if (decremented.count !== 1) {
