@@ -75,6 +75,7 @@ export class LossesService {
           type: StockMovementType.WASTE,
           quantity: quantity,
           unitCost: unitCost,
+          costEvidence: ingredient.currentCostEvidence,
           notes: `Perda: ${reason}`
         }
       });

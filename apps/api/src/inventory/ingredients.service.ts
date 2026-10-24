@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
-import { UnitType as PrismaUnitType, Prisma, StockMovementType as PrismaStockMovementType } from '@prisma/client';
+import { HistoricalCostEvidence, UnitType as PrismaUnitType, Prisma, StockMovementType as PrismaStockMovementType } from '@prisma/client';
 import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
 import { convertUnitQuantity, UnitConversionError } from './unit-conversion';
 
@@ -103,6 +103,7 @@ export class IngredientsService {
     }
 
     const { initialPurchase, purchasePresentations = [], ...ingredientData } = dto;
+    const hasExplicitOpeningBalance = initialPurchase !== undefined && initialPurchase.quantity > 0;
     const ingredientUnit = this.mapPrismaUnit(ingredientData.unit);
     const normalizedPresentations = purchasePresentations.map((presentation) => this.resolveCanonicalPresentation(presentation, ingredientUnit));
     if (new Set(normalizedPresentations.map((presentation) => presentation.label.toLocaleLowerCase())).size !== normalizedPresentations.length) {
@@ -124,6 +125,7 @@ export class IngredientsService {
           tenantId,
           currentStock: 0,
           currentCost: 0,
+          currentCostEvidence: hasExplicitOpeningBalance ? HistoricalCostEvidence.known : HistoricalCostEvidence.unknown,
         },
       });
 
@@ -152,6 +154,7 @@ export class IngredientsService {
           data: {
             currentStock: quantityBase,
             currentCost: unitCostBase,
+            currentCostEvidence: HistoricalCostEvidence.known,
           }
         });
 
@@ -163,6 +166,7 @@ export class IngredientsService {
             type: PrismaStockMovementType.in,
             quantity: quantityBase,
             unitCost: unitCostBase,
+            costEvidence: HistoricalCostEvidence.known,
             notes: 'Saldo inicial informado no cadastro do insumo.',
           }
         });
