@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { IsString, IsOptional } from 'class-validator';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppInstanceStatus, WhatsAppProviderType } from '@prisma/client';
@@ -32,7 +33,16 @@ export class WhatsAppInstanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerRegistry: WhatsAppProviderRegistryService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private assertDevResetAllowed(tenantId: string): void {
+    const environment = this.configService.get<string>('NODE_ENV');
+    const enabled = this.configService.get<string>('ALLOW_WHATSAPP_DEV_RESET') === 'true';
+    if (enabled && (environment === 'development' || environment === 'test')) return;
+    this.logger.warn(`WhatsApp dev reset blocked for tenant ${tenantId} in environment ${environment ?? 'unknown'}`);
+    throw new ForbiddenException('Reset de desenvolvimento do WhatsApp não permitido neste ambiente.');
+  }
 
   private async resolveApiKeyForProvider(input: {
     providerType: WhatsAppProviderType;
@@ -349,6 +359,7 @@ export class WhatsAppInstanceService {
    * Reseta completamente a instância (remove do Evolution-Go e do banco local)
    */
   async devResetInstance(tenantId: string): Promise<void> {
+    this.assertDevResetAllowed(tenantId);
     const instance = await this.prisma.whatsAppInstance.findUnique({
       where: { tenantId },
     });

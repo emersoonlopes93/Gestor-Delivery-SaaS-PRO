@@ -1,4 +1,4 @@
-import { statusBadgeClass, TabId, TABS, statusLabels } from '../types';
+import { statusBadgeClass, statusLabels } from '../types';
 
 export function StatusBadge({ status }: { status: string }) {
   return (

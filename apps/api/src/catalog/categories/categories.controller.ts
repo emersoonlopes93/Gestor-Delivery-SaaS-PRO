@@ -5,6 +5,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
+import { BulkSetCategoryActiveDto } from './dto/bulk-set-category-active.dto';
 
 @Controller('catalog/categories')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -27,6 +28,12 @@ export class CategoriesController {
   @RequirePermissions('catalog.read')
   findAllWithProductCount() {
     return this.categoriesService.findAllWithProductCount();
+  }
+
+  @Patch('bulk-active')
+  @RequirePermissions('catalog.update')
+  bulkSetActive(@Body() dto: BulkSetCategoryActiveDto) {
+    return this.categoriesService.bulkSetActive(dto);
   }
 
   @Get(':id')

@@ -195,7 +195,7 @@ export function DeliveryMapCanvas(props: DeliveryMapCanvasProps) {
 
   return (
     <div className="relative h-full w-full">
-      <MapContainer center={props.storePosition} zoom={13} className="h-full w-full">
+      <MapContainer center={props.storePosition} zoom={13} className="theme-aware-map h-full w-full">
         <MapRefSync mapRef={mapRef} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -281,9 +281,9 @@ export function DeliveryMapCanvas(props: DeliveryMapCanvasProps) {
         />
       </MapContainer>
 
-      <div className="absolute left-6 top-6 z-[1000] rounded-2xl border border-white/70 bg-white/92 p-4 shadow-xl backdrop-blur">
-        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Legenda</div>
-        <div className="mt-3 space-y-2 text-sm text-slate-700">
+      <div className="absolute left-6 top-6 z-[1000] rounded-2xl border border-border bg-popover/95 p-4 text-popover-foreground shadow-xl backdrop-blur">
+        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Legenda</div>
+        <div className="mt-3 space-y-2 text-sm text-popover-foreground">
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full bg-blue-600" />
             <span>Raio de entrega</span>

@@ -21,8 +21,14 @@ function normalizeCustomer(customer: CustomerDTO | null): CustomerDTO | null {
 interface CustomerState {
   customer: CustomerDTO | null;
   accessToken: string | null;
+  refreshToken: string | null;
   tenantSlug: string | null;
-  setCustomer: (customer: CustomerDTO | null, accessToken: string | null, tenantSlug: string) => void;
+  setCustomer: (
+    customer: CustomerDTO | null,
+    accessToken: string | null,
+    refreshToken: string | null,
+    tenantSlug: string,
+  ) => void;
   setTenantSlug: (tenantSlug: string) => void;
   logout: () => void;
   isLoggedIn: boolean;
@@ -33,11 +39,13 @@ export const useCustomerStore = create<CustomerState>()(
     (set) => ({
       customer: null,
       accessToken: null,
+      refreshToken: null,
       tenantSlug: null,
       isLoggedIn: false,
-      setCustomer: (customer, accessToken, tenantSlug) => set({ 
+      setCustomer: (customer, accessToken, refreshToken, tenantSlug) => set({
         customer: normalizeCustomer(customer),
-        accessToken, 
+        accessToken,
+        refreshToken,
         tenantSlug,
         isLoggedIn: !!accessToken 
       }),
@@ -50,13 +58,15 @@ export const useCustomerStore = create<CustomerState>()(
           return {
             customer: null,
             accessToken: null,
+            refreshToken: null,
             isLoggedIn: false,
             tenantSlug,
           };
         }),
       logout: () => set({ 
         customer: null, 
-        accessToken: null, 
+        accessToken: null,
+        refreshToken: null,
         tenantSlug: null,
         isLoggedIn: false 
       }),

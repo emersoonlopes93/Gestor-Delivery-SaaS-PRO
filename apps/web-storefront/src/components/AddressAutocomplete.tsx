@@ -14,8 +14,13 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   className = '',
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const onAddressSelectedRef = useRef(onAddressSelected);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onAddressSelectedRef.current = onAddressSelected;
+  }, [onAddressSelected]);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
@@ -40,7 +45,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           const place = autocomplete.getPlace();
           const parsed = parseGooglePlace(place);
           if (parsed) {
-            onAddressSelected(parsed);
+            onAddressSelectedRef.current(parsed);
           }
         });
 
@@ -51,7 +56,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         setError('Erro ao carregar o serviço de mapas');
         setLoading(false);
       });
-  }, [onAddressSelected]);
+  }, []);
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
   if (!apiKey) {

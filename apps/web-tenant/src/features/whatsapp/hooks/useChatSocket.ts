@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
-import type { ChatMessage, ChatSession } from '@gestor/types';
+import type { ChatMessage, ChatSession, TenantNotificationEventPayload } from '@gestor/types';
+import { createNotificationEvent, emitNotificationEvent } from '../../../notifications/notificationEvents';
 
 interface MessageCreatedEvent {
   sessionId: string;
@@ -106,6 +107,19 @@ export function useChatSocket(tenantId: string | undefined) {
       try {
         window.dispatchEvent(new CustomEvent('chat:sessionUpdated', { detail: event }));
       } catch { /* ignore */ }
+    });
+
+    socket.on('whatsapp.handoff', (event: TenantNotificationEventPayload) => {
+      if (!event.sessionId) return;
+
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:whatsapp.handoff:${event.sessionId}`,
+        type: 'whatsapp.handoff',
+        title: 'Transferencia para atendimento humano',
+        message: `${event.customerName || event.sessionName || 'Cliente'} aguardando atendimento.`,
+        priority: 'high',
+        source: 'socket',
+      }));
     });
 
     return () => {

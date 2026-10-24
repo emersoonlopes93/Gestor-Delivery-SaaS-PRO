@@ -1,320 +1,78 @@
-import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
-import { CampaignDispatcherService } from './campaign-dispatcher.service';
-import { CampaignAutomationService } from './campaign-automation.service';
+import { normalizeMarketingPhone } from '../../common/utils/marketing-opt-out.util';
 import { applyCampaignTemplate } from '../utils/campaign-template.util';
+import { CampaignAutomationService } from './campaign-automation.service';
+import { CampaignDispatcherService } from './campaign-dispatcher.service';
 
-export interface CampaignJobData {
-  campaignId?: string;
-  dispatchId?: string;
-  tenantId?: string;
-  customerId?: string;
-  phone?: string;
-  customerName?: string;
-  messageTemplate?: string;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
-  isStatus?: boolean;
-  isSystemJob?: boolean;
-}
+const TERMINAL = ['sent', 'delivered', 'read', 'replied', 'opt_out', 'failed', 'cancelled'] as const;
+export interface CampaignJobData { campaignId?: string; dispatchId?: string; tenantId?: string; customerId?: string; phone?: string; customerName?: string; messageTemplate?: string; mediaUrl?: string | null; mediaType?: string | null; isStatus?: boolean; isSystemJob?: boolean; }
+class RetryableCampaignError extends Error {}
 
 @Processor('campaign-dispatch')
 export class CampaignProcessor extends WorkerHost {
   private readonly logger = new Logger(CampaignProcessor.name);
+  constructor(private readonly prisma: PrismaService, private readonly whatsappSender: WhatsAppSenderService, private readonly dispatcher: CampaignDispatcherService, private readonly automation: CampaignAutomationService) { super(); }
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly whatsappSender: WhatsAppSenderService,
-    private readonly campaignDispatcher: CampaignDispatcherService,
-    private readonly campaignAutomationService: CampaignAutomationService,
-  ) {
-    super();
+  async process(job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>) {
+    if (job.name === 'system-feed-queue') { await this.dispatcher.feedQueue(); return { success: true }; }
+    if (job.name === 'system-automation-scan') { await this.automation.runAllTenants(); return { success: true }; }
+    const data = job.data;
+    if (!data.campaignId || !data.tenantId) throw new Error('Invalid campaign job tenant scope.');
+    if (data.isStatus) return this.processStatus(data);
+    if (!data.dispatchId || !data.customerId || !data.phone || !data.customerName || !data.messageTemplate) throw new Error('Invalid dispatch job data.');
+    return this.processDispatch(data);
   }
 
-  async process(
-    job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>,
-  ): Promise<{ success: boolean; messageId?: string; skipped?: boolean; reason?: string }> {
-    if (job.name === 'system-feed-queue') {
-      this.logger.log('Processing system-feed-queue job...');
-      await this.campaignDispatcher.feedQueue();
-      return { success: true };
+  private async processStatus(data: CampaignJobData) {
+    const campaign = await this.prisma.campaign.findFirst({ where: { id: data.campaignId, tenantId: data.tenantId }, select: { status: true, tenant: { select: { name: true, slug: true } } } });
+    if (!campaign || campaign.status !== 'processing') return { success: true, skipped: true, reason: 'not_processing' };
+    const result = await this.whatsappSender.publishStatus(data.tenantId!, { text: applyCampaignTemplate(data.messageTemplate ?? '', { nome: campaign.tenant.name.split(' ')[0], nome_loja: campaign.tenant.name, link_cardapio: `https://${campaign.tenant.slug}.gestordelivery.com` }), mediaUrl: data.mediaUrl ?? undefined, mediaType: data.mediaType ?? undefined });
+    if (!result.success) { await this.prisma.campaign.updateMany({ where: { id: data.campaignId, tenantId: data.tenantId, status: 'processing' }, data: { status: 'failed' } }); throw new RetryableCampaignError(result.error ?? 'Status provider rejected delivery.'); }
+    await this.prisma.campaign.updateMany({ where: { id: data.campaignId, tenantId: data.tenantId, status: 'processing' }, data: { status: 'completed', completedAt: new Date() } });
+    return { success: true, messageId: result.messageId };
+  }
+
+  private async processDispatch(data: CampaignJobData) {
+    const dispatch = await this.prisma.campaignDispatch.findFirst({ where: { id: data.dispatchId, campaignId: data.campaignId, customerId: data.customerId, campaign: { tenantId: data.tenantId } }, select: { phone: true, status: true, idempotencyKey: true, attemptCount: true, campaign: { select: { status: true } } } });
+    if (!dispatch) throw new Error('Invalid tenant-scoped campaign dispatch.');
+    if (TERMINAL.includes(dispatch.status as typeof TERMINAL[number])) return { success: true, skipped: true, reason: 'terminal' };
+    if (dispatch.campaign.status === 'cancelled') { await this.prisma.campaignDispatch.updateMany({ where: { id: data.dispatchId, status: { in: ['queued', 'processing'] } }, data: { status: 'cancelled', failReason: 'Campaign cancelled before delivery.' } }); return { success: true, skipped: true, reason: 'cancelled' }; }
+    if (dispatch.campaign.status !== 'processing') return { success: true, skipped: true, reason: 'not_processing' };
+    if (dispatch.status === 'processing' && dispatch.attemptCount > 0 && !(await this.whatsappSender.supportsIdempotencyKey(data.tenantId))) {
+      await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: { status: 'unknown', reconciliationRequired: true, failReason: 'Provider has no idempotency contract; automatic resend blocked.' } });
+      await this.dispatcher.finalizeCampaign(data.campaignId, data.tenantId);
+      return { success: true, skipped: true, reason: 'reconciliation_required' };
     }
-
-    if (job.name === 'system-automation-scan') {
-      this.logger.log('Processing system-automation-scan job...');
-      await this.campaignAutomationService.runAllTenants();
-      return { success: true };
-    }
-
-    // A partir daqui, esperamos que seja um job de campanha (status ou dispatch)
-    const { campaignId, dispatchId, tenantId, customerId, phone, customerName, messageTemplate, mediaUrl, mediaType, isStatus } = job.data;
-    
-    if (!campaignId || !tenantId) {
-      throw new Error(`Invalid job data: missing campaignId or tenantId for job ${job.id}`);
-    }
-
-    if (isStatus) {
-      this.logger.log(`Processing status campaign ${campaignId}`);
-      try {
-        const campaignMeta = await this.prisma.campaign.findUnique({
-          where: { id: campaignId },
-          select: { startedAt: true, tenant: { select: { name: true, slug: true } } },
-        });
-        const publishStartedAt = Date.now();
-        const statusTemplate = messageTemplate || '';
-        const resolvedStatusMessage = applyCampaignTemplate(statusTemplate, {
-          nome: campaignMeta?.tenant?.name?.split(' ')[0] || 'cliente',
-          nome_loja: campaignMeta?.tenant?.name || 'nossa loja',
-          link_cardapio: campaignMeta?.tenant?.slug ? `https://${campaignMeta.tenant.slug}.gestordelivery.com` : '',
-          cupom: '',
-          pedido: '',
-          total: '',
-        });
-        const result = await this.whatsappSender.publishStatus(tenantId, {
-          text: resolvedStatusMessage,
-          mediaUrl: mediaUrl || undefined,
-          mediaType: mediaType || undefined,
-          caption: resolvedStatusMessage,
-        });
-        const publishDurationMs = Date.now() - publishStartedAt;
-        const elapsedSinceStartMs = campaignMeta?.startedAt ? Date.now() - campaignMeta.startedAt.getTime() : publishDurationMs;
-        this.logger.log(
-          `status_publish_result campaignId=${campaignId} success=${result.success} publishDurationMs=${publishDurationMs} elapsedSinceStartMs=${elapsedSinceStartMs} hasMedia=${Boolean(mediaUrl)} mediaType=${mediaType || 'text'} captionLength=${resolvedStatusMessage.length}`,
-        );
-        
-        await this.prisma.campaign.update({
-          where: { id: campaignId },
-          data: result.success
-            ? { status: 'completed', completedAt: new Date() }
-            : { status: 'cancelled' },
-        });
-
-        return { success: result.success, messageId: result.messageId };
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(`Error processing status campaign ${campaignId}: ${message}`);
-        await this.prisma.campaign.update({
-          where: { id: campaignId },
-          data: { status: 'cancelled' },
-        });
-        throw error;
-      }
-    }
-
-    if (!dispatchId || !customerId || !phone || !customerName || !messageTemplate) {
-      throw new Error(`Invalid job data: missing required dispatch fields for job ${job.id}`);
-    }
-
-    this.logger.log(`Processing campaign dispatch ${dispatchId} for phone ${phone}`);
-
-    const optOut = await this.prisma.customerOptOut.findUnique({
-      where: { tenantId_phone: { tenantId, phone } },
-    });
-
-    if (optOut) {
-      this.logger.warn(`Customer ${phone} has opted out. Skipping dispatch.`);
-      await this.prisma.campaignDispatch.update({
-        where: { id: dispatchId },
-        data: {
-          status: 'opt_out',
-          failReason: 'Opt-out: cliente solicitou nao receber mensagens.',
-        },
-      });
-      await this.prisma.campaign.update({
-        where: { id: campaignId },
-        data: { totalOptOut: { increment: 1 } },
-      });
-      return { success: false, skipped: true, reason: 'opt-out' };
-    }
-
-    const antiSpam = await this.checkAntiSpam(tenantId, customerId, dispatchId);
-    if (!antiSpam.allowed) {
-      if (antiSpam.reason.startsWith('outside_quiet_hours')) {
-        // Reagendar: reverter para queued para ser reprocessado no próximo ciclo do feedQueue (a cada 60s)
-        // O dispatch não é perdido — será enviado quando a janela de 08h-21h (America/Sao_Paulo) abrir
-        await this.prisma.campaignDispatch.update({
-          where: { id: dispatchId },
-          data: { status: 'queued', failReason: null },
-        });
-        this.logger.warn(
-          `rescheduled_due_to_quiet_hours dispatchId=${dispatchId} tenantId=${tenantId} — aguardando janela 08h-21h (America/Sao_Paulo)`,
-        );
-        return { success: false, skipped: true, reason: 'rescheduled_quiet_hours' };
-      }
-      // Demais motivos de anti-spam (cooldown, max_frequency) → falha definitiva para este ciclo
-      this.logger.warn(`Dispatch ${dispatchId} skipped due to anti-spam: ${antiSpam.reason}`);
-      await this.prisma.campaignDispatch.update({
-        where: { id: dispatchId },
-        data: { status: 'failed', failReason: antiSpam.reason },
-      });
-      return { success: false, skipped: true, reason: antiSpam.reason };
-    }
-
-    const firstName = customerName.trim().split(' ')[0] || 'cliente';
-    const personalizedMessage = applyCampaignTemplate(messageTemplate, {
-      nome: firstName,
-    });
-
-    // Jitter/Delay aleatório para evitar banimento do WhatsApp (Anti-Spam)
-    // Entre 5000ms e 15000ms
-    const jitterMs = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
-    this.logger.log(`Aguardando ${jitterMs}ms antes de enviar para ${phone}...`);
-    await new Promise(resolve => setTimeout(resolve, jitterMs));
-
+    if (normalizeMarketingPhone(dispatch.phone) !== normalizeMarketingPhone(data.phone)) throw new Error('Campaign dispatch phone mismatch.');
+    if (dispatch.status === 'sending') { await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: { status: 'unknown', reconciliationRequired: true, failReason: 'Provider outcome unknown; automatic resend blocked.' } }); await this.dispatcher.finalizeCampaign(data.campaignId, data.tenantId); return { success: true, skipped: true, reason: 'reconciliation_required' }; }
+    const claimed = await this.prisma.campaignDispatch.updateMany({ where: { id: data.dispatchId, status: { in: ['queued', 'processing'] }, campaign: { tenantId: data.tenantId, status: 'processing' } }, data: { status: 'sending', attemptCount: { increment: 1 }, failReason: null } });
+    if (claimed.count === 0) return { success: true, skipped: true, reason: 'already_claimed' };
+    const optOut = await this.prisma.customerOptOut.findUnique({ where: { tenantId_phone: { tenantId: data.tenantId, phone: normalizeMarketingPhone(dispatch.phone) } } });
+    if (optOut) { await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: { status: 'opt_out', failReason: 'Opt-out: customer requested no marketing.' } }); await this.prisma.campaign.update({ where: { id: data.campaignId }, data: { totalOptOut: { increment: 1 } } }); await this.dispatcher.finalizeCampaign(data.campaignId, data.tenantId); return { success: true, skipped: true, reason: 'opt-out' }; }
+    const next = await this.nextAllowedAttempt(data.tenantId);
+    if (next) { await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: { status: 'queued', nextAttemptAt: next } }); await this.dispatcher.rescheduleDispatch(data, next); return { success: true, skipped: true, reason: 'quiet_hours' }; }
+    const current = await this.prisma.campaign.findFirst({ where: { id: data.campaignId, tenantId: data.tenantId }, select: { status: true } });
+    if (current?.status === 'cancelled') { await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: { status: 'cancelled', failReason: 'Campaign cancelled before provider call.' } }); return { success: true, skipped: true, reason: 'cancelled' }; }
     try {
-      const result = mediaUrl
-        ? await this.whatsappSender.sendMedia(tenantId, {
-            to: phone,
-            type: 'image',
-            url: mediaUrl,
-            caption: personalizedMessage,
-          })
-        : await this.whatsappSender.sendText(tenantId, {
-            to: phone,
-            text: personalizedMessage,
-          });
-
-      const status = result.success ? 'sent' : 'failed';
-
-      await this.prisma.campaignDispatch.update({
-        where: { id: dispatchId },
-        data: {
-          status,
-          externalId: result.messageId,
-          failReason: result.error,
-          sentAt: result.success ? new Date() : null,
-        },
-      });
-
-      if (result.success) {
-        await this.prisma.campaign.update({
-          where: { id: campaignId },
-          data: { totalSent: { increment: 1 } },
-        });
-
-        let session = await this.prisma.chatSession.findFirst({
-          where: {
-            tenantId,
-            customerPhone: phone,
-            state: { notIn: ['closed', 'expired'] },
-          },
-          orderBy: { updatedAt: 'desc' },
-        });
-
-        if (!session) {
-          session = await this.prisma.chatSession.create({
-            data: {
-              tenantId,
-              customerId,
-              customerPhone: phone,
-              state: 'greeting',
-              lastMessageAt: new Date(),
-            },
-          });
-        }
-
-        await this.prisma.chatMessage.create({
-          data: {
-            sessionId: session.id,
-            direction: 'outbound',
-            senderType: 'human',
-            content: personalizedMessage,
-            messageType: 'text',
-            externalId: result.messageId || undefined,
-            externalStatus: result.success ? 'sent' : 'failed',
-            timestamp: new Date(),
-            metadata: {
-              source: 'campaign',
-              campaignId,
-              dispatchId,
-              hasMedia: Boolean(mediaUrl),
-            },
-          },
-        });
-      }
-
-      return { success: result.success, messageId: result.messageId };
+      const result = data.mediaUrl ? await this.whatsappSender.sendMedia(data.tenantId, { to: dispatch.phone, type: this.mediaType(data.mediaType), url: data.mediaUrl, caption: applyCampaignTemplate(data.messageTemplate, { nome: data.customerName.split(' ')[0] || 'cliente' }), idempotencyKey: dispatch.idempotencyKey }) : await this.whatsappSender.sendText(data.tenantId, { to: dispatch.phone, text: applyCampaignTemplate(data.messageTemplate, { nome: data.customerName.split(' ')[0] || 'cliente' }), idempotencyKey: dispatch.idempotencyKey });
+      if (!result.success) { const retryable = result.retryable === true; await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: retryable ? { status: 'processing', failReason: result.error ?? 'Retryable provider failure.' } : { status: 'failed', failReason: result.error ?? 'Provider rejected delivery.' } }); if (retryable) throw new RetryableCampaignError(result.error ?? 'Retryable provider failure.'); await this.dispatcher.finalizeCampaign(data.campaignId, data.tenantId); return { success: false, reason: 'provider_terminal_failure' }; }
+      await this.prisma.campaignDispatch.update({ where: { id: data.dispatchId }, data: { status: 'sent', sentAt: new Date(), providerAcceptedAt: new Date(), externalId: result.messageId, reconciliationRequired: false } });
+      await this.prisma.campaign.update({ where: { id: data.campaignId }, data: { totalSent: { increment: 1 } } });
+      await this.dispatcher.finalizeCampaign(data.campaignId, data.tenantId);
+      return { success: true, messageId: result.messageId };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error processing dispatch ${dispatchId}: ${message}`);
-
-      await this.prisma.campaignDispatch.update({
-        where: { id: dispatchId },
-        data: {
-          status: 'failed',
-          failReason: message,
-        },
-      });
-
-      throw error;
+      if (error instanceof RetryableCampaignError) throw error;
+      await this.prisma.campaignDispatch.updateMany({ where: { id: data.dispatchId, status: 'sending' }, data: { status: 'processing', failReason: error instanceof Error ? error.message : 'Network error.' } });
+      throw new RetryableCampaignError(error instanceof Error ? error.message : 'Network error.');
     }
   }
 
-  private async checkAntiSpam(tenantId: string, customerId: string, dispatchId: string) {
-    // Verificacao de janela de silencio central (08:00 - 21:00)
-    // TODO P1-TECH: buscar tenantSettings.timezone para suportar múltiplos fusos horários.
-    // Por enquanto, America/Sao_Paulo como fallback — impacto zero para tenants brasileiros.
-    // Quando implementado: const tz = (await prisma.tenantSettings.findUnique(...))?.timezone ?? 'America/Sao_Paulo';
-    const hourFormatter = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo', // TODO P1-TECH: substituir por tenantSettings.timezone
-      hour: 'numeric',
-      hour12: false,
-    });
-
-    try {
-      const currentHour = parseInt(hourFormatter.format(new Date()), 10);
-      if (currentHour < 8 || currentHour >= 21) {
-        return { allowed: false, reason: 'outside_quiet_hours - Horário não permitido (Silêncio Noturno)' };
-      }
-    } catch (e) {
-      this.logger.error('Failed to parse timezone hour, falling back to local system hour', e);
-      const currentHour = new Date().getHours();
-      if (currentHour < 8 || currentHour >= 21) {
-        return { allowed: false, reason: 'outside_quiet_hours - Horário não permitido (Silêncio Noturno)' };
-      }
-    }
-
-    const settings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId },
-      select: { automationCooldownHours: true, automationMaxMessagesPerDay: true },
-    });
-    const cooldownHours = settings?.automationCooldownHours ?? 24;
-    const maxPerDay = settings?.automationMaxMessagesPerDay ?? 1;
-    const cooldownSince = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
-    const daySince = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    const [recentSent, sentToday] = await Promise.all([
-      this.prisma.campaignDispatch.findFirst({
-        where: {
-          customerId,
-          id: { not: dispatchId },
-          status: { in: ['sent', 'delivered', 'read', 'replied'] },
-          sentAt: { gte: cooldownSince },
-          campaign: { tenantId },
-        },
-        select: { id: true },
-      }),
-      this.prisma.campaignDispatch.count({
-        where: {
-          customerId,
-          id: { not: dispatchId },
-          status: { in: ['sent', 'delivered', 'read', 'replied'] },
-          sentAt: { gte: daySince },
-          campaign: { tenantId },
-        },
-      }),
-    ]);
-
-    if (recentSent) return { allowed: false, reason: `cooldown_${cooldownHours}h` };
-    if (sentToday >= maxPerDay) return { allowed: false, reason: `max_frequency_${maxPerDay}_per_day` };
-    return { allowed: true };
-  }
-
-  @OnWorkerEvent('failed')
-  onFailed(job: Job, error: Error) {
-    this.logger.error(`Job ${job.id} failed: ${error.message}`);
-  }
+  private async nextAllowedAttempt(tenantId: string): Promise<Date | null> { const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId }, select: { timezone: true } }); const timezone = settings?.timezone?.trim() || 'America/Sao_Paulo'; const now = new Date(); if (this.hour(timezone, now) >= 8 && this.hour(timezone, now) < 21) return null; for (let minute = 1; minute <= 1440; minute += 1) { const candidate = new Date(now.getTime() + minute * 60000); const hour = this.hour(timezone, candidate); if (hour >= 8 && hour < 21) return candidate; } throw new Error('Unable to determine next campaign window.'); }
+  private hour(timezone: string, instant: Date): number { const value = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: '2-digit', hour12: false }).format(instant); const hour = Number.parseInt(value, 10); return hour === 24 ? 0 : hour; }
+  private mediaType(value?: string | null): 'image' | 'video' | 'audio' | 'document' { return value === 'video' || value === 'audio' || value === 'document' ? value : 'image'; }
+  @OnWorkerEvent('failed') onFailed(job: Job, error: Error) { this.logger.error(`Job ${job.id} failed: ${error.message}`); }
 }

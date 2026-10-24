@@ -12,6 +12,7 @@ export const TENANT_PERMISSIONS = {
   'orders.view_timeline': 'View order timeline',
   'orders.use_kanban': 'Use operational kanban',
   'orders.use_kds': 'Use kitchen display system',
+  'orders.settings.manage': 'Manage operational order settings',
 
   // Catalog module
   'catalog.read': 'View catalog',
@@ -162,6 +163,8 @@ export const ADMIN_PERMISSIONS = {
   'saas.settings.manage': 'Manage system settings',
   'saas.franchise.read': 'View franchise dashboard and groups',
   'saas.franchise.manage': 'Manage franchise operations',
+  'saas.marketplace.read': 'View marketplace operations and reconciliation',
+  'saas.marketplace.manage': 'Retry and acknowledge marketplace operations',
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
@@ -174,7 +177,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   tenant_owner: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   tenant_admin: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   manager: [
-    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
+    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds', 'orders.settings.manage',
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_products', 'catalog.manage_option_groups', 'catalog.bulk_edit', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
     'printing.read', 'printing.manage', 'printing.print', 'printing.reprint',
@@ -261,6 +264,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_menu.read',
     'saas.base_media.read',
     'saas.franchise.read',
+    'saas.marketplace.read',
   ],
   financial: [
     'saas.tenants.read',
@@ -290,6 +294,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_media.manage',
     'saas.franchise.read',
     'saas.franchise.manage',
+    'saas.marketplace.read',
+    'saas.marketplace.manage',
   ],
   auditor: [
     'saas.tenants.read',
@@ -300,5 +306,6 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_menu.read',
     'saas.base_media.read',
     'saas.franchise.read',
+    'saas.marketplace.read',
   ],
 };

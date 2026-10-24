@@ -14,6 +14,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import { PwaLifecycle } from './components/PwaLifecycle';
 import { useStorefrontThemeStore } from './stores/theme.store';
+import { bootstrapCustomerSession } from './lib/api-client';
 
 import { SaasLayout } from './layouts/SaasLayout';
 import { SaasLandingPage } from './pages/SaasLandingPage';
@@ -25,6 +26,7 @@ export function App() {
   const initTheme = useStorefrontThemeStore((s) => s.initializeTheme);
   useEffect(() => {
     initTheme();
+    void bootstrapCustomerSession();
   }, [initTheme]);
 
   return (

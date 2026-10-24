@@ -1,13 +1,18 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
-import { UnitType as PrismaUnitType, Prisma } from '@prisma/client';
+import { UnitType as PrismaUnitType, Prisma, StockMovementType as PrismaStockMovementType } from '@prisma/client';
+import { IngredientBaseUnitGuardService } from './ingredient-base-unit-guard.service';
+import { convertUnitQuantity, UnitConversionError } from './unit-conversion';
 
 type IngredientWithRelations = Prisma.IngredientGetPayload<Record<string, never>>;
 
 @Injectable()
 export class IngredientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly baseUnitGuard: IngredientBaseUnitGuardService,
+  ) {}
 
   private mapUnit(unit: PrismaUnitType): UnitType {
     const map: Record<PrismaUnitType, UnitType> = {
@@ -29,6 +34,39 @@ export class IngredientsService {
       [UnitType.L]: PrismaUnitType.l,
     };
     return map[unit];
+  }
+
+  private resolveConversionFactor(value: number | undefined): number {
+    const conversionFactor = value ?? 1;
+    if (!Number.isFinite(conversionFactor) || conversionFactor <= 0) {
+      throw new BadRequestException('O fator de conversão deve ser maior que zero');
+    }
+    return conversionFactor;
+  }
+
+  private resolveCanonicalPresentation(
+    presentation: NonNullable<CreateIngredientDTO['purchasePresentations']>[number],
+    ingredientUnit: PrismaUnitType,
+  ): { label: string; contentQuantity: Prisma.Decimal; contentUnit: PrismaUnitType; conversionFactor: Prisma.Decimal } {
+    const label = presentation.label?.trim();
+    const contentQuantity = new Prisma.Decimal(presentation.contentQuantity);
+    if (!label || !contentQuantity.isFinite() || contentQuantity.lte(0) || contentQuantity.decimalPlaces() > 6) {
+      throw new BadRequestException('Cada apresentacao precisa ter nome unico e conteudo positivo de ate seis casas decimais.');
+    }
+    const contentUnit = this.mapPrismaUnit(presentation.contentUnit);
+    let conversionFactor: Prisma.Decimal;
+    try {
+      conversionFactor = convertUnitQuantity(contentQuantity, contentUnit, ingredientUnit);
+    } catch (error) {
+      if (error instanceof UnitConversionError) {
+        throw new BadRequestException({ code: error.code, message: 'A unidade da apresentacao deve ser compativel com a unidade-base do insumo.' });
+      }
+      throw error;
+    }
+    if (conversionFactor.decimalPlaces() > 6) {
+      throw new BadRequestException('O conteudo normalizado nao cabe na precisao da apresentacao.');
+    }
+    return { label, contentQuantity, contentUnit, conversionFactor };
   }
 
   async findAll(tenantId: string): Promise<IngredientDTO[]> {
@@ -64,7 +102,12 @@ export class IngredientsService {
       }
     }
 
-    const { initialPurchase, ...ingredientData } = dto;
+    const { initialPurchase, purchasePresentations = [], ...ingredientData } = dto;
+    const ingredientUnit = this.mapPrismaUnit(ingredientData.unit);
+    const normalizedPresentations = purchasePresentations.map((presentation) => this.resolveCanonicalPresentation(presentation, ingredientUnit));
+    if (new Set(normalizedPresentations.map((presentation) => presentation.label.toLocaleLowerCase())).size !== normalizedPresentations.length) {
+      throw new BadRequestException('Cada apresentacao precisa ter nome unico.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Create Ingredient
@@ -73,9 +116,9 @@ export class IngredientsService {
           name: ingredientData.name,
           sku: safeSku,
           description: ingredientData.description,
-          unit: this.mapPrismaUnit(ingredientData.unit),
+          unit: ingredientUnit,
           purchaseUnit: ingredientData.purchaseUnit ? this.mapPrismaUnit(ingredientData.purchaseUnit) : this.mapPrismaUnit(ingredientData.unit),
-          conversionFactor: ingredientData.conversionFactor || 1,
+          conversionFactor: this.resolveConversionFactor(ingredientData.conversionFactor),
           category: ingredientData.category,
           minStock: ingredientData.minStock,
           tenantId,
@@ -84,31 +127,24 @@ export class IngredientsService {
         },
       });
 
-      // 2. Handle Initial Purchase if provided
-      if (initialPurchase && initialPurchase.quantity > 0) {
-        const factor = Number(ingredient.conversionFactor);
-        const quantityBase = Number(initialPurchase.quantity) * factor;
-        const unitCostBase = Number(initialPurchase.totalCost) / quantityBase;
-
-        // Create Purchase record for history
-        const purchase = await tx.purchase.create({
-          data: {
+      if (normalizedPresentations.length > 0) {
+        await tx.purchasePresentation.createMany({
+          data: normalizedPresentations.map((presentation) => ({
             tenantId,
-            supplierId: initialPurchase.supplierId || '', // Handle missing supplier
-            totalValue: initialPurchase.totalCost,
-            status: 'received',
-            purchaseDate: new Date(),
-            items: {
-              create: {
-                tenantId,
-                ingredientId: ingredient.id,
-                quantity: initialPurchase.quantity,
-                unitCost: Number(initialPurchase.totalCost) / Number(initialPurchase.quantity),
-                totalCost: initialPurchase.totalCost,
-              }
-            }
-          }
+            ingredientId: ingredient.id,
+            label: presentation.label,
+            contentQuantity: presentation.contentQuantity,
+            contentUnit: presentation.contentUnit,
+            conversionFactor: presentation.conversionFactor,
+          })),
         });
+      }
+
+      // 2. Opening stock is not a purchase. It is always expressed in the
+      // ingredient's base stock unit and must not create supplier/financial data.
+      if (initialPurchase && initialPurchase.quantity > 0) {
+        const quantityBase = Number(initialPurchase.quantity);
+        const unitCostBase = Number(initialPurchase.totalCost) / quantityBase;
 
         // Update Ingredient with initial stock and cost
         await tx.ingredient.update({
@@ -124,10 +160,10 @@ export class IngredientsService {
           data: {
             tenantId,
             ingredientId: ingredient.id,
-            type: 'purchase_entry',
+            type: PrismaStockMovementType.in,
             quantity: quantityBase,
             unitCost: unitCostBase,
-            notes: `Entrada inicial via cadastro (Compra #${purchase.id})`,
+            notes: 'Saldo inicial informado no cadastro do insumo.',
           }
         });
       }
@@ -159,23 +195,59 @@ export class IngredientsService {
     }
 
     const { ...updateData } = dto;
+    const requestedUnit = updateData.unit === undefined ? undefined : this.mapPrismaUnit(updateData.unit);
 
-    const updated = await this.prisma.ingredient.update({
-      where: { id },
-      data: {
-        name: updateData.name,
-        sku: safeSku,
-        description: updateData.description,
-        unit: updateData.unit ? this.mapPrismaUnit(updateData.unit) : undefined,
-        purchaseUnit: updateData.purchaseUnit ? this.mapPrismaUnit(updateData.purchaseUnit) : undefined,
-        conversionFactor: updateData.conversionFactor,
-        category: updateData.category,
-        minStock: updateData.minStock,
-        isActive: updateData.isActive,
-      },
-    });
+    // Only requests that omit unit altogether may skip the locked read. A unit
+    // that looked unchanged before the transaction can become a real change
+    // while another request updates the ingredient.
+    if (requestedUnit === undefined) {
+      const updated = await this.prisma.ingredient.update({
+        where: { id },
+        data: this.updateData(updateData, requestedUnit),
+      });
+      return this.mapToDTO(updated);
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // The row lock conflicts with foreign-key key-share locks. READ COMMITTED
+      // deliberately refreshes the snapshot after a lock wait, so dependencies
+      // committed by a concurrent writer are visible before the guard runs.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM ingredients
+        WHERE id = ${id} AND tenant_id = ${tenantId}
+        FOR UPDATE
+      `;
+      if (locked.length !== 1) throw new NotFoundException('Insumo nao encontrado');
+
+      const current = await tx.ingredient.findFirst({ where: { id, tenantId } });
+      if (!current) throw new NotFoundException('Insumo nao encontrado');
+      if (requestedUnit !== current.unit) {
+        await this.baseUnitGuard.assertCanChange(tx, tenantId, id, current);
+      }
+
+      return tx.ingredient.update({
+        where: { id },
+        data: this.updateData(updateData, requestedUnit),
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 
     return this.mapToDTO(updated);
+  }
+
+  private updateData(updateData: UpdateIngredientDTO, requestedUnit: PrismaUnitType | undefined) {
+    return {
+      name: updateData.name,
+      sku: updateData.sku === undefined ? undefined : (updateData.sku && updateData.sku.trim() !== '' ? updateData.sku.trim() : null),
+      description: updateData.description,
+      unit: requestedUnit,
+      purchaseUnit: updateData.purchaseUnit ? this.mapPrismaUnit(updateData.purchaseUnit) : undefined,
+      conversionFactor: updateData.conversionFactor === undefined
+        ? undefined
+        : this.resolveConversionFactor(updateData.conversionFactor),
+      category: updateData.category,
+      minStock: updateData.minStock,
+      isActive: updateData.isActive,
+    };
   }
 
   async getSummary(tenantId: string) {

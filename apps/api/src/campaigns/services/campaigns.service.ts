@@ -1,6 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional, ServiceUnavailableException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
+import { normalizeMarketingPhone } from '../../common/utils/marketing-opt-out.util';
+import { CampaignDispatcherService } from './campaign-dispatcher.service';
 
 export interface CreateCampaignDto {
   name: string;
@@ -9,7 +12,7 @@ export interface CreateCampaignDto {
   messageTemplate: string;
   mediaUrl?: string;
   mediaType?: string;
-  segmentRules: {
+  segmentRules?: {
     minOrders?: number;
     maxOrders?: number;
     minSpent?: number;
@@ -24,7 +27,10 @@ export interface CreateCampaignDto {
 export class CampaignsService {
   private readonly logger = new Logger('CampaignsService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly campaignDispatcher?: CampaignDispatcherService,
+  ) {}
 
   /**
    * Cria uma nova campanha e calcula a audiência inicial baseada nas regras de segmentação.
@@ -40,7 +46,7 @@ export class CampaignsService {
 
     if (!isStatus) {
       // 1. Encontra clientes que batem com as regras (e não estão em opt-out)
-      const audienceIds = await this.calculateAudience(tenantId, dto.segmentRules);
+      const audienceIds = await this.calculateAudience(tenantId, dto.segmentRules ?? {});
 
       // Limit audience by maxDispatches
       finalAudienceIds = dto.maxDispatches 
@@ -63,7 +69,7 @@ export class CampaignsService {
         messageTemplate: dto.messageTemplate,
         mediaUrl: dto.mediaUrl,
         mediaType: dto.mediaType,
-        segmentRules: isStatus ? undefined : dto.segmentRules as Prisma.JsonObject,
+        segmentRules: (dto.segmentRules ?? {}) as Prisma.JsonObject,
         scheduledAt,
         status: scheduledAt && scheduledAt > new Date() ? 'scheduled' : 'draft',
         totalAudience: finalAudienceIds.length,
@@ -73,16 +79,21 @@ export class CampaignsService {
 
     if (!isStatus) {
       // 3. Cria os dispatches em massa (status: queued)
-      const dispatchesData = finalAudienceIds.map(customerId => ({
-        campaignId: campaign.id,
-        customerId: customerId,
-        phone: '', // Preencheremos na query abaixo
-        status: 'queued' as const,
-      }));
+      const dispatchesData = finalAudienceIds.map(customerId => {
+        const id = randomUUID();
+        return {
+          id,
+          campaignId: campaign.id,
+          customerId,
+          phone: '', // Preencheremos na query abaixo
+          status: 'queued' as const,
+          idempotencyKey: `campaign:${campaign.id}:dispatch:${id}`,
+        };
+      });
 
       // Buscar os telefones para gravar no dispatch
       const customers = await this.prisma.customer.findMany({
-        where: { id: { in: finalAudienceIds } },
+        where: { tenantId, id: { in: finalAudienceIds } },
         select: { id: true, phone: true },
       });
 
@@ -105,15 +116,14 @@ export class CampaignsService {
   }
 
   /**
-   * Inicia a execução de uma campanha (muda status de draft/scheduled para running).
-   * O CampaignDispatcherService deverá varrer campanhas 'running' para enviar.
+   * Inicia a execução de uma campanha e a torna visível ao dispatcher.
    */
   async startCampaign(tenantId: string, campaignId: string) {
-    const campaign = await this.prisma.campaign.findUnique({
-      where: { id: campaignId },
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id: campaignId, tenantId },
     });
 
-    if (!campaign || campaign.tenantId !== tenantId) {
+    if (!campaign) {
       throw new BadRequestException('Campanha não encontrada.');
     }
 
@@ -121,10 +131,19 @@ export class CampaignsService {
       throw new BadRequestException(`Campanha não pode ser iniciada. Status atual: ${campaign.status}`);
     }
 
+    if (!this.campaignDispatcher) {
+      throw new ServiceUnavailableException('Fila de campanhas indisponível. Tente novamente quando BullMQ/Redis estiver disponível.');
+    }
+    try {
+      await this.campaignDispatcher.assertAvailable();
+    } catch {
+      throw new ServiceUnavailableException('Fila de campanhas indisponível. A campanha não foi iniciada.');
+    }
+
     return this.prisma.campaign.update({
       where: { id: campaignId },
       data: {
-        status: 'running',
+        status: 'processing',
         startedAt: new Date(),
       },
     });
@@ -150,23 +169,27 @@ export class CampaignsService {
   }
 
   /**
-   * Pausa uma campanha em execução.
+   * Pausar campanhas não é suportado, as campanhas podem ser apenas canceladas.
    */
-  async pauseCampaign(tenantId: string, campaignId: string) {
-    return this.prisma.campaign.updateMany({
-      where: { id: campaignId, tenantId, status: 'running' },
-      data: { status: 'paused' },
-    });
+  async pauseCampaign(_tenantId: string, _campaignId: string) {
+    throw new BadRequestException('A ação de pausar campanhas não é mais suportada nesta versão. Use cancelar.');
   }
 
   /**
    * Cancela uma campanha.
    */
   async cancelCampaign(tenantId: string, campaignId: string) {
-    return this.prisma.campaign.updateMany({
-      where: { id: campaignId, tenantId, status: { in: ['draft', 'scheduled', 'running', 'paused'] } },
+    const cancelled = await this.prisma.campaign.updateMany({
+      where: { id: campaignId, tenantId, status: { in: ['draft', 'scheduled', 'processing', 'queued'] } },
       data: { status: 'cancelled', cancelledAt: new Date() },
     });
+    if (cancelled.count > 0) {
+      await this.prisma.campaignDispatch.updateMany({
+        where: { campaignId, campaign: { tenantId }, status: { in: ['queued', 'processing'] } },
+        data: { status: 'cancelled', failReason: 'Campaign cancelled before delivery.' },
+      });
+    }
+    return cancelled;
   }
 
   /**
@@ -213,8 +236,8 @@ export class CampaignsService {
       },
     });
 
-    const active = campaigns.filter((campaign) => campaign.status === 'running' || campaign.status === 'scheduled');
-    const paused = campaigns.filter((campaign) => campaign.status === 'paused');
+    const active = campaigns.filter((campaign) => campaign.status === 'processing' || campaign.status === 'scheduled');
+    const queued = campaigns.filter((campaign) => campaign.status === 'queued');
     const lastExecutions = campaigns
       .filter((campaign) => campaign.startedAt || campaign.completedAt)
       .slice(0, 10)
@@ -243,7 +266,7 @@ export class CampaignsService {
       { sent: 0, delivered: 0, read: 0, clicked: 0, converted: 0, optOuts: 0, failures: 0, revenueGenerated: 0 },
     );
 
-    return { active, paused, lastExecutions, totals };
+    return { active, queued, lastExecutions, totals };
   }
 
   async markConversionsFromOrders(tenantId: string, lookbackDays = 7) {
@@ -309,15 +332,21 @@ export class CampaignsService {
   private async calculateAudience(tenantId: string, rules: CreateCampaignDto['segmentRules']): Promise<string[]> {
     const optedOutCustomers = await this.prisma.customerOptOut.findMany({
       where: { tenantId },
-      select: { customerId: true },
+      select: { customerId: true, phone: true },
     });
-    const optedOutCustomerIds = optedOutCustomers.map((optOut) => optOut.customerId);
+    const optedOutCustomerIds = optedOutCustomers
+      .map((optOut) => optOut.customerId)
+      .filter((customerId): customerId is string => Boolean(customerId));
+    const optedOutPhones = optedOutCustomers.map((optOut) => normalizeMarketingPhone(optOut.phone));
 
     const whereClause: Prisma.CustomerWhereInput = {
       tenantId,
-      // Não incluir quem fez opt-out
       id: { notIn: optedOutCustomerIds },
     };
+
+    if (optedOutPhones.length > 0) {
+      whereClause.phone = { notIn: optedOutPhones };
+    }
 
     if (rules.specificCustomers && rules.specificCustomers.length > 0) {
       whereClause.id = { in: rules.specificCustomers, notIn: optedOutCustomerIds };

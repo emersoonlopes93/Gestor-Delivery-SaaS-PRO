@@ -203,6 +203,25 @@ export class CustomerService {
   async getCustomer(tenantId: string, id: string) {
     const customer = await this.db.customer.findUnique({
       where: { id, tenantId },
+      include: {
+        addresses: {
+          where: { tenantId },
+          orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+        },
+        orders: {
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            fulfillmentType: true,
+            total: true,
+            createdAt: true,
+          },
+        },
+      },
     });
 
     if (!customer) {
@@ -213,6 +232,10 @@ export class CustomerService {
       ...customer,
       totalSpent: Number(customer.totalSpent),
       cashbackBalance: Number(customer.cashbackBalance),
+      orders: customer.orders.map((order) => ({
+        ...order,
+        total: Number(order.total),
+      })),
     };
   }
 

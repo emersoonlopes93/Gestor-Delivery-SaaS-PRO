@@ -1,10 +1,17 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, CheckCircle2, CircleDot, Loader2, Plus, Store } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { api, ApiError } from '../../lib/api-client';
+import { api } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { CreateBranchRequest, TenantNetworkContext } from '@gestor/types';
+import { useTenantCapabilities } from '../../hooks/useTenantCapabilities';
+import {
+  branchCreationMessage,
+  branchCreationErrorMessage,
+  canCreateBranch,
+  runSingleBranchSubmission,
+} from './branchCreationSafety';
 
 function statusLabel(role: TenantNetworkContext['role']) {
   return role === 'headquarters' ? 'Matriz' : 'Filial';
@@ -16,6 +23,8 @@ export function StoreNetworkPage() {
   const [branchName, setBranchName] = useState('');
   const [branchSlug, setBranchSlug] = useState('');
   const [error, setError] = useState('');
+  const submitLock = useRef(false);
+  const { capabilities } = useTenantCapabilities();
 
   const { data, isLoading } = useQuery({
     queryKey: ['tenant-network'],
@@ -41,11 +50,7 @@ export function StoreNetworkPage() {
       ]);
     },
     onError: (err) => {
-      if (err instanceof ApiError) {
-        setError(err.message);
-        return;
-      }
-      setError('Nao foi possivel criar a filial agora.');
+      setError(branchCreationErrorMessage(err));
     },
   });
 
@@ -54,7 +59,8 @@ export function StoreNetworkPage() {
     [user?.roles],
   );
 
-  const canCreateBranch = isOwner && data?.role === 'headquarters';
+  const branchCreationCapability = capabilities?.actions?.['branches.create'];
+  const isBranchCreationAllowed = canCreateBranch(isOwner, data?.role, branchCreationCapability);
 
   const handleCreateBranch = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,10 +70,16 @@ export function StoreNetworkPage() {
       return;
     }
 
-    await createBranchMutation.mutateAsync({
-      name: branchName.trim(),
-      slug: branchSlug.trim() || undefined,
-    });
+    try {
+      await runSingleBranchSubmission(submitLock, async () => {
+        await createBranchMutation.mutateAsync({
+          name: branchName.trim(),
+          slug: branchSlug.trim() || undefined,
+        });
+      });
+    } catch {
+      // The mutation callback maps the server error to the visible form state.
+    }
   };
 
   return (
@@ -156,7 +168,7 @@ export function StoreNetworkPage() {
                 </p>
               </div>
 
-              {canCreateBranch ? (
+              {isBranchCreationAllowed ? (
                 <form onSubmit={handleCreateBranch} className="space-y-4">
                   <div>
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Nome da filial</label>
@@ -196,9 +208,7 @@ export function StoreNetworkPage() {
                 </form>
               ) : (
                 <div className="rounded-2xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-                  {isOwner
-                    ? 'Somente a matriz cria novas filiais. Se esta conta estiver em uma filial, a criacao acontece pela loja principal.'
-                    : 'A criacao de filiais fica disponivel apenas para a conta dona da rede.'}
+                  {branchCreationMessage(isOwner, data.role, branchCreationCapability)}
                 </div>
               )}
 

@@ -72,7 +72,8 @@ export interface CostMarginMetricsDTO {
 export interface DashboardStatsDTO {
   operational: OperationalMetricsDTO;
   commercial: CommercialMetricsDTO;
-  costs: CostMarginMetricsDTO;
+  /** Omitted when the authenticated user cannot view cost and margin data. */
+  costs?: CostMarginMetricsDTO;
   financial: {
     totalIncome: number;
     totalExpenses: number;
@@ -85,4 +86,28 @@ export interface MetricFilterDTO {
   startDate: string;
   endDate: string;
   channel?: string;
+}
+
+/**
+ * Read-only dashboard data that is safe for operational staff.  It deliberately
+ * contains order volume and completed-order totals only; it is not a financial
+ * statement, receivables view, or profitability report.
+ */
+export interface DashboardOperationalDTO {
+  period: {
+    from: string;
+    to: string;
+    timezone: string;
+  };
+  orders: {
+    total: number;
+    byStatus: Record<OrderStatus, number>;
+    cancelled: number;
+    cancellationRate: number;
+  };
+  completedSales: {
+    orderCount: number;
+    grossOrderTotal: number;
+    averageTicket: number;
+  };
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Palette, Image as ImageIcon, Sun, Moon, Monitor, CheckCircle2 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
-import { ImagePickerModal } from '../../../components/ImagePickerModal';
 
 interface StorefrontDraft {
   bannerUrl: string;
@@ -66,8 +65,42 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
     colorMode: 'light',
     productLayout: 'list',
   });
-  const [bannerPicker, setBannerPicker] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [bannerError, setBannerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const handleBannerUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setBannerError(null);
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setBannerError('Use uma imagem JPG, PNG ou WebP.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setBannerError('A imagem deve ter no máximo 5MB.');
+      return;
+    }
+
+    setUploadingBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.upload<{ id: string; publicUrl: string }>('/upload/storefront-background', formData);
+      if (response.success) {
+        setDraft((current) => ({
+          ...current,
+          bannerUrl: response.data.publicUrl,
+          bannerMediaAssetId: response.data.id,
+        }));
+      }
+    } catch (error) {
+      setBannerError(error instanceof Error ? error.message : 'Não foi possível enviar o banner.');
+    } finally {
+      setUploadingBanner(false);
+      event.target.value = '';
+    }
+  };
 
   const handleNext = () => {
     onNext(async () => {
@@ -120,12 +153,10 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
           <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 aspect-video bg-slate-100 dark:bg-slate-800 group">
             <img src={draft.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-              <button
-                onClick={() => setBannerPicker(true)}
-                className="px-4 py-2 bg-white text-slate-900 rounded-xl text-xs font-bold"
-              >
-                Alterar
-              </button>
+            <label className="cursor-pointer rounded-xl bg-card px-4 py-2 text-xs font-bold text-card-foreground">
+                {uploadingBanner ? 'Enviando...' : 'Substituir'}
+                <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp" onChange={handleBannerUpload} disabled={uploadingBanner} />
+              </label>
               <button
                 onClick={() => setDraft(d => ({ ...d, bannerUrl: '', bannerMediaAssetId: '' }))}
                 className="px-4 py-2 bg-red-500 text-white rounded-xl text-xs font-bold"
@@ -138,15 +169,16 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setBannerPicker(true)}
+          <label
             className="w-full aspect-video rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-pink-400 dark:hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-500 hover:text-pink-500 transition-all"
           >
             <ImageIcon className="w-8 h-8" />
-            <span className="text-sm font-bold">Selecionar banner</span>
+            <span className="text-sm font-bold">{uploadingBanner ? 'Enviando...' : 'Selecionar arquivo'}</span>
             <span className="text-xs">Opcional. Da personalidade a sua loja.</span>
-          </button>
+            <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp" onChange={handleBannerUpload} disabled={uploadingBanner} />
+          </label>
         )}
+        {bannerError ? <p role="alert" className="mt-3 text-xs font-medium text-red-600 dark:text-red-400">{bannerError}</p> : null}
       </div>
 
       <div>
@@ -228,7 +260,7 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                 draft.productLayout === id ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 dark:border-slate-600'
               }`}>
-                {draft.productLayout === id && <div className="w-2 h-2 rounded-full bg-white" />}
+                {draft.productLayout === id && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
               </div>
               <div>
                 <div className={`font-bold text-sm ${draft.productLayout === id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>{label}</div>
@@ -252,15 +284,6 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
         </button>
       </div>
 
-      <ImagePickerModal
-        isOpen={bannerPicker}
-        onClose={() => setBannerPicker(false)}
-        onSelect={(asset) => {
-          setDraft(d => ({ ...d, bannerUrl: asset.publicUrl, bannerMediaAssetId: asset.id }));
-          setBannerPicker(false);
-        }}
-        selectedAssetId={draft.bannerMediaAssetId || undefined}
-      />
     </div>
   );
 }

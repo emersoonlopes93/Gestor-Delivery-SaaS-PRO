@@ -1,0 +1,3 @@
+ALTER TYPE "MarketplaceOperationType" ADD VALUE IF NOT EXISTS 'READY';
+ALTER TYPE "MarketplaceOperationType" ADD VALUE IF NOT EXISTS 'DISPATCH';
+ALTER TYPE "MarketplaceOperationType" ADD VALUE IF NOT EXISTS 'DELIVER';

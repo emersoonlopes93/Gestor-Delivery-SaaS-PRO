@@ -34,7 +34,8 @@ import { TransferTableModal } from './components/TransferTableModal';
 import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
 import { SplitPaymentModal } from './components/SplitPaymentModal';
 import { PosCustomerDrawer } from './components/PosCustomerDrawer';
-import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
+import type { CategoryTemplateType, CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
+import { getProductConfigurationRoute } from '@gestor/utils';
 
 interface CatalogProduct {
   id: string;
@@ -43,8 +44,9 @@ interface CatalogProduct {
   image: string | null;
   categoryName: string;
   categoryId: string;
-  categoryTemplateType?: string | null;
+  categoryTemplateType?: CategoryTemplateType | null;
   type: 'simple' | 'configurable' | 'combo';
+  activeOptionGroupCount: number;
 }
 
 interface CartItem {
@@ -141,6 +143,7 @@ export default function PosPage() {
   
   // Mesa Fields
   const [tableNumber, setTableNumber] = useState('');
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   
   // Delivery Fields
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -221,8 +224,9 @@ export default function PosPage() {
         image: (p['image'] as string | null) || null,
         categoryId: ((p['category'] as Record<string, unknown>)?.['id'] as string) || 'uncategorized',
         categoryName: ((p['category'] as Record<string, unknown>)?.['name'] as string) || 'Sem Categoria',
-        categoryTemplateType: ((p['category'] as Record<string, unknown>)?.['templateType'] as string) || null,
+        categoryTemplateType: ((p['category'] as Record<string, unknown>)?.['templateType'] as CategoryTemplateType) || null,
         type: (p['type'] as 'simple' | 'configurable' | 'combo') || 'simple',
+        activeOptionGroupCount: Number(((p['_count'] as Record<string, unknown> | undefined)?.['optionGroupLinks']) ?? 0),
       }));
     },
     refetchOnWindowFocus: false,
@@ -457,8 +461,7 @@ export default function PosPage() {
   }, [products, selectedCategoryId]);
 
   const addToCart = useCallback((product: CatalogProduct) => {
-    // Produtos configuráveis/combos devem passar pelo fluxo de configuração.
-    if (product.type === 'configurable' || product.type === 'combo' || product.categoryTemplateType === 'pizza') {
+    if (getProductConfigurationRoute(product) !== 'direct') {
       setConfigProductId(product.id);
       return;
     }
@@ -488,6 +491,7 @@ export default function PosPage() {
   const handleSelectTable = async (table: SalonTable) => {
      setFulfillmentType(PosFulfillmentType.TABLE);
      setTableNumber(table.name);
+     setSelectedTableId(table.id);
      
      if (table.activeOrderId) {
         const res = await api.get<OrderResponseDTO>(`/orders/${table.activeOrderId}`);
@@ -535,7 +539,8 @@ export default function PosPage() {
     cart.length > 0 &&
     !createSale.isPending &&
     !customerMissingRequiredData &&
-    (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated));
+    (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated)) &&
+    (fulfillmentType !== PosFulfillmentType.TABLE || !!selectedTableId);
   const isSavingCustomerAddress =
     createCustomerMutation.isPending ||
     createAddressMutation.isPending ||
@@ -582,6 +587,7 @@ export default function PosPage() {
     customerName: customerName || undefined,
     customerPhone: customerPhone || undefined,
     fulfillmentType,
+    tableId: fulfillmentType === PosFulfillmentType.TABLE ? selectedTableId || undefined : undefined,
     tableNumber: fulfillmentType === PosFulfillmentType.TABLE ? tableNumber : undefined,
     deliveryFee: isDelivery ? deliveryFee : undefined,
     selectedAddressId: isDelivery ? selectedAddressId || undefined : undefined,
@@ -634,7 +640,7 @@ export default function PosPage() {
     createSale.mutate({ ...getPayload(), paymentMethod: method }, {
       onSuccess: (data) => {
         handlePrint(data.id, 'customer'); // Auto-print customer receipt
-        setCart([]); setCurrentOrderId(null); setTableNumber(''); setViewMode('salon'); setIsPaymentModalOpen(false);
+        setCart([]); setCurrentOrderId(null); setTableNumber(''); setSelectedTableId(null); setViewMode('salon'); setIsPaymentModalOpen(false);
         clearSelectedCustomer();
         setDeliveryFee(0); setDeliveryFeeCalculated(false); setDeliveryFeeError(null);
         setSaleError(null);
@@ -652,10 +658,10 @@ export default function PosPage() {
     });
   };
 
-  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-background dark:bg-muted950 text-muted-foreground500 dark:text-muted-foreground400 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
+  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-[100dvh] bg-background text-muted-foreground italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-background dark:bg-muted950 text-foreground overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-[calc(100dvh-64px)] bg-background text-foreground overflow-hidden font-sans">
       
       {/* ========== LEFT: NAVIGATION ========== */}
       <div className="hidden lg:flex w-16 flex-col bg-card dark:bg-muted900 border-r border-border200 dark:border-border800 py-4 gap-4 items-center">
@@ -697,7 +703,7 @@ export default function PosPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                 {filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
+                 {filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={() => addToCart(p)} />)}
                </div>
             </div>
            </>
@@ -821,11 +827,11 @@ export default function PosPage() {
                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400"><Hash size={14} /></span>
-                  <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-status-success" placeholder="Nº Mesa" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />
+                  <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-status-success" placeholder="Selecione uma mesa no salão" value={tableNumber} readOnly aria-label="Mesa selecionada" />
                   </div>
                   <button 
                     onClick={handleSaveDraft}
-                    disabled={!tableNumber || cart.length === 0 || upsertDraft.isPending}
+                    disabled={!selectedTableId || cart.length === 0 || upsertDraft.isPending}
                   className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                      <Save size={14} />

@@ -71,7 +71,7 @@ export function parseTenantPaymentMethodKeys(raw: unknown): string[] {
 export function buildAgentPaymentMethodsResult(input: {
   paymentMethodsRaw: unknown;
   pixKey: string | null;
-  mercadoPagoAccessToken: string | null;
+  mercadoPagoConnected: boolean;
 }): AgentPaymentMethodsResult {
   const keys = parseTenantPaymentMethodKeys(input.paymentMethodsRaw);
   const uniqueTypes = new Set<AgentPaymentMethodType>();
@@ -87,7 +87,7 @@ export function buildAgentPaymentMethodsResult(input: {
     uniqueTypes.add(type);
 
     if (type === 'pix') {
-      const hasGateway = Boolean(input.mercadoPagoAccessToken?.trim());
+      const hasGateway = input.mercadoPagoConnected;
       const hasManualKey = Boolean(input.pixKey?.trim());
       const enabled = hasGateway || hasManualKey;
       const mode: AgentPixMode = hasGateway

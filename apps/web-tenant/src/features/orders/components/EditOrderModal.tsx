@@ -10,6 +10,7 @@ import { api } from '../../../lib/api-client';
 import { PosItemConfiguratorModal } from '../../pos/components/PosItemConfiguratorModal';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { getProductConfigurationRoute } from '@gestor/utils';
 
 export interface EditOrderModalProps {
   order: OrderResponseDTO | null;
@@ -37,6 +38,18 @@ interface CatalogProduct {
   basePrice: number;
   image: string | null;
   type: 'simple' | 'configurable' | 'combo';
+  categoryTemplateType?: 'none' | 'pizza' | 'combo' | null;
+  activeOptionGroupCount: number;
+}
+
+interface CatalogProductListResponse {
+  id: string;
+  name: string;
+  basePrice: number;
+  image?: string | null;
+  type?: CatalogProduct['type'];
+  category?: { templateType?: CatalogProduct['categoryTemplateType'] } | null;
+  _count?: { optionGroupLinks?: number };
 }
 
 const mapItemToEditable = (item: OrderItemResponseDTO): EditableItem => {
@@ -70,13 +83,15 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
     queryKey: ['catalog-search', searchTerm],
     queryFn: async () => {
       if (searchTerm.length < 2) return [];
-      const res = await api.get<CatalogProduct[]>(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=10`);
+      const res = await api.get<CatalogProductListResponse[]>(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=10`);
       return (res.data || []).map((p) => ({
         id: p.id,
         name: p.name,
         basePrice: Number(p.basePrice || 0),
         image: p.image || null,
         type: p.type || 'simple',
+        categoryTemplateType: p.category?.templateType || null,
+        activeOptionGroupCount: Number(p._count?.optionGroupLinks ?? 0),
       }));
     },
     enabled: searchTerm.length >= 2,
@@ -110,7 +125,7 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
   };
 
   const handleAddProduct = (product: CatalogProduct) => {
-    if (product.type === 'configurable' || product.type === 'combo') {
+    if (getProductConfigurationRoute(product) !== 'direct') {
       setConfigProductId(product.id);
     } else {
       const newItem: EditableItem = {

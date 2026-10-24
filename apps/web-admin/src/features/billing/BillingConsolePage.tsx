@@ -12,7 +12,7 @@ import { CloseCycleModal } from './components/BillingSubscriptionsTab';
 
 export function BillingConsolePage() {
   const state = useBillingConsole();
-  const { activeTab, setActiveTab, selectedTenantId, setSelectedTenantId, usagePreview, setUsagePreview, invoicePreview, setInvoicePreview, selectedInvoiceId, setSelectedInvoiceId, closeModalOpen, setCloseModalOpen, overviewQuery, plansQuery, tenantsQuery, tenantBillingQuery, tenantCyclesQuery, tenantInvoicesQuery, draftInvoicesQuery, invoiceDetailsQuery, paymentConfigQuery, revenueEventsQuery, usageSnapshotsQuery, subscriptionHistoryQuery, settingsQuery, createCycleMutation, closeCycleMutation, createSubscriptionMutation, usagePreviewMutation, invoicePreviewMutation, createPaymentAttemptMutation, markPaymentAttemptPaidMutation, markPaymentAttemptFailedMutation, updatePlanMutation, updateSettingsMutation, tenants, revenueGrowthPlans, selectedTenantBilling } = state;
+  const { activeTab, setActiveTab, selectedTenantId, setSelectedTenantId, usagePreview, setUsagePreview, invoicePreview, setInvoicePreview, setSelectedInvoiceId, closeModalOpen, setCloseModalOpen, overviewQuery, tenantBillingQuery, tenantCyclesQuery, tenantInvoicesQuery, draftInvoicesQuery, invoiceDetailsQuery, paymentConfigQuery, revenueEventsQuery, usageSnapshotsQuery, subscriptionHistoryQuery, settingsQuery, createCycleMutation, closeCycleMutation, createSubscriptionMutation, usagePreviewMutation, invoicePreviewMutation, createPaymentAttemptMutation, markPaymentAttemptPaidMutation, markPaymentAttemptFailedMutation, updatePlanMutation, updateSettingsMutation, tenants, revenueGrowthPlans, selectedTenantBilling } = state;
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">

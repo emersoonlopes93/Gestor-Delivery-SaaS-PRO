@@ -8,12 +8,14 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { MenuImportService, MenuImportOptions } from './menu-import.service';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { FeatureControlService } from '../../feature-control/feature-control.service';
 
 class ExecuteImportDto {
   @IsString()
@@ -27,7 +29,10 @@ class ExecuteImportDto {
 @Controller('catalog/menu-import')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class MenuImportController {
-  constructor(private readonly menuImportService: MenuImportService) {}
+  constructor(
+    private readonly menuImportService: MenuImportService,
+    private readonly featureControlService: FeatureControlService,
+  ) {}
 
   /**
    * Lista todos os templates de cardápio disponíveis.
@@ -74,6 +79,14 @@ export class MenuImportController {
   @RequirePermissions('catalog.create')
   @HttpCode(HttpStatus.OK)
   async executeImport(@Body() dto: ExecuteImportDto) {
+    const capability = this.featureControlService.getTenantActionCapability('baseMenu.import');
+    if (!capability.enabled) {
+      throw new ForbiddenException({
+        code: capability.code,
+        message: capability.message,
+      });
+    }
+
     const options: MenuImportOptions = {
       skipExisting: dto.skipExisting ?? true,
     };

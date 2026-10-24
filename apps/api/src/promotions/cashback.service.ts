@@ -27,14 +27,13 @@ export class CashbackService {
     orderId?: string;
     description?: string;
     expiresAt?: Date;
-  }) {
+  }, tx?: Prisma.TransactionClient) {
     if (params.amount < 0) {
       throw new BadRequestException('Amount must be positive');
     }
     
-    // We do this in a transaction because we need to update the customer's balance securely
-    return this.db.$transaction(async (tx: Prisma.TransactionClient) => {
-      const customer = await tx.customer.findUnique({
+    const execute = async (client: Prisma.TransactionClient) => {
+      const customer = await client.customer.findUnique({
         where: { id: params.customerId },
       });
 
@@ -62,20 +61,20 @@ export class CashbackService {
         // but if it does we floor to 0.
         if (newBalance < 0) newBalance = 0;
 
-        await tx.customer.update({
+        await client.customer.update({
           where: { id: params.customerId },
           data: { cashbackBalance: newBalance },
         });
 
       } else {
          // Earned adds to the balance
-         await tx.customer.update({
+         await client.customer.update({
           where: { id: params.customerId },
           data: { cashbackBalance: { increment: params.amount } },
         });
       }
 
-      const transaction = await tx.cashbackTransaction.create({
+      const transaction = await client.cashbackTransaction.create({
         data: {
           tenantId: params.tenantId,
           customerId: params.customerId,
@@ -91,7 +90,9 @@ export class CashbackService {
         ...transaction,
         amount: Number(transaction.amount),
       };
-    });
+    };
+
+    return tx ? execute(tx) : this.db.$transaction(execute);
   }
 
   // Helper method for POS checkout

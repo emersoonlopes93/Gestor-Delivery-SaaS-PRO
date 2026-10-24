@@ -1,5 +1,4 @@
 import { DecimalLike } from '../admin-billing-api';
-import { money } from '../types';
 import { CreditCard, Loader2 } from 'lucide-react';
 
 export function Panel(props: { title?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {

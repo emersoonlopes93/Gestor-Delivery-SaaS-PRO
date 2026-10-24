@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X, Phone, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useToast } from './Toast';
 import { CustomerDTO } from '@gestor/types';
+import { getGoogleClientId, loadGoogleIdentityServices, type GoogleCredentialResponse } from '../lib/google-identity';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -16,8 +17,59 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLinkCapability, setGoogleLinkCapability] = useState<string | null>(null);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const { setCustomer } = useCustomerStore();
   const { showToast } = useToast();
+
+  const handleGoogleCredential = useCallback(async (response: GoogleCredentialResponse) => {
+    if (!response.credential || isLoading) return;
+
+    setIsLoading(true);
+    try {
+      const result = await api.post<
+        | { status: 'AUTHENTICATED'; customer: CustomerDTO; accessToken: string; refreshToken: string }
+        | { status: 'PHONE_LINK_REQUIRED'; googleLinkCapability: string }
+      >(`/public/auth/${tenantSlug}/otp/google`, { credential: response.credential });
+      if (result.data.status === 'AUTHENTICATED') {
+        setCustomer(result.data.customer, result.data.accessToken, result.data.refreshToken, tenantSlug);
+        showToast({ title: 'Bem-vindo!', type: 'success' });
+        onClose();
+        return;
+      }
+
+      setGoogleLinkCapability(result.data.googleLinkCapability);
+      setStep('phone');
+      showToast({ title: 'Confirme seu WhatsApp para vincular sua conta Google.', type: 'success' });
+    } catch (error: unknown) {
+      const err = error as Error;
+      showToast({ title: err.message || 'Não foi possível entrar com Google', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, onClose, setCustomer, showToast, tenantSlug]);
+
+  useEffect(() => {
+    const clientId = getGoogleClientId();
+    const target = googleButtonRef.current;
+    if (!isOpen || step !== 'phone' || !clientId || !target) return;
+
+    let cancelled = false;
+    void loadGoogleIdentityServices()
+      .then((google) => {
+        if (cancelled || !googleButtonRef.current) return;
+        google.accounts.id.initialize({ client_id: clientId, callback: handleGoogleCredential, auto_select: false });
+        googleButtonRef.current.replaceChildren();
+        google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'outline', size: 'large', text: 'continue_with', width: 320,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) showToast({ title: 'Google não está disponível no momento.', type: 'error' });
+      });
+
+    return () => { cancelled = true; };
+  }, [handleGoogleCredential, isOpen, showToast, step]);
 
   if (!isOpen) return null;
 
@@ -50,12 +102,13 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
 
     setIsLoading(true);
     try {
-      const response = await api.post<{ customer: CustomerDTO, accessToken: string }>(`/public/auth/${tenantSlug}/otp/validate`, { 
+      const response = await api.post<{ customer: CustomerDTO; accessToken: string; refreshToken: string }>(`/public/auth/${tenantSlug}/otp/validate`, {
         phone, 
-        code: otp 
+        code: otp,
+        ...(googleLinkCapability ? { googleLinkCapability } : {}),
       });
       
-      setCustomer(response.data.customer, response.data.accessToken, tenantSlug);
+      setCustomer(response.data.customer, response.data.accessToken, response.data.refreshToken, tenantSlug);
       showToast({ title: 'Bem-vindo!', type: 'success' });
       onClose();
     } catch (error: unknown) {
@@ -125,6 +178,14 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
                   </>
                 )}
               </button>
+              {getGoogleClientId() ? (
+                <div className="pt-2">
+                  <div className="relative my-2 text-center text-xs text-gray-400 before:absolute before:inset-x-0 before:top-1/2 before:border-t before:border-gray-100">
+                    <span className="relative bg-white px-2 dark:bg-gray-900">ou</span>
+                  </div>
+                  <div ref={googleButtonRef} aria-label="Continuar com Google" className="flex justify-center" />
+                </div>
+              ) : null}
             </form>
           ) : (
             <form onSubmit={handleValidateOtp} className="space-y-4">

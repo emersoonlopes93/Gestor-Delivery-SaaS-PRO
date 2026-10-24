@@ -4,7 +4,6 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
 import { DriversService } from './drivers.service';
-import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 
 @Controller('delivery/drivers')
@@ -53,16 +52,6 @@ export class DriversController {
     @Param('id') id: string,
   ) {
     return this.driversService.resetDriverPin(req.user.tenantId, id);
-  }
-
-  @Post(':id/location')
-  @RequirePermissions('delivery.dispatch', 'delivery.manage_drivers')
-  async updateLocation(
-    @Request() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Body() data: UpdateDriverLocationDTO,
-  ) {
-    return this.driversService.updateDriverLocation(req.user.tenantId, id, data);
   }
 
   @Delete(':id')

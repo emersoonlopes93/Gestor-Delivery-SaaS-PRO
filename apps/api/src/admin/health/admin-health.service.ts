@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { resolveMediaStorageDriver } from '../../config/environment-aliases';
 
 @Injectable()
 export class AdminHealthService {
@@ -15,19 +16,55 @@ export class AdminHealthService {
     const redisConfigured = Boolean(redisHost && redisHost !== 'localhost' && redisHost !== '127.0.0.1');
     const bullmqEnabled = process.env.BULLMQ_ENABLED === 'true';
     const campaignsDispatchEnabled = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+    const marketplacePollingEnabled = process.env.MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED === 'true';
+    const marketplaceTenantIds = databaseOk
+      ? await this.prisma.tenant.findMany({ select: { id: true }, orderBy: { id: 'asc' }, take: 10_000 })
+      : [];
+    const marketplaceConnections = marketplaceTenantIds.length
+      ? await this.prisma.marketplaceConnection.findMany({
+        where: { tenantId: { in: marketplaceTenantIds.map((tenant) => tenant.id) }, provider: 'IFOOD' },
+        select: {
+          pollingStatus: true,
+          pollingLastSuccessAt: true,
+          pollingBlockedReason: true,
+          settingsJson: true,
+        },
+      })
+      : [];
+    const pollingConnections = marketplaceConnections.filter((connection) => (
+      typeof connection.settingsJson === 'object'
+      && connection.settingsJson !== null
+      && !Array.isArray(connection.settingsJson)
+      && 'pollingFallbackEnabled' in connection.settingsJson
+      && connection.settingsJson.pollingFallbackEnabled === true
+      && 'presenceMode' in connection.settingsJson
+      && connection.settingsJson.presenceMode === 'POLLING'
+    ));
+    const pollingStaleAfterMs = 90_000;
+    const pollingStaleThreshold = Date.now() - pollingStaleAfterMs;
+    const stalePollingConnections = pollingConnections.filter((connection) => (
+      !connection.pollingLastSuccessAt || connection.pollingLastSuccessAt.getTime() < pollingStaleThreshold
+    ));
     const readinessReasons = [
       !databaseOk ? 'Database health check failed' : null,
       !redisEnabled ? 'REDIS_ENABLED=false' : null,
       redisEnabled && !redisHost ? 'REDIS_HOST missing' : null,
       redisEnabled && redisHost && !redisConfigured ? 'REDIS_HOST points to localhost' : null,
       !bullmqEnabled ? 'BULLMQ_ENABLED=false' : null,
+      marketplacePollingEnabled && (!redisEnabled || !bullmqEnabled)
+        ? 'iFood polling requires Redis and BullMQ'
+        : null,
       process.env.NODE_ENV === 'production' && !redisEnabled ? 'Production requires REDIS_ENABLED=true' : null,
       process.env.NODE_ENV === 'production' && !bullmqEnabled ? 'Production requires BULLMQ_ENABLED=true' : null,
     ].filter((reason): reason is string => Boolean(reason));
     const productionReady = databaseOk && redisEnabled && redisConfigured && bullmqEnabled && readinessReasons.length === 0;
+    const marketplaceDegraded = marketplacePollingEnabled && (
+      stalePollingConnections.length > 0
+      || pollingConnections.some((connection) => connection.pollingStatus === 'DEGRADED' || connection.pollingStatus === 'BLOCKED')
+    );
 
     return {
-      status: productionReady ? 'ok' : 'degraded',
+      status: productionReady && !marketplaceDegraded ? 'ok' : 'degraded',
       checkedAt: new Date().toISOString(),
       services: {
         database: {
@@ -49,12 +86,22 @@ export class AdminHealthService {
         campaignsDispatch: {
           enabled: campaignsDispatchEnabled,
         },
+        marketplacePolling: {
+          enabled: marketplacePollingEnabled,
+          configuredConnections: pollingConnections.length,
+          healthyConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'HEALTHY').length,
+          degradedConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'DEGRADED').length,
+          blockedConnections: pollingConnections.filter((connection) => connection.pollingStatus === 'BLOCKED').length,
+          staleConnections: stalePollingConnections.length,
+          staleAfterMs: pollingStaleAfterMs,
+          affectsGlobalReadiness: false,
+        },
       },
       productionReadiness: {
         productionReady,
         reasons: readinessReasons,
         nodeEnv: process.env.NODE_ENV ?? 'development',
-        storageDriver: process.env.MEDIA_STORAGE_PROVIDER || process.env.MEDIA_STORAGE_DRIVER || process.env.STORAGE_DRIVER || 'local',
+        storageDriver: resolveMediaStorageDriver(process.env),
         billingPaymentsEnabled: process.env.BILLING_PAYMENTS_ENABLED === 'true',
         billingGatewayProvider: process.env.BILLING_GATEWAY_PROVIDER ?? 'manual',
         billingGatewayMode: process.env.BILLING_GATEWAY_MODE ?? 'disabled',
@@ -78,6 +125,18 @@ export class AdminHealthService {
             delayed: null,
             lastError: campaignsDispatchEnabled && (!bullmqEnabled || !redisConfigured) ? 'Queue cannot run without BullMQ and production Redis' : null,
           },
+          {
+            name: 'marketplace-event-ingest',
+            critical: marketplacePollingEnabled,
+            status: marketplacePollingEnabled ? (bullmqEnabled && redisConfigured ? 'configured' : 'blocked') : 'disabled',
+            waiting: null,
+            active: null,
+            failed: null,
+            delayed: null,
+            lastError: marketplacePollingEnabled && (!bullmqEnabled || !redisConfigured)
+              ? 'iFood polling cannot run without BullMQ and production Redis'
+              : null,
+          },
         ],
       },
     };
@@ -87,12 +146,16 @@ export class AdminHealthService {
    * Check health/status of a specific tenant.
    */
   async checkTenantHealth(tenantId: string) {
-    const [productsCount, settings, lastOrder] = await Promise.all([
+    const [productsCount, settings, lastOrder, mercadoPagoConnection] = await Promise.all([
       this.prisma.product.count({ where: { tenantId, isActive: true } }),
       this.prisma.tenantSettings.findUnique({ where: { tenantId } }),
       this.prisma.order.findFirst({
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.paymentProviderConnection.findFirst({
+        where: { tenantId, provider: 'mercado_pago', status: 'CONNECTED' },
+        select: { id: true },
       }),
     ]);
 
@@ -106,7 +169,7 @@ export class AdminHealthService {
       issues.push({ code: 'MISSING_ADDRESS', severity: 'high', message: 'Endereço da loja incompleto.' });
     }
 
-    const hasPayment = settings?.pixKey || settings?.mercadoPagoAccessToken || 
+    const hasPayment = settings?.pixKey || settings?.mercadoPagoAccessToken || mercadoPagoConnection ||
                       (settings?.paymentMethods && (settings.paymentMethods as string[]).length > 0);
     
     if (!hasPayment) {
