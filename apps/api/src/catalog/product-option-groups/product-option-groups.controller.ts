@@ -7,6 +7,7 @@ import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-gro
 import { UpdateProductOptionGroupLinkDto } from './dto/update-product-option-group-link.dto';
 import { ReorderProductOptionGroupLinksDto } from './dto/reorder-product-option-group-links.dto';
 import { UpdateProductOptionItemOverrideDto } from './dto/update-product-option-item-override.dto';
+import { CreateContextualOptionGroupDto } from './dto/create-contextual-option-group.dto';
 
 @Controller('catalog/products/:productId/option-groups')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -23,6 +24,12 @@ export class ProductOptionGroupsController {
   @RequirePermissions('catalog.manage_products')
   link(@Param('productId') productId: string, @Body() dto: Omit<CreateProductOptionGroupLinkDto, 'productId'>, @CurrentUser('sub') actorId: string) {
     return this.service.link({ ...dto, productId }, actorId);
+  }
+
+  @Post('contextual')
+  @RequirePermissions('catalog.manage_products')
+  createContextual(@Param('productId') productId: string, @Body() dto: CreateContextualOptionGroupDto, @CurrentUser('sub') actorId: string) {
+    return this.service.createContextual(productId, dto, actorId);
   }
 
   @Patch('items/:optionItemId/override')

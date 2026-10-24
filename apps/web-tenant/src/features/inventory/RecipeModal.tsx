@@ -49,10 +49,13 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName,
     : { type: 'base', baseId: component.baseId, inputQuantity: Number(component.inputQuantity), inputUnit: component.inputUnit }), [components]);
 
   useEffect(() => {
-    if (!isOpen || isLoading || !canViewCosts || optionItemId) return;
+    if (!isOpen || isLoading || !canViewCosts) return;
     let cancelled = false;
     setIsDraftCostLoading(true);
-    void api.post<ProductRecipeDraftCostPreviewDTO>(`/inventory/recipes/product/${entityId}/preview-cost`, draftPayload)
+    const previewPath = optionItemId
+      ? `/inventory/recipes/product/${entityId}/option-item/${optionItemId}/preview-cost`
+      : `/inventory/recipes/product/${entityId}/preview-cost`;
+    void api.post<ProductRecipeDraftCostPreviewDTO>(previewPath, draftPayload)
       .then((result) => { if (!cancelled && result.success) setDraftCost(result.data); })
       .catch(() => { if (!cancelled) setDraftCost(null); })
       .finally(() => { if (!cancelled) setIsDraftCostLoading(false); });

@@ -444,19 +444,21 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     setIsAddGroupModalOpen(true);
   };
 
-  const handleComplementCreated = async (created: OptionGroup) => {
+  const handleComplementCreated = async (created: OptionGroup, contextualLinkCreated = false) => {
     if (!productId) {
       setIsCreateComplementModalOpen(false);
       return;
     }
     setSavingStates((p) => ({ ...p, createComplementAndLink: true }));
     try {
-      await api.post(`/catalog/products/${productId}/option-groups`, {
-        optionGroupId: created.id,
-        order: links.length,
-        pricingAxis: newGroupPricingAxis,
-        ...newGroupLinkOverrides,
-      });
+      if (!contextualLinkCreated) {
+        await api.post(`/catalog/products/${productId}/option-groups`, {
+          optionGroupId: created.id,
+          order: links.length,
+          pricingAxis: newGroupPricingAxis,
+          ...newGroupLinkOverrides,
+        });
+      }
       setIsCreateComplementModalOpen(false);
       await loadAll();
     } catch (caught) {
@@ -916,6 +918,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         groupId={null}
         onSaved={handleComplementCreated}
         contextualLink={{
+          productId,
           pricingAxis: newGroupPricingAxis,
           overrides: newGroupLinkOverrides,
           onPricingAxisChange: setNewGroupPricingAxis,
