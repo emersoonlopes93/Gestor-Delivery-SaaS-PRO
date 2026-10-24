@@ -1,16 +1,20 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, UnitType as PrismaUnitType } from '@prisma/client';
-import { CreateRecipeBaseDTO, RecipeBaseComponentDTO, RecipeBaseDetailDTO, UnitType, UpdateRecipeBaseDTO, UpsertRecipeBaseComponentDTO } from '@gestor/types';
+import { CreateRecipeBaseDTO, RecipeBaseComponentDTO, RecipeBaseCostProjectionDTO, RecipeBaseDetailDTO, UnitType, UpdateRecipeBaseDTO, UpsertRecipeBaseComponentDTO } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { normalizeRecipeQuantity } from './recipe-unit-normalization';
+import { RecipeExpansionService } from './recipe-expansion.service';
 
 const MAX_BASE_DEPTH = 10;
 type RecipeBaseReader = Pick<PrismaService, 'recipeBase'>;
 
 @Injectable()
 export class RecipeBasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly expansion: RecipeExpansionService,
+  ) {}
 
   private decimal(value: unknown, label: string): Prisma.Decimal {
     const text = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
@@ -39,6 +43,45 @@ export class RecipeBasesService {
 
   async list(tenantId: string) { return this.prisma.recipeBase.findMany({ where: { tenantId }, orderBy: [{ isActive: 'desc' }, { name: 'asc' }] }); }
   async detail(tenantId: string, id: string): Promise<RecipeBaseDetailDTO> { return this.detailWith(this.prisma, tenantId, id); }
+
+  /**
+   * Read-only current-cost projection. Recipe bases remain virtual: this never
+   * creates movements, persists a cost, or participates in historical CMV.
+   */
+  async costProjection(tenantId: string, id: string): Promise<RecipeBaseCostProjectionDTO> {
+    const base = await this.prisma.recipeBase.findFirst({
+      where: { id, tenantId },
+      select: { id: true, yieldQuantity: true, outputUnit: true },
+    });
+    if (!base) throw new NotFoundException('PreparaÃ§Ã£o nÃ£o encontrada.');
+
+    const quantities = await this.expansion.expandRecipeBaseToIngredients(tenantId, base.id, base.yieldQuantity);
+    const cost = await this.expansion.calculateExpandedIngredientCostCoverage(tenantId, quantities);
+    const total = cost.estimatedTotalCost;
+    const partial = cost.partialEstimatedTotalCost;
+    return {
+      baseId: base.id,
+      yieldQuantity: Number(base.yieldQuantity),
+      outputUnit: base.outputUnit as UnitType,
+      coverage: cost.coverage,
+      estimatedTotalCost: total?.toNumber() ?? null,
+      estimatedCostPerYieldUnit: total ? total.div(base.yieldQuantity).toNumber() : null,
+      partialEstimatedTotalCost: partial?.toNumber() ?? null,
+      partialEstimatedCostPerYieldUnit: partial ? partial.div(base.yieldQuantity).toNumber() : null,
+      knownIngredientCount: cost.knownIngredientCount,
+      unknownIngredientCount: cost.unknownIngredientCount,
+      basis: 'CURRENT_INGREDIENT_COSTS',
+    };
+  }
+
+  async listCostProjections(tenantId: string): Promise<RecipeBaseCostProjectionDTO[]> {
+    const bases = await this.prisma.recipeBase.findMany({
+      where: { tenantId },
+      select: { id: true },
+      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+    });
+    return Promise.all(bases.map((base) => this.costProjection(tenantId, base.id)));
+  }
   async create(tenantId: string, dto: CreateRecipeBaseDTO) { return this.prisma.recipeBase.create({ data: { tenantId, ...this.metadata(dto) } }); }
 
   async update(tenantId: string, id: string, dto: UpdateRecipeBaseDTO) {

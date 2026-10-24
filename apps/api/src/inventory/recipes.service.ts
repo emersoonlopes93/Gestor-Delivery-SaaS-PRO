@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, UnitType as PrismaUnitType } from '@prisma/client';
-import { ProductRecipeComponentDTO, ProductRecipeComponentInputDTO, ProductRecipeDTO, UnitType } from '@gestor/types';
+import { ProductRecipeComponentDTO, ProductRecipeComponentInputDTO, ProductRecipeDTO, ProductRecipeDraftCostPreviewDTO, UnitType } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 import { RecipeExpansionService } from './recipe-expansion.service';
@@ -24,6 +24,63 @@ export class RecipesService {
     ]);
     const total = await this.calculateProductTotalCostDecimal(tenantId, productId);
     return { productId, components: this.mapComponents(ingredients, bases), totalEstimatedCost: Number(total) };
+  }
+
+  /**
+   * Read-only preview for the recipe editor. Draft components are normalized
+   * server-side and reusable bases are expanded through the canonical engine;
+   * nothing is persisted and no stock/cost ledger is touched.
+   */
+  async previewProductRecipeCost(
+    tenantId: string,
+    productId: string,
+    components: ProductRecipeComponentInputDTO[],
+  ): Promise<ProductRecipeDraftCostPreviewDTO> {
+    if (!Array.isArray(components)) throw new BadRequestException('A ficha técnica deve ser uma lista.');
+    const product = await this.prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } });
+    if (!product) throw new NotFoundException('Produto não encontrado.');
+
+    const ingredients = components.filter((item): item is Extract<ProductRecipeComponentInputDTO, { type: 'ingredient' }> => item.type === 'ingredient');
+    const bases = components.filter((item): item is Extract<ProductRecipeComponentInputDTO, { type: 'base' }> => item.type === 'base');
+    if (ingredients.length + bases.length !== components.length) throw new BadRequestException('Tipo de componente inválido.');
+    if (new Set(ingredients.map((item) => item.ingredientId)).size !== ingredients.length || new Set(bases.map((item) => item.baseId)).size !== bases.length) {
+      throw new BadRequestException('Componentes duplicados não são permitidos.');
+    }
+
+    const [foundIngredients, foundBases] = await Promise.all([
+      this.prisma.ingredient.findMany({ where: { tenantId, id: { in: ingredients.map((item) => item.ingredientId) } } }),
+      this.prisma.recipeBase.findMany({ where: { tenantId, id: { in: bases.map((item) => item.baseId) } } }),
+    ]);
+    if (foundIngredients.length !== ingredients.length || foundBases.length !== bases.length) throw new NotFoundException('Componente não encontrado.');
+
+    const ingredientById = new Map(foundIngredients.map((item) => [item.id, item]));
+    const baseById = new Map(foundBases.map((item) => [item.id, item]));
+    const quantities = new Map<string, Prisma.Decimal>();
+    const addQuantity = (ingredientId: string, quantity: Prisma.Decimal) => quantities.set(ingredientId, (quantities.get(ingredientId) ?? new Prisma.Decimal(0)).plus(quantity));
+
+    for (const component of ingredients) {
+      const ingredient = ingredientById.get(component.ingredientId);
+      if (!ingredient) throw new NotFoundException('Ingrediente não encontrado.');
+      addQuantity(component.ingredientId, normalizeRecipeQuantity(component.inputQuantity, component.inputUnit as PrismaUnitType, ingredient.unit));
+    }
+    for (const component of bases) {
+      const base = baseById.get(component.baseId);
+      if (!base) throw new NotFoundException('Preparação não encontrada.');
+      if (!base.isActive) throw new ConflictException('Preparação arquivada não pode ser usada no preview da ficha técnica.');
+      const requestedOutput = normalizeRecipeQuantity(component.inputQuantity, component.inputUnit as PrismaUnitType, base.outputUnit);
+      const expanded = await this.expansion.expandRecipeBaseToIngredients(tenantId, base.id, requestedOutput);
+      for (const [ingredientId, quantity] of expanded) addQuantity(ingredientId, quantity);
+    }
+
+    const cost = await this.expansion.calculateExpandedIngredientCostCoverage(tenantId, quantities);
+    return {
+      coverage: cost.coverage,
+      estimatedTotalCost: cost.estimatedTotalCost?.toNumber() ?? null,
+      partialEstimatedTotalCost: cost.partialEstimatedTotalCost?.toNumber() ?? null,
+      knownIngredientCount: cost.knownIngredientCount,
+      unknownIngredientCount: cost.unknownIngredientCount,
+      basis: 'CURRENT_INGREDIENT_COSTS',
+    };
   }
 
   async upsertProductRecipe(tenantId: string, productId: string, components: ProductRecipeComponentInputDTO[]): Promise<ProductRecipeDTO> {

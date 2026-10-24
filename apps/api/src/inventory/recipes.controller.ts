@@ -4,7 +4,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { RecipesService } from './recipes.service';
-import { ProductRecipeComponentInputDTO, ProductRecipeDTO } from '@gestor/types';
+import { ProductRecipeComponentInputDTO, ProductRecipeDTO, ProductRecipeDraftCostPreviewDTO } from '@gestor/types';
 
 @Controller('inventory/recipes')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -32,6 +32,16 @@ export class RecipesController {
     @Body() components: ProductRecipeComponentInputDTO[]
   ) {
     return this.recipesService.upsertProductRecipe(tenantId, productId, components);
+  }
+
+  @Post('product/:productId/preview-cost')
+  @RequirePermissions('reports.view_costs')
+  async previewProductRecipeCost(
+    @CurrentTenant() tenantId: string,
+    @Param('productId') productId: string,
+    @Body() components: ProductRecipeComponentInputDTO[],
+  ): Promise<ProductRecipeDraftCostPreviewDTO> {
+    return this.recipesService.previewProductRecipeCost(tenantId, productId, components);
   }
 
 }

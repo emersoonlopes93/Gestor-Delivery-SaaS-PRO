@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { CreateOptionGroupDto, OptionGroup, OptionItem } from '@gestor/types';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CreateOptionGroupDto, OptionGroup, OptionItem, UpdateProductOptionGroupLinkDto } from '@gestor/types';
 import { Modal } from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
 import { Plus, Trash2, Globe, Info } from 'lucide-react';
@@ -11,7 +11,14 @@ interface OptionGroupEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   groupId: string | null;
-  onSaved: (group: GroupWithItems) => void;
+  onSaved: (group: GroupWithItems, contextualLinkCreated?: boolean) => void | Promise<void>;
+  contextualLink?: {
+    productId: string;
+    pricingAxis: 'primary' | 'secondary';
+    overrides: Pick<UpdateProductOptionGroupLinkDto, 'overrideName' | 'overrideDescription' | 'overrideIsRequired' | 'overrideMinSelect' | 'overrideMaxSelect'>;
+    onPricingAxisChange: (axis: 'primary' | 'secondary') => void;
+    onOverridesChange: (overrides: Pick<UpdateProductOptionGroupLinkDto, 'overrideName' | 'overrideDescription' | 'overrideIsRequired' | 'overrideMinSelect' | 'overrideMaxSelect'>) => void;
+  };
 }
 
 export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
@@ -19,10 +26,14 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
   onClose,
   groupId,
   onSaved,
+  contextualLink,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [usageCount, setUsageCount] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const contextualOperationKey = useRef<string | null>(null);
 
   const [groupForm, setGroupForm] = useState<CreateOptionGroupDto>({
     name: '',
@@ -36,7 +47,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
   });
 
   // Items are kept here. Items without an ID are considered "new"
-  const [items, setItems] = useState<Array<Partial<OptionItem> & { _tempId?: string }>>([]);
+  const [items, setItems] = useState<Array<Partial<OptionItem> & { _tempId?: string; productIsActive?: boolean }>>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
 
   const createEmptyItem = useCallback(() => ({
@@ -49,6 +60,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
     allowQuantity: false,
     minQty: 1,
     maxQty: 1,
+    productIsActive: true,
   }), []);
 
   const loadGroup = useCallback(async (id: string) => {
@@ -79,9 +91,13 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setSaveError(null);
       if (groupId) {
+        setCreatedGroupId(null);
         loadGroup(groupId);
       } else {
+        setCreatedGroupId(null);
+        contextualOperationKey.current = null;
         setUsageCount(0);
         setGroupForm({
           name: '',
@@ -128,32 +144,64 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
 
   const handleSave = async () => {
     if (!groupForm.name) {
-      alert('Preencha o nome do grupo.');
+      setSaveError('Preencha o nome do grupo.');
       return;
     }
+    setSaveError(null);
     setIsSaving(true);
     try {
+      if (contextualLink && !groupId && !createdGroupId) {
+        const validItems = items.filter((item) => item.name && item.name.trim());
+        if (validItems.length === 0) throw new Error('Adicione pelo menos uma opção com nome.');
+        if (contextualLink.pricingAxis === 'secondary' && validItems.some((item) => item.isActive !== false && item.priceImpactType === 'replace')) {
+          throw new Error('Um item que define o preço final (REPLACE) exige eixo principal. Escolha “Primário” ou altere o impacto da opção.');
+        }
+        contextualOperationKey.current ??= crypto.randomUUID();
+        const result = await api.post<{ group: GroupWithItems }>(`/catalog/products/${contextualLink.productId}/option-groups/contextual`, {
+          idempotencyKey: contextualOperationKey.current,
+          ...groupForm,
+          pricingAxis: contextualLink.pricingAxis,
+          ...contextualLink.overrides,
+          items: validItems.map((item) => ({
+            name: item.name?.trim(), description: item.description, sku: item.sku,
+            isActive: item.isActive !== false, priceImpactType: item.priceImpactType ?? 'none',
+            priceImpactValue: Number(item.priceImpactValue ?? 0), allowQuantity: Boolean(item.allowQuantity),
+            minQty: item.minQty ?? null, maxQty: item.maxQty ?? null,
+            productIsActive: item.productIsActive ?? item.isActive !== false,
+          })),
+        });
+        if (!result.success) throw new Error('Não foi possível confirmar a criação contextual do grupo.');
+        await onSaved(result.data.group, true);
+        return;
+      }
       let savedGroup: GroupWithItems;
+      const effectiveGroupId = groupId ?? createdGroupId;
 
-      if (groupId) {
-        const res = await api.patch<OptionGroup>(`/catalog/option-groups/${groupId}`, groupForm);
+      if (effectiveGroupId) {
+        const res = await api.patch<OptionGroup>(`/catalog/option-groups/${effectiveGroupId}`, groupForm);
         savedGroup = res.data as GroupWithItems;
       } else {
         const res = await api.post<OptionGroup>('/catalog/option-groups', groupForm);
         savedGroup = res.data as GroupWithItems;
+        setCreatedGroupId(savedGroup.id);
       }
 
       const gid = savedGroup.id;
 
-      // 1. Delete removed items
-      for (const delId of deletedItemIds) {
+      // 1. Delete removed items. Persist progress so a retry does not repeat a successful delete.
+      const remainingDeletedItemIds = [...deletedItemIds];
+      for (const delId of [...remainingDeletedItemIds]) {
         await api.delete(`/catalog/option-groups/items/${delId}`);
+        remainingDeletedItemIds.splice(remainingDeletedItemIds.indexOf(delId), 1);
+        setDeletedItemIds([...remainingDeletedItemIds]);
       }
 
-      // 2. Upsert items
-      const validItems = items.filter(it => it.name && it.name.trim() !== '');
+      // 2. Upsert items. Keep IDs returned by successful creates so retrying after
+      // a later request fails updates the same item instead of creating a duplicate.
+      const nextItems = [...items];
+      const validItems = nextItems.map((item, index) => ({ item, index })).filter(({ item }) => item.name && item.name.trim() !== '');
       for (let i = 0; i < validItems.length; i++) {
-        const it = validItems[i];
+        const { item: it, index } = validItems[i];
         const payload: Record<string, unknown> = {
           name: it.name,
           description: it.description,
@@ -171,18 +219,19 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
           await api.patch(`/catalog/option-groups/items/${it.id}`, payload);
         } else {
           payload.optionGroupId = gid;
-          await api.post('/catalog/option-groups/items', payload);
+          const created = await api.post<OptionItem>('/catalog/option-groups/items', payload);
+          nextItems[index] = { ...it, id: created.data.id };
+          setItems([...nextItems]);
         }
       }
 
       // Refresh final state to return
       const finalRes = await api.get<GroupWithItems>(`/catalog/option-groups/${gid}`);
-      if (finalRes.success) {
-        onSaved(finalRes.data);
-      }
+      if (!finalRes.success) throw new Error('O grupo foi salvo, mas não foi possível confirmar os itens. Tente novamente.');
+      await onSaved(finalRes.data);
     } catch (e) {
       console.error(e);
-      alert('Erro ao salvar o grupo de opções.');
+      setSaveError(e instanceof Error ? e.message : 'Erro ao salvar o grupo de opções. Revise os dados e tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -212,6 +261,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
         </div>
       ) : (
         <div className="space-y-6">
+          {saveError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{saveError}{createdGroupId && <span className="mt-1 block text-xs">O grupo já foi criado; ao tentar novamente, os itens serão salvos nele sem duplicar o grupo.</span>}</div>}
           {/* Guardrail Usage Banner */}
           {groupId && usageCount !== null && usageCount > 1 && (
             <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-600 dark:text-amber-400">
@@ -242,6 +292,15 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
               <Info className="w-4 h-4 shrink-0" />
               <span>Este grupo ainda não está vinculado a nenhum produto.</span>
             </div>
+          )}
+
+          {contextualLink && !groupId && (
+            <section className="space-y-4 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+              <div><h4 className="font-bold text-foreground">Configurações neste produto</h4><p className="text-xs text-muted-foreground">Este novo grupo será vinculado ao produto ao salvar. Essas opções não alteram outros produtos.</p></div>
+              <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground">Eixo de precificação<select value={contextualLink.pricingAxis} onChange={(event) => contextualLink.onPricingAxisChange(event.target.value as 'primary' | 'secondary')} className="input-premium mt-1"><option value="secondary">Secundário — adicionais e preferências</option><option value="primary">Primário — tamanho/preço principal</option></select></label>
+              <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Nome neste produto<input value={contextualLink.overrides.overrideName ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideName: event.target.value || undefined })} className="input-premium mt-1" placeholder="Usar nome do grupo" /></label><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Descrição neste produto<input value={contextualLink.overrides.overrideDescription ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideDescription: event.target.value || undefined })} className="input-premium mt-1" placeholder="Usar descrição do grupo" /></label></div>
+              <div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Obrigatório<select value={contextualLink.overrides.overrideIsRequired === undefined ? 'default' : String(contextualLink.overrides.overrideIsRequired)} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideIsRequired: event.target.value === 'default' ? undefined : event.target.value === 'true' })} className="input-premium mt-1"><option value="default">Padrão do grupo</option><option value="true">Obrigatório</option><option value="false">Opcional</option></select></label><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Mínimo local<input type="number" min="0" value={contextualLink.overrides.overrideMinSelect ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideMinSelect: event.target.value === '' ? undefined : Number(event.target.value) })} className="input-premium mt-1" placeholder="Padrão" /></label><label className="text-xs font-black uppercase tracking-wider text-muted-foreground">Máximo local<input type="number" min="1" value={contextualLink.overrides.overrideMaxSelect ?? ''} onChange={(event) => contextualLink.onOverridesChange({ ...contextualLink.overrides, overrideMaxSelect: event.target.value === '' ? undefined : Number(event.target.value) })} className="input-premium mt-1" placeholder="Padrão" /></label></div>
+            </section>
           )}
 
           {/* Grupo de Opções - Informações Básicas */}
@@ -340,13 +399,14 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                 “Define o preço final” substitui o preço-base quando este grupo estiver vinculado ao eixo principal do produto.
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse min-w-[780px]">
                   <thead className="bg-muted/50 border-b border-border">
                     <tr>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[35%]">Nome da Opção *</th>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[20%]">Impacto no Preço</th>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[15%]">Valor (R$)</th>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[10%] text-center">Status</th>
+                      {contextualLink && !groupId && <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider text-center">Neste produto</th>}
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[20%]">Ações</th>
                     </tr>
                   </thead>
@@ -403,6 +463,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                             className="w-4 h-4 text-primary rounded"
                           />
                         </td>
+                        {contextualLink && !groupId && <td className="px-4 py-2 text-center"><input aria-label={`Disponível neste produto: ${it.name || 'nova opção'}`} type="checkbox" checked={it.productIsActive ?? it.isActive !== false} onChange={(e) => handleItemChange(idx, 'productIsActive' as keyof OptionItem, e.target.checked)} className="w-4 h-4 text-primary rounded" /></td>}
                         <td className="px-4 py-2">
                           <div className="flex items-center gap-2">
                             <label className="flex items-center gap-1 cursor-pointer text-[10px] text-muted-foreground font-bold hover:text-foreground">
@@ -428,7 +489,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                     ))}
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground italic">
+                        <td colSpan={contextualLink && !groupId ? 6 : 5} className="px-4 py-8 text-center text-sm text-muted-foreground italic">
                           Nenhuma opção adicionada. Clique no botão acima para adicionar.
                         </td>
                       </tr>

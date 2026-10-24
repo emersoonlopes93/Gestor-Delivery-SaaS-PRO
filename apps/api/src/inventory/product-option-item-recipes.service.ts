@@ -4,6 +4,7 @@ import {
   ProductOptionItemRecipeComponentDTO,
   ProductOptionItemRecipeComponentInputDTO,
   ProductOptionItemRecipeDTO,
+  ProductRecipeDraftCostPreviewDTO,
   UnitType,
 } from '@gestor/types';
 import { PrismaService } from '../database/prisma.service';
@@ -76,6 +77,38 @@ export class ProductOptionItemRecipesService {
       const quantities = await this.expansion.expandProductOptionItemRecipeToIngredients(tenantId, productId, optionItemId, new Prisma.Decimal(1), tx);
       const cost = await this.expansion.calculateExpandedIngredientCost(tenantId, quantities, tx);
       return { productId, optionItemId, components: this.mapComponents(ingredients, bases), totalEstimatedCost: Number(cost.totalCost) };
+    });
+  }
+
+  async previewCost(tenantId: string, productId: string, optionItemId: string, components: ProductOptionItemRecipeComponentInputDTO[]): Promise<ProductRecipeDraftCostPreviewDTO> {
+    if (!Array.isArray(components)) throw new BadRequestException('A composição deve ser uma lista.');
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertContext(tx, tenantId, productId, optionItemId, false);
+      const ingredients = components.filter((component): component is Extract<ProductOptionItemRecipeComponentInputDTO, { type: 'ingredient' }> => component.type === 'ingredient');
+      const bases = components.filter((component): component is Extract<ProductOptionItemRecipeComponentInputDTO, { type: 'base' }> => component.type === 'base');
+      if (ingredients.length + bases.length !== components.length || new Set(ingredients.map((item) => item.ingredientId)).size !== ingredients.length || new Set(bases.map((item) => item.baseId)).size !== bases.length) throw new BadRequestException('Componentes inválidos ou duplicados.');
+      const [storedIngredients, storedBases] = await Promise.all([
+        tx.ingredient.findMany({ where: { tenantId, id: { in: ingredients.map((item) => item.ingredientId) } } }),
+        tx.recipeBase.findMany({ where: { tenantId, id: { in: bases.map((item) => item.baseId) } } }),
+      ]);
+      if (storedIngredients.length !== ingredients.length || storedBases.length !== bases.length) throw new NotFoundException('Componente não encontrado.');
+      const ingredientsById = new Map(storedIngredients.map((item) => [item.id, item]));
+      const basesById = new Map(storedBases.map((item) => [item.id, item]));
+      const quantities = new Map<string, Prisma.Decimal>();
+      const add = (id: string, quantity: Prisma.Decimal) => quantities.set(id, (quantities.get(id) ?? new Prisma.Decimal(0)).plus(quantity));
+      for (const component of ingredients) {
+        const ingredient = ingredientsById.get(component.ingredientId);
+        if (!ingredient) throw new NotFoundException('Ingrediente não encontrado.');
+        add(ingredient.id, normalizeRecipeQuantity(component.inputQuantity, component.inputUnit as PrismaUnitType, ingredient.unit));
+      }
+      for (const component of bases) {
+        const base = basesById.get(component.baseId);
+        if (!base || !base.isActive) throw new ConflictException('Preparação arquivada não pode ser usada no preview.');
+        const expanded = await this.expansion.expandRecipeBaseToIngredients(tenantId, base.id, normalizeRecipeQuantity(component.inputQuantity, component.inputUnit as PrismaUnitType, base.outputUnit), tx);
+        for (const [id, quantity] of expanded) add(id, quantity);
+      }
+      const cost = await this.expansion.calculateExpandedIngredientCostCoverage(tenantId, quantities, tx);
+      return { coverage: cost.coverage, estimatedTotalCost: cost.estimatedTotalCost?.toNumber() ?? null, partialEstimatedTotalCost: cost.partialEstimatedTotalCost?.toNumber() ?? null, knownIngredientCount: cost.knownIngredientCount, unknownIngredientCount: cost.unknownIngredientCount, basis: 'CURRENT_INGREDIENT_COSTS' };
     });
   }
 

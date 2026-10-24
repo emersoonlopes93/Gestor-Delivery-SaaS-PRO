@@ -1,5 +1,6 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { Cache } from 'cache-manager';
 import { Prisma, PricingAxis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
@@ -8,6 +9,7 @@ import { runSerializableTransactionWithRetry } from '../../database/serializable
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';
 import { UpdateProductOptionGroupLinkDto } from './dto/update-product-option-group-link.dto';
 import { UpdateProductOptionItemOverrideDto } from './dto/update-product-option-item-override.dto';
+import { CreateContextualOptionGroupDto } from './dto/create-contextual-option-group.dto';
 import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
 
 @Injectable()
@@ -153,6 +155,56 @@ export class ProductOptionGroupsService {
 
     if (pricingAxis === 'secondary') {
       throw new BadRequestException('Grupo com item REPLACE ativo deve usar eixo PRIMARY.');
+    }
+  }
+
+  async createContextual(productId: string, dto: CreateContextualOptionGroupDto, actorId?: string) {
+    const tenantId = this.getRequiredTenantId();
+    if (!dto.items.length || dto.items.some((item) => !item.name.trim())) throw new BadRequestException('Informe ao menos uma opção com nome.');
+    const isRequired = dto.isRequired ?? false;
+    const minSelect = dto.minSelect ?? 0;
+    const maxSelect = dto.maxSelect ?? 1;
+    this.validateOverrideRules({ selectionType: dto.selectionType, isRequired, minSelect, maxSelect });
+    for (const item of dto.items) {
+      const replace = item.priceImpactType === 'replace';
+      if (!Number.isFinite(item.priceImpactValue ?? 0) || (item.priceImpactValue ?? 0) < 0 || (item.priceImpactType === 'percentage' && (item.priceImpactValue ?? 0) > 100)) throw new BadRequestException('Preço da opção inválido.');
+      if (replace && ((item.allowQuantity ?? false) || item.minQty !== 1 || item.maxQty !== 1)) throw new BadRequestException('Opção REPLACE requer quantidade desativada e faixa 1..1.');
+      if (item.allowQuantity && item.minQty != null && item.maxQty != null && item.minQty > item.maxQty) throw new BadRequestException('Quantidade mínima não pode ser maior que a máxima.');
+    }
+    const { idempotencyKey: _key, ...request } = dto;
+    const requestHash = createHash('sha256').update(JSON.stringify({ productId, request })).digest('hex');
+    const readCompleted = async (tx: Prisma.TransactionClient | PrismaService) => {
+      const prior = await tx.productOptionGroupAuthoringRequest.findUnique({ where: { tenantId_productId_idempotencyKey: { tenantId, productId, idempotencyKey: dto.idempotencyKey } }, include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } }, link: true } });
+      if (!prior) return null;
+      if (prior.requestHash !== requestHash) throw new ConflictException('A chave de idempotência foi reutilizada com dados diferentes.');
+      return { group: prior.optionGroup, link: prior.link, idempotent: true };
+    };
+    const completed = await readCompleted(this.prisma);
+    if (completed) return completed;
+    try {
+      const result = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`product-option-groups:${tenantId}:${productId}`}, 0))`;
+        const existing = await readCompleted(tx); if (existing) return existing;
+        const product = await tx.product.findFirst({ where: { id: productId, tenantId, deletedAt: null }, select: { id: true, type: true } });
+        if (!product) throw new NotFoundException('Produto não encontrado. Salve o produto antes de criar um grupo contextual.');
+        const routesBefore = await this.comboEligibility.getProductConfigurationRoutes(tenantId, [product.id], { requireActive: false }, tx);
+        const group = await tx.optionGroup.create({ data: { tenantId, name: dto.name, description: dto.description ?? null, selectionType: dto.selectionType, isRequired, minSelect, maxSelect, isActive: dto.isActive ?? true, order: dto.order ?? 0 } });
+        const items = await Promise.all(dto.items.map((item, order) => tx.optionItem.create({ data: { tenantId, optionGroupId: group.id, name: item.name.trim(), description: item.description ?? null, sku: item.sku ?? null, isActive: item.isActive ?? true, order, priceImpactType: item.priceImpactType ?? 'none', priceImpactValue: new Prisma.Decimal(String(item.priceImpactValue ?? 0)), allowQuantity: item.allowQuantity ?? false, minQty: item.minQty ?? null, maxQty: item.maxQty ?? null } })));
+        this.validateOverrideRules({ selectionType: group.selectionType, isRequired: dto.overrideIsRequired ?? isRequired, minSelect: dto.overrideMinSelect ?? minSelect, maxSelect: dto.overrideMaxSelect ?? maxSelect });
+        await this.assertPricingAxisSupportsReplace(tx, tenantId, group.id, group.isActive, dto.pricingAxis);
+        const link = await tx.productOptionGroupLink.create({ data: { tenantId, productId, optionGroupId: group.id, order: dto.order ?? 0, pricingAxis: dto.pricingAxis, overrideName: dto.overrideName ?? null, overrideDescription: dto.overrideDescription ?? null, overrideIsRequired: dto.overrideIsRequired ?? null, overrideMinSelect: dto.overrideMinSelect ?? null, overrideMaxSelect: dto.overrideMaxSelect ?? null } });
+        await this.assertNoPrimaryReplaceConflict(tx, tenantId, productId);
+        await Promise.all(dto.items.map((item, index) => item.productIsActive === false && (item.isActive ?? true) ? tx.productOptionItemPrice.create({ data: { tenantId, productId, optionItemId: items[index].id, isActive: false } }) : Promise.resolve()));
+        if (product.type === 'simple') await tx.product.updateMany({ where: { id: product.id, tenantId, type: 'simple', deletedAt: null }, data: { type: 'configurable' } });
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, [product.id], routesBefore, tx);
+        await tx.productOptionGroupAuthoringRequest.create({ data: { tenantId, productId, idempotencyKey: dto.idempotencyKey, requestHash, optionGroupId: group.id, linkId: link.id } });
+        return { group: { ...group, items }, link, idempotent: false };
+      });
+      if (!result.idempotent) { await this.audit(tenantId, actorId, 'catalog.product_option_group.contextual_created', 'product_option_group_link', { productId, optionGroupId: result.group.id, linkId: result.link.id }); await this.invalidateStorefrontCache(tenantId); }
+      return result;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') { const prior = await readCompleted(this.prisma); if (prior) return prior; }
+      throw error;
     }
   }
 

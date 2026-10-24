@@ -45,6 +45,31 @@ describe('RecipeExpansionService', () => {
     await expect(service.expandProductRecipeToIngredients(tenantId, 'product-a', decimal('0'))).rejects.toThrow('maior que zero');
   });
 
+  it('reuses the base expansion and labels zero or absent cost evidence as unknown', async () => {
+    const source = reader();
+    const service = new RecipeExpansionService(source as never);
+    const expanded = await service.expandRecipeBaseToIngredients(tenantId, 'base-b');
+    expect(expanded.get('tomato')?.toString()).toBe('140');
+    expect(expanded.get('oil')?.toString()).toBe('50');
+
+    const partial = await service.calculateExpandedIngredientCostCoverage(tenantId, new Map([
+      ['tomato', decimal('10')],
+      ['oil', decimal('2')],
+    ]));
+    expect(partial).toMatchObject({ coverage: 'KNOWN', knownIngredientCount: 2, unknownIngredientCount: 0 });
+    expect(partial.estimatedTotalCost?.toString()).toBe('0.2');
+
+    source.ingredient.findMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) => Promise.resolve(where.id.in.map((id) => ({
+      id,
+      tenantId,
+      currentCost: id === 'oil' ? decimal('0') : decimal('0.01'),
+    }))));
+    const unknown = await service.calculateExpandedIngredientCostCoverage(tenantId, new Map([
+      ['oil', decimal('2')],
+    ]));
+    expect(unknown).toEqual(expect.objectContaining({ coverage: 'UNKNOWN', estimatedTotalCost: null, partialEstimatedTotalCost: null }));
+  });
+
   it('fails closed for cycles and for a base deeper than the persisted contract allows', async () => {
     const cycleReader = reader();
     cycleReader.recipeBase.findFirst.mockImplementation(({ where }: { where: { id: string } }) => Promise.resolve({

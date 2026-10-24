@@ -4,6 +4,10 @@ import { CurrencyInput } from '@gestor/ui';
 import { Switch } from '../../components/ui/Switch';
 import { api, ApiError } from '../../lib/api-client';
 
+const formatCommercialCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+const formatTechnicalCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value);
+const needsTechnicalCostDetail = (value: number) => Math.abs(value - Math.round(value * 100) / 100) > Number.EPSILON;
+
 interface IngredientModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -481,7 +485,8 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                     <div className="bg-card p-4 rounded-xl border border-green-500/20 flex flex-wrap gap-6 justify-between items-center">
                       <div className="flex flex-col">
                         <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Custo inicial calculado ({formData.unit})</span>
-                        <span className="text-lg font-black text-green-600 dark:text-green-400">R$ {calculatedValues.costPerBaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
+                        <span className="text-lg font-black text-green-600 dark:text-green-400">{formatCommercialCurrency(calculatedValues.costPerBaseUnit)}</span>
+                        {needsTechnicalCostDetail(calculatedValues.costPerBaseUnit) && <span className="text-xs text-muted-foreground">Valor técnico: {formatTechnicalCurrency(calculatedValues.costPerBaseUnit)} por {formData.unit}</span>}
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Estoque inicial</span>
@@ -498,7 +503,8 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
             <div className="bg-primary/10 p-4 rounded-xl border border-primary/20 flex items-center gap-3">
               <span className="text-xl text-primary">ℹ️</span>
               <p className="text-sm text-primary">
-                O custo atual deste insumo é de <strong>R$ {editingIngredient.currentCost.toLocaleString('pt-BR', { minimumFractionDigits: 4 })}</strong> por <strong>{editingIngredient.unit}</strong>. 
+                O custo atual deste insumo é de <strong>{formatCommercialCurrency(editingIngredient.currentCost)}</strong> por <strong>{editingIngredient.unit}</strong>.
+                {needsTechnicalCostDetail(editingIngredient.currentCost) && <> <span className="text-xs">Valor técnico: {formatTechnicalCurrency(editingIngredient.currentCost)} por {editingIngredient.unit}.</span></>}
                 Para atualizar o estoque e custo, use o módulo de Compras.
               </p>
             </div>

@@ -101,7 +101,7 @@ describe('Configurable recipe composition PostgreSQL proof', () => {
         quantity: '0.5',
       },
     });
-    const recipeBases = new RecipeBasesService(prisma as never);
+    const recipeBases = new RecipeBasesService(prisma as never, new RecipeExpansionService(prisma as never));
 
     await expect(recipeBases.update(data.tenant.id, base.id, {
       name: base.name,

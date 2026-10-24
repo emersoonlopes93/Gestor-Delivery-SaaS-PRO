@@ -101,6 +101,19 @@ export interface ProductRecipeDTO {
   totalEstimatedCost: number;
 }
 
+/**
+ * Read-only cost calculated from an unsaved recipe draft and the current
+ * tenant-scoped ingredient costs. It is not stock or historical CMV.
+ */
+export interface ProductRecipeDraftCostPreviewDTO {
+  coverage: 'KNOWN' | 'PARTIAL' | 'UNKNOWN';
+  estimatedTotalCost: number | null;
+  partialEstimatedTotalCost: number | null;
+  knownIngredientCount: number;
+  unknownIngredientCount: number;
+  basis: 'CURRENT_INGREDIENT_COSTS';
+}
+
 /** A physical recipe contribution that belongs to an OptionItem only within one product. */
 export type ProductOptionItemRecipeComponentInputDTO =
   | { type: 'ingredient'; ingredientId: string; inputQuantity: number; inputUnit: UnitType }
@@ -192,6 +205,28 @@ export type RecipeBaseComponentDTO =
 
 export interface RecipeBaseDetailDTO extends RecipeBaseDTO {
   components: RecipeBaseComponentDTO[];
+}
+
+/**
+ * Read-only estimate derived from the persisted recipe and current ingredient
+ * costs. It is not a historical cost and never represents physical stock.
+ */
+export type RecipeBaseCostCoverage = 'KNOWN' | 'PARTIAL' | 'UNKNOWN';
+
+export interface RecipeBaseCostProjectionDTO {
+  baseId: string;
+  yieldQuantity: number;
+  outputUnit: UnitType;
+  coverage: RecipeBaseCostCoverage;
+  /** Present only when every physical component has a trustworthy current cost. */
+  estimatedTotalCost: number | null;
+  estimatedCostPerYieldUnit: number | null;
+  /** A labelled subtotal for known components when coverage is partial. */
+  partialEstimatedTotalCost: number | null;
+  partialEstimatedCostPerYieldUnit: number | null;
+  knownIngredientCount: number;
+  unknownIngredientCount: number;
+  basis: 'CURRENT_INGREDIENT_COSTS';
 }
 
 export interface IngredientStatsDTO {
