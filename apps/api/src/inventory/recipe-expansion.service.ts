@@ -23,6 +23,14 @@ export interface ExpandedRecipeCost {
   ingredients: ExpandedIngredientCost[];
 }
 
+export interface ExpandedRecipeCostCoverage {
+  coverage: 'KNOWN' | 'PARTIAL' | 'UNKNOWN';
+  estimatedTotalCost: Prisma.Decimal | null;
+  partialEstimatedTotalCost: Prisma.Decimal | null;
+  knownIngredientCount: number;
+  unknownIngredientCount: number;
+}
+
 /** Read-only canonical expansion of persisted recipes into physical ingredients. */
 @Injectable()
 export class RecipeExpansionService {
@@ -112,6 +120,30 @@ export class RecipeExpansionService {
     return result;
   }
 
+  /**
+   * Expands one persisted RecipeBase into its physical ingredients. The
+   * requested output defaults to the base's full persisted yield, so reporting
+   * consumers never implement their own recipe traversal.
+   */
+  async expandRecipeBaseToIngredients(
+    tenantId: string,
+    baseId: string,
+    requestedOutput?: Prisma.Decimal,
+    client?: Prisma.TransactionClient,
+  ): Promise<Map<string, Prisma.Decimal>> {
+    const reader = this.reader(client);
+    const base = await reader.recipeBase.findFirst({
+      where: { id: baseId, tenantId },
+      select: { id: true, yieldQuantity: true },
+    });
+    if (!base) throw new NotFoundException('PreparaÃ§Ã£o nÃ£o encontrada.');
+    const output = requestedOutput ?? base.yieldQuantity;
+    this.positive(output, 'Rendimento da preparaÃ§Ã£o');
+    const result = new Map<string, Prisma.Decimal>();
+    await this.expandBase(reader, tenantId, base.id, output, result, new Set(), 0, new Map());
+    return result;
+  }
+
   /** Expands an OptionItem contribution within its product context using the same base DFS. */
   async expandProductOptionItemRecipeToIngredients(
     tenantId: string,
@@ -163,6 +195,51 @@ export class RecipeExpansionService {
       return { ingredientId, quantity, unitCost, totalCost: quantity.mul(unitCost) };
     });
     return { totalCost: breakdown.reduce((total, item) => total.plus(item.totalCost), new Prisma.Decimal(0)), ingredients: breakdown };
+  }
+
+  /**
+   * Current-cost coverage is deliberately conservative. `currentCost = 0` is
+   * historically ambiguous in this schema, so it is not announced as a known
+   * free component without a separate authoritative cost-evidence contract.
+   */
+  async calculateExpandedIngredientCostCoverage(
+    tenantId: string,
+    quantities: ReadonlyMap<string, Prisma.Decimal>,
+    client?: Prisma.TransactionClient,
+  ): Promise<ExpandedRecipeCostCoverage> {
+    const ids = [...quantities.keys()];
+    if (!ids.length) {
+      return { coverage: 'UNKNOWN', estimatedTotalCost: null, partialEstimatedTotalCost: null, knownIngredientCount: 0, unknownIngredientCount: 0 };
+    }
+    const ingredients = await this.reader(client).ingredient.findMany({
+      where: { tenantId, id: { in: ids } },
+      select: { id: true, currentCost: true },
+    });
+    if (ingredients.length !== ids.length) throw new NotFoundException('Ingrediente nÃ£o encontrado.');
+
+    const costs = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient.currentCost]));
+    let partialEstimatedTotalCost = new Prisma.Decimal(0);
+    let knownIngredientCount = 0;
+    let unknownIngredientCount = 0;
+    for (const ingredientId of ids) {
+      const quantity = quantities.get(ingredientId);
+      const unitCost = costs.get(ingredientId);
+      if (!quantity || !unitCost) throw new NotFoundException('Ingrediente nÃ£o encontrado.');
+      if (!unitCost.isFinite() || unitCost.lte(0)) {
+        unknownIngredientCount += 1;
+        continue;
+      }
+      knownIngredientCount += 1;
+      partialEstimatedTotalCost = partialEstimatedTotalCost.plus(quantity.mul(unitCost));
+    }
+
+    if (unknownIngredientCount === 0) {
+      return { coverage: 'KNOWN', estimatedTotalCost: partialEstimatedTotalCost, partialEstimatedTotalCost: null, knownIngredientCount, unknownIngredientCount };
+    }
+    if (knownIngredientCount === 0) {
+      return { coverage: 'UNKNOWN', estimatedTotalCost: null, partialEstimatedTotalCost: null, knownIngredientCount, unknownIngredientCount };
+    }
+    return { coverage: 'PARTIAL', estimatedTotalCost: null, partialEstimatedTotalCost, knownIngredientCount, unknownIngredientCount };
   }
 
   /** Canonical bounded batch reader for reporting consumers. */

@@ -17,9 +17,9 @@ interface LinkExistingGroupDialogProps {
   isOpen: boolean;
   onClose: () => void;
   availableGroups: GroupWithDetails[];
-  onLinkGroup: (groupId: string) => Promise<void>;
+  onLinkGroup: (groupId: string, pricingAxis: 'primary' | 'secondary') => Promise<void>;
   isLinking: boolean;
-  onOpenCreateGroup: () => void;
+  onOpenCreateGroup: (pricingAxis: 'primary' | 'secondary') => void;
 }
 
 export const LinkExistingGroupDialog: React.FC<LinkExistingGroupDialogProps> = ({
@@ -32,6 +32,7 @@ export const LinkExistingGroupDialog: React.FC<LinkExistingGroupDialogProps> = (
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [pricingAxis, setPricingAxis] = useState<'primary' | 'secondary'>('secondary');
 
   const filteredGroups = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -46,7 +47,7 @@ export const LinkExistingGroupDialog: React.FC<LinkExistingGroupDialogProps> = (
   const handleSelectGroup = async (groupId: string) => {
     setLinkingId(groupId);
     try {
-      await onLinkGroup(groupId);
+      await onLinkGroup(groupId, pricingAxis);
     } finally {
       setLinkingId(null);
     }
@@ -71,7 +72,7 @@ export const LinkExistingGroupDialog: React.FC<LinkExistingGroupDialogProps> = (
             type="button"
             onClick={() => {
               onClose();
-              onOpenCreateGroup();
+              onOpenCreateGroup(pricingAxis);
             }}
             className="px-4 py-2 text-sm font-bold text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors flex items-center gap-1.5"
           >
@@ -82,6 +83,20 @@ export const LinkExistingGroupDialog: React.FC<LinkExistingGroupDialogProps> = (
       }
     >
       <div className="space-y-4 text-left">
+        <fieldset className="rounded-xl border border-border bg-muted/20 p-3">
+          <legend className="px-1 text-xs font-bold text-foreground">Eixo de precificação</legend>
+          <p className="mb-2 text-xs text-muted-foreground">Principal pode definir o preço-base; secundário acrescenta escolhas ao produto.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border p-2 text-sm text-foreground has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+              <input type="radio" name="pricing-axis" value="primary" checked={pricingAxis === 'primary'} onChange={() => setPricingAxis('primary')} className="mt-0.5" />
+              <span><strong>Principal</strong><span className="block text-xs text-muted-foreground">Ex.: tamanho que pode substituir o preço-base.</span></span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border p-2 text-sm text-foreground has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+              <input type="radio" name="pricing-axis" value="secondary" checked={pricingAxis === 'secondary'} onChange={() => setPricingAxis('secondary')} className="mt-0.5" />
+              <span><strong>Secundário</strong><span className="block text-xs text-muted-foreground">Ex.: adicionais e preferências.</span></span>
+            </label>
+          </div>
+        </fieldset>
         <p className="text-xs text-muted-foreground font-medium leading-relaxed">
           Selecione um grupo de opções reutilizável da sua biblioteca para vinculá-lo a este produto.
         </p>
@@ -183,7 +198,7 @@ export const LinkExistingGroupDialog: React.FC<LinkExistingGroupDialogProps> = (
                 type="button"
                 onClick={() => {
                   onClose();
-                  onOpenCreateGroup();
+                  onOpenCreateGroup(pricingAxis);
                 }}
                 className="btn-primary px-4 py-2 text-xs font-bold inline-flex items-center gap-1.5"
               >

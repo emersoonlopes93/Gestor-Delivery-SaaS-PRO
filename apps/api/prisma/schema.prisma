@@ -124,6 +124,7 @@ model Tenant {
   product_complement_groups          product_complement_groups[]
   product_complement_items           product_complement_items[]
   productOptionGroupLinks            ProductOptionGroupLink[]
+  productOptionGroupAuthoringRequests ProductOptionGroupAuthoringRequest[]
   productOptionItemPrices            ProductOptionItemPrice[]
   productOptionItemRecipeIngredients ProductOptionItemRecipeIngredient[]
   productOptionItemRecipeBases       ProductOptionItemRecipeBase[]
@@ -355,6 +356,7 @@ model OptionGroup {
   tenant                Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items                 OptionItem[]
   productLinks          ProductOptionGroupLink[]
+  contextualAuthoringRequests ProductOptionGroupAuthoringRequest[]
 
   @@index([tenantId, deletedAt])
   @@map("option_groups")
@@ -425,11 +427,31 @@ model ProductOptionGroupLink {
   optionGroup         OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
   product             Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   tenant              Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contextualAuthoringRequests ProductOptionGroupAuthoringRequest[]
 
   @@unique([productId, optionGroupId])
   @@index([tenantId])
   @@index([productId])
   @@map("product_option_group_links")
+}
+
+model ProductOptionGroupAuthoringRequest {
+  id             String                 @id @default(uuid())
+  tenantId       String                 @map("tenant_id")
+  productId      String                 @map("product_id")
+  idempotencyKey String                 @map("idempotency_key") @db.VarChar(100)
+  requestHash    String                 @map("request_hash") @db.VarChar(64)
+  optionGroupId  String                 @map("option_group_id")
+  linkId         String                 @map("link_id")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product        Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionGroup    OptionGroup            @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  link           ProductOptionGroupLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productId, idempotencyKey])
+  @@index([tenantId, productId])
+  @@map("product_option_group_authoring_requests")
 }
 
 model CatalogPublication {
@@ -980,6 +1002,7 @@ model Product {
   product_combo_block_items      product_combo_block_items[]
   product_complement_group_links product_complement_group_links[]
   optionGroupLinks               ProductOptionGroupLink[]
+  contextualOptionGroupAuthoringRequests ProductOptionGroupAuthoringRequest[]
   optionItemPrices               ProductOptionItemPrice[]
   optionItemRecipeIngredients    ProductOptionItemRecipeIngredient[]
   optionItemRecipeBases          ProductOptionItemRecipeBase[]

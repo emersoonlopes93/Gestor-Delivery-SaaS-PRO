@@ -36,7 +36,7 @@ describe('Product Recipe V2 PostgreSQL integrity', () => {
   it('normalizes authored units, persists metadata, expands nested bases, and derives cost once', async () => {
     const data = await fixture('normalization');
     const expansion = new RecipeExpansionService(prisma as never);
-    const bases = new RecipeBasesService(prisma as never);
+    const bases = new RecipeBasesService(prisma as never, new RecipeExpansionService(prisma as never));
     const recipes = new RecipesService(prisma as never, expansion);
     const dough = await bases.create(data.tenant.id, { name: 'Dough', outputUnit: UnitType.KG, yieldQuantity: 1 });
     await bases.replaceComponents(data.tenant.id, dough.id, [
@@ -78,7 +78,7 @@ describe('Product Recipe V2 PostgreSQL integrity', () => {
 
   it('locks outputUnit after product or parent references and keeps archived links usable', async () => {
     const data = await fixture('guard');
-    const bases = new RecipeBasesService(prisma as never);
+    const bases = new RecipeBasesService(prisma as never, new RecipeExpansionService(prisma as never));
     const expansion = new RecipeExpansionService(prisma as never);
     const recipes = new RecipesService(prisma as never, expansion);
     const freeBase = await bases.create(data.tenant.id, { name: 'Free sauce', outputUnit: UnitType.L, yieldQuantity: 1 });

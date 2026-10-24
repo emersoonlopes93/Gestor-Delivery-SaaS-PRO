@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient, UnitType } from '@prisma/client';
 import { UnitType as SharedUnitType } from '@gestor/types';
 import { RecipeBasesService } from './recipe-bases.service';
+import { RecipeExpansionService } from './recipe-expansion.service';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -56,7 +57,7 @@ describe('Recipe base PostgreSQL schema integrity', () => {
 
   it('validates projected cycles, maximum depth, archived children, and preserves inventory invariants', async () => {
     const data = await fixture('graph');
-    const service = new RecipeBasesService(prisma as never);
+    const service = new RecipeBasesService(prisma as never, new RecipeExpansionService(prisma as never));
     const createBase = (name: string) => prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name, outputUnit: UnitType.un, yieldQuantity: 1 } });
     const [a, b, c] = await Promise.all([createBase('A'), createBase('B'), createBase('C')]);
     await service.replaceComponents(data.tenant.id, a.id, [{ type: 'base', baseId: b.id, inputQuantity: 1, inputUnit: SharedUnitType.UN }]);
@@ -82,7 +83,7 @@ describe('Recipe base PostgreSQL schema integrity', () => {
 
   it('serializes concurrent opposite graph mutations without partial writes', async () => {
     const data = await fixture('concurrent');
-    const service = new RecipeBasesService(prisma as never);
+    const service = new RecipeBasesService(prisma as never, new RecipeExpansionService(prisma as never));
     const [a, b] = await Promise.all([
       prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name: 'Concurrent A', outputUnit: UnitType.un, yieldQuantity: 1 } }),
       prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name: 'Concurrent B', outputUnit: UnitType.un, yieldQuantity: 1 } }),
@@ -95,5 +96,46 @@ describe('Recipe base PostgreSQL schema integrity', () => {
     const edges = await prisma.recipeBaseDependency.findMany({ where: { tenantId: data.tenant.id, baseId: { in: [a.id, b.id] } } });
     expect(edges).toHaveLength(1);
     expect(new Set(edges.map((edge) => `${edge.baseId}:${edge.componentBaseId}`))).not.toEqual(new Set([`${a.id}:${b.id}`, `${b.id}:${a.id}`]));
+  });
+
+  it('derives a tenant-scoped current-cost projection without mutating stock, recipe data, or movements', async () => {
+    const data = await fixture('cost-projection');
+    const [liquid, cup] = await Promise.all([
+      prisma.ingredient.update({ where: { id: data.ingredient.id }, data: { unit: UnitType.l, currentCost: '10.0000', currentStock: '7.000000' } }),
+      prisma.ingredient.create({ data: { tenantId: data.tenant.id, name: 'Cup', sku: `cup-${randomUUID()}`, unit: UnitType.un, currentCost: '2.0000', currentStock: '9.000000' } }),
+    ]);
+    const base = await prisma.recipeBase.create({ data: { tenantId: data.tenant.id, name: 'Açaí', outputUnit: UnitType.un, yieldQuantity: '2.000000' } });
+    const service = new RecipeBasesService(prisma as never, new RecipeExpansionService(prisma as never));
+    await service.replaceComponents(data.tenant.id, base.id, [
+      { type: 'ingredient', ingredientId: liquid.id, inputQuantity: 400, inputUnit: SharedUnitType.ML },
+      { type: 'ingredient', ingredientId: cup.id, inputQuantity: 1, inputUnit: SharedUnitType.UN },
+    ]);
+
+    const [beforeBase, beforeLiquid, beforeCup, beforeMovements] = await Promise.all([
+      prisma.recipeBase.findUniqueOrThrow({ where: { id: base.id } }),
+      prisma.ingredient.findUniqueOrThrow({ where: { id: liquid.id } }),
+      prisma.ingredient.findUniqueOrThrow({ where: { id: cup.id } }),
+      prisma.stockMovement.count({ where: { tenantId: data.tenant.id } }),
+    ]);
+    const projection = await service.costProjection(data.tenant.id, base.id);
+    expect(projection).toMatchObject({ coverage: 'KNOWN', estimatedTotalCost: 6, estimatedCostPerYieldUnit: 3, outputUnit: SharedUnitType.UN });
+    const [afterBase, afterLiquid, afterCup, afterMovements] = await Promise.all([
+      prisma.recipeBase.findUniqueOrThrow({ where: { id: base.id } }),
+      prisma.ingredient.findUniqueOrThrow({ where: { id: liquid.id } }),
+      prisma.ingredient.findUniqueOrThrow({ where: { id: cup.id } }),
+      prisma.stockMovement.count({ where: { tenantId: data.tenant.id } }),
+    ]);
+    expect(afterBase).toEqual(beforeBase);
+    expect(afterLiquid.currentStock).toEqual(beforeLiquid.currentStock);
+    expect(afterLiquid.currentCost).toEqual(beforeLiquid.currentCost);
+    expect(afterCup.currentStock).toEqual(beforeCup.currentStock);
+    expect(afterCup.currentCost).toEqual(beforeCup.currentCost);
+    expect(afterMovements).toBe(beforeMovements);
+
+    await prisma.ingredient.update({ where: { id: cup.id }, data: { currentCost: '0.0000' } });
+    await expect(service.costProjection(data.tenant.id, base.id)).resolves.toMatchObject({ coverage: 'PARTIAL', estimatedTotalCost: null, partialEstimatedTotalCost: 4 });
+    await service.archive(data.tenant.id, base.id);
+    await expect(service.costProjection(data.tenant.id, base.id)).resolves.toMatchObject({ baseId: base.id, coverage: 'PARTIAL' });
+    await expect(service.costProjection('other-tenant', base.id)).rejects.toThrow('nÃ£o encontrada');
   });
 });
