@@ -6,7 +6,7 @@ import type {
   CreateOrderItemDTO,
   EditOrderOperationDTO,
 } from '@gestor/types';
-import { api } from '../../../lib/api-client';
+import { api, ApiError } from '../../../lib/api-client';
 import { PosItemConfiguratorModal } from '../../pos/components/PosItemConfiguratorModal';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -247,8 +247,13 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(e.response?.data?.message || e.message || 'Erro ao salvar pedido');
+      if (err instanceof ApiError && err.code === 'ORDER_ECONOMIC_EDIT_REQUIRES_RECONCILIATION') {
+        setError('Este pedido já possui baixa de estoque registrada. Nesta versão, itens, quantidades e opções não podem ser alterados; siga o procedimento operacional aprovado para cancelamento e recriação quando permitido.');
+      } else if (err instanceof ApiError) {
+        setError(err.message || 'Erro ao salvar pedido');
+      } else {
+        setError('Erro ao salvar pedido');
+      }
     } finally {
       setIsSaving(false);
     }

@@ -172,6 +172,13 @@ jobs:
           --runInBand
           src/analytics/historical-cmv.postgres.integration-test.ts
 
+      - name: Test post-depletion order edit guard with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/orders/orders-post-depletion-edit.postgres.integration-test.ts
+
       - name: Test unit integrity audit with ephemeral PostgreSQL
         run: >-
           pnpm --filter @gestor/api exec jest

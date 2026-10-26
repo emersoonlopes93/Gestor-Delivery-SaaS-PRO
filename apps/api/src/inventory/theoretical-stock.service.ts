@@ -75,7 +75,7 @@ export class TheoreticalStockService {
   }
 
   async processOrderDepletionInTransaction(tx: Prisma.TransactionClient, tenantId: string, orderId: string): Promise<void> {
-    await this.lockOrder(tx, tenantId, orderId);
+    await this.lockOrderInTransaction(tx, tenantId, orderId);
     const existingMovements = await tx.stockMovement.count({
       where: { tenantId, orderId, type: StockMovementType.THEORETICAL_DEPLETION },
     });
@@ -87,7 +87,7 @@ export class TheoreticalStockService {
   }
 
   async reconcileOrderDepletionInTransaction(tx: Prisma.TransactionClient, tenantId: string, orderId: string): Promise<void> {
-    await this.lockOrder(tx, tenantId, orderId);
+    await this.lockOrderInTransaction(tx, tenantId, orderId);
     await this.reverseActiveOrderDepletionInTransaction(tx, tenantId, orderId, `Theoretical reversal for reconciled order ${orderId}`);
     await this.depleteCurrentOrderItemsInTransaction(tx, tenantId, orderId);
   }
@@ -102,11 +102,15 @@ export class TheoreticalStockService {
   }
 
   async reverseOrderDepletionInTransaction(tx: Prisma.TransactionClient, tenantId: string, orderId: string): Promise<void> {
-    await this.lockOrder(tx, tenantId, orderId);
+    await this.lockOrderInTransaction(tx, tenantId, orderId);
     await this.reverseActiveOrderDepletionInTransaction(tx, tenantId, orderId, `Theoretical reversal for cancelled order ${orderId}`);
   }
 
-  private async lockOrder(tx: Prisma.TransactionClient, tenantId: string, orderId: string): Promise<void> {
+  /**
+   * Serializes every operation that can observe or mutate an order's physical
+   * consumption. Callers must keep this lock for the whole transaction.
+   */
+  async lockOrderInTransaction(tx: Prisma.TransactionClient, tenantId: string, orderId: string): Promise<void> {
     const lockKey = `${tenantId}:${orderId}`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
   }
