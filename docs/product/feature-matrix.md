@@ -18,7 +18,10 @@ source_of_truth:
 
 ## Legenda de Status
 
-- **Stable**: Funcionalidade completa, testada e em uso por tenants reais. Pode ser ativada com segurança.
+- **Stable**: Funcionalidade com contrato implementado e cobertura tecnica
+  registrada. A ativacao continua condicionada ao preset, RBAC e aos gates de
+  ensaio/piloto/producao aplicaveis; este status nao afirma uso atual por
+  tenants reais.
 - **Beta**: Funcionalidade implementada mas sujeita a mudanças, instabilidades ou requisitos incompletos.
 - **Coming Soon**: Planejado ou em desenvolvimento ativo (código pode estar presente mas não é funcional).
 - **Stub**: Declarado mas sem implementação real de persistência ou lógica (verificado via código).
@@ -105,7 +108,7 @@ source_of_truth:
 | Feature Key | Status | Descrição | Permissão requerida |
 |-------------|--------|-----------|--------------------|
 | `inventory_advanced` | **Stable** | Fichas técnicas, insumos e baixa teórica atômica, idempotente e sem saldo negativo. | `inventory.read` |
-| `finance_advanced` | **Stable** | DRE simplificado, fluxo de caixa e lançamentos. | `finance.read` |
+| `finance_advanced` | **Stable** | Fluxo de caixa e lançamentos suportados. Não representa, por si só, CMV histórico agregado, lucro real ou DRE histórico canônico. | `finance.read` |
 | `bi_advanced` | **Beta** | Dashboards e cubos de dados customizados. | `reports.read` |
 | `goals` | **Beta** | Cadastro e acompanhamento de metas da loja. | `goals.read` |
 
