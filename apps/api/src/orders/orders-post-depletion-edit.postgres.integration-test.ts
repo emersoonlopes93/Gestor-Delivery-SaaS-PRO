@@ -3,10 +3,15 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { FulfillmentType, OrderLineType, PrismaClient, StockMovementType, UnitType } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
+import { ConfigurableRecipeCompositionService } from '../inventory/configurable-recipe-composition.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
+import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
 
 jest.mock('@gestor/utils', () => ({
   getProductConfigurationRoute: jest.fn(),
 }), { virtual: true });
+
+jest.setTimeout(30_000);
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -47,11 +52,33 @@ describe('post-depletion order edit guard with ephemeral PostgreSQL', () => {
   });
 
   function createService(checkoutValidator: { validate: jest.Mock }) {
-    const inventory = new TheoreticalStockService(prisma as never, {} as never, {} as never);
+    const expansion = new RecipeExpansionService(prisma as never);
+    const composition = new ConfigurableRecipeCompositionService(
+      prisma as never,
+      expansion,
+      { calculatePrice: jest.fn() } as never,
+    );
+    const inventory = new TheoreticalStockService(
+      prisma as never,
+      composition,
+      new ComboComponentEligibilityService(prisma as never),
+    );
     const service = new OrdersService(
       prisma as never, checkoutValidator as never, {} as never, {} as never, {} as never,
-      inventory, {} as never, {} as never, {} as never,
-      { emitOrderChanged: jest.fn() } as never, {} as never, {} as never, {} as never, {} as never, {} as never,
+      inventory,
+      {} as never,
+      {} as never,
+      { notifyOrderStatus: jest.fn().mockResolvedValue(undefined) } as never,
+      {
+        emitOrderChanged: jest.fn(),
+        emitOrderCancelled: jest.fn(),
+        emitOrderStatusUpdated: jest.fn(),
+      } as never,
+      {} as never,
+      {} as never,
+      { recordOrderStatusEvent: jest.fn().mockResolvedValue(undefined) } as never,
+      {} as never,
+      {} as never,
     );
     return { service, inventory };
   }
@@ -179,6 +206,57 @@ describe('post-depletion order edit guard with ephemeral PostgreSQL', () => {
     expect(checkoutValidator.validate).not.toHaveBeenCalled();
   });
 
+  it('rejects a stale economic replacement after a real item-note edit and preserves the note', async () => {
+    const product = await prisma.product.create({ data: { tenantId, name: `Note race ${suffix}`, slug: `note-race-${suffix}`, basePrice: 8 } });
+    const order = await prisma.order.create({ data: { tenantId, orderNumber: `NOTE-RACE-${suffix}`.slice(0, 20), fulfillmentType: FulfillmentType.pickup, customerName: 'Note race', customerPhone: `113${Date.now().toString().slice(-8)}`, itemsSubtotal: 8, total: 8, idempotencyKey: `note-race-${suffix}`, publicTrackingToken: `note-race-${suffix}` } });
+    const item = await prisma.orderItem.create({ data: { tenantId, orderId: order.id, lineType: OrderLineType.product, productId: product.id, quantity: 1, unitPrice: 8, lineTotal: 8, snapshotName: 'Original', snapshotBasePrice: 8, snapshotExtrasTotal: 0 } });
+    const validationStarted = deferred<void>();
+    const validationResult = deferred<{
+      lines: Array<{ lineType: 'product'; productId: string; quantity: number; unitPrice: number; lineTotal: number; name: string; image: null; basePrice: number; extrasTotal: number; composition: null; snapshotCatalogV2Json: { version: string; lineType: string; selections: never[] } }>;
+      itemsSubtotal: number; discountTotal: number; deliveryFee: number; total: number;
+    }>();
+    const checkoutValidator = {
+      validate: jest.fn(async () => {
+        validationStarted.resolve();
+        return validationResult.promise;
+      }),
+    };
+    const { service } = createService(checkoutValidator);
+    jest.spyOn(service, 'getOrderDetail').mockResolvedValue({ id: order.id } as never);
+
+    const economicEdit = service.editOrder(order.id, tenantId, {
+      operations: [{ type: 'update_quantity', orderItemId: item.id, quantity: 2 }],
+    }).catch((error: unknown) => error);
+    await validationStarted.promise;
+
+    await service.editOrder(order.id, tenantId, {
+      operations: [{ type: 'update_item_notes', orderItemId: item.id, notes: 'Sem gelo' }],
+    });
+
+    validationResult.resolve({
+      lines: [{ lineType: 'product', productId: product.id, quantity: 2, unitPrice: 8, lineTotal: 16, name: 'Changed', image: null, basePrice: 8, extrasTotal: 0, composition: null, snapshotCatalogV2Json: { version: 'catalog_v2_snapshot_v1', lineType: 'product', selections: [] } }],
+      itemsSubtotal: 16, discountTotal: 0, deliveryFee: 0, total: 16,
+    });
+
+    const error = await economicEdit;
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({ code: 'ORDER_EDIT_STALE' });
+    const [persistedOrder, persistedItem, items, movements, editTimelines] = await Promise.all([
+      prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+      prisma.orderItem.findUniqueOrThrow({ where: { id: item.id } }),
+      prisma.orderItem.findMany({ where: { tenantId, orderId: order.id } }),
+      prisma.stockMovement.count({ where: { tenantId, orderId: order.id } }),
+      prisma.orderTimeline.count({ where: { tenantId, orderId: order.id, note: { startsWith: 'Pedido editado:' } } }),
+    ]);
+    expect(persistedItem.notes).toBe('Sem gelo');
+    expect(persistedOrder.updatedAt.getTime()).toBeGreaterThan(order.updatedAt.getTime());
+    expect(Number(persistedOrder.total)).toBe(8);
+    expect(items).toHaveLength(1);
+    expect(Number(items[0]?.quantity)).toBe(1);
+    expect(movements).toBe(0);
+    expect(editTimelines).toBe(0);
+  });
+
   it('serializes an edit behind cancellation so no replacement persists after the terminal status', async () => {
     const product = await prisma.product.create({ data: { tenantId, name: `Cancel race ${suffix}`, slug: `cancel-race-${suffix}`, basePrice: 9 } });
     const order = await prisma.order.create({ data: { tenantId, orderNumber: `CANCEL-${suffix}`.slice(0, 20), fulfillmentType: FulfillmentType.pickup, customerName: 'Cancel race', customerPhone: `116${Date.now().toString().slice(-8)}`, itemsSubtotal: 9, total: 9, idempotencyKey: `cancel-race-${suffix}`, publicTrackingToken: `cancel-race-${suffix}` } });
@@ -189,15 +267,18 @@ describe('post-depletion order edit guard with ephemeral PostgreSQL', () => {
       itemsSubtotal: number; discountTotal: number; deliveryFee: number; total: number;
     }>();
     const checkoutValidator = { validate: jest.fn(() => { validationStarted.resolve(); return validationResult.promise; }) };
-    const { service, inventory } = createService(checkoutValidator);
+    const { service } = createService(checkoutValidator);
     jest.spyOn(service, 'getOrderDetail').mockResolvedValue({ id: order.id } as never);
 
     const edit = service.editOrder(order.id, tenantId, { operations: [{ type: 'update_quantity', orderItemId: item.id, quantity: 2 }] }).catch((error: unknown) => error);
     await validationStarted.promise;
-    await prisma.$transaction(async (tx) => {
-      await inventory.lockOrderInTransaction(tx as never, tenantId, order.id);
-      await tx.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
-    }, { isolationLevel: 'Serializable' });
+    await service.updateOrderStatus(
+      order.id,
+      tenantId,
+      { status: 'cancelled', note: 'Corrida de cancelamento real' },
+      undefined,
+      { marketplaceEvent: true },
+    );
     validationResult.resolve({ lines: [{ lineType: 'product', productId: product.id, quantity: 2, unitPrice: 9, lineTotal: 18, name: 'Changed', image: null, basePrice: 9, extrasTotal: 0, composition: null, snapshotCatalogV2Json: { version: 'catalog_v2_snapshot_v1', lineType: 'product', selections: [] } }], itemsSubtotal: 18, discountTotal: 0, deliveryFee: 0, total: 18 });
 
     const result = await edit;
@@ -219,6 +300,16 @@ describe('post-depletion order edit guard with ephemeral PostgreSQL', () => {
     ]);
     const order = await prisma.order.create({ data: { tenantId, orderNumber: `DEPLETE-${suffix}`.slice(0, 20), fulfillmentType: FulfillmentType.pickup, customerName: 'Depletion race', customerPhone: `115${Date.now().toString().slice(-8)}`, itemsSubtotal: 11, total: 11, idempotencyKey: `depletion-race-${suffix}`, publicTrackingToken: `depletion-race-${suffix}` } });
     const item = await prisma.orderItem.create({ data: { tenantId, orderId: order.id, lineType: OrderLineType.product, productId: product.id, quantity: 1, unitPrice: 11, lineTotal: 11, snapshotName: 'Original', snapshotBasePrice: 11, snapshotExtrasTotal: 0 } });
+    await prisma.productRecipeIngredient.create({
+      data: {
+        tenantId,
+        productId: product.id,
+        ingredientId: ingredient.id,
+        quantity: 1,
+        inputQuantity: 1,
+        inputUnit: UnitType.un,
+      },
+    });
     const validationStarted = deferred<void>();
     const validationResult = deferred<{
       lines: Array<{ lineType: 'product'; productId: string; quantity: number; unitPrice: number; lineTotal: number; name: string; image: null; basePrice: number; extrasTotal: number; composition: null; snapshotCatalogV2Json: { version: string; lineType: string; selections: never[] } }>;
@@ -230,10 +321,7 @@ describe('post-depletion order edit guard with ephemeral PostgreSQL', () => {
 
     const edit = service.editOrder(order.id, tenantId, { operations: [{ type: 'update_quantity', orderItemId: item.id, quantity: 2 }] }).catch((error: unknown) => error);
     await validationStarted.promise;
-    await prisma.$transaction(async (tx) => {
-      await inventory.lockOrderInTransaction(tx as never, tenantId, order.id);
-      await tx.stockMovement.create({ data: { tenantId, ingredientId: ingredient.id, orderId: order.id, type: StockMovementType.theoretical_depletion, quantity: 1, unitCost: 3 } });
-    }, { isolationLevel: 'Serializable' });
+    await inventory.processOrderDepletion(tenantId, order.id);
     validationResult.resolve({ lines: [{ lineType: 'product', productId: product.id, quantity: 2, unitPrice: 11, lineTotal: 22, name: 'Changed', image: null, basePrice: 11, extrasTotal: 0, composition: null, snapshotCatalogV2Json: { version: 'catalog_v2_snapshot_v1', lineType: 'product', selections: [] } }], itemsSubtotal: 22, discountTotal: 0, deliveryFee: 0, total: 22 });
 
     const result = await edit;

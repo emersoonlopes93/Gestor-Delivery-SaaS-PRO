@@ -191,7 +191,10 @@ describe('OrdersService post-depletion economic edit guard', () => {
     expect(harness.tx.stockMovement.count).not.toHaveBeenCalled();
     expect(harness.tx.order.update).toHaveBeenCalledWith({
       where: { id: orderId },
-      data: { notes: 'portaria' },
+      data: expect.objectContaining({
+        notes: 'portaria',
+        updatedAt: expect.any(Date),
+      }),
     });
     expect(harness.tx.orderItem.updateMany).toHaveBeenCalledWith({
       where: { id: 'item-a', orderId, tenantId },
@@ -199,6 +202,26 @@ describe('OrdersService post-depletion economic edit guard', () => {
     });
     expect(harness.tx.orderItem.deleteMany).not.toHaveBeenCalled();
     expect(harness.tx.orderItem.create).not.toHaveBeenCalled();
+  });
+
+  it('advances the order CAS version for an item-note-only edit', async () => {
+    const harness = makeHarness();
+    const now = jest.spyOn(Date, 'now').mockReturnValue(updatedAt.getTime());
+
+    try {
+      await harness.service.editOrder(orderId, tenantId, {
+        operations: [{ type: 'update_item_notes', orderItemId: 'item-a', notes: 'sem gelo' }],
+      });
+    } finally {
+      now.mockRestore();
+    }
+
+    const updateCall = harness.tx.order.update.mock.calls[0]?.[0] as {
+      data: { updatedAt: Date };
+    };
+    expect(updateCall.data.updatedAt.getTime()).toBe(updatedAt.getTime() + 1);
+    expect(harness.checkoutValidator.validate).not.toHaveBeenCalled();
+    expect(harness.tx.orderItem.deleteMany).not.toHaveBeenCalled();
   });
 
   it('fails closed when the locked order changed before an economic edit can write', async () => {

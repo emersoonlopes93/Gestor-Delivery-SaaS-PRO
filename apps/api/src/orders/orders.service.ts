@@ -2069,6 +2069,16 @@ export class OrdersService {
       ));
   }
 
+  /**
+   * The economic edit CAS is intentionally based on Order.updatedAt. Item-note
+   * changes therefore need to advance the parent version as well. PostgreSQL
+   * stores Prisma DateTime values at millisecond precision, so relying on
+   * @updatedAt alone could retain the same value for two writes in one tick.
+   */
+  private nextOrderUpdatedAt(currentUpdatedAt: Date): Date {
+    return new Date(Math.max(Date.now(), currentUpdatedAt.getTime() + 1));
+  }
+
   private async assertEconomicEditHasNoHistoricalDepletion(
     order: Pick<PrismaOrder, 'id' | 'tenantId' | 'status' | 'updatedAt'>,
     tenantId: string,
@@ -2117,7 +2127,7 @@ export class OrdersService {
       await this.inventoryService.lockOrderInTransaction(tx, tenantId, orderId);
       const order = await tx.order.findFirst({
         where: { id: orderId, tenantId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, updatedAt: true },
       });
       if (!order) throw new NotFoundException('Pedido não encontrado.');
 
@@ -2126,12 +2136,6 @@ export class OrdersService {
         throw new BadRequestException(`Não é possível editar observações do pedido com status ${order.status}`);
       }
       const orderNotesOperation = operations.find((operation) => operation.type === 'update_order_notes');
-      if (orderNotesOperation) {
-        await tx.order.update({
-          where: { id: order.id },
-          data: { notes: orderNotesOperation.notes || null },
-        });
-      }
 
       for (const operation of operations) {
         if (operation.type !== 'update_item_notes' || !operation.orderItemId) continue;
@@ -2143,6 +2147,17 @@ export class OrdersService {
           throw new NotFoundException('Item do pedido não encontrado.');
         }
       }
+
+      // Keep the order-level CAS version monotonic even when only an OrderItem
+      // note changed. This prevents a previously-read economic replacement
+      // from deleting the updated line after it acquires the advisory lock.
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          ...(orderNotesOperation ? { notes: orderNotesOperation.notes || null } : {}),
+          updatedAt: this.nextOrderUpdatedAt(order.updatedAt),
+        },
+      });
 
       await tx.orderTimeline.create({
         data: {
