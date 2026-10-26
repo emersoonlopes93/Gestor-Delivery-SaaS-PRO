@@ -121,6 +121,7 @@ describe('OrdersService cancellation stock reversal atomicity', () => {
       }),
     };
     const inventoryService = {
+      lockOrderInTransaction: jest.fn().mockResolvedValue(undefined),
       reverseOrderDepletionInTransaction: jest.fn().mockImplementation(async () => {
         if (inventoryFailure) throw inventoryFailure;
       }),

@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { evaluateOwnFleetEligibility } from '../delivery/own-fleet-eligibility';
-import { MarketplaceProvider, OrderStatus, Prisma, DineInTable, Order as PrismaOrder, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { MarketplaceProvider, OrderStatus, Prisma, DineInTable, Order as PrismaOrder, PaymentMethod as PrismaPaymentMethod, StockMovementType } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
@@ -1442,6 +1442,13 @@ export class OrdersService {
 
     let tenantName: string | null = null;
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Cancellation and an economic edit both mutate the same order and can
+      // touch theoretical stock. Take the shared order lock before taking the
+      // order-row write lock so their ordering matches editOrder().
+      if (nextStatus === 'cancelled') {
+        await this.inventoryService.lockOrderInTransaction(tx, tenantId, orderId);
+      }
+
       const transition = await this.applyOrderStatusTransitionInTransaction(tx, {
         tenantId,
         orderId,
@@ -1805,6 +1812,12 @@ export class OrdersService {
     });
     if (!tenant) throw new NotFoundException('Loja não encontrada.');
 
+    if (this.isNotesOnlyOrderEdit(dto)) {
+      await this.applyNotesOnlyOrderEdit(orderId, tenantId, dto, actorId);
+      this.ordersGateway.emitOrderChanged(tenantId, orderId, 'edited');
+      return this.getOrderDetail(orderId, tenantId);
+    }
+
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -1821,6 +1834,14 @@ export class OrdersService {
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    // Fail closed before interpreting the replacement payload. An invalid
+    // economic payload must not bypass the historical-depletion contract (for
+    // example, removing the only line would otherwise fail validation first).
+    // The final transaction repeats this check while retaining the same lock
+    // through the domain write, so this preliminary check is not a TOCTOU
+    // substitute for the commit-time guard.
+    await this.assertEconomicEditHasNoHistoricalDepletion(order, tenantId);
 
     // Validar se status permite edição
     const allowedStatuses = ['pending', 'confirmed', 'preparing'];
@@ -1927,34 +1948,70 @@ export class OrdersService {
 
     const { lines, itemsSubtotal, discountTotal, deliveryFee, total } = validation;
 
-    // 2. Transaction to replace items
-    await this.prisma.$transaction(async (tx) => {
-      // Process order notes update if requested
-      if (dto.operations) {
-        const orderNotesOp = dto.operations.find(op => op.type === 'update_order_notes');
-        if (orderNotesOp) {
-          await tx.order.update({
-            where: { id: order.id },
-            data: { notes: orderNotesOp.notes || null },
-          });
-        }
+    // Keep the physical-stock lock until all order writes are committed. A
+    // previous theoretical depletion is historical even after reversal, so it
+    // never makes this legacy replacement flow safe again.
+    await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      await this.inventoryService.lockOrderInTransaction(tx, tenantId, orderId);
+
+      const lockedOrder = await tx.order.findFirst({
+        where: { id: orderId, tenantId },
+        select: { status: true, updatedAt: true },
+      });
+      if (!lockedOrder) throw new NotFoundException('Pedido não encontrado.');
+      if (
+        lockedOrder.status !== order.status
+        || lockedOrder.updatedAt.getTime() !== order.updatedAt.getTime()
+      ) {
+        throw new ConflictException({
+          code: 'ORDER_EDIT_STALE',
+          message: 'O pedido mudou enquanto era editado. Atualize os dados e tente novamente.',
+        });
+      }
+      if (!allowedStatuses.includes(lockedOrder.status)) {
+        throw new BadRequestException(`Não é possível editar pedido com status ${lockedOrder.status}`);
       }
 
-      // Delete old items and their relations
+      const historicalDepletionCount = await tx.stockMovement.count({
+        where: {
+          tenantId,
+          orderId,
+          type: StockMovementType.theoretical_depletion,
+        },
+      });
+      if (historicalDepletionCount > 0) {
+        throw new ConflictException({
+          code: 'ORDER_ECONOMIC_EDIT_REQUIRES_RECONCILIATION',
+          message: 'Este pedido já possui baixa de estoque registrada e não pode ter itens, quantidades ou opções alterados. Use o procedimento operacional aprovado para cancelamento e recriação quando permitido.',
+        });
+      }
 
-      await tx.orderItem.deleteMany({ where: { orderId: order.id } });
-
-      // Update order totals
-      await tx.order.update({
-        where: { id: order.id },
+      const orderNotesOp = dto.operations?.find((op) => op.type === 'update_order_notes');
+      const update = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          tenantId,
+          status: order.status,
+          updatedAt: order.updatedAt,
+        },
         data: {
+          ...(orderNotesOp ? { notes: orderNotesOp.notes || null } : {}),
           itemsSubtotal,
           discountTotal: discountTotal || 0,
           deliveryFee,
           normalDeliveryFee: deliveryFee,
-          total: total,
+          total,
         },
       });
+      if (update.count !== 1) {
+        throw new ConflictException({
+          code: 'ORDER_EDIT_STALE',
+          message: 'O pedido mudou enquanto era editado. Atualize os dados e tente novamente.',
+        });
+      }
+
+      // Delete old items and their relations
+      await tx.orderItem.deleteMany({ where: { orderId: order.id } });
 
       // Create new items
       for (const line of lines) {
@@ -2001,6 +2058,102 @@ export class OrdersService {
     this.ordersGateway.emitOrderChanged(tenantId, order.id, 'edited');
 
     return this.getOrderDetail(order.id, tenantId);
+  }
+
+  private isNotesOnlyOrderEdit(dto: EditOrderDTO): boolean {
+    return dto.items === undefined
+      && dto.operations !== undefined
+      && dto.operations.length > 0
+      && dto.operations.every((operation) => (
+        operation.type === 'update_order_notes' || operation.type === 'update_item_notes'
+      ));
+  }
+
+  private async assertEconomicEditHasNoHistoricalDepletion(
+    order: Pick<PrismaOrder, 'id' | 'tenantId' | 'status' | 'updatedAt'>,
+    tenantId: string,
+  ): Promise<void> {
+    await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      await this.inventoryService.lockOrderInTransaction(tx, tenantId, order.id);
+
+      const lockedOrder = await tx.order.findFirst({
+        where: { id: order.id, tenantId },
+        select: { status: true, updatedAt: true },
+      });
+      if (!lockedOrder) throw new NotFoundException('Pedido não encontrado.');
+      if (
+        lockedOrder.status !== order.status
+        || lockedOrder.updatedAt.getTime() !== order.updatedAt.getTime()
+      ) {
+        throw new ConflictException({
+          code: 'ORDER_EDIT_STALE',
+          message: 'O pedido mudou enquanto era editado. Atualize os dados e tente novamente.',
+        });
+      }
+
+      const historicalDepletionCount = await tx.stockMovement.count({
+        where: {
+          tenantId,
+          orderId: order.id,
+          type: StockMovementType.theoretical_depletion,
+        },
+      });
+      if (historicalDepletionCount > 0) {
+        throw new ConflictException({
+          code: 'ORDER_ECONOMIC_EDIT_REQUIRES_RECONCILIATION',
+          message: 'Este pedido já possui baixa de estoque registrada e não pode ter itens, quantidades ou opções alterados. Use o procedimento operacional aprovado para cancelamento e recriação quando permitido.',
+        });
+      }
+    }, { timeout: 20000 });
+  }
+
+  private async applyNotesOnlyOrderEdit(
+    orderId: string,
+    tenantId: string,
+    dto: EditOrderDTO,
+    actorId?: string,
+  ): Promise<void> {
+    await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      await this.inventoryService.lockOrderInTransaction(tx, tenantId, orderId);
+      const order = await tx.order.findFirst({
+        where: { id: orderId, tenantId },
+        select: { id: true, status: true },
+      });
+      if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+      const operations = dto.operations ?? [];
+      if (!['pending', 'confirmed', 'preparing'].includes(order.status)) {
+        throw new BadRequestException(`Não é possível editar observações do pedido com status ${order.status}`);
+      }
+      const orderNotesOperation = operations.find((operation) => operation.type === 'update_order_notes');
+      if (orderNotesOperation) {
+        await tx.order.update({
+          where: { id: order.id },
+          data: { notes: orderNotesOperation.notes || null },
+        });
+      }
+
+      for (const operation of operations) {
+        if (operation.type !== 'update_item_notes' || !operation.orderItemId) continue;
+        const updatedItem = await tx.orderItem.updateMany({
+          where: { id: operation.orderItemId, orderId: order.id, tenantId },
+          data: { notes: operation.notes || null },
+        });
+        if (updatedItem.count !== 1) {
+          throw new NotFoundException('Item do pedido não encontrado.');
+        }
+      }
+
+      await tx.orderTimeline.create({
+        data: {
+          orderId: order.id,
+          tenantId,
+          status: order.status,
+          note: 'Observação do pedido alterada sem impacto econômico.',
+          actorId,
+        },
+      });
+    }, { timeout: 20000 });
   }
 
   private mapOrderItemToCreateDTO(
