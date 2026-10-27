@@ -101,7 +101,7 @@ export function SaasRegisterPage() {
 
   const goToTenantLogin = () => {
     const tenantUrl = import.meta.env.VITE_TENANT_URL || 'http://localhost:5173';
-    const returnTo = subscription?.canProceedToOnboarding ? '/onboarding' : '/billing';
+    const returnTo = subscription?.canProceedToOnboarding ? '/onboarding' : '/billing/contract';
     window.location.assign(`${tenantUrl}/login?${new URLSearchParams({ email: formData.email, returnTo }).toString()}`);
   };
 

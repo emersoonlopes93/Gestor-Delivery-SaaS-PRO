@@ -41,7 +41,7 @@ export function LoginPage() {
       // Set user in store
       setUser(user);
 
-      if (returnTo === '/billing' || returnTo === '/onboarding') {
+      if (returnTo === '/billing' || returnTo === '/billing/contract' || returnTo === '/onboarding') {
         navigate(returnTo);
       } else if (!user.onboardingCompletedAt) {
         navigate('/onboarding');
