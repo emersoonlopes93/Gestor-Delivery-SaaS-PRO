@@ -37,6 +37,10 @@ nao sao evidência de bloqueio P0 por si, mas nao possuem aceite V1.
   frontend nao prova, por si so, a versao da API Dokploy.
 - R1/R2/R3/R4/R9 exigem aceite autenticado com dados controlados antes de
   ativacao para cliente.
+- A adesao comercial self-service registra a oferta e a assinatura Billing V2,
+  mas nao confirma pagamento. Cobranca SaaS automatica, gateway de producao e
+  enforcement global continuam fora do V1 ate haver uma politica comercial e
+  uma integracao de pagamento efetivamente homologadas.
 
 ## Rollback e piloto
 

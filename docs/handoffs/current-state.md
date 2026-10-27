@@ -2858,3 +2858,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - New theoretical depletions persist explicit cost evidence and order coverage alongside the existing physical quantity and unit-cost snapshot. Existing movements remain nullable/ambiguous: zero/default cost, null cost, and absence of movements are never promoted to known CMV.
 - The per-order read model returns `KNOWN`, `PARTIAL`, or `UNKNOWN`; `totalCmv` is null unless coverage is `KNOWN`, while `knownSubtotal` remains visibly separate. Reversal facts are immutable and net only their linked original depletion.
 - Order-item allocation, BI/dashboard replacement, historical backfill, and edit-order economic deltas remain intentionally out of scope. See `docs/contracts/historical-cmv.md`.
+## Fase Comercial 1 — cadastro, adesão e onboarding (2026-10-27)
+
+- A oferta pública agora é uma allowlist de planos Billing V2 `revenue_tiered`, ativos e públicos; preços e faixas vêm do catálogo persistido, sem cálculo paralelo no navegador.
+- Após o cadastro, a adesão autenticada cria no máximo uma assinatura por tenant para a oferta escolhida, registra a versão da confirmação comercial, um snapshot das faixas e a regra de faturamento vigente no histórico e na auditoria. Retry retorna a assinatura existente; troca silenciosa de plano é rejeitada.
+- Não há cobrança SaaS real, fatura, provider de produção ou enforcement global nesta fase. Planos que exigem pagamento ficam explicitamente pendentes; o texto comercial exibido não é termo jurídico final.
+- O redirecionamento entre storefront e painel nunca envia JWT na URL: o painel recebe somente e-mail pré-preenchido e retorno permitido para `/onboarding` ou `/billing`. O guard permite Billing para owner ainda em onboarding, sem liberar rotas operacionais.

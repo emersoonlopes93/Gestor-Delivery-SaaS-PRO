@@ -9,7 +9,7 @@ import { Mail, Lock, Loader2, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucid
  * Login page for tenant users with premium aesthetics.
  */
 export function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get('email') ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -18,6 +18,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isExpired = searchParams.get('expired') === '1';
+  const returnTo = searchParams.get('returnTo');
   const { setUser } = useAuthStore();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -40,7 +41,9 @@ export function LoginPage() {
       // Set user in store
       setUser(user);
 
-      if (!user.onboardingCompletedAt) {
+      if (returnTo === '/billing' || returnTo === '/onboarding') {
+        navigate(returnTo);
+      } else if (!user.onboardingCompletedAt) {
         navigate('/onboarding');
       } else {
         navigate('/dashboard');

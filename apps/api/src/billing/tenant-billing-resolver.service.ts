@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   BillingPlan,
   BillingRevenueTier,
   PaymentProvider,
-  Prisma,
   TenantBillingSubscription,
   TenantStatus,
   TenantSubscriptionStatus,
@@ -35,6 +34,7 @@ export type TenantEntitlements = {
 
 
 const DEFAULT_BILLING_PLAN_SLUG = 'revenue-growth';
+export const COMMERCIAL_OFFER_TERMS_VERSION = 'commercial-offer-v1';
 
 const CORE_MODULES = [
   'catalog',
@@ -81,6 +81,172 @@ export class TenantBillingResolverService {
     }
 
     return plan;
+  }
+
+  async listPublicCommercialPlans() {
+    const plans = await this.prisma.billingPlan.findMany({
+      where: { isActive: true, isPublic: true, type: 'revenue_tiered' },
+      include: {
+        revenueTiers: { orderBy: [{ sortOrder: 'asc' }] },
+        modules: { where: { isIncluded: true }, select: { moduleKey: true } },
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    return plans.map((plan) => ({
+      id: plan.id,
+      name: plan.name,
+      slug: plan.slug,
+      description: plan.description,
+      type: plan.type,
+      cycleInterval: plan.cycleInterval,
+      currency: plan.currency,
+      trialDays: plan.trialDays,
+      requiresPaymentMethod: plan.requiresPaymentMethod,
+      includedModules: plan.modules.map((module) => module.moduleKey),
+      revenueTiers: plan.revenueTiers.map((tier) => ({
+        id: tier.id,
+        minRevenue: tier.minRevenue.toString(),
+        maxRevenue: tier.maxRevenue?.toString() ?? null,
+        price: tier.price.toString(),
+        label: tier.label,
+        sortOrder: tier.sortOrder,
+      })),
+    }));
+  }
+
+  async subscribeToPublicCommercialPlan(input: {
+    tenantId: string;
+    actorId: string;
+    planId: string;
+    termsVersion: string;
+  }) {
+    if (input.termsVersion !== COMMERCIAL_OFFER_TERMS_VERSION) {
+      throw new BadRequestException('A versão apresentada da oferta comercial não é mais válida. Atualize a página e confira novamente.');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Serializes self-service retries for this tenant without changing global
+      // billing behaviour or relying on a client-provided idempotency key.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.tenantId}))`;
+
+      const existing = await tx.tenantBillingSubscription.findFirst({
+        where: { tenantId: input.tenantId },
+        orderBy: [{ createdAt: 'desc' }],
+      });
+      if (existing) {
+        if (existing.billingPlanId !== input.planId) {
+          throw new ConflictException('Este tenant já possui uma assinatura. A troca de plano deve ser feita no portal de faturamento autorizado.');
+        }
+        return { subscription: existing, created: false };
+      }
+
+      const now = new Date();
+      const [tenant, plan, billingRule] = await Promise.all([
+        tx.tenant.findUnique({ where: { id: input.tenantId }, select: { id: true } }),
+        tx.billingPlan.findFirst({
+          where: { id: input.planId, isActive: true, isPublic: true, type: 'revenue_tiered' },
+          include: { revenueTiers: { orderBy: [{ sortOrder: 'asc' }] } },
+        }),
+        tx.billingRuleVersion.findFirst({
+          where: {
+            isActive: true,
+            effectiveFrom: { lte: now },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+          },
+          orderBy: [{ effectiveFrom: 'desc' }],
+          select: { id: true, version: true, name: true },
+        }),
+      ]);
+
+      if (!tenant) throw new NotFoundException('Tenant não encontrado.');
+      if (!plan) throw new NotFoundException('O plano selecionado não está disponível para contratação.');
+      if (!billingRule) {
+        throw new ConflictException('A regra de faturamento desta oferta não está disponível para contratação.');
+      }
+
+      const trialDays = Math.max(0, plan.trialDays);
+      const canStartTrial = trialDays > 0 && !plan.requiresPaymentMethod;
+      const cycleEnd = new Date(now);
+      cycleEnd.setMonth(cycleEnd.getMonth() + 1);
+      const trialEndsAt = canStartTrial ? this.addDays(now, trialDays) : null;
+      const status = plan.requiresPaymentMethod
+        ? TenantSubscriptionStatus.past_due
+        : canStartTrial ? TenantSubscriptionStatus.trialing : TenantSubscriptionStatus.active;
+
+      const subscription = await tx.tenantBillingSubscription.create({
+        data: {
+          tenantId: input.tenantId,
+          billingPlanId: plan.id,
+          status,
+          startedAt: now,
+          trialStartedAt: canStartTrial ? now : null,
+          trialEndsAt,
+          currentCycleStartedAt: now,
+          currentCycleEndsAt: cycleEnd,
+          requiresPaymentMethod: plan.requiresPaymentMethod,
+          provider: PaymentProvider.manual,
+        },
+      });
+
+      await tx.subscriptionStatusHistory.create({
+        data: {
+          tenantId: input.tenantId,
+          subscriptionId: subscription.id,
+          previousStatus: null,
+          nextStatus: status,
+          reason: 'commercial_offer_accepted',
+          source: 'commercial_self_service',
+          actorType: 'tenant_user',
+          actorId: input.actorId,
+          metadata: {
+            termsVersion: input.termsVersion,
+            acceptedAt: now.toISOString(),
+            plan: {
+              id: plan.id,
+              slug: plan.slug,
+              name: plan.name,
+              type: plan.type,
+              cycleInterval: plan.cycleInterval,
+              currency: plan.currency,
+              trialDays: plan.trialDays,
+              requiresPaymentMethod: plan.requiresPaymentMethod,
+            },
+            revenueTiers: plan.revenueTiers.map((tier) => ({
+              id: tier.id,
+              minRevenue: tier.minRevenue.toString(),
+              maxRevenue: tier.maxRevenue?.toString() ?? null,
+              price: tier.price.toString(),
+              label: tier.label,
+              sortOrder: tier.sortOrder,
+            })),
+            billingRuleVersion: billingRule,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: input.tenantId,
+          userId: input.actorId,
+          userType: 'tenant_user',
+          action: 'billing.commercial_offer_accepted',
+          resource: 'tenant_billing_subscription',
+          details: { subscriptionId: subscription.id, billingPlanId: plan.id, termsVersion: input.termsVersion },
+        },
+      });
+
+      return { subscription, created: true };
+    });
+
+    return {
+      subscriptionId: result.subscription.id,
+      status: result.subscription.status,
+      created: result.created,
+      requiresPaymentMethod: result.subscription.requiresPaymentMethod,
+      canProceedToOnboarding: result.subscription.status === TenantSubscriptionStatus.trialing
+        || result.subscription.status === TenantSubscriptionStatus.active,
+    };
   }
 
   async getTenantBillingState(tenantId: string): Promise<TenantBillingState> {

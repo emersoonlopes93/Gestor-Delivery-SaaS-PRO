@@ -94,6 +94,24 @@ pnpm --filter @gestor/api exec prisma migrate deploy
 
 ## Gateway e cobrança
 
+## Adesão comercial self-service
+
+O catálogo público expõe somente planos Billing V2 ativos, públicos e do tipo
+`revenue_tiered`. A página de cadastro mostra faixas e preços persistidos nesse
+catálogo; não calcula mensalidade no navegador nem aceita preço/fator enviado
+pelo cliente.
+
+A adesão cria uma assinatura e registra a versão da oferta, as faixas e a regra
+de faturamento vigente no histórico da assinatura. Isso não representa pagamento
+confirmado. Quando a oferta exigir forma de pagamento, a assinatura permanece
+em estado pendente de acompanhamento no portal Billing até que o fluxo real seja
+homologado.
+
+O texto exibido nesta fase é uma confirmação comercial não jurídica. Conteúdo e
+versão de termos legais finais ainda requerem aprovação de produto/jurídico.
+
+## Gateway e cobrança
+
 ### Pagamentos desligados
 
 ```env
