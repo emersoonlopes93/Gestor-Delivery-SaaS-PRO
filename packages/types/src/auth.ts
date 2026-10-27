@@ -80,6 +80,12 @@ export interface TenantUserSession {
   enabledModules?: string[];
   accessibleTenants?: AccessibleTenantSession[];
   onboardingCompletedAt?: string | null;
+  /**
+   * Server-resolved continuation for accounts created by the Commercial V1
+   * self-service flow. Legacy tenants remain on their existing navigation.
+   */
+  commercialSignupState?: 'legacy' | 'contract_required' | 'payment_pending' | 'eligible';
+  commercialNextStep?: '/billing/contract' | '/billing' | '/onboarding' | '/dashboard';
   tenant?: {
     id: string;
     name: string;

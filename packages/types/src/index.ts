@@ -29,6 +29,7 @@ export {
 export * from './auth';
 export * from './tenant';
 export * from './billing';
+export * from './commercial-billing';
 export * from './purchasing';
 export * from './finance';
 export * from './rbac';

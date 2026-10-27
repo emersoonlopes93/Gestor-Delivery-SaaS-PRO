@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
-import { CurrentTenant, RequirePermissions } from '../common/decorators';
+import { CurrentTenant, CurrentUser, RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { BillingService } from './billing.service';
@@ -13,6 +13,21 @@ import { BillingSettingsService } from './billing-settings.service';
 import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
 import { PrismaService } from '../database/prisma.service';
 import { TenantSubscriptionStatus } from '@prisma/client';
+import { Equals, IsBoolean, IsNotEmpty, IsString } from 'class-validator';
+
+class CreateCommercialSubscriptionDto {
+  @IsString()
+  @IsNotEmpty()
+  planId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  termsVersion!: string;
+
+  @IsBoolean()
+  @Equals(true)
+  acceptedCommercialTerms!: boolean;
+}
 
 @Controller('billing')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -115,6 +130,21 @@ export class BillingController {
   ) {
     const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, dto.planId);
     return this.tenantBillingResolver.getTenantBillingState(subscription.tenantId);
+  }
+
+  @Post('commercial-subscription')
+  @RequirePermissions('billing.write')
+  async createCommercialSubscription(
+    @Body() dto: CreateCommercialSubscriptionDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') actorId: string,
+  ) {
+    return this.tenantBillingResolver.subscribeToPublicCommercialPlan({
+      tenantId,
+      actorId,
+      planId: dto.planId,
+      termsVersion: dto.termsVersion,
+    });
   }
 
   @Post('trial-pro/start')
