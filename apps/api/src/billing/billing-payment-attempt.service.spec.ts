@@ -42,6 +42,7 @@ describe('BillingPaymentAttemptService', () => {
       auditLog: { create: jest.fn() },
       subscriptionStatusHistory: { create: jest.fn() },
       tenant: { update: jest.fn() },
+      $executeRaw: jest.fn(),
     };
     const prisma = {
       $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => {
@@ -54,6 +55,7 @@ describe('BillingPaymentAttemptService', () => {
       }),
       paymentAttempt: {
         findUnique: jest.fn().mockResolvedValue({ metadataJson: null }),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn(),
         findMany: jest.fn(),
       },
@@ -115,6 +117,18 @@ describe('BillingPaymentAttemptService', () => {
 
     expect(result.id).toBe('attempt-existing');
     expect(gateway.createPaymentForInvoice).not.toHaveBeenCalled();
+  });
+
+  it('reuses an in-progress reservation even when a retry uses a different key', async () => {
+    const { prisma, gateway, tx } = createHarness();
+    tx.paymentAttempt.findFirst.mockResolvedValue({ id: 'attempt-processing', status: PaymentAttemptStatus.processing });
+    const service = new BillingPaymentAttemptService(prisma as never, gateway as never);
+
+    const result = await service.createAttemptForInvoice({ ...input, idempotencyKey: 'different-key' });
+
+    expect(result.id).toBe('attempt-processing');
+    expect(gateway.createPaymentForInvoice).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
   });
 
   it('keeps a timeout reservation processing so a retry cannot create another charge', async () => {

@@ -200,6 +200,13 @@ jobs:
           --runInBand
           src/inventory/purchase-presentation-units.postgres.integration-test.ts
 
+      - name: Test billing payment attempt concurrency with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/billing/billing-payment-attempt.postgres.integration-test.ts
+
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
 

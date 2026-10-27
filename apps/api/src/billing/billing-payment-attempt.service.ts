@@ -17,6 +17,11 @@ import {
 import { mapAsaasPaymentStatusToAttemptStatus } from './asaas-billing-payment.provider';
 
 const PENDING_ATTEMPT_STATUSES = [PaymentAttemptStatus.pending, PaymentAttemptStatus.processing];
+const EXTERNALLY_SUBMITTED_ATTEMPT_STATUSES = [
+  PaymentAttemptStatus.pending,
+  PaymentAttemptStatus.processing,
+  PaymentAttemptStatus.succeeded,
+];
 
 export type CreateBillingPaymentAttemptInput = {
   invoiceId: string;
@@ -78,7 +83,11 @@ export class BillingPaymentAttemptService {
   }
 
   private async reserveAttempt(input: CreateBillingPaymentAttemptInput & { idempotencyKey: string }) {
-    return this.prisma.$transaction(async (tx) => {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+      // Keep this transaction short: it serializes the reservation decision,
+      // then releases the lock before any external provider call.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`billing-payment-attempt:${input.invoiceId}`}, 0))`;
       const invoice = await tx.invoice.findFirst({
         where: { id: input.invoiceId, tenantId: input.tenantId },
         include: { subscription: true },
@@ -91,14 +100,17 @@ export class BillingPaymentAttemptService {
         where: {
           invoiceId: invoice.id,
           provider: input.provider,
-          idempotencyKey: input.idempotencyKey,
+          OR: [
+            { idempotencyKey: input.idempotencyKey },
+            { status: { in: EXTERNALLY_SUBMITTED_ATTEMPT_STATUSES } },
+          ],
         },
+        orderBy: [{ createdAt: 'desc' }],
       });
       if (existing) return { attempt: existing, invoice, created: false };
 
       this.assertInvoiceAllowsAttempt(invoice);
       const openedInvoice = await this.openInvoiceForAttempt(tx, invoice, null, input.provider);
-      try {
         const attempt = await tx.paymentAttempt.create({
           data: {
             invoiceId: openedInvoice.id,
@@ -112,19 +124,31 @@ export class BillingPaymentAttemptService {
           },
         });
         return { attempt, invoice, created: true };
-      } catch (error: unknown) {
-        if (!this.isPrismaUniqueConstraint(error)) throw error;
-        const concurrentAttempt = await tx.paymentAttempt.findFirst({
+      });
+    } catch (error: unknown) {
+      // PostgreSQL aborts a transaction after P2002. A recovery read must use
+      // the root client after rollback, never the failed transaction client.
+      if (!this.isPrismaUniqueConstraint(error)) throw error;
+      const [invoice, concurrentAttempt] = await Promise.all([
+        this.prisma.invoice.findFirst({
+          where: { id: input.invoiceId, tenantId: input.tenantId },
+          include: { subscription: true },
+        }),
+        this.prisma.paymentAttempt.findFirst({
           where: {
-            invoiceId: invoice.id,
+            invoiceId: input.invoiceId,
             provider: input.provider,
-            idempotencyKey: input.idempotencyKey,
+            OR: [
+              { idempotencyKey: input.idempotencyKey },
+              { status: { in: EXTERNALLY_SUBMITTED_ATTEMPT_STATUSES } },
+            ],
           },
-        });
-        if (!concurrentAttempt) throw error;
-        return { attempt: concurrentAttempt, invoice, created: false };
-      }
-    });
+          orderBy: [{ createdAt: 'desc' }],
+        }),
+      ]);
+      if (!invoice || !concurrentAttempt) throw error;
+      return { attempt: concurrentAttempt, invoice, created: false };
+    }
   }
 
   private async finalizeReservedAttempt(input: {

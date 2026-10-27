@@ -174,18 +174,9 @@ async function seedBillingFoundation() {
 
   const plan = await prisma.billingPlan.upsert({
     where: { slug: 'revenue-growth' },
-    update: {
-      name: 'Crescimento por Faturamento',
-      description: 'Plano novo para faturamento por receita mensal',
-      type: 'revenue_tiered',
-      cycleInterval: 'monthly',
-      isActive: true,
-      isPublic: true,
-      currency: 'BRL',
-      trialDays: 0,
-      requiresPaymentMethod: false,
-      allowAllModules: true,
-    },
+    // Persistent environments own their commercial configuration after the
+    // first seed. Re-running this seed may create defaults, never reset them.
+    update: {},
     create: {
       name: 'Crescimento por Faturamento',
       slug: 'revenue-growth',
@@ -198,35 +189,6 @@ async function seedBillingFoundation() {
       trialDays: 0,
       requiresPaymentMethod: false,
       allowAllModules: true,
-    },
-  });
-
-  const mvpPlan = await prisma.billingPlan.upsert({
-    where: { slug: 'mvp-starter' },
-    update: {
-      name: 'MVP Starter',
-      description: 'Plano inicial (apenas funcionalidades essenciais)',
-      type: 'fixed',
-      cycleInterval: 'monthly',
-      isActive: true,
-      isPublic: true,
-      currency: 'BRL',
-      trialDays: 0,
-      requiresPaymentMethod: false,
-      allowAllModules: false, // Bloqueia módulos avançados
-    },
-    create: {
-      name: 'MVP Starter',
-      slug: 'mvp-starter',
-      description: 'Plano inicial (apenas funcionalidades essenciais)',
-      type: 'fixed',
-      cycleInterval: 'monthly',
-      isActive: true,
-      isPublic: true,
-      currency: 'BRL',
-      trialDays: 0,
-      requiresPaymentMethod: false,
-      allowAllModules: false,
     },
   });
 
@@ -245,12 +207,7 @@ async function seedBillingFoundation() {
           sortOrder: tier.sortOrder,
         },
       },
-      update: {
-        minRevenue: tier.minRevenue,
-        maxRevenue: tier.maxRevenue,
-        price: tier.price,
-        label: tier.label,
-      },
+      update: {},
       create: {
         planId: plan.id,
         minRevenue: tier.minRevenue,
@@ -264,32 +221,7 @@ async function seedBillingFoundation() {
 
   await prisma.billingSettings.upsert({
     where: { id: 'global' },
-    update: {
-      includeDeliveryFeeByDefault: false,
-      includeServiceFeeByDefault: false,
-      countStorefrontOrders: true,
-      countDirectOnlineOrders: true,
-      countPosOrders: true,
-      countWhatsappAiOrders: true,
-      countManualOrders: false,
-      countMarketplaceIfoodOrders: true,
-      countConfirmedOrders: true,
-      countCompletedOrders: true,
-      excludeCancelledOrders: true,
-      discountReducesRevenue: true,
-      defaultGracePeriodDays: 7,
-      defaultTrialDays: 0,
-      requirePaymentMethodForPaidPlans: false,
-      trialProEnabled: false,
-      trialIncludesAi: true,
-      trialIncludesIfood: true,
-      trialIncludesAdvancedReports: true,
-      trialAutoConvertToBilling: false,
-      aiIncludedForPaidTenants: true,
-      aiIncludedMonthlyMessages: 200,
-      aiFreeTrialMessages: 0,
-      aiHardLimitMonthlyMessages: 1000,
-    },
+    update: {},
     create: {
       id: 'global',
       includeDeliveryFeeByDefault: false,
@@ -321,15 +253,7 @@ async function seedBillingFoundation() {
 
   await prisma.billingModuleAddon.upsert({
     where: { addonKey: 'ai_agent' },
-    update: {
-      addonKey: 'ai_agent',
-      moduleKey: 'ai_agent',
-      name: 'Add-on Agente IA',
-      description: 'Libera o Agente IA com cota controlada.',
-      pricingType: 'fixed',
-      price: 70,
-      isActive: true,
-    },
+    update: {},
     create: {
       addonKey: 'ai_agent',
       moduleKey: 'ai_agent',
@@ -501,12 +425,7 @@ async function seedDemoTenant() {
         requiresPaymentMethod: smokePlan.requiresPaymentMethod,
       };
 
-      if (existingSubscription) {
-        await prisma.tenantBillingSubscription.update({
-          where: { id: existingSubscription.id },
-          data: subscriptionData,
-        });
-      } else {
+      if (!existingSubscription) {
         await prisma.tenantBillingSubscription.create({
           data: {
             tenantId: tenant.id,
