@@ -59,6 +59,9 @@ describe('BillingPaymentAttemptService', () => {
         update: jest.fn(),
         findMany: jest.fn(),
       },
+      invoice: {
+        findFirst: jest.fn().mockResolvedValue(invoice),
+      },
     };
     const gateway = {
       assertPaymentsEnabled: jest.fn(),
@@ -144,5 +147,25 @@ describe('BillingPaymentAttemptService', () => {
         metadataJson: expect.objectContaining({ gatewaySubmission: 'unknown_outcome' }),
       }),
     }));
+  });
+
+  it('recovers a P2002 only through the root client after the transaction has rolled back', async () => {
+    const { prisma, gateway, tx } = createHarness();
+    const uniqueError = new Prisma.PrismaClientKnownRequestError('duplicate reservation', {
+      code: 'P2002',
+      clientVersion: 'test',
+    });
+    tx.paymentAttempt.create.mockRejectedValueOnce(uniqueError);
+    prisma.paymentAttempt.findFirst.mockImplementation(async () => {
+      expect(tx.paymentAttempt.findFirst).toHaveBeenCalled();
+      return { id: 'attempt-winner', status: PaymentAttemptStatus.processing };
+    });
+    const service = new BillingPaymentAttemptService(prisma as never, gateway as never);
+
+    const result = await service.createAttemptForInvoice(input);
+
+    expect(result.id).toBe('attempt-winner');
+    expect(prisma.paymentAttempt.findFirst).toHaveBeenCalledTimes(1);
+    expect(gateway.createPaymentForInvoice).not.toHaveBeenCalled();
   });
 });
