@@ -187,6 +187,21 @@ Resultado esperado:
 - não usa envs legadas de pedido/split
 - não chama produção
 
+### Reserva idempotente antes do gateway
+
+Toda tentativa de cobrança SaaS é primeiro reservada no banco com a chave
+`(invoiceId, provider, idempotencyKey)` e status `processing`. A chamada ao
+provider ocorre **fora** da transação Prisma; somente a resposta externa
+finaliza a tentativa, a invoice e o customer do provider em uma nova
+transação. Assim, retry concorrente retorna a reserva existente e não cria
+outra cobrança externa.
+
+Se a chamada falhar ou expirar sem resultado autoritativo, a tentativa fica
+`processing` com `gatewaySubmission=unknown_outcome`. Não a marque como paga
+ou falha pela UI e não reenvie a cobrança com outra chave; reconcilie pela
+identidade externa/webhook antes de qualquer nova ação. Asaas continua
+estritamente sandbox nesta fase: CPF sintético não pode ser usado em produção.
+
 O webhook SaaS Asaas fica em:
 
 ```text

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { InvoiceStatus, Prisma } from '@prisma/client';
 import { InvoiceService } from './invoice.service';
 
 describe('InvoiceService', () => {
@@ -37,5 +37,23 @@ describe('InvoiceService', () => {
       type: 'addon:ai_agent',
       totalAmount: new Prisma.Decimal(70),
     }));
+  });
+
+  it('does not recalculate a non-draft invoice during an idempotent cycle retry', async () => {
+    const existingInvoice = { id: 'invoice-1', status: InvoiceStatus.open };
+    const prisma = {
+      invoice: { findFirst: jest.fn().mockResolvedValue(existingInvoice) },
+    };
+    const service = new InvoiceService(prisma as never, {} as never, {} as never);
+
+    const result = await service.getOrCreateDraftInvoiceForCycle({
+      tenantId: 'tenant-1',
+      subscriptionId: 'subscription-1',
+      cycleId: 'cycle-1',
+      planId: 'plan-1',
+    });
+
+    expect(result).toEqual(existingInvoice);
+    expect(prisma.invoice.findFirst).toHaveBeenCalledTimes(1);
   });
 });

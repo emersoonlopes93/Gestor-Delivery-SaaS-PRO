@@ -65,6 +65,21 @@ provider, conexão opcional, valor, moeda, chave idempotente e status canônico.
 - Transições usam compare-and-set no status para que concorrência não adquira o mesmo efeito
   financeiro duas vezes.
 
+### Billing SaaS por faturamento
+
+As tentativas de `Invoice` SaaS são separadas das tentativas de pedido. A
+chave única `(invoiceId, provider, idempotencyKey)` primeiro reserva uma linha
+`processing` em transação curta. A chamada HTTP ao gateway nunca acontece
+dentro da transação; sua resposta é finalizada em transação posterior. Uma
+falha de rede tem resultado externo desconhecido, portanto conserva a reserva
+e bloqueia novo envio automático. Somente webhook autenticado ou resposta
+autoritativa pode concluir uma invoice como `paid`.
+
+Itens de invoice deixam de ser recalculados quando a invoice sai de `draft`;
+tiers, regras e add-ons atuais não podem alterar o snapshot comercial já
+emitido. Billing SaaS não habilita enforcement global nem altera pagamentos de
+pedidos, POS, Storefront ou checkout.
+
 ## Payment Monetization Foundation R2
 
 - `PlatformFeePolicy` is provider-neutral and versioned by `selectorKey + version`, with an

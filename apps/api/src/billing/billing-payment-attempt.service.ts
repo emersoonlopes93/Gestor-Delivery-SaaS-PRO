@@ -10,7 +10,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
-import { BillingPaymentSimulation } from './billing-payment-gateway.interface';
+import {
+  BillingPaymentCreateResult,
+  BillingPaymentSimulation,
+} from './billing-payment-gateway.interface';
 import { mapAsaasPaymentStatusToAttemptStatus } from './asaas-billing-payment.provider';
 
 const PENDING_ATTEMPT_STATUSES = [PaymentAttemptStatus.pending, PaymentAttemptStatus.processing];
@@ -37,6 +40,44 @@ export class BillingPaymentAttemptService {
     this.gatewayService.assertPaymentsEnabled(input.provider, input.mode);
     const idempotencyKey = this.resolveIdempotencyKey(input);
 
+    const reservation = await this.reserveAttempt({
+      ...input,
+      idempotencyKey,
+    });
+    if (!reservation.created) {
+      return reservation.attempt;
+    }
+
+    let gatewayResult: BillingPaymentCreateResult;
+    try {
+      // Never keep a database transaction open while calling a payment provider.
+      // The reservation is durable and keyed before this call, so a timeout or a
+      // concurrent retry cannot submit another external charge for this invoice.
+      gatewayResult = await this.gatewayService.createPaymentForInvoice({
+        invoice: reservation.invoice,
+        provider: input.provider,
+        mode: input.mode,
+        idempotencyKey,
+        providerCustomerId: reservation.invoice.subscription.providerCustomerId,
+        simulate: input.simulate,
+      });
+    } catch (error: unknown) {
+      await this.recordGatewaySubmissionUncertain({
+        attemptId: reservation.attempt.id,
+        message: this.getErrorMessage(error),
+      });
+      throw error;
+    }
+
+    return this.finalizeReservedAttempt({
+      attemptId: reservation.attempt.id,
+      provider: input.provider,
+      mode: input.mode,
+      gatewayResult,
+    });
+  }
+
+  private async reserveAttempt(input: CreateBillingPaymentAttemptInput & { idempotencyKey: string }) {
     return this.prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findFirst({
         where: { id: input.invoiceId, tenantId: input.tenantId },
@@ -50,22 +91,63 @@ export class BillingPaymentAttemptService {
         where: {
           invoiceId: invoice.id,
           provider: input.provider,
-          idempotencyKey,
+          idempotencyKey: input.idempotencyKey,
         },
       });
-      if (existing) return existing;
+      if (existing) return { attempt: existing, invoice, created: false };
 
       this.assertInvoiceAllowsAttempt(invoice);
+      const openedInvoice = await this.openInvoiceForAttempt(tx, invoice, null, input.provider);
+      try {
+        const attempt = await tx.paymentAttempt.create({
+          data: {
+            invoiceId: openedInvoice.id,
+            tenantId: openedInvoice.tenantId,
+            provider: input.provider,
+            mode: input.mode,
+            idempotencyKey: input.idempotencyKey,
+            status: PaymentAttemptStatus.processing,
+            amount: openedInvoice.total,
+            metadataJson: { gatewaySubmission: 'reserved' },
+          },
+        });
+        return { attempt, invoice, created: true };
+      } catch (error: unknown) {
+        if (!this.isPrismaUniqueConstraint(error)) throw error;
+        const concurrentAttempt = await tx.paymentAttempt.findFirst({
+          where: {
+            invoiceId: invoice.id,
+            provider: input.provider,
+            idempotencyKey: input.idempotencyKey,
+          },
+        });
+        if (!concurrentAttempt) throw error;
+        return { attempt: concurrentAttempt, invoice, created: false };
+      }
+    });
+  }
 
-      const gatewayResult = await this.gatewayService.createPaymentForInvoice({
-        invoice,
-        provider: input.provider,
-        mode: input.mode,
-        idempotencyKey,
-        providerCustomerId: invoice.subscription.providerCustomerId,
-        simulate: input.simulate,
+  private async finalizeReservedAttempt(input: {
+    attemptId: string;
+    provider: PaymentProvider;
+    mode: BillingGatewayMode;
+    gatewayResult: Awaited<ReturnType<BillingPaymentGatewayService['createPaymentForInvoice']>>;
+  }): Promise<PaymentAttempt> {
+    return this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.paymentAttempt.findUnique({
+        where: { id: input.attemptId },
+        include: { invoice: { include: { subscription: true } } },
       });
+      if (!attempt) {
+        throw new NotFoundException('Reserva de payment attempt nao encontrada.');
+      }
 
+      if (attempt.providerPaymentId || attempt.status !== PaymentAttemptStatus.processing) {
+        return attempt;
+      }
+
+      const invoice = attempt.invoice;
+      const gatewayResult = input.gatewayResult;
       if (gatewayResult.providerCustomerId && !invoice.subscription.providerCustomerId) {
         await tx.tenantBillingSubscription.update({
           where: { id: invoice.subscriptionId },
@@ -76,14 +158,17 @@ export class BillingPaymentAttemptService {
         });
       }
 
-      const openedInvoice = await this.openInvoiceForAttempt(tx, invoice, gatewayResult.providerPaymentUrl, input.provider);
-      const attempt = await tx.paymentAttempt.create({
+      const openedInvoice = await this.openInvoiceForAttempt(
+        tx,
+        invoice,
+        gatewayResult.providerPaymentUrl,
+        input.provider,
+      );
+      const finalizedAttempt = await tx.paymentAttempt.update({
+        where: { id: attempt.id },
         data: {
-          invoiceId: openedInvoice.id,
-          tenantId: openedInvoice.tenantId,
           provider: input.provider,
           mode: input.mode,
-          idempotencyKey,
           status: gatewayResult.status,
           amount: openedInvoice.total,
           providerPaymentId: gatewayResult.providerPaymentId,
@@ -109,7 +194,7 @@ export class BillingPaymentAttemptService {
           provider: input.provider,
           mode: input.mode,
           invoiceId: openedInvoice.id,
-          paymentAttemptId: attempt.id,
+          paymentAttemptId: finalizedAttempt.id,
           providerPaymentId: gatewayResult.providerPaymentId,
           providerCustomerId: gatewayResult.providerCustomerId ?? invoice.subscription.providerCustomerId ?? null,
           invoiceStatusBefore: invoice.status,
@@ -124,13 +209,34 @@ export class BillingPaymentAttemptService {
         mode: input.mode,
         tenantId: openedInvoice.tenantId,
         invoiceId: openedInvoice.id,
-        paymentAttemptId: attempt.id,
+        paymentAttemptId: finalizedAttempt.id,
         providerPaymentId: gatewayResult.providerPaymentId,
         transition: `${invoice.status}->${gatewayResult.status === PaymentAttemptStatus.succeeded ? InvoiceStatus.paid : openedInvoice.status}`,
         result: 'created',
       });
 
-      return attempt;
+      return finalizedAttempt;
+    });
+  }
+
+  private async recordGatewaySubmissionUncertain(input: {
+    attemptId: string;
+    message: string;
+  }): Promise<void> {
+    const attempt = await this.prisma.paymentAttempt.findUnique({
+      where: { id: input.attemptId },
+      select: { metadataJson: true },
+    });
+    if (!attempt) return;
+
+    await this.prisma.paymentAttempt.update({
+      where: { id: input.attemptId },
+      data: {
+        metadataJson: this.mergeMetadata(attempt.metadataJson, {
+          gatewaySubmission: 'unknown_outcome',
+          gatewaySubmissionError: input.message,
+        }),
+      },
     });
   }
 
@@ -667,6 +773,14 @@ export class BillingPaymentAttemptService {
     const value = metadata[key];
     if (!Array.isArray(value)) return [];
     return value.filter((entry): entry is string => typeof entry === 'string');
+  }
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'Erro desconhecido ao submeter cobranca ao gateway.';
+  }
+
+  private isPrismaUniqueConstraint(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
   }
 
   private isJsonObject(value: Prisma.JsonValue | null): value is Prisma.JsonObject {
