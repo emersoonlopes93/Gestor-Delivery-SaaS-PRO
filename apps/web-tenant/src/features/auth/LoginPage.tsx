@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { TenantLoginResponse } from '@gestor/types';
 import { Mail, Lock, Loader2, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { resolvePostLoginDestination } from './commercial-reentry';
 
 /**
  * Login page for tenant users with premium aesthetics.
@@ -41,13 +42,7 @@ export function LoginPage() {
       // Set user in store
       setUser(user);
 
-      if (returnTo === '/billing' || returnTo === '/billing/contract' || returnTo === '/onboarding') {
-        navigate(returnTo);
-      } else if (!user.onboardingCompletedAt) {
-        navigate('/onboarding');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate(resolvePostLoginDestination(user, returnTo));
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

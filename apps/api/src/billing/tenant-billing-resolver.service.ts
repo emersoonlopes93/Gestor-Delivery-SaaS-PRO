@@ -31,6 +31,13 @@ export type TenantEntitlements = {
   source: TenantBillingStateSource;
 };
 
+export type CommercialSignupState = 'legacy' | 'contract_required' | 'payment_pending' | 'eligible';
+
+export type CommercialReentryResolution = {
+  state: CommercialSignupState;
+  nextStep: '/billing/contract' | '/billing' | '/onboarding' | '/dashboard';
+};
+
 
 
 const DEFAULT_BILLING_PLAN_SLUG = 'revenue-growth';
@@ -279,6 +286,36 @@ export class TenantBillingResolverService {
       subscription: null,
       warning: 'Tenant sem assinatura Billing V2 ativa.',
     };
+  }
+
+  /**
+   * Resolves the next authenticated screen for the opt-in Commercial V1 signup
+   * flow. This deliberately does not alter billing entitlements or legacy
+   * tenants: the nullable tenant marker is written only by that public flow.
+   */
+  async resolveCommercialReentry(
+    tenantId: string,
+    commercialSignupStartedAt: Date | null,
+    onboardingCompletedAt: Date | null,
+  ): Promise<CommercialReentryResolution> {
+    const normalNextStep = onboardingCompletedAt ? '/dashboard' : '/onboarding';
+    if (!commercialSignupStartedAt) {
+      return { state: 'legacy', nextStep: normalNextStep };
+    }
+
+    const billingState = await this.getTenantBillingState(tenantId);
+    const subscription = billingState.subscription;
+    if (!subscription) {
+      return { state: 'contract_required', nextStep: '/billing/contract' };
+    }
+
+    const trialIsCurrent = subscription.status === TenantSubscriptionStatus.trialing
+      && (!subscription.trialEndsAt || subscription.trialEndsAt >= new Date());
+    if (subscription.status === TenantSubscriptionStatus.active || trialIsCurrent) {
+      return { state: 'eligible', nextStep: normalNextStep };
+    }
+
+    return { state: 'payment_pending', nextStep: '/billing' };
   }
 
   async reconcileTenantBillingStatus(tenantId: string, now = new Date()): Promise<TenantBillingState> {

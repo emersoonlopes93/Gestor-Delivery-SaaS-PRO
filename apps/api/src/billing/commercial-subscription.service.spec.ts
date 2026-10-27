@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { PaymentProvider, TenantSubscriptionStatus } from '@prisma/client';
-import { COMMERCIAL_OFFER_TERMS_VERSION, TenantBillingResolverService } from './tenant-billing-resolver.service';
+import { COMMERCIAL_OFFER_TERMS_VERSION, type TenantBillingState, TenantBillingResolverService } from './tenant-billing-resolver.service';
 
 describe('Commercial self-service subscription', () => {
   const createPlan = () => ({
@@ -53,5 +53,33 @@ describe('Commercial self-service subscription', () => {
     const service = new TenantBillingResolverService(prisma as never, {} as never);
 
     await expect(service.subscribeToPublicCommercialPlan({ tenantId: 'tenant-1', actorId: 'owner-1', planId: 'other-plan', termsVersion: COMMERCIAL_OFFER_TERMS_VERSION })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns interrupted commercial signups to the contract without changing legacy tenants', async () => {
+    const service = new TenantBillingResolverService({} as never, {} as never);
+    const getState = jest.spyOn(service, 'getTenantBillingState');
+    getState.mockResolvedValue({ subscription: null } as TenantBillingState);
+
+    await expect(service.resolveCommercialReentry('tenant-1', new Date(), null)).resolves.toEqual({
+      state: 'contract_required', nextStep: '/billing/contract',
+    });
+    await expect(service.resolveCommercialReentry('legacy-tenant', null, null)).resolves.toEqual({
+      state: 'legacy', nextStep: '/onboarding',
+    });
+    expect(getState).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves eligible and payment-pending subscriptions without treating payment as active', async () => {
+    const service = new TenantBillingResolverService({} as never, {} as never);
+    const getState = jest.spyOn(service, 'getTenantBillingState');
+    getState.mockResolvedValueOnce({ subscription: { status: TenantSubscriptionStatus.trialing, trialEndsAt: new Date(Date.now() + 60_000) } } as TenantBillingState);
+    getState.mockResolvedValueOnce({ subscription: { status: TenantSubscriptionStatus.past_due, trialEndsAt: null } } as TenantBillingState);
+
+    await expect(service.resolveCommercialReentry('tenant-1', new Date(), null)).resolves.toEqual({
+      state: 'eligible', nextStep: '/onboarding',
+    });
+    await expect(service.resolveCommercialReentry('tenant-1', new Date(), new Date())).resolves.toEqual({
+      state: 'payment_pending', nextStep: '/billing',
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth.store';
+import { resolveCommercialGuardDestination } from '../features/auth/commercial-reentry';
 
 interface OnboardingGuardProps {
   children: ReactNode;
@@ -13,6 +14,11 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   if (isLoading) return null;
 
   if (isAuthenticated && user) {
+    const commercialDestination = resolveCommercialGuardDestination(user, location.pathname);
+    if (commercialDestination) {
+      return <Navigate to={commercialDestination} replace />;
+    }
+
     // If onboarding is not completed, restrict access but allow specific paths
     if (!user.onboardingCompletedAt) {
       // Remove '/dashboard' to force users to finish onboarding

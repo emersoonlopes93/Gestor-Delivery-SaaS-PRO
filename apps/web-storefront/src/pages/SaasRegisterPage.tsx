@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, CircleAlert, CreditCard, Lock, Mail, Phone, Store, User } from 'lucide-react';
 import type { PublicCommercialPlanDTO, PublicCommercialPricingDTO, TenantLoginResponse } from '@gestor/types';
 import { api } from '../lib/api-client';
@@ -27,6 +27,7 @@ function formatRevenueRange(plan: PublicCommercialPlanDTO, minRevenue: string, m
 }
 
 export function SaasRegisterPage() {
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({ ownerName: '', shopName: '', phone: '', email: '', password: '', confirmPassword: '' });
   const [catalog, setCatalog] = useState<PublicCommercialPricingDTO | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState('');
@@ -42,14 +43,16 @@ export function SaasRegisterPage() {
       try {
         const response = await api.get<PublicCommercialPricingDTO>('/saas/pricing');
         setCatalog(response.data);
-        setSelectedPlanId(response.data.plans[0]?.id ?? '');
+        const requestedPlanId = searchParams.get('plan');
+        const requestedPlanIsAvailable = response.data.plans.some((plan) => plan.id === requestedPlanId);
+        setSelectedPlanId(requestedPlanIsAvailable ? requestedPlanId ?? '' : response.data.plans[0]?.id ?? '');
       } catch {
         setError('Não foi possível carregar as ofertas comerciais agora. Tente novamente em instantes.');
       } finally {
         setLoadingCatalog(false);
       }
     })();
-  }, []);
+  }, [searchParams]);
 
   const selectedPlan = useMemo(
     () => catalog?.plans.find((plan) => plan.id === selectedPlanId) ?? null,
@@ -78,7 +81,7 @@ export function SaasRegisterPage() {
     try {
       const registration = await api.post<TenantLoginResponse>('/auth/tenant/register', {
         ownerName: formData.ownerName, shopName: formData.shopName, email: formData.email,
-        password: formData.password, phone: unmask(formData.phone),
+        password: formData.password, phone: unmask(formData.phone), commercialSignup: true,
       });
       const registrationSession = registration.data;
       setSession(registrationSession);

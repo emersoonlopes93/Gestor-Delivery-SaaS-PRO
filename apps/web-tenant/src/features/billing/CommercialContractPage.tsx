@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Loader2 } from 'lucide-react';
-import type { PublicCommercialPricingDTO } from '@gestor/types';
+import type { PublicCommercialPricingDTO, TenantUserSession } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
+import { useAuthStore } from '../../stores/auth.store';
 
 type CommercialSubscriptionResponse = {
   subscriptionId: string;
@@ -14,6 +15,7 @@ type CommercialSubscriptionResponse = {
 
 export function CommercialContractPage() {
   const navigate = useNavigate();
+  const { setUser } = useAuthStore();
   const [catalog, setCatalog] = useState<PublicCommercialPricingDTO | null>(null);
   const [planId, setPlanId] = useState('');
   const [accepted, setAccepted] = useState(false);
@@ -46,7 +48,9 @@ export function CommercialContractPage() {
         termsVersion: catalog.termsVersion,
         acceptedCommercialTerms: true,
       });
-      navigate(response.data.canProceedToOnboarding ? '/onboarding' : '/billing', { replace: true });
+      const session = await api.get<TenantUserSession>('/auth/tenant/me');
+      setUser(session.data);
+      navigate(session.data.commercialNextStep ?? (response.data.canProceedToOnboarding ? '/onboarding' : '/billing'), { replace: true });
     } catch (cause: unknown) {
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível concluir a adesão.');
     } finally {
