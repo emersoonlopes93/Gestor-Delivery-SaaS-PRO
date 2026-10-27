@@ -207,6 +207,13 @@ jobs:
           --runInBand
           src/billing/billing-payment-attempt.postgres.integration-test.ts
 
+      - name: Test billing seed rerun with ephemeral PostgreSQL
+        run: >-
+          pnpm --filter @gestor/api exec jest
+          --config jest.operations-integration.config.js
+          --runInBand
+          src/billing/billing-seed-rerun.postgres.integration-test.ts
+
       - name: Test concurrent operational transactions
         run: pnpm --filter @gestor/api test:operations-concurrency
 

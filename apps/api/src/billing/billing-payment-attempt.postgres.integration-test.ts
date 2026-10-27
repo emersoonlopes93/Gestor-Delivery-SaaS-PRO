@@ -120,4 +120,41 @@ describe('Billing payment attempt PostgreSQL proof', () => {
     expect(retry.status).toBe(PaymentAttemptStatus.processing);
     expect(retry.metadataJson).toEqual(expect.objectContaining({ gatewaySubmission: 'unknown_outcome' }));
   });
+
+  it('proves the real unique violation rolls back before a root-client recovery read', async () => {
+    const { tenant, invoice } = await fixture();
+    const winner = await prisma.paymentAttempt.create({
+      data: {
+        tenantId: tenant.id,
+        invoiceId: invoice.id,
+        provider: PaymentProvider.mock,
+        mode: BillingGatewayMode.sandbox,
+        idempotencyKey: 'p2002-winner',
+        status: PaymentAttemptStatus.processing,
+        amount: 25,
+      },
+    });
+
+    await expect(prisma.$transaction(async (tx) => {
+      await tx.paymentAttempt.create({
+        data: {
+          tenantId: tenant.id,
+          invoiceId: invoice.id,
+          provider: PaymentProvider.mock,
+          mode: BillingGatewayMode.sandbox,
+          idempotencyKey: 'p2002-winner',
+          status: PaymentAttemptStatus.processing,
+          amount: 25,
+        },
+      });
+    })).rejects.toMatchObject({ code: 'P2002' });
+
+    // This query is deliberately outside the failed transaction. The service
+    // follows the same recovery rule if a P2002 ever reaches its guarded path.
+    const recovered = await prisma.paymentAttempt.findFirstOrThrow({
+      where: { invoiceId: invoice.id, provider: PaymentProvider.mock, idempotencyKey: 'p2002-winner' },
+    });
+    expect(recovered.id).toBe(winner.id);
+    expect(await prisma.paymentAttempt.count({ where: { invoiceId: invoice.id } })).toBe(1);
+  });
 });
