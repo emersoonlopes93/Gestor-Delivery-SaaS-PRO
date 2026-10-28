@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Store,
@@ -19,6 +19,10 @@ import {
 } from 'lucide-react';
 
 import { useOnboardingState, AutoSaveStatus, type SaveStepOptions } from './useOnboardingState';
+import { api } from '../../lib/api-client';
+import { useAuthStore } from '../../stores/auth.store';
+import { resolvePostLoginDestination } from '../auth/commercial-reentry';
+import type { TenantUserSession } from '@gestor/types';
 import { Step1Identity } from './steps/Step1Identity';
 import { Step2Location } from './steps/Step2Location';
 import { Step3Delivery } from './steps/Step3Delivery';
@@ -90,9 +94,16 @@ function AutoSaveIndicator({ status }: { status: AutoSaveStatus }) {
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
+  const clearUser = useAuthStore((state) => state.clearUser);
+  const setUser = useAuthStore((state) => state.setUser);
+  const [showContinueLater, setShowContinueLater] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [completedSession, setCompletedSession] = useState<TenantUserSession | null>(null);
   const {
     currentStep,
     visitedSteps,
+    completedSteps,
+    isHydrating,
     autoSaveStatus,
     validation,
     ifoodChoice,
@@ -103,17 +114,32 @@ export function OnboardingWizard() {
     markValidation,
     setIfoodChoice,
     completeOnboarding,
-    triggerAutoSave,
   } = useOnboardingState();
 
   const handleSaveAndNext = useCallback(async (saveFn: () => Promise<void>, options?: SaveStepOptions) => {
     return saveStep(saveFn, options);
   }, [saveStep]);
 
-  const handleContinueLater = useCallback(() => {
-    triggerAutoSave(async () => {});
-    navigate('/dashboard');
-  }, [navigate, triggerAutoSave]);
+  const handleContinueLater = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    await api.post('/auth/tenant/logout').catch(() => undefined);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    clearUser();
+    navigate('/login', { replace: true });
+  }, [clearUser, navigate, signingOut]);
+
+  const handleCompleteOnboarding = useCallback(async () => {
+    const session = await completeOnboarding();
+    setCompletedSession(session);
+  }, [completeOnboarding]);
+
+  const handleEnterPedeHub = useCallback(() => {
+    if (!completedSession) return;
+    setUser(completedSession);
+    navigate(resolvePostLoginDestination(completedSession, null), { replace: true });
+  }, [completedSession, navigate, setUser]);
 
   const step = STEPS[currentStep];
   const progressPct = (currentStep / (totalSteps - 1)) * 100;
@@ -133,7 +159,7 @@ export function OnboardingWizard() {
       <nav className="flex-1 space-y-1 overflow-y-auto">
         {STEPS.map((s, idx) => {
           const isActive = idx === currentStep;
-          const isPast = idx < currentStep;
+          const isCompleted = completedSteps.includes(idx);
           const isVisited = visitedSteps.includes(idx);
           const Icon = s.icon;
 
@@ -145,7 +171,7 @@ export function OnboardingWizard() {
               className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left disabled:cursor-default ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                  : isPast
+                  : isVisited
                     ? 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer'
                     : 'text-slate-400 dark:text-slate-600'
               }`}
@@ -153,7 +179,7 @@ export function OnboardingWizard() {
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                 isActive ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800'
               }`}>
-                {isPast ? (
+                {isCompleted ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 ) : (
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : s.colorClass}`} />
@@ -180,7 +206,7 @@ export function OnboardingWizard() {
       </nav>
 
       <button
-        onClick={handleContinueLater}
+        onClick={() => setShowContinueLater(true)}
         className="mt-6 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
       >
         <X className="w-3.5 h-3.5" />
@@ -204,6 +230,14 @@ export function OnboardingWizard() {
         <div className="flex items-center gap-2">
           <AutoSaveIndicator status={autoSaveStatus} />
           <span className="text-xs font-black text-slate-400">{currentStep + 1}/{totalSteps}</span>
+          <button
+            type="button"
+            onClick={() => setShowContinueLater(true)}
+            aria-label="Continuar onboarding depois"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       </div>
       <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -217,7 +251,7 @@ export function OnboardingWizard() {
           <div
             key={idx}
             className={`rounded-full transition-all ${
-              idx === currentStep ? 'w-5 h-1.5 bg-indigo-600' : idx < currentStep ? 'w-1.5 h-1.5 bg-emerald-500' : 'w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700'
+              idx === currentStep ? 'w-5 h-1.5 bg-indigo-600' : completedSteps.includes(idx) ? 'w-1.5 h-1.5 bg-emerald-500' : 'w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700'
             }`}
           />
         ))}
@@ -254,7 +288,7 @@ export function OnboardingWizard() {
         return (
           <Step8Review
             validation={validation}
-            onActivate={completeOnboarding}
+            onActivate={handleCompleteOnboarding}
             onPrev={goPrev}
             goToStep={goToStep}
           />
@@ -288,7 +322,7 @@ export function OnboardingWizard() {
           <div className="flex items-center gap-4 ml-8">
             <AutoSaveIndicator status={autoSaveStatus} />
             <button
-              onClick={handleContinueLater}
+              onClick={() => setShowContinueLater(true)}
               className="text-xs font-bold text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors flex items-center gap-1.5"
             >
               <X className="w-3.5 h-3.5" />
@@ -299,12 +333,76 @@ export function OnboardingWizard() {
 
         {MobileHeader}
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-xl mx-auto px-4 py-8 md:px-8">
-            {renderStep()}
-          </div>
-        </main>
+        {isHydrating ? (
+          <main className="flex flex-1 items-center justify-center" aria-live="polite">
+            <div className="flex items-center gap-3 text-sm font-bold text-slate-500 dark:text-slate-400">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+              Recuperando seu progresso...
+            </div>
+          </main>
+        ) : (
+
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-xl mx-auto px-4 py-8 md:px-8">
+              {completedSession ? (
+                <section className="mx-auto max-w-lg py-8 text-center" aria-live="polite">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    <CheckCircle2 className="h-8 w-8" />
+                  </div>
+                  <h1 className="mt-5 text-2xl font-black text-slate-900 dark:text-white">Configuracao inicial concluida</h1>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    O servidor confirmou os requisitos da sua loja. Esta etapa organiza a configuracao inicial; publicar o cardapio e receber a primeira venda continuam sendo a proxima fase operacional.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleEnterPedeHub}
+                    className="mt-6 min-h-11 w-full rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-indigo-700 sm:w-auto"
+                  >
+                    Acessar o PedeHub
+                  </button>
+                </section>
+              ) : renderStep()}
+            </div>
+          </main>
+        )}
       </div>
+
+      {showContinueLater ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="continue-later-title"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+          >
+            <h2 id="continue-later-title" className="text-lg font-black text-slate-900 dark:text-white">
+              Continuar em outro momento?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              As etapas confirmadas no servidor permanecem salvas. Alteracoes ainda nao confirmadas nesta tela nao serao marcadas como concluidas. Para proteger sua configuracao, voce saira da conta e retomara o onboarding no proximo acesso.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowContinueLater(false)}
+                disabled={signingOut}
+                className="min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Voltar ao onboarding
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => void handleContinueLater()}
+                disabled={signingOut}
+                className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                {signingOut ? 'Saindo...' : 'Sair e continuar depois'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

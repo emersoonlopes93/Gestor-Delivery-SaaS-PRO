@@ -67,6 +67,7 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
   const [error, setError] = useState('');
   const [completionCheck, setCompletionCheck] = useState<OnboardingCompletionCheck | null>(null);
   const [checkingCompletion, setCheckingCompletion] = useState(true);
+  const [completionCheckError, setCompletionCheckError] = useState('');
 
   const { data: readinessData, loading: readinessLoading } = useReadinessScore();
 
@@ -76,13 +77,18 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
 
   const loadCompletionCheck = useCallback(async () => {
     setCheckingCompletion(true);
+    setCompletionCheckError('');
     try {
       const res = await api.get<OnboardingCompletionCheck>('/tenant/onboarding-completion-check');
-      if (res.success) {
+      if (res.success && res.data) {
         setCompletionCheck(res.data);
+      } else {
+        setCompletionCheck(null);
+        setCompletionCheckError('Nao foi possivel confirmar os requisitos oficiais agora.');
       }
     } catch {
       setCompletionCheck(null);
+      setCompletionCheckError('Nao foi possivel confirmar os requisitos oficiais agora. Tente novamente.');
     } finally {
       setCheckingCompletion(false);
     }
@@ -92,9 +98,7 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
     void loadCompletionCheck();
   }, [loadCompletionCheck, validation]);
 
-  const canActivate =
-    completionCheck?.canComplete ??
-    (readinessData ? readinessData.canActivate : allValid);
+  const canActivate = !completionCheckError && completionCheck?.canComplete === true;
 
   const handleViewed = useCallback(() => {
     void api.post('/tenant/telemetry', {
@@ -154,19 +158,20 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
               {!completionCheck.canComplete && completionCheck.missingRequirements.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {completionCheck.missingRequirements.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => {
-                        const targetStep = REQUIREMENT_TO_STEP[item];
-                        if (targetStep !== undefined) {
-                          goToStep(targetStep);
-                        }
-                      }}
-                      className="rounded-full border border-amber-300/80 bg-white/80 px-3 py-1 text-xs font-black text-amber-700 transition-colors hover:bg-white"
-                    >
-                      {REQUIREMENT_LABELS[item] || item}
-                    </button>
+                    REQUIREMENT_TO_STEP[item] !== undefined ? (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => goToStep(REQUIREMENT_TO_STEP[item])}
+                        className="min-h-11 rounded-full border border-amber-300/80 bg-white/80 px-3 py-2 text-xs font-black text-amber-700 transition-colors hover:bg-white"
+                      >
+                        {REQUIREMENT_LABELS[item] || item}
+                      </button>
+                    ) : (
+                      <span key={item} className="rounded-full border border-amber-300/80 bg-white/80 px-3 py-2 text-xs font-black text-amber-700">
+                        {REQUIREMENT_LABELS[item] || item}
+                      </span>
+                    )
                   ))}
                 </div>
               ) : null}
@@ -179,8 +184,32 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
                   ))}
                 </div>
               ) : null}
+              {completionCheck.nextRecommendedStep && REQUIREMENT_TO_STEP[completionCheck.nextRecommendedStep] !== undefined ? (
+                <button
+                  type="button"
+                  onClick={() => goToStep(REQUIREMENT_TO_STEP[completionCheck.nextRecommendedStep ?? ''])}
+                  className="min-h-11 rounded-xl border border-current px-3 py-2 text-xs font-black transition-colors hover:bg-white/60"
+                >
+                  Ir para {REQUIREMENT_LABELS[completionCheck.nextRecommendedStep] || completionCheck.nextRecommendedStep}
+                </button>
+              ) : completionCheck.nextRecommendedStep ? (
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                  Proximo passo recomendado: {completionCheck.nextRecommendedStep}
+                </p>
+              ) : null}
             </div>
           </div>
+        </div>
+      ) : completionCheckError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20" role="alert">
+          <p className="text-sm font-bold text-red-700 dark:text-red-300">{completionCheckError}</p>
+          <button
+            type="button"
+            onClick={() => void loadCompletionCheck()}
+            className="mt-3 min-h-11 rounded-xl border border-red-300 px-4 py-2 text-sm font-black text-red-700 transition-colors hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
+          >
+            Tentar novamente
+          </button>
         </div>
       ) : null}
 
@@ -280,7 +309,7 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
       )}
 
       {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl" role="alert">
           <p className="text-sm font-bold text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
@@ -299,16 +328,16 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
         </button>
         <button
           onClick={handleActivate}
-          disabled={!canActivate || activating || readinessLoading || checkingCompletion}
+          disabled={!canActivate || activating || checkingCompletion}
           className={`flex-[2] py-4 font-black rounded-2xl transition-all text-sm flex items-center justify-center gap-2 ${
-            canActivate && !readinessLoading && !checkingCompletion
+            canActivate && !checkingCompletion
               ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/30'
               : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
           }`}
         >
           {activating ? (
             <><Loader2 className="w-4 h-4 animate-spin" />Ativando...</>
-          ) : readinessLoading || checkingCompletion ? (
+          ) : checkingCompletion ? (
             <><Loader2 className="w-4 h-4 animate-spin" />Verificando...</>
           ) : (
             <><Rocket className="w-4 h-4" />{canActivate ? 'Ativar Loja!' : 'Complete os itens obrigatorios'}</>
