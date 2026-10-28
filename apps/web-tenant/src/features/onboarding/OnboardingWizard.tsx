@@ -108,6 +108,7 @@ export function OnboardingWizard() {
     validation,
     ifoodChoice,
     totalSteps,
+    goNext,
     goPrev,
     goToStep,
     saveStep,
@@ -277,7 +278,7 @@ export function OnboardingWizard() {
       case 4:
         return <Step4Payments {...commonProps} onMarkValid={(v) => markValidation('hasPaymentMethod', v)} />;
       case 5:
-        return <Step5Product {...commonProps} onMarkValid={(v) => markValidation('hasProduct', v)} />;
+        return <Step5Product {...commonProps} onSkip={goNext} onMarkValid={(v) => markValidation('hasProduct', v)} />;
       case 6:
         return <Step6Rules {...commonProps} onMarkValid={(v) => markValidation('hasOperationalModes', v)} />;
       case 7:
