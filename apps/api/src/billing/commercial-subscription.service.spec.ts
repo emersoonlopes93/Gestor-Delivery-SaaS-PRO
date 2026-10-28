@@ -69,14 +69,18 @@ describe('Commercial self-service subscription', () => {
     expect(getState).toHaveBeenCalledTimes(1);
   });
 
-  it('resolves eligible and payment-pending subscriptions without treating payment as active', async () => {
+  it('uses the canonical entitlement for reentry without treating past due as active', async () => {
     const service = new TenantBillingResolverService({} as never, {} as never);
     const getState = jest.spyOn(service, 'getTenantBillingState');
     getState.mockResolvedValueOnce({ subscription: { status: TenantSubscriptionStatus.trialing, trialEndsAt: new Date(Date.now() + 60_000) } } as TenantBillingState);
-    getState.mockResolvedValueOnce({ subscription: { status: TenantSubscriptionStatus.past_due, trialEndsAt: null } } as TenantBillingState);
+    getState.mockResolvedValueOnce({ subscription: { status: TenantSubscriptionStatus.grace_period, gracePeriodEndsAt: new Date(Date.now() + 60_000) } } as TenantBillingState);
+    getState.mockResolvedValueOnce({ subscription: { status: TenantSubscriptionStatus.past_due, gracePeriodEndsAt: new Date(Date.now() + 60_000) } } as TenantBillingState);
 
     await expect(service.resolveCommercialReentry('tenant-1', new Date(), null)).resolves.toEqual({
       state: 'eligible', nextStep: '/onboarding',
+    });
+    await expect(service.resolveCommercialReentry('tenant-1', new Date(), new Date())).resolves.toEqual({
+      state: 'eligible', nextStep: '/dashboard',
     });
     await expect(service.resolveCommercialReentry('tenant-1', new Date(), new Date())).resolves.toEqual({
       state: 'payment_pending', nextStep: '/billing',

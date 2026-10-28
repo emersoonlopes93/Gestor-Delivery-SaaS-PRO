@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
+import { resolveEffectiveBillingEntitlement } from './billing-entitlement-decision';
 
 export type TenantBillingStateSource = 'billing_v2' | 'none';
 
@@ -309,9 +310,8 @@ export class TenantBillingResolverService {
       return { state: 'contract_required', nextStep: '/billing/contract' };
     }
 
-    const trialIsCurrent = subscription.status === TenantSubscriptionStatus.trialing
-      && (!subscription.trialEndsAt || subscription.trialEndsAt >= new Date());
-    if (subscription.status === TenantSubscriptionStatus.active || trialIsCurrent) {
+    const entitlement = resolveEffectiveBillingEntitlement(subscription);
+    if (entitlement.hasPaidEntitlement) {
       return { state: 'eligible', nextStep: normalNextStep };
     }
 
@@ -329,15 +329,19 @@ export class TenantBillingResolverService {
       return this.getTenantBillingState(tenantId);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.tenantBillingSubscription.update({
-        where: { id: subscription.id },
+    const reconciled = await this.prisma.$transaction(async (tx) => {
+      // Compare-and-set makes concurrent reconciliation idempotent. A caller
+      // that loses the race must not append another status-history/audit row.
+      const updated = await tx.tenantBillingSubscription.updateMany({
+        where: { id: subscription.id, status: subscription.status },
         data: {
           status: next.status,
           gracePeriodEndsAt: next.gracePeriodEndsAt ?? subscription.gracePeriodEndsAt,
           suspendedAt: next.status === TenantSubscriptionStatus.suspended ? now : subscription.suspendedAt,
         },
       });
+
+      if (updated.count !== 1) return false;
 
       await tx.subscriptionStatusHistory.create({
         data: {
@@ -382,16 +386,19 @@ export class TenantBillingResolverService {
           },
         },
       });
+      return true;
     });
 
-    this.logger.warn({
-      message: 'billing_subscription_status_reconciled',
-      tenantId,
-      subscriptionId: subscription.id,
-      previousStatus: subscription.status,
-      nextStatus: next.status,
-      reason: next.reason,
-    });
+    if (reconciled) {
+      this.logger.warn({
+        message: 'billing_subscription_status_reconciled',
+        tenantId,
+        subscriptionId: subscription.id,
+        previousStatus: subscription.status,
+        nextStatus: next.status,
+        reason: next.reason,
+      });
+    }
 
     return this.getTenantBillingState(tenantId);
   }
