@@ -2874,7 +2874,8 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - A retomada reconcilia o passo visual com `GET /tenant/onboarding`; abrir uma etapa nao a marca como concluida. O CTA final falha fechado e depende exclusivamente de `GET /tenant/onboarding-completion-check`, com retry explicito em falha de rede e links para requisitos conhecidos.
 - **Continuar depois** nao simula salvamento nem tenta abrir o dashboard bloqueado: exibe a consequencia e, mediante confirmacao explicita, encerra a sessao para retomada no proximo login. Os guards comerciais de contrato e pagamento permanecem inalterados.
 - A conclusao chama o endpoint canonico, recarrega `/auth/tenant/me` e exige `onboardingCompletedAt` confirmado pelo servidor. Antes de entrar no painel, mostra uma confirmacao que distingue configuracao inicial de publicacao do cardapio/primeira venda.
-- Nao houve alteracao em schema, migration, Billing V2, gateway, catalogo ou endpoints. Testes focados do onboarding/guard/reentrada, build e lint do Web Tenant, typecheck global e checks arquiteturais passaram localmente; CI, previews e QA visual permanecem pendentes da Draft PR.
+- O estado visual persistido normaliza passos inteiros dentro de `0..9`, etapas visitadas deduplicadas e escolha iFood conhecida. Respostas atrasadas de uma identidade anterior sao descartadas antes de atualizar o tenant/usuario atual; a recomendacao da revisao final usa seu proprio mapa de contrato, sem confundir identidades com requisitos pendentes.
+- Nao houve alteracao em schema, migration, Billing V2, gateway, catalogo ou endpoints. Testes focados do onboarding/guard/reentrada, build e lint do Web Tenant, typecheck global e checks arquiteturais passaram localmente; a QA visual autenticada continua dependente de navegador/sessao segura no ambiente de execucao.
 
 ## P1.5 - historical CMV core (2026-10-23)
 

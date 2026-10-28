@@ -373,6 +373,9 @@ export function OnboardingWizard() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="continue-later-title"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !signingOut) setShowContinueLater(false);
+            }}
             className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
           >
             <h2 id="continue-later-title" className="text-lg font-black text-slate-900 dark:text-white">

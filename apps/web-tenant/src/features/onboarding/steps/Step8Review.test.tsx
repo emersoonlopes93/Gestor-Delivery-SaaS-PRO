@@ -70,4 +70,36 @@ describe('Step8Review authoritative completion check', () => {
     expect(goToStep).toHaveBeenCalledWith(5);
     expect((screen.getByRole('button', { name: /Complete os itens obrigatorios/i }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it.each([
+    ['products', 5, 'Produtos'],
+    ['location', 1, 'Localizacao da loja'],
+  ])('maps the backend recommended step %s independently from requirement codes', async (recommended, expectedStep, label) => {
+    vi.spyOn(api, 'get').mockResolvedValue(success<OnboardingCompletionCheck>({
+      canComplete: false,
+      missingRequirements: [],
+      warnings: [],
+      nextRecommendedStep: recommended,
+      completedAt: null,
+    }));
+    const goToStep = vi.fn();
+    render(<Step8Review validation={validation} onActivate={vi.fn()} onPrev={vi.fn()} goToStep={goToStep} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: `Ir para ${label}` }));
+    expect(goToStep).toHaveBeenCalledWith(expectedStep);
+  });
+
+  it('renders an honest non-navigable fallback for an unknown recommended step', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue(success<OnboardingCompletionCheck>({
+      canComplete: false,
+      missingRequirements: [],
+      warnings: [],
+      nextRecommendedStep: 'future_step',
+      completedAt: null,
+    }));
+    render(<Step8Review validation={validation} onActivate={vi.fn()} onPrev={vi.fn()} goToStep={vi.fn()} />);
+
+    expect(await screen.findByText('Proximo passo recomendado: future_step')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /future_step/i })).toBeNull();
+  });
 });

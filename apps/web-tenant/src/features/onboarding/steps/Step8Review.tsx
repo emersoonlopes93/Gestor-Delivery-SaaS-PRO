@@ -56,6 +56,26 @@ const REQUIREMENT_LABELS: Record<string, string> = {
   order_modes: 'Pelo menos 1 modo operacional valido',
 };
 
+const RECOMMENDED_STEP_TO_STEP: Record<string, number> = {
+  identity: 0,
+  location: 1,
+  delivery: 2,
+  hours: 3,
+  payments: 4,
+  products: 5,
+  order_modes: 6,
+};
+
+const RECOMMENDED_STEP_LABELS: Record<string, string> = {
+  identity: 'Identidade da loja',
+  location: 'Localizacao da loja',
+  delivery: 'Entrega',
+  hours: 'Horarios de funcionamento',
+  payments: 'Metodos de pagamento',
+  products: 'Produtos',
+  order_modes: 'Modos operacionais',
+};
+
 const WARNING_LABELS: Record<string, string> = {
   business_phone_recommended: 'Adicionar telefone/WhatsApp melhora o setup inicial.',
   logo_optional_missing: 'Logo continua opcional e pode ser configurada depois.',
@@ -184,13 +204,13 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
                   ))}
                 </div>
               ) : null}
-              {completionCheck.nextRecommendedStep && REQUIREMENT_TO_STEP[completionCheck.nextRecommendedStep] !== undefined ? (
+              {completionCheck.nextRecommendedStep && RECOMMENDED_STEP_TO_STEP[completionCheck.nextRecommendedStep] !== undefined ? (
                 <button
                   type="button"
-                  onClick={() => goToStep(REQUIREMENT_TO_STEP[completionCheck.nextRecommendedStep ?? ''])}
+                  onClick={() => goToStep(RECOMMENDED_STEP_TO_STEP[completionCheck.nextRecommendedStep ?? ''])}
                   className="min-h-11 rounded-xl border border-current px-3 py-2 text-xs font-black transition-colors hover:bg-white/60"
                 >
-                  Ir para {REQUIREMENT_LABELS[completionCheck.nextRecommendedStep] || completionCheck.nextRecommendedStep}
+                  Ir para {RECOMMENDED_STEP_LABELS[completionCheck.nextRecommendedStep] || completionCheck.nextRecommendedStep}
                 </button>
               ) : completionCheck.nextRecommendedStep ? (
                 <p className="text-xs font-bold text-slate-600 dark:text-slate-300">

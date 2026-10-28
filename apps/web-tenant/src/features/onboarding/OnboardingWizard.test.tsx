@@ -83,6 +83,12 @@ describe('OnboardingWizard continue later flow', () => {
     await userEvent.click(screen.getAllByRole('button', { name: /Continuar depois/i })[0]);
     expect(screen.getByRole('dialog').textContent).toContain('etapas confirmadas no servidor permanecem salvas');
 
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(useAuthStore.getState().user?.userId).toBe('user-a');
+
+    await userEvent.click(screen.getAllByRole('button', { name: /Continuar depois/i })[0]);
+
     await userEvent.click(screen.getByRole('button', { name: 'Sair e continuar depois' }));
 
     expect(await screen.findByText('Login seguro')).toBeTruthy();

@@ -55,6 +55,24 @@ afterEach(() => {
 });
 
 describe('useOnboardingState persistence and server reconciliation', () => {
+  it.each([-1, 10, 999, 1.5])('normalizes an invalid persisted step %s without exposing impossible state', async (invalidStep) => {
+    localStorage.setItem(getOnboardingStorageKey('tenant-a', 'user-a'), JSON.stringify({
+      version: 2,
+      currentStep: invalidStep,
+      visitedSteps: [invalidStep, -2, 0, 0, 3.5, 11],
+      ifoodChoice: 'invalid-choice',
+    }));
+    mockOnboardingRequests({});
+    act(() => useAuthStore.setState({ user: session('tenant-a', 'user-a'), isAuthenticated: true, isLoading: false }));
+
+    const { result } = renderHook(() => useOnboardingState());
+    await waitFor(() => expect(result.current.isHydrating).toBe(false));
+
+    expect(result.current.currentStep).toBe(0);
+    expect(result.current.visitedSteps).toEqual([0]);
+    expect(result.current.ifoodChoice).toBeNull();
+  });
+
   it('scopes presentation state by tenant and user and discards the unsafe legacy key', async () => {
     localStorage.setItem('onboarding_state', JSON.stringify({ currentStep: 9 }));
     localStorage.setItem(getOnboardingStorageKey('tenant-a', 'user-a'), JSON.stringify({
@@ -138,5 +156,55 @@ describe('useOnboardingState persistence and server reconciliation', () => {
     expect(get).toHaveBeenCalledWith('/auth/tenant/me');
     expect(authoritativeSession?.onboardingCompletedAt).toBe(completedSession.onboardingCompletedAt);
     expect(useAuthStore.getState().user?.onboardingCompletedAt).toBeNull();
+  });
+
+  it('ignores delayed progress and validation responses from the previous tenant identity', async () => {
+    let releaseOldOnboarding: ((value: ApiResponse<Record<string, boolean>>) => void) | undefined;
+    let releaseOldTenant: ((value: ApiResponse<{ name: string; settings: Record<string, unknown> }>) => void) | undefined;
+    const oldOnboarding = new Promise<ApiResponse<Record<string, boolean>>>((resolve) => { releaseOldOnboarding = resolve; });
+    const oldTenant = new Promise<ApiResponse<{ name: string; settings: Record<string, unknown> }>>((resolve) => { releaseOldTenant = resolve; });
+    const calls = new Map<string, number>();
+
+    vi.spyOn(api, 'get').mockImplementation(async <T,>(endpoint: string): Promise<ApiResponse<T>> => {
+      const count = (calls.get(endpoint) ?? 0) + 1;
+      calls.set(endpoint, count);
+      if (endpoint === '/tenant/onboarding') {
+        if (count === 1) return oldOnboarding as Promise<ApiResponse<T>>;
+        return success({ stepBasicInfo: true }) as ApiResponse<T>;
+      }
+      if (endpoint === '/tenant/me') {
+        if (count === 1) return oldTenant as Promise<ApiResponse<T>>;
+        return success({ name: '', settings: {} }) as ApiResponse<T>;
+      }
+      if (endpoint === '/tenant/operating-hours' || endpoint === '/catalog/products') return success([]) as ApiResponse<T>;
+      if (endpoint === '/delivery/coverage') return success(null) as ApiResponse<T>;
+      throw new Error(`Unexpected onboarding request: ${endpoint}`);
+    });
+
+    act(() => useAuthStore.setState({ user: session('tenant-a', 'user-a'), isAuthenticated: true, isLoading: false }));
+    const { result } = renderHook(() => useOnboardingState());
+    await waitFor(() => expect(calls.get('/tenant/onboarding')).toBe(1));
+
+    act(() => useAuthStore.setState({ user: session('tenant-b', 'user-b'), isAuthenticated: true, isLoading: false }));
+    await waitFor(() => expect(result.current.isHydrating).toBe(false));
+    expect(result.current.currentStep).toBe(1);
+    expect(result.current.validation.hasStoreName).toBe(false);
+
+    await act(async () => {
+      releaseOldOnboarding?.(success({
+        stepBasicInfo: true,
+        stepAddress: true,
+        stepDelivery: true,
+        stepOperatingHours: true,
+        stepPayments: true,
+        stepCatalog: true,
+      }));
+      releaseOldTenant?.(success({ name: 'Tenant antigo', settings: { pickupEnabled: true } }));
+      await Promise.resolve();
+    });
+
+    expect(result.current.currentStep).toBe(1);
+    expect(result.current.completedSteps).toEqual([0]);
+    expect(result.current.validation.hasStoreName).toBe(false);
   });
 });
