@@ -460,6 +460,23 @@ export class TenantBillingResolverService {
     return subscription;
   }
 
+  async assertLegacySubscriptionCreationAllowed(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { commercialSignupStartedAt: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado.');
+    if (tenant.commercialSignupStartedAt) {
+      const existing = await this.prisma.tenantBillingSubscription.findFirst({
+        where: { tenantId },
+        select: { id: true },
+      });
+      if (!existing) {
+        throw new ConflictException('Conclua a contratação comercial pelo contrato apresentado antes de criar uma assinatura.');
+      }
+    }
+  }
+
   async resolveTenantEntitlements(tenantId: string): Promise<TenantEntitlements> {
     const state = await this.getTenantBillingState(tenantId);
     return {

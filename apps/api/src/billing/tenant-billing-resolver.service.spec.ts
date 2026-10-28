@@ -50,4 +50,25 @@ describe('TenantBillingResolverService status history', () => {
       }),
     });
   });
+
+  it('blocks a commercial signup from creating its first subscription through the legacy flow', async () => {
+    const prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ commercialSignupStartedAt: new Date() }) },
+      tenantBillingSubscription: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const service = new TenantBillingResolverService(prisma as never, {} as never);
+
+    await expect(service.assertLegacySubscriptionCreationAllowed('tenant-1')).rejects.toThrow('contratação comercial');
+  });
+
+  it('preserves the legacy route for an existing tenant without a commercial marker', async () => {
+    const prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ commercialSignupStartedAt: null }) },
+      tenantBillingSubscription: { findFirst: jest.fn() },
+    };
+    const service = new TenantBillingResolverService(prisma as never, {} as never);
+
+    await expect(service.assertLegacySubscriptionCreationAllowed('tenant-1')).resolves.toBeUndefined();
+    expect(prisma.tenantBillingSubscription.findFirst).not.toHaveBeenCalled();
+  });
 });

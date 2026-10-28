@@ -88,15 +88,34 @@ export class BillingCycleService {
     });
     if (existing) return existing;
 
-    return this.prisma.billingCycleRecord.create({
-      data: {
-        tenantId: input.tenantId,
-        subscriptionId: input.subscriptionId,
-        startedAt: input.periodStart,
-        endedAt: input.periodEnd,
-        status: 'open',
-      },
-    });
+    try {
+      return await this.prisma.billingCycleRecord.create({
+        data: {
+          tenantId: input.tenantId,
+          subscriptionId: input.subscriptionId,
+          startedAt: input.periodStart,
+          endedAt: input.periodEnd,
+          status: 'open',
+        },
+      });
+    } catch (error: unknown) {
+      // The database unique key is the authority under concurrent callers.
+      // Re-read the winner instead of exposing a false failure for an idempotent
+      // get-or-create request.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+        throw error;
+      }
+      const concurrent = await this.prisma.billingCycleRecord.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          subscriptionId: input.subscriptionId,
+          startedAt: input.periodStart,
+          endedAt: input.periodEnd,
+        },
+      });
+      if (!concurrent) throw error;
+      return concurrent;
+    }
   }
 
   async previewCloseCycle(input: {

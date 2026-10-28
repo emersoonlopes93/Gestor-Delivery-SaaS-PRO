@@ -67,12 +67,17 @@ export class InvoiceService {
     });
 
     if (existing) {
-      await this.ensureDraftInvoiceItems({
-        invoiceId: existing.id,
-        cycleId: input.cycleId,
-        planId: input.planId,
-        tx: client,
-      });
+      // A retry must be idempotent. Once the invoice left draft, its line
+      // items are its commercial snapshot and must not be recalculated from
+      // current tiers or add-ons.
+      if (existing.status === 'draft') {
+        await this.ensureDraftInvoiceItems({
+          invoiceId: existing.id,
+          cycleId: input.cycleId,
+          planId: input.planId,
+          tx: client,
+        });
+      }
       return existing;
     }
 

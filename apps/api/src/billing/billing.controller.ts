@@ -128,6 +128,7 @@ export class BillingController {
     @Body() dto: Omit<CreateSubscriptionDto, 'tenantId'>,
     @CurrentTenant() tenantId: string,
   ) {
+    await this.tenantBillingResolver.assertLegacySubscriptionCreationAllowed(tenantId);
     const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, dto.planId);
     return this.tenantBillingResolver.getTenantBillingState(subscription.tenantId);
   }
@@ -150,6 +151,7 @@ export class BillingController {
   @Post('trial-pro/start')
   @RequirePermissions('billing.write')
   async startTrialPro(@CurrentTenant() tenantId: string) {
+    await this.tenantBillingResolver.assertLegacySubscriptionCreationAllowed(tenantId);
     const settings = await this.billingSettingsService.ensureDefaultSettings();
     if (!settings.trialProEnabled) {
       throw new BadRequestException('Trial Pro desativado no SaaS Admin.');

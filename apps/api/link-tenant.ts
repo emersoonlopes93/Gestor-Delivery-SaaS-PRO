@@ -5,21 +5,29 @@ async function main() {
     where: { slug: 'pizzaria-demo' }
   });
   
-  const mvpPlan = await prisma.billingPlan.findUnique({
-    where: { slug: 'mvp-starter' }
+  const plan = await prisma.billingPlan.findUnique({
+    where: { slug: 'revenue-growth' }
   });
 
-  if (t && mvpPlan) {
+  if (t && plan) {
+    const existing = await prisma.tenantBillingSubscription.findFirst({
+      where: { tenantId: t.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) {
+      console.log('TENANT ALREADY HAS A BILLING V2 SUBSCRIPTION');
+      return;
+    }
     const sub = await prisma.tenantBillingSubscription.create({
       data: {
         tenantId: t.id,
-        billingPlanId: mvpPlan.id,
+        billingPlanId: plan.id,
         status: 'active',
         startedAt: new Date(),
         requiresPaymentMethod: false
       }
     });
-    console.log('--- LINKED DEMO TENANT TO MVP PLAN ---');
+    console.log('--- LINKED DEMO TENANT TO REVENUE GROWTH PLAN ---');
     console.log(JSON.stringify(sub, null, 2));
   } else {
     console.log('MISSING TENANT OR PLAN');

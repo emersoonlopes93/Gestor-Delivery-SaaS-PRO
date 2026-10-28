@@ -1,3 +1,19 @@
+## Commercial V2 billing lifecycle (2026-10-27)
+
+- Reused the existing `TenantBillingSubscription`, revenue ledger/rating,
+  cycle, invoice, payment-attempt, webhook and portal contracts; no parallel
+  billing model, migration, gateway activation or global enforcement was
+  introduced.
+- Payment attempts now reserve the unique invoice/provider/idempotency key in
+  a short transaction, call the gateway only after commit, and finalize the
+  result in a separate transaction. Ambiguous gateway failures remain
+  `processing` and cannot be retried as a second external charge.
+- Invoice retries preserve emitted invoice items as immutable commercial
+  snapshots; only a draft may refresh its calculated items. Cycle creation
+  recovers the concurrent winner from the existing database unique key.
+- Asaas stays sandbox-only and disabled by default. No real charge, provider
+  operation, remote database operation, production deploy or merge occurred.
+
 ## 99Food partial-cancellation reconciliation (2026-10-16)
 
 - `orderPartialCancel` obtains its authoritative 99Food order-detail snapshot through the existing inbox flow. For an active linked order with fully resolved catalog identities, item rows and operational totals are replaced atomically while the commercial lifecycle status remains unchanged.
