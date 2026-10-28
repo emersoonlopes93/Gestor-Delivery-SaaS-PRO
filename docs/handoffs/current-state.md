@@ -2868,6 +2868,15 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Future `FUTURE_COMBO_NESTED_CONFIG`: introduce nested selections/pizza composition DTOs, individual validation, immutable component snapshots, and Storefront/POS/AI flows before allowing configurable components in combos. No default selection or recipe inference is permitted.
 - The POS now persists `snapshotCatalogV2Json` supplied by Checkout, so the stock reader has the same canonical selection snapshot as other order channels. Reversal remains movement-based and preserves original quantity/cost. Historical CMV ledger and order-edit delta are deliberately not introduced in this phase.
 
+## Fase Comercial 3 - onboarding profissional e retomada (2026-10-27)
+
+- O wizard existente continua unico. O estado local agora guarda apenas apresentacao (`currentStep`, `visitedSteps` e escolha visual do iFood) em chave escopada por tenant e usuario; a chave global legada e descartada. Flags de conclusao e validacao continuam vindo do backend.
+- A retomada reconcilia o passo visual com `GET /tenant/onboarding`; abrir uma etapa nao a marca como concluida. O CTA final falha fechado e depende exclusivamente de `GET /tenant/onboarding-completion-check`, com retry explicito em falha de rede e links para requisitos conhecidos.
+- **Continuar depois** nao simula salvamento nem tenta abrir o dashboard bloqueado: exibe a consequencia e, mediante confirmacao explicita, encerra a sessao para retomada no proximo login. Os guards comerciais de contrato e pagamento permanecem inalterados.
+- A conclusao chama o endpoint canonico, recarrega `/auth/tenant/me` e exige `onboardingCompletedAt` confirmado pelo servidor. Antes de entrar no painel, mostra uma confirmacao que distingue configuracao inicial de publicacao do cardapio/primeira venda.
+- O estado visual persistido normaliza passos inteiros dentro de `0..9`, etapas visitadas deduplicadas e escolha iFood conhecida. Respostas atrasadas de uma identidade anterior sao descartadas antes de atualizar o tenant/usuario atual; a recomendacao da revisao final usa seu proprio mapa de contrato, sem confundir identidades com requisitos pendentes.
+- Nao houve alteracao em schema, migration, Billing V2, gateway, catalogo ou endpoints. Testes focados do onboarding/guard/reentrada, build e lint do Web Tenant, typecheck global e checks arquiteturais passaram localmente; a QA visual autenticada continua dependente de navegador/sessao segura no ambiente de execucao.
+
 ## P1.5 - historical CMV core (2026-10-23)
 
 - Historical CMV is a read-only, tenant-scoped interpretation of canonical `StockMovement` facts, exposed only behind `reports.view_costs`. It never writes a financial transaction or a second stock ledger.

@@ -71,4 +71,36 @@ describe('TenantBillingResolverService status history', () => {
     await expect(service.assertLegacySubscriptionCreationAllowed('tenant-1')).resolves.toBeUndefined();
     expect(prisma.tenantBillingSubscription.findFirst).not.toHaveBeenCalled();
   });
+
+  it('does not append duplicate reconciliation history when another request wins the transition', async () => {
+    const tx = {
+      tenantBillingSubscription: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      subscriptionStatusHistory: { create: jest.fn() },
+      tenant: { update: jest.fn() },
+      auditLog: { create: jest.fn() },
+    };
+    const prisma = {
+      tenantBillingSubscription: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'subscription-1',
+          tenantId: 'tenant-1',
+          status: TenantSubscriptionStatus.trialing,
+          trialEndsAt: new Date('2026-10-01T00:00:00.000Z'),
+          gracePeriodEndsAt: null,
+          suspendedAt: null,
+        }),
+      },
+      $transaction: jest.fn((callback: (transaction: typeof tx) => Promise<boolean>) => callback(tx)),
+    };
+    const service = new TenantBillingResolverService(prisma as never, {} as never);
+    jest.spyOn(service, 'getTenantBillingState').mockResolvedValue({} as never);
+
+    await service.reconcileTenantBillingStatus('tenant-1', new Date('2026-10-02T00:00:00.000Z'));
+
+    expect(tx.tenantBillingSubscription.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'subscription-1', status: TenantSubscriptionStatus.trialing },
+    }));
+    expect(tx.subscriptionStatusHistory.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
 });
