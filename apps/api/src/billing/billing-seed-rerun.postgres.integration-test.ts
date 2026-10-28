@@ -31,18 +31,24 @@ describe('Billing seed rerun PostgreSQL proof', () => {
     await prisma.$disconnect();
   });
 
-  async function runSeed(): Promise<void> {
+  async function runSeed(label: 'initial' | 'rerun'): Promise<void> {
     const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
     const repositoryRoot = resolve(__dirname, '../../../..');
-    await execFileAsync(command, ['-C', 'apps/api', 'prisma:seed'], {
-      cwd: repositoryRoot,
-      env: { ...process.env, NODE_ENV: 'test' },
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    try {
+      await execFileAsync(command, ['-C', 'apps/api', 'prisma:seed'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, NODE_ENV: 'test' },
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 75_000,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Billing seed ${label} execution failed or exceeded its 75s child-process limit: ${message}`);
+    }
   }
 
   it('preserves administrator-owned commercial settings and the existing demo subscription on rerun', async () => {
-    await runSeed();
+    await runSeed('initial');
     const plan = await prisma.billingPlan.findUniqueOrThrow({ where: { slug: 'revenue-growth' } });
     const tier = await prisma.billingRevenueTier.findFirstOrThrow({
       where: { planId: plan.id },
@@ -56,17 +62,27 @@ describe('Billing seed rerun PostgreSQL proof', () => {
     const planCount = await prisma.billingPlan.count({ where: { slug: 'revenue-growth' } });
     const tierCount = await prisma.billingRevenueTier.count({ where: { planId: plan.id } });
 
-    await prisma.billingPlan.update({ where: { id: plan.id }, data: { description: 'admin-owned-description', isPublic: false } });
-    await prisma.billingRevenueTier.update({ where: { id: tier.id }, data: { price: 123.45 } });
-    await prisma.billingSettings.update({ where: { id: settings.id }, data: { defaultGracePeriodDays: 19 } });
-    await runSeed();
+    const originalPlan = { description: plan.description, isPublic: plan.isPublic };
+    const originalTierPrice = tier.price;
+    const originalGracePeriodDays = settings.defaultGracePeriodDays;
 
-    expect(await prisma.billingPlan.findUniqueOrThrow({ where: { id: plan.id } })).toMatchObject({ description: 'admin-owned-description', isPublic: false });
-    expect((await prisma.billingRevenueTier.findUniqueOrThrow({ where: { id: tier.id } })).price.toString()).toBe('123.45');
-    expect((await prisma.billingSettings.findUniqueOrThrow({ where: { id: settings.id } })).defaultGracePeriodDays).toBe(19);
-    expect(await prisma.billingPlan.count({ where: { slug: 'revenue-growth' } })).toBe(planCount);
-    expect(await prisma.billingRevenueTier.count({ where: { planId: plan.id } })).toBe(tierCount);
-    expect(await prisma.tenantBillingSubscription.findFirstOrThrow({ where: { id: subscription.id } })).toMatchObject({ billingPlanId: subscription.billingPlanId, status: subscription.status });
-    expect(await prisma.tenantBillingSubscription.count({ where: { tenantId: demo.id } })).toBe(1);
-  });
+    try {
+      await prisma.billingPlan.update({ where: { id: plan.id }, data: { description: 'admin-owned-description', isPublic: false } });
+      await prisma.billingRevenueTier.update({ where: { id: tier.id }, data: { price: 123.45 } });
+      await prisma.billingSettings.update({ where: { id: settings.id }, data: { defaultGracePeriodDays: 19 } });
+      await runSeed('rerun');
+
+      expect(await prisma.billingPlan.findUniqueOrThrow({ where: { id: plan.id } })).toMatchObject({ description: 'admin-owned-description', isPublic: false });
+      expect((await prisma.billingRevenueTier.findUniqueOrThrow({ where: { id: tier.id } })).price.toString()).toBe('123.45');
+      expect((await prisma.billingSettings.findUniqueOrThrow({ where: { id: settings.id } })).defaultGracePeriodDays).toBe(19);
+      expect(await prisma.billingPlan.count({ where: { slug: 'revenue-growth' } })).toBe(planCount);
+      expect(await prisma.billingRevenueTier.count({ where: { planId: plan.id } })).toBe(tierCount);
+      expect(await prisma.tenantBillingSubscription.findFirstOrThrow({ where: { id: subscription.id } })).toMatchObject({ billingPlanId: subscription.billingPlanId, status: subscription.status });
+      expect(await prisma.tenantBillingSubscription.count({ where: { tenantId: demo.id } })).toBe(1);
+    } finally {
+      await prisma.billingPlan.update({ where: { id: plan.id }, data: originalPlan });
+      await prisma.billingRevenueTier.update({ where: { id: tier.id }, data: { price: originalTierPrice } });
+      await prisma.billingSettings.update({ where: { id: settings.id }, data: { defaultGracePeriodDays: originalGracePeriodDays } });
+    }
+  }, 180_000);
 });
