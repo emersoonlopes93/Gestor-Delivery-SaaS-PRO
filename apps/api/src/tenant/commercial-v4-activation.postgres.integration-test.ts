@@ -1,6 +1,15 @@
 import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
+import { PaymentMethod } from '@gestor/types';
 import { AvailabilityService } from '../catalog/publication/availability.service';
+import { CheckoutValidatorService } from '../orders/checkout-validator.service';
+import { CouponsService } from '../promotions/coupons.service';
+import { CashbackService } from '../promotions/cashback.service';
+import { DeliveryRateService } from '../delivery/delivery-rate.service';
+import { PizzaEngineService } from '../catalog/pizza-engine.service';
+import { UpsellsService } from '../catalog/upsells.service';
+import { FeatureControlService } from '../feature-control/feature-control.service';
+import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
 import { TenantActivationService } from './tenant-activation.service';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
@@ -33,7 +42,7 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     const tenant = await prisma.tenant.create({ data: { name: label, slug: `commercial-v4-${label}-${suffix}` } });
     tenantIds.push(tenant.id);
     await prisma.tenantSettings.create({ data: { tenantId: tenant.id, street: 'Rua A', number: '1', neighborhood: 'Centro', zipCode: '01001000', pickupEnabled: true, paymentMethods: ['cash'] } });
-    await prisma.tenantOperatingHours.create({ data: { tenantId: tenant.id, dayOfWeek: new Date().getDay(), isOpen: true, openTime: '00:00', closeTime: '23:59' } });
+    await prisma.tenantOperatingHours.createMany({ data: Array.from({ length: 7 }, (_, dayOfWeek) => ({ tenantId: tenant.id, dayOfWeek, isOpen: true, openTime: '00:00', closeTime: '23:59' })) });
     const category = await prisma.productCategory.create({ data: { tenantId: tenant.id, name: 'Categoria', slug: `cat-${suffix}-${label}` } });
     const product = await prisma.product.create({ data: { tenantId: tenant.id, categoryId: category.id, name: 'Produto', slug: `prod-${suffix}-${label}`, basePrice: 10 } });
     await prisma.tenantOnboarding.create({ data: { tenantId: tenant.id, completedAt: new Date() } });
@@ -49,6 +58,28 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     expect(decision.canSell).toBe(true);
     expect(projection.operationallyReady).toBe(true);
     expect(projection.firstStorefrontOrder).toBeNull();
+  });
+
+  it('validates a real pickup cash checkout without Pix or delivery coverage', async () => {
+    const { tenant, product } = await fixture('validator');
+    const validator = new CheckoutValidatorService(
+      prisma as never,
+      new CouponsService(prisma as never),
+      new CashbackService(prisma as never),
+      new DeliveryRateService(prisma.deliveryRateRule as never, prisma.deliveryCoverageConfig as never, prisma as never, undefined as never, undefined as never),
+      availability,
+      new PizzaEngineService({ tenantClient: prisma } as never),
+      new UpsellsService(prisma as never),
+      new FeatureControlService(prisma as never, undefined as never, undefined as never, undefined as never),
+      new ComboComponentEligibilityService(prisma as never),
+    );
+    const result = await validator.validate(tenant.slug, [{ lineType: 'product', productId: product.id, quantity: 1 }], { channel: 'storefront_pickup', payment: { method: PaymentMethod.cash } });
+    expect(result.tenantId).toBe(tenant.id);
+    expect(result.lines).toHaveLength(1);
+    expect(result.itemsSubtotal).toBe(10);
+    expect(result.deliveryFee).toBe(0);
+    expect(result.total).toBe(10);
+    expect(await prisma.order.count({ where: { tenantId: tenant.id } })).toBe(0);
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
