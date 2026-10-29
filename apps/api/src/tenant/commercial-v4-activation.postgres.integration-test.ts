@@ -180,6 +180,41 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     expect(timelineCountAfterReplay).toBe(timelineCountBeforeReplay);
     expect(tenantAfterReplay?.orderSequence).toBe(tenantBeforeReplay?.orderSequence);
     expect((await activation.getStatus(tenant.id)).firstStorefrontOrder?.status).toBe('pending');
+
+    // B3: new checkout must be rejected while the store is paused.
+    const [ordersBeforePause, itemsBeforePause, timelineBeforePause, tenantBeforePause] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }),
+      prisma.orderItem.count({ where: { tenantId: tenant.id } }),
+      prisma.orderTimeline.count({ where: { tenantId: tenant.id } }),
+      prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+    const emittedNewOrderBeforePause = events.emitNewOrder.mock.calls.length;
+    const emittedChangedBeforePause = events.emitOrderChanged.mock.calls.length;
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { isStorePaused: true, storePauseReason: 'Loja pausada para B3' },
+    });
+    try {
+      const pausedDto: CreateOrderDTO = { ...dto, idempotencyKey: `b3-paused-${suffix}` };
+      await expect(orders.createOrder(tenant.slug, pausedDto)).rejects.toThrow('Loja pausada para B3');
+      const [ordersAfterPause, itemsAfterPause, timelineAfterPause, tenantAfterPause] = await Promise.all([
+        prisma.order.count({ where: { tenantId: tenant.id } }),
+        prisma.orderItem.count({ where: { tenantId: tenant.id } }),
+        prisma.orderTimeline.count({ where: { tenantId: tenant.id } }),
+        prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+      ]);
+      expect(ordersAfterPause).toBe(ordersBeforePause);
+      expect(itemsAfterPause).toBe(itemsBeforePause);
+      expect(timelineAfterPause).toBe(timelineBeforePause);
+      expect(tenantAfterPause.orderSequence).toBe(tenantBeforePause.orderSequence);
+      expect(events.emitNewOrder.mock.calls).toHaveLength(emittedNewOrderBeforePause);
+      expect(events.emitOrderChanged.mock.calls).toHaveLength(emittedChangedBeforePause);
+    } finally {
+      await prisma.tenantSettings.update({
+        where: { tenantId: tenant.id },
+        data: { isStorePaused: false, storePauseReason: null },
+      });
+    }
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
