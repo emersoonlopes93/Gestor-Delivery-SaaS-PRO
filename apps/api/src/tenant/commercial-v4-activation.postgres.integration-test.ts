@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PaymentMethod, type CreateOrderDTO } from '@gestor/types';
 import { AvailabilityService } from '../catalog/publication/availability.service';
@@ -231,7 +232,10 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     });
     try {
       const pickupDisabledDto: CreateOrderDTO = { ...dto, idempotencyKey: `b4-pickup-disabled-${suffix}` };
-      await expect(orders.createOrder(tenant.slug, pickupDisabledDto)).rejects.toThrow('Retirada indisponivel no momento.');
+      const blockedStatus = await availability.getStoreStatus(tenant.id);
+      expect(blockedStatus.reason).toBe('CONFIG_PENDING');
+      expect(blockedStatus.missingRequirements).toContain('FULFILLMENT_METHOD_MISSING');
+      await expect(orders.createOrder(tenant.slug, pickupDisabledDto)).rejects.toBeInstanceOf(BadRequestException);
 
       const [ordersAfterPickupBlock, itemsAfterPickupBlock, timelineAfterPickupBlock, tenantAfterPickupBlock] = await Promise.all([
         prisma.order.count({ where: { tenantId: tenant.id } }),
