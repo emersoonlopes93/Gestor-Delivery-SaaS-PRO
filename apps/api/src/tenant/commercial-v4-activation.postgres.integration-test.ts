@@ -54,7 +54,7 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
     const first = await fixture('first');
     const second = await fixture('other');
-    await prisma.order.create({ data: { tenantId: first.tenant.id, orderNumber: `V4-${suffix}`, fulfillmentType: 'pickup', customerName: 'Test', customerPhone: '11999999999', itemsSubtotal: 10, total: 10, idempotencyKey: `v4-${suffix}`, publicTrackingToken: `v4-token-${suffix}`, sourceChannel: 'direct_online' } });
+    await prisma.order.create({ data: { tenantId: first.tenant.id, orderNumber: `V4${suffix.replace(/[^a-z0-9]/gi, '').slice(-12)}`, fulfillmentType: 'pickup', customerName: 'Test', customerPhone: '11999999999', itemsSubtotal: 10, total: 10, idempotencyKey: `v4-${suffix}`, publicTrackingToken: `v4-token-${suffix}`, sourceChannel: 'direct_online' } });
     const [a, b] = await Promise.all([activation.getStatus(first.tenant.id), activation.getStatus(second.tenant.id)]);
     expect(a.firstStorefrontOrder?.status).toBe('pending');
     expect(a.firstCompletedStorefrontOrder).toBeNull();

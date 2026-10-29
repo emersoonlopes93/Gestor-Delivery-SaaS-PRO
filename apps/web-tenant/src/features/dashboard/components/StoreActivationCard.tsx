@@ -48,7 +48,7 @@ export function StoreActivationCard({ activation, publicUrl, onCopy }: StoreActi
           <Link to="/orders" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring">
             <ShoppingBag className="h-4 w-4" /> Acompanhar pedidos
           </Link>
-          {publicUrl ? (
+          {publicUrl && activation.operationallyReady ? (
             <>
               <a href={publicUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring">
                 <ExternalLink className="h-4 w-4" /> Testar vitrine

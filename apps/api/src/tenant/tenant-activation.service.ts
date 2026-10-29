@@ -71,7 +71,7 @@ export class TenantActivationService {
     });
     const sellableProductCount = [...sellableDecisions.values()].filter((decision) => decision.canSell).length;
     const onboardingCompleted = Boolean(tenant?.onboarding?.completedAt);
-    const tenantOperational = tenant?.status === 'active' || tenant?.status === 'trial';
+    const tenantOperational = tenant?.status === 'active';
     const operationallyReady = Boolean(
       onboardingCompleted && tenantOperational && storeStatus.reason !== 'CONFIG_PENDING' && sellableProductCount > 0,
     );
@@ -90,7 +90,7 @@ export class TenantActivationService {
       onboardingCompleted,
       operationallyReady,
       acceptingOrdersNow: operationallyReady && storeStatus.isOpen,
-      storefrontAccessible: Boolean(tenant?.slug && sellableProductCount > 0),
+      storefrontAccessible: Boolean(tenantOperational && tenant?.slug && sellableProductCount > 0),
       storefrontSlug: tenant?.slug ?? null,
       sellableProductCount,
       reasons,
