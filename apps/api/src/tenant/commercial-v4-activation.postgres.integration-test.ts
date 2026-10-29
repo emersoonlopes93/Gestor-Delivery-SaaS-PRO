@@ -215,6 +215,42 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
         data: { isStorePaused: false, storePauseReason: null },
       });
     }
+
+    // B4: pickup-disabled tenant must reject a new pickup checkout without creating an order.
+    const [ordersBeforePickupBlock, itemsBeforePickupBlock, timelineBeforePickupBlock, tenantBeforePickupBlock] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }),
+      prisma.orderItem.count({ where: { tenantId: tenant.id } }),
+      prisma.orderTimeline.count({ where: { tenantId: tenant.id } }),
+      prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+    const newEventsBeforePickupBlock = events.emitNewOrder.mock.calls.length;
+    const changedEventsBeforePickupBlock = events.emitOrderChanged.mock.calls.length;
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { pickupEnabled: false },
+    });
+    try {
+      const pickupDisabledDto: CreateOrderDTO = { ...dto, idempotencyKey: `b4-pickup-disabled-${suffix}` };
+      await expect(orders.createOrder(tenant.slug, pickupDisabledDto)).rejects.toThrow('Retirada indisponivel no momento.');
+
+      const [ordersAfterPickupBlock, itemsAfterPickupBlock, timelineAfterPickupBlock, tenantAfterPickupBlock] = await Promise.all([
+        prisma.order.count({ where: { tenantId: tenant.id } }),
+        prisma.orderItem.count({ where: { tenantId: tenant.id } }),
+        prisma.orderTimeline.count({ where: { tenantId: tenant.id } }),
+        prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+      ]);
+      expect(ordersAfterPickupBlock).toBe(ordersBeforePickupBlock);
+      expect(itemsAfterPickupBlock).toBe(itemsBeforePickupBlock);
+      expect(timelineAfterPickupBlock).toBe(timelineBeforePickupBlock);
+      expect(tenantAfterPickupBlock.orderSequence).toBe(tenantBeforePickupBlock.orderSequence);
+      expect(events.emitNewOrder.mock.calls).toHaveLength(newEventsBeforePickupBlock);
+      expect(events.emitOrderChanged.mock.calls).toHaveLength(changedEventsBeforePickupBlock);
+    } finally {
+      await prisma.tenantSettings.update({
+        where: { tenantId: tenant.id },
+        data: { pickupEnabled: true },
+      });
+    }
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
