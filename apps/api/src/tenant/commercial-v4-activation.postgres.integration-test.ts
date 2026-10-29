@@ -255,6 +255,46 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
         data: { pickupEnabled: true },
       });
     }
+
+    // B5: unavailable product blocks a new order without writes.
+    const [ordersBeforeUnavailable, itemsBeforeUnavailable, timelineBeforeUnavailable, tenantBeforeUnavailable] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }),
+      prisma.orderItem.count({ where: { tenantId: tenant.id } }),
+      prisma.orderTimeline.count({ where: { tenantId: tenant.id } }),
+      prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+    const newEventsBeforeUnavailable = events.emitNewOrder.mock.calls.length;
+    const changedEventsBeforeUnavailable = events.emitOrderChanged.mock.calls.length;
+    await prisma.product.update({ where: { id: product.id }, data: { isAvailable: false } });
+    try {
+      const availabilityDecision = await availability.decide({
+        tenantId: tenant.id,
+        productId: product.id,
+        channel: 'storefront_pickup',
+      });
+      expect(availabilityDecision.canSell).toBe(false);
+      expect(availabilityDecision.reason).toBe('PRODUCT_UNAVAILABLE');
+      const unavailableDto: CreateOrderDTO = {
+        ...dto,
+        idempotencyKey: 'b5-unavailable-' + suffix,
+      };
+      await expect(orders.createOrder(tenant.slug, unavailableDto)).rejects.toBeInstanceOf(BadRequestException);
+
+      const [ordersAfterUnavailable, itemsAfterUnavailable, timelineAfterUnavailable, tenantAfterUnavailable] = await Promise.all([
+        prisma.order.count({ where: { tenantId: tenant.id } }),
+        prisma.orderItem.count({ where: { tenantId: tenant.id } }),
+        prisma.orderTimeline.count({ where: { tenantId: tenant.id } }),
+        prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+      ]);
+      expect(ordersAfterUnavailable).toBe(ordersBeforeUnavailable);
+      expect(itemsAfterUnavailable).toBe(itemsBeforeUnavailable);
+      expect(timelineAfterUnavailable).toBe(timelineBeforeUnavailable);
+      expect(tenantAfterUnavailable.orderSequence).toBe(tenantBeforeUnavailable.orderSequence);
+      expect(events.emitNewOrder.mock.calls).toHaveLength(newEventsBeforeUnavailable);
+      expect(events.emitOrderChanged.mock.calls).toHaveLength(changedEventsBeforeUnavailable);
+    } finally {
+      await prisma.product.update({ where: { id: product.id }, data: { isAvailable: true } });
+    }
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
