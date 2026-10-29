@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
-import { PaymentMethod } from '@gestor/types';
+import { PaymentMethod, type CreateOrderDTO } from '@gestor/types';
 import { AvailabilityService } from '../catalog/publication/availability.service';
 import { CheckoutValidatorService } from '../orders/checkout-validator.service';
 import { CouponsService } from '../promotions/coupons.service';
@@ -11,6 +11,11 @@ import { UpsellsService } from '../catalog/upsells.service';
 import { FeatureControlService } from '../feature-control/feature-control.service';
 import { ComboComponentEligibilityService } from '../catalog/combo-component-eligibility.service';
 import { TenantActivationService } from './tenant-activation.service';
+import { OrdersService } from '../orders/orders.service';
+import { CustomerService } from '../crm/customer.service';
+import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
+import { ConfigurableRecipeCompositionService } from '../inventory/configurable-recipe-composition.service';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -80,6 +85,73 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     expect(result.deliveryFee).toBe(0);
     expect(result.total).toBe(10);
     expect(await prisma.order.count({ where: { tenantId: tenant.id } })).toBe(0);
+  });
+
+  it('persists a pickup cash order through real OrdersService and PostgreSQL', async () => {
+    const { tenant, product } = await fixture('realorder');
+    const cashback = new CashbackService(prisma as never);
+    const pizza = new PizzaEngineService({ tenantClient: prisma } as never);
+    const combo = new ComboComponentEligibilityService(prisma as never);
+    const validator = new CheckoutValidatorService(
+      prisma as never,
+      new CouponsService(prisma as never),
+      cashback,
+      new DeliveryRateService(
+        prisma.deliveryRateRule as never,
+        prisma.deliveryCoverageConfig as never,
+        prisma as never,
+        undefined as never,
+        undefined as never,
+      ),
+      availability,
+      pizza,
+      new UpsellsService(prisma as never),
+      new FeatureControlService(prisma as never, undefined as never, undefined as never, undefined as never),
+      combo,
+    );
+    const inventory = new TheoreticalStockService(
+      prisma as never,
+      new ConfigurableRecipeCompositionService(prisma as never, new RecipeExpansionService(prisma as never), pizza),
+      combo,
+    );
+    const events = { emitNewOrder: jest.fn(), emitOrderChanged: jest.fn() };
+    const key = `b1-${suffix}`;
+    const orders = new OrdersService(
+      prisma as never,
+      validator,
+      new CustomerService(prisma as never),
+      cashback,
+      {} as never,
+      inventory,
+      {} as never,
+      {} as never,
+      {} as never,
+      events as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const dto: CreateOrderDTO = {
+      idempotencyKey: key,
+      items: [{ lineType: 'product', productId: product.id, quantity: 1 }],
+      customerName: 'Cliente B1',
+      customerPhone: '11987654321',
+      fulfillmentType: 'pickup',
+      payment: { method: PaymentMethod.cash },
+      sourceChannel: 'direct_online',
+    };
+    const created = await orders.createOrder(tenant.slug, dto);
+    const order = await prisma.order.findUnique({
+      where: { tenantId_idempotencyKey: { tenantId: tenant.id, idempotencyKey: key } },
+      include: { items: true, timeline: true },
+    });
+    expect(order).not.toBeNull();
+    expect(created.id).toBe(order?.id);
+    expect(order?.items).toHaveLength(1);
+    expect(order?.timeline.length).toBeGreaterThanOrEqual(1);
+    expect((await activation.getStatus(tenant.id)).firstStorefrontOrder?.status).toBe('pending');
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
