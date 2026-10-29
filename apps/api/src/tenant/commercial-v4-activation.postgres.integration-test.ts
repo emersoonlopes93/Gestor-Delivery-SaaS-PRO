@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PaymentMethod, type CreateOrderDTO } from '@gestor/types';
 import { AvailabilityService } from '../catalog/publication/availability.service';
@@ -17,6 +17,9 @@ import { CustomerService } from '../crm/customer.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
 import { ConfigurableRecipeCompositionService } from '../inventory/configurable-recipe-composition.service';
+import { fingerprintOrderSubmission } from '../orders/order-idempotency.util';
+import { GeocodingService } from '../delivery/geocoding.service';
+import { LocationProviderService } from '../location/location-provider.service';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -53,6 +56,18 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     const product = await prisma.product.create({ data: { tenantId: tenant.id, categoryId: category.id, name: 'Produto', slug: `prod-${suffix}-${label}`, basePrice: 10 } });
     await prisma.tenantOnboarding.create({ data: { tenantId: tenant.id, completedAt: new Date() } });
     return { tenant, product };
+  }
+
+  function realOrderHarness(deliveryRate: DeliveryRateService) {
+    const cashback = new CashbackService(prisma as never);
+    const pizza = new PizzaEngineService({ tenantClient: prisma } as never);
+    const combo = new ComboComponentEligibilityService(prisma as never);
+    const customerService = new CustomerService(prisma as never);
+    const validator = new CheckoutValidatorService(prisma as never, new CouponsService(prisma as never), cashback, deliveryRate, availability, pizza, new UpsellsService(prisma as never), new FeatureControlService(prisma as never, undefined as never, undefined as never, undefined as never), combo);
+    const inventory = new TheoreticalStockService(prisma as never, new ConfigurableRecipeCompositionService(prisma as never, new RecipeExpansionService(prisma as never), pizza), combo);
+    const events = { emitNewOrder: jest.fn(), emitOrderChanged: jest.fn() };
+    const orders = new OrdersService(prisma as never, validator, customerService, cashback, {} as never, inventory, {} as never, {} as never, {} as never, events as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    return { customerService, events, orders };
   }
 
   it('keeps pickup with cash operational without a delivery coverage or Pix key', async () => {
@@ -295,6 +310,66 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     } finally {
       await prisma.product.update({ where: { id: product.id }, data: { isAvailable: true } });
     }
+  });
+
+  it('creates one order for concurrent real checkout submissions with the same key', async () => {
+    const { tenant, product } = await fixture('concurrent');
+    const rate = new DeliveryRateService(prisma.deliveryRateRule as never, prisma.deliveryCoverageConfig as never, prisma as never, undefined as never, undefined as never);
+    const { customerService, events, orders } = realOrderHarness(rate);
+    await customerService.syncCustomerOnOrderUpsert(tenant.id, '11987650001', 'Cliente Concorrente');
+    const before = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } });
+    const dto: CreateOrderDTO = { idempotencyKey: `concurrent-${suffix}`, items: [{ lineType: 'product', productId: product.id, quantity: 1 }], customerName: 'Cliente Concorrente', customerPhone: '11987650001', fulfillmentType: 'pickup', payment: { method: PaymentMethod.cash }, sourceChannel: 'direct_online' };
+    const [left, right] = await Promise.all([orders.createOrder(tenant.slug, dto), orders.createOrder(tenant.slug, dto)]);
+    const [orderCount, itemCount, timelineCount, after] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }), prisma.orderItem.count({ where: { tenantId: tenant.id } }), prisma.orderTimeline.count({ where: { tenantId: tenant.id } }), prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+    expect(left.id).toBe(right.id); expect(left.orderNumber).toBe(right.orderNumber);
+    expect(orderCount).toBe(1); expect(itemCount).toBe(1); expect(timelineCount).toBe(1);
+    expect(after.orderSequence).toBe(before.orderSequence + 1); expect(events.emitNewOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a changed payload reused with a versioned idempotency key without writes', async () => {
+    const { tenant, product } = await fixture('versioned-conflict');
+    const rate = new DeliveryRateService(prisma.deliveryRateRule as never, prisma.deliveryCoverageConfig as never, prisma as never, undefined as never, undefined as never);
+    const { events, orders } = realOrderHarness(rate);
+    const base: CreateOrderDTO = { idempotencyKey: '', items: [{ lineType: 'product', productId: product.id, quantity: 1 }], customerName: 'Cliente Conflito', customerPhone: '11987650002', fulfillmentType: 'pickup', payment: { method: PaymentMethod.cash }, sourceChannel: 'direct_online' };
+    const dto: CreateOrderDTO = { ...base, idempotencyKey: `v1.commercial-${fingerprintOrderSubmission(base)}` };
+    const created = await orders.createOrder(tenant.slug, dto);
+    const [beforeOrders, beforeItems, beforeTimeline, beforeTenant, emitted] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }), prisma.orderItem.count({ where: { tenantId: tenant.id } }), prisma.orderTimeline.count({ where: { tenantId: tenant.id } }), prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }), Promise.resolve(events.emitNewOrder.mock.calls.length),
+    ]);
+    await expect(orders.createOrder(tenant.slug, { ...dto, items: [{ lineType: 'product', productId: product.id, quantity: 2 }] })).rejects.toBeInstanceOf(ConflictException);
+    const [afterOrders, afterItems, afterTimeline, afterTenant] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }), prisma.orderItem.count({ where: { tenantId: tenant.id } }), prisma.orderTimeline.count({ where: { tenantId: tenant.id } }), prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+    expect(created.id).toBeTruthy(); expect(afterOrders).toBe(beforeOrders); expect(afterItems).toBe(beforeItems); expect(afterTimeline).toBe(beforeTimeline); expect(afterTenant.orderSequence).toBe(beforeTenant.orderSequence); expect(events.emitNewOrder).toHaveBeenCalledTimes(emitted);
+  });
+
+  it('supports real delivery checkout while rejecting pickup for a delivery-only tenant', async () => {
+    const { tenant, product } = await fixture('delivery-only');
+    await prisma.tenantSettings.update({ where: { tenantId: tenant.id }, data: { pickupEnabled: false, lat: -23.55052, lng: -46.633308 } });
+    await prisma.deliveryCoverageConfig.create({ data: { tenantId: tenant.id, storeLat: -23.55052, storeLng: -46.633308, maxRadiusKm: 10, defaultPricePerKm: 2, isDeliveryEnabled: true } });
+    const location = new LocationProviderService({} as never);
+    const rate = new DeliveryRateService(prisma.deliveryRateRule as never, prisma.deliveryCoverageConfig as never, prisma as never, new GeocodingService(location), location);
+    const { events, orders } = realOrderHarness(rate);
+    const address = { street: 'Rua B', number: '2', neighborhood: 'Centro', city: 'Sao Paulo', state: 'SP', zipCode: '01001000', lat: -23.551, lng: -46.634 };
+    expect((await availability.getStoreStatus(tenant.id)).reason).toBe('OPEN');
+    expect((await availability.decide({ tenantId: tenant.id, productId: product.id, channel: 'storefront_delivery' })).canSell).toBe(true);
+    const delivery = await orders.createOrder(tenant.slug, { idempotencyKey: `delivery-${suffix}`, items: [{ lineType: 'product', productId: product.id, quantity: 1 }], customerName: 'Cliente Delivery', customerPhone: '11987650003', fulfillmentType: 'delivery', deliveryAddress: address, payment: { method: PaymentMethod.cash }, sourceChannel: 'direct_online' });
+    const persisted = await prisma.order.findUniqueOrThrow({ where: { id: delivery.id }, include: { items: true, deliveryAddress: true, timeline: true } });
+    expect(persisted.fulfillmentType).toBe('delivery'); expect(persisted.items).toHaveLength(1); expect(persisted.deliveryAddress).not.toBeNull(); expect(Number(persisted.total)).toBeCloseTo(Number(persisted.itemsSubtotal) + Number(persisted.deliveryFee));
+    const before = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }); const eventCount = events.emitNewOrder.mock.calls.length;
+    await expect(orders.createOrder(tenant.slug, {
+      idempotencyKey: `delivery-pickup-${suffix}`,
+      items: [{ lineType: 'product', productId: product.id, quantity: 1 }],
+      customerName: 'Cliente Delivery',
+      customerPhone: '11987650003',
+      fulfillmentType: 'pickup',
+      payment: { method: PaymentMethod.cash },
+      sourceChannel: 'direct_online',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    const [ordersAfter, itemsAfter, timelineAfter, after] = await Promise.all([prisma.order.count({ where: { tenantId: tenant.id } }), prisma.orderItem.count({ where: { tenantId: tenant.id } }), prisma.orderTimeline.count({ where: { tenantId: tenant.id } }), prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } })]);
+    expect(ordersAfter).toBe(1); expect(itemsAfter).toBe(1); expect(timelineAfter).toBe(1); expect(after.orderSequence).toBe(before.orderSequence); expect(events.emitNewOrder.mock.calls).toHaveLength(eventCount);
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
