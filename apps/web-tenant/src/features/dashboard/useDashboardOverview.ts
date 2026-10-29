@@ -9,6 +9,7 @@ import type {
   Tenant,
   TenantOperatingHours,
   TenantSettings,
+  TenantActivationStatus,
 } from '@gestor/types';
 import { api } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
@@ -92,6 +93,18 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
     retry: 1,
   });
 
+  const activationQuery = useQuery({
+    queryKey: ['tenant-activation-status', ...sessionKey],
+    queryFn: async () => {
+      const response = await api.get<TenantActivationStatus>('/tenant/activation-status');
+      if (!response.success) throw new Error('Tenant activation status request failed');
+      return response.data;
+    },
+    enabled: canViewDashboard && tenantQuery.isSuccess,
+    staleTime: 30_000,
+    retry: 1,
+  });
+
   const operatingHours = tenantQuery.data?.operatingHours ?? setupQuery.data?.operatingHours ?? [];
   const setupAvailable = canReadSettings && canReadCatalog;
   return {
@@ -100,6 +113,8 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
     setup: setupAvailable ? setupQuery.data ?? { operatingHours, hasCategories: false, hasProducts: false } : null,
     current: operationalQuery.data ?? null,
     billing: billingQuery.data ?? null,
+    activation: activationQuery.data ?? null,
+    hasActivationError: activationQuery.isError,
     storeStatus: getStoreStatus(tenantQuery.data?.settings, operatingHours),
     canReadReports,
     isLoading: tenantQuery.isLoading || (setupAvailable && setupQuery.isLoading) || (canViewDashboard && operationalQuery.isLoading),
@@ -110,6 +125,7 @@ export function useDashboardOverview(periodPreset: DashboardPeriodPreset) {
       if (setupAvailable) requests.push(setupQuery.refetch());
       if (canViewDashboard) requests.push(operationalQuery.refetch());
       if (canReadBilling) requests.push(billingQuery.refetch());
+      if (canViewDashboard) requests.push(activationQuery.refetch());
       await Promise.all(requests);
     },
   };

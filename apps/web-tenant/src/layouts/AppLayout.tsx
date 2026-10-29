@@ -20,6 +20,7 @@ import { addNativeNotificationClickListener } from '../lib/native-notifications'
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { OrderAlertTopbarButton } from '../features/orders/v2/OrderAlertTopbarButton';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
+import { buildStorefrontUrl, resolveStorefrontBaseUrl } from '../lib/storefront-url';
 import { filterSidebarNavigation, getActiveSidebarGroupId, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
 import type { SidebarNavigationGroup, SidebarNavigationItem } from '../navigation/navigation.types';
 
@@ -341,16 +342,24 @@ export function AppLayout() {
     canReadCustomers ? '/customers' : null,
   ].filter((destination): destination is string => destination !== null);
   const tenantSlug = user?.tenant?.slug;
-  const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
+  const publicMenuUrl = buildStorefrontUrl(storefrontBaseUrl, tenantSlug) ?? '';
 
   useEffect(() => {
-    const envBase = (import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined)?.trim();
+    const envBase = resolveStorefrontBaseUrl(
+      window.location,
+      import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined,
+    );
     if (envBase) {
-      setStorefrontBaseUrl(envBase.replace(/\/+$/, ''));
+      setStorefrontBaseUrl(envBase);
       return;
     }
 
     const { hostname, origin } = window.location;
+
+    if (window.location.protocol === 'capacitor:') {
+      setStorefrontBaseUrl('');
+      return;
+    }
 
     // Capacitor/Android: hostname Ã© 'capacitor://localhost', nÃ£o fazer parsing
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('capacitor://')) {
@@ -374,7 +383,7 @@ export function AppLayout() {
     } else if (hostname.startsWith('app.')) {
       setStorefrontBaseUrl(origin.replace('app.', ''));
     } else {
-      setStorefrontBaseUrl(origin.replace('tenant', 'storefront'));
+      setStorefrontBaseUrl('');
     }
   }, []);
 

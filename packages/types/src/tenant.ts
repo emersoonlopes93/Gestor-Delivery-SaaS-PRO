@@ -190,6 +190,33 @@ export interface OnboardingCompletionCheck {
   completedAt?: string | null;
 }
 
+/**
+ * Read-only projection of the existing onboarding, storefront and order
+ * contracts. It records no activation state and never creates an order.
+ */
+export interface TenantActivationStatus {
+  onboardingCompleted: boolean;
+  operationallyReady: boolean;
+  acceptingOrdersNow: boolean;
+  storefrontAccessible: boolean;
+  storefrontSlug: string | null;
+  sellableProductCount: number;
+  reasons: string[];
+  storeStatus: {
+    isOpen: boolean;
+    reason: string;
+    message: string;
+    nextOpenAt?: string | null;
+  };
+  firstStorefrontOrder: {
+    receivedAt: string;
+    status: string;
+  } | null;
+  firstCompletedStorefrontOrder: {
+    orderCreatedAt: string;
+  } | null;
+}
+
 export interface TenantSchedulingSettings {
   id: string;
   tenantId: string;

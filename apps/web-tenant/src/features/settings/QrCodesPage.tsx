@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Tenant } from '@gestor/types';
+import { buildStorefrontUrl, resolveStorefrontBaseUrl } from '../../lib/storefront-url';
 
 
 
@@ -29,26 +30,13 @@ export function QrCodesPage() {
     };
     loadTenantInfo();
 
-    const envBase = (import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined)?.trim();
-    if (envBase) {
-      setStorefrontBaseUrl(envBase.replace(/\/+$/, ''));
-    } else {
-      const { origin, hostname } = window.location;
-      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        if (hostname.startsWith('app-')) {
-          setStorefrontBaseUrl(origin.replace('app-', ''));
-        } else if (hostname.startsWith('app.')) {
-          setStorefrontBaseUrl(origin.replace('app.', ''));
-        } else {
-          setStorefrontBaseUrl(origin.replace('tenant', 'storefront'));
-        }
-      } else {
-        setStorefrontBaseUrl(origin.replace('tenant', 'storefront').replace('8081', '3000'));
-      }
-    }
+    setStorefrontBaseUrl(resolveStorefrontBaseUrl(
+      window.location,
+      import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined,
+    ) ?? '');
   }, []);
 
-  const publicUrl = `${storefrontBaseUrl}/${tenantSlug}`;
+  const publicUrl = buildStorefrontUrl(storefrontBaseUrl, tenantSlug) ?? '';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(publicUrl);
@@ -113,17 +101,21 @@ export function QrCodesPage() {
             </div>
 
             <div className="flex items-center gap-2 p-4 bg-muted rounded-2xl border border-border mb-6">
-               <span className="text-sm font-bold text-muted-foreground truncate flex-1">{publicUrl}</span>
+                <span className="text-sm font-bold text-muted-foreground truncate flex-1">{publicUrl || 'Configure a URL pública da vitrine para compartilhar.'}</span>
                <button 
-                 onClick={handleCopy}
-                 className={`p-2 rounded-xl transition-all ${copied ? 'text-status-success bg-status-success/10' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={handleCopy}
+                  disabled={!publicUrl}
+                  aria-label="Copiar link do cardápio"
+                  className={`p-2 rounded-xl transition-all disabled:cursor-not-allowed disabled:opacity-50 ${copied ? 'text-status-success bg-status-success/10' : 'text-muted-foreground hover:text-foreground'}`}
                >
                   {copied ? <CheckCircle2 size={20} /> : <Copy size={20} />}
                </button>
             </div>
 
             <a 
-              href={publicUrl} 
+               href={publicUrl || undefined}
+               onClick={publicUrl ? undefined : (event) => event.preventDefault()}
+               aria-disabled={!publicUrl}
               target="_blank" 
               rel="noopener noreferrer"
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl shadow-primary/20"
@@ -151,19 +143,26 @@ export function QrCodesPage() {
              <p className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">Ideal para adesivos e mesas</p>
           </div>
 
-          {/* @allow-theme-risk: área branca preserva contraste e leitura óptica do QR Code. */}
-          <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-border mb-8">
-             <QRCodeSVG 
-               id="main-qr"
-               value={publicUrl} 
-               size={240} 
-               level="H" 
-               includeMargin={true}
-             />
-          </div>
+          {publicUrl ? (
+            /* @allow-theme-risk: área branca preserva contraste e leitura óptica do QR Code. */
+            <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-border mb-8">
+              <QRCodeSVG
+                id="main-qr"
+                value={publicUrl}
+                size={240}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+          ) : (
+            <p className="mb-8 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              Configure uma URL pública confiável para gerar o QR Code.
+            </p>
+          )}
 
           <button 
-            onClick={downloadQRCode}
+             onClick={downloadQRCode}
+             disabled={!publicUrl}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-900/20 active:scale-95"
           >
              <Download size={20} />
