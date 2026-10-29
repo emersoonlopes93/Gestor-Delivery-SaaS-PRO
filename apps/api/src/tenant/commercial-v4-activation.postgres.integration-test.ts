@@ -152,6 +152,34 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     expect(order?.items).toHaveLength(1);
     expect(order?.timeline.length).toBeGreaterThanOrEqual(1);
     expect((await activation.getStatus(tenant.id)).firstStorefrontOrder?.status).toBe('pending');
+
+    const [orderCountBeforeReplay, itemCountBeforeReplay, timelineCountBeforeReplay, tenantBeforeReplay] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }),
+      prisma.orderItem.count({ where: { orderId: created.id } }),
+      prisma.orderTimeline.count({ where: { orderId: created.id } }),
+      prisma.tenant.findUnique({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+
+    const replayed = await orders.createOrder(tenant.slug, dto);
+
+    const [orderCountAfterReplay, ordersWithKeyAfterReplay, itemCountAfterReplay, timelineCountAfterReplay, tenantAfterReplay] = await Promise.all([
+      prisma.order.count({ where: { tenantId: tenant.id } }),
+      prisma.order.count({ where: { tenantId: tenant.id, idempotencyKey: key } }),
+      prisma.orderItem.count({ where: { orderId: created.id } }),
+      prisma.orderTimeline.count({ where: { orderId: created.id } }),
+      prisma.tenant.findUnique({ where: { id: tenant.id }, select: { orderSequence: true } }),
+    ]);
+
+    expect(replayed.id).toBe(created.id);
+    expect(replayed.orderNumber).toBe(created.orderNumber);
+    expect(orderCountBeforeReplay).toBe(1);
+    expect(orderCountAfterReplay).toBe(1);
+    expect(ordersWithKeyAfterReplay).toBe(1);
+    expect(itemCountBeforeReplay).toBe(1);
+    expect(itemCountAfterReplay).toBe(itemCountBeforeReplay);
+    expect(timelineCountAfterReplay).toBe(timelineCountBeforeReplay);
+    expect(tenantAfterReplay?.orderSequence).toBe(tenantBeforeReplay?.orderSequence);
+    expect((await activation.getStatus(tenant.id)).firstStorefrontOrder?.status).toBe('pending');
   });
 
   it('derives the first storefront order from a persisted tenant-scoped order only', async () => {
