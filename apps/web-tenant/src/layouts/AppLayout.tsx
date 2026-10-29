@@ -350,39 +350,6 @@ export function AppLayout() {
       import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined,
     );
     setStorefrontBaseUrl(envBase ?? '');
-    return;
-
-    const { hostname, origin } = window.location;
-
-    if (window.location.protocol === 'capacitor:') {
-      setStorefrontBaseUrl('');
-      return;
-    }
-
-    // Capacitor/Android: hostname Ã© 'capacitor://localhost', nÃ£o fazer parsing
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('capacitor://')) {
-      // Em Capacitor ou localhost, usar variÃ¡vel de ambiente ou fallback seguro
-      // Se nÃ£o tiver VITE_STOREFRONT_BASE_URL configurado, usar a mesma origem da API
-      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-      if (apiBase && !apiBase.startsWith('/')) {
-        // Extrair origin da API URL (removendo /api/v1 ou similar)
-        const apiOrigin = apiBase.replace(/\/api\/v\d+.*$/, '');
-        setStorefrontBaseUrl(apiOrigin);
-        return;
-      }
-      // Fallback final: nÃ£o definir storefrontBaseUrl em Capacitor sem config
-      setStorefrontBaseUrl('');
-      return;
-    }
-
-    // Production fallback: same origin. Dev fallback: common storefront port.
-    if (hostname.startsWith('app-')) {
-      setStorefrontBaseUrl(origin.replace('app-', ''));
-    } else if (hostname.startsWith('app.')) {
-      setStorefrontBaseUrl(origin.replace('app.', ''));
-    } else {
-      setStorefrontBaseUrl('');
-    }
   }, []);
 
   const groups = useMemo(() => {
