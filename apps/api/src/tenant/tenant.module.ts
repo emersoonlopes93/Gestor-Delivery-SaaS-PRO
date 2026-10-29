@@ -9,11 +9,11 @@ import { BusinessGroupController } from './business-group.controller';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
 import { FeatureControlModule } from '../feature-control/feature-control.module';
-import { CatalogModule } from '../catalog/catalog.module';
+import { AvailabilityService } from '../catalog/publication/availability.service';
 import { TenantActivationService } from './tenant-activation.service';
 
 @Module({
-  imports: [RbacModule, FeatureControlModule, CatalogModule],
+  imports: [RbacModule, FeatureControlModule],
   controllers: [TenantController, TenantUserController, BusinessGroupController],
   providers: [
     TenantService,
@@ -21,6 +21,7 @@ import { TenantActivationService } from './tenant-activation.service';
     BusinessGroupService,
     OnboardingService,
     ReadinessScoreService,
+    AvailabilityService,
     TenantActivationService,
   ],
   exports: [TenantService, TenantUserService, BusinessGroupService, OnboardingService, ReadinessScoreService, TenantActivationService],

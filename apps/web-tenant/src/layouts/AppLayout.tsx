@@ -349,10 +349,8 @@ export function AppLayout() {
       window.location,
       import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined,
     );
-    if (envBase) {
-      setStorefrontBaseUrl(envBase);
-      return;
-    }
+    setStorefrontBaseUrl(envBase ?? '');
+    return;
 
     const { hostname, origin } = window.location;
 
