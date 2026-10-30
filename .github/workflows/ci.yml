@@ -537,6 +537,7 @@ jobs:
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       CORS_ORIGINS: http://127.0.0.1:5173
+      VITE_STOREFRONT_BASE_URL: http://127.0.0.1:3000
       DASHBOARD_THEME_E2E_API_BASE: http://127.0.0.1:3333/api/v1
       DASHBOARD_THEME_E2E_WEB_URL: http://127.0.0.1:5173
       DASHBOARD_THEME_E2E_TENANT_SLUG: pizzaria-demo
@@ -565,22 +566,24 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm db:generate
 
-      - name: Build API and web tenant
-        run: pnpm --filter @gestor/api build && pnpm --filter @gestor/web-tenant build
+      - name: Build API, web tenant and storefront
+        run: pnpm --filter @gestor/api build && pnpm --filter @gestor/web-tenant build && pnpm --filter @gestor/web-storefront build
 
       - name: Migrate and seed ephemeral database
         run: pnpm --filter @gestor/api prisma:migrate:deploy && pnpm --filter @gestor/api prisma:seed
 
-      - name: Start API and web tenant
+      - name: Start API, web tenant and storefront
         run: |
           (cd apps/api && exec node dist/apps/api/src/main.js) >"$RUNNER_TEMP/dashboard-theme-api.log" 2>&1 &
           echo "$!" >"$RUNNER_TEMP/dashboard-theme-api.pid"
           (exec pnpm --filter @gestor/web-tenant dev --host 127.0.0.1) >"$RUNNER_TEMP/dashboard-theme-web.log" 2>&1 &
           echo "$!" >"$RUNNER_TEMP/dashboard-theme-web.pid"
+          (exec pnpm --filter @gestor/web-storefront dev --host 127.0.0.1) >"$RUNNER_TEMP/dashboard-theme-storefront.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/dashboard-theme-storefront.pid"
 
       - name: Wait for readiness
         run: |
-          for url in http://127.0.0.1:3333/api/v1/health http://127.0.0.1:5173; do
+          for url in http://127.0.0.1:3333/api/v1/health http://127.0.0.1:5173 http://127.0.0.1:3000; do
             for i in $(seq 1 60); do
               if curl --fail --silent "$url" >/dev/null; then break; fi
               if [ "$i" = "60" ]; then echo "Readiness failed: $url"; exit 1; fi
@@ -591,6 +594,9 @@ jobs:
       - name: Dashboard theme E2E
         run: pnpm exec ts-node --transpile-only scripts/dashboard-theme-e2e.ts
 
+      - name: Commercial V4 browser QA
+        run: pnpm exec ts-node --transpile-only scripts/commercial-v4-browser-qa.ts
+
       - name: Upload dashboard theme artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -598,13 +604,15 @@ jobs:
           name: dashboard-theme-e2e
           path: |
             qa-artifacts/dashboard-theme-consistency
+            qa-artifacts/commercial-v4-browser
             ${{ runner.temp }}/dashboard-theme-api.log
             ${{ runner.temp }}/dashboard-theme-web.log
+            ${{ runner.temp }}/dashboard-theme-storefront.log
 
       - name: Cleanup dashboard theme processes
         if: always()
         run: |
-          for pid_file in "$RUNNER_TEMP/dashboard-theme-api.pid" "$RUNNER_TEMP/dashboard-theme-web.pid"; do
+          for pid_file in "$RUNNER_TEMP/dashboard-theme-api.pid" "$RUNNER_TEMP/dashboard-theme-web.pid" "$RUNNER_TEMP/dashboard-theme-storefront.pid"; do
             if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
               kill "$(cat "$pid_file")"
             fi
