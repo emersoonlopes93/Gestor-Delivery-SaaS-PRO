@@ -17,7 +17,22 @@ const password = `V4-${suffix}-test`;
 type Fixture = { id: string; slug: string; categorySlug: string; productId: string; email: string; deliveryOnly: boolean };
 type LoginResponse = { accessToken?: string; data?: { accessToken?: string } };
 type Activation = { storefrontSlug: string; firstStorefrontOrder: unknown | null; operationallyReady: boolean };
-type Report = { scenarios: Record<string, 'PASS' | 'FAIL'>; screenshots: string[]; errors: string[] };
+type ScenarioStatus = 'PASS' | 'FAIL' | 'NOT_PROVEN';
+type NetworkDiagnostic = {
+  method: string;
+  path: string;
+  errorText: string;
+  phase: string;
+  route: string;
+};
+type Report = {
+  qaResult: 'PASS' | 'FAIL';
+  scenarios: Record<string, ScenarioStatus>;
+  screenshots: string[];
+  errors: string[];
+  networkDiagnostics: NetworkDiagnostic[];
+  expectedNavigationAborts: NetworkDiagnostic[];
+};
 
 function assertEphemeralDatabase(): void {
   if (process.env.NODE_ENV !== 'test') throw new Error('Commercial V4 browser QA requires NODE_ENV=test.');
@@ -50,14 +65,40 @@ async function activation(token?: string): Promise<Response> {
   });
 }
 
-function collect(page: Page, report: Report): void {
+function collect(page: Page, report: Report, currentPhase: () => string): void {
   page.on('console', (message) => {
     if (message.type() === 'error') report.errors.push(`console: ${message.text()}`);
   });
   page.on('pageerror', (error) => report.errors.push(`page: ${error.message}`));
   page.on('requestfailed', (request) => {
-    if (!request.url().includes('openstreetmap.org')) report.errors.push(`request: ${request.method()} ${request.url()}`);
+    const url = new URL(request.url());
+    if (!url.hostname.includes('openstreetmap.org')) {
+      report.networkDiagnostics.push({
+        method: request.method(),
+        path: url.pathname,
+        errorText: request.failure()?.errorText ?? 'UNKNOWN',
+        phase: currentPhase(),
+        route: new URL(page.url()).pathname,
+      });
+    }
   });
+}
+
+function classifyNetworkDiagnostics(report: Report, pickup: Fixture, checkoutConfirmed: boolean): void {
+  const expectedPath = `/api/v1/public/storefront/${pickup.slug}`;
+  for (const diagnostic of report.networkDiagnostics) {
+    const isExpectedNavigationAbort =
+      checkoutConfirmed &&
+      diagnostic.method === 'GET' &&
+      diagnostic.path === expectedPath &&
+      diagnostic.errorText === 'net::ERR_ABORTED' &&
+      diagnostic.phase === 'checkout-confirmation-navigation';
+    if (isExpectedNavigationAbort) {
+      report.expectedNavigationAborts.push(diagnostic);
+    } else {
+      report.errors.push(`network: ${diagnostic.method} ${diagnostic.path} ${diagnostic.errorText} during ${diagnostic.phase}`);
+    }
+  }
 }
 
 async function screenshot(page: Page, report: Report, name: string): Promise<void> {
@@ -100,7 +141,7 @@ async function createFixture(prisma: PrismaClient, label: string, deliveryOnly: 
 async function runDashboard(browser: Awaited<ReturnType<typeof chromium.launch>>, fixture: Fixture, token: string, mobile: boolean, report: Report): Promise<void> {
   const context = await authenticatedContext(browser, token, mobile);
   const page = await context.newPage();
-  collect(page, report);
+  collect(page, report, () => 'dashboard-before-first-order');
   try {
     await page.goto(`${tenantUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
     await page.getByText('Prepare sua loja para o primeiro pedido', { exact: false }).waitFor({ timeout: 15_000 });
@@ -109,23 +150,37 @@ async function runDashboard(browser: Awaited<ReturnType<typeof chromium.launch>>
   } finally { await context.close(); }
 }
 
-async function runQr(browser: Awaited<ReturnType<typeof chromium.launch>>, token: string, report: Report): Promise<void> {
-  const context = await authenticatedContext(browser, token, false);
+async function runQr(browser: Awaited<ReturnType<typeof chromium.launch>>, token: string, mobile: boolean, report: Report): Promise<void> {
+  const context = await authenticatedContext(browser, token, mobile);
   const page = await context.newPage();
-  collect(page, report);
+  collect(page, report, () => `qr-${mobile ? 'mobile' : 'desktop'}`);
   try {
     await page.goto(`${tenantUrl}/settings/qr-codes`, { waitUntil: 'domcontentloaded' });
     await page.locator('#main-qr').waitFor({ timeout: 15_000 });
     const target = await page.getByRole('link', { name: /Testar Card.pio Online/i }).getAttribute('href');
     assert.ok(target?.startsWith(`${storefrontUrl}/`), 'QR does not encode the local storefront URL');
-    await screenshot(page, report, 'qr-desktop');
+    await screenshot(page, report, `qr-${mobile ? 'mobile' : 'desktop'}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 4), false, 'QR page has horizontal overflow');
   } finally { await context.close(); }
 }
 
-async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.launch>>, fixture: Fixture, report: Report): Promise<void> {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+async function runDashboardAfterFirstOrder(browser: Awaited<ReturnType<typeof chromium.launch>>, fixture: Fixture, token: string, mobile: boolean, report: Report): Promise<void> {
+  const context = await authenticatedContext(browser, token, mobile);
   const page = await context.newPage();
-  collect(page, report);
+  collect(page, report, () => 'dashboard-after-first-order');
+  try {
+    await page.goto(`${tenantUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await page.getByText('Prepare sua loja para o primeiro pedido', { exact: false }).waitFor({ state: 'hidden', timeout: 15_000 });
+    await screenshot(page, report, `dashboard-pickup-${mobile ? 'mobile' : 'desktop'}-after`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 4), false, 'dashboard has horizontal overflow after first order');
+  } finally { await context.close(); }
+}
+
+async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.launch>>, fixture: Fixture, report: Report, mobile: boolean): Promise<void> {
+  let phase = 'storefront-initial-load';
+  const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  collect(page, report, () => phase);
   try {
     await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
     await page.locator(`#${fixture.categorySlug}`).getByText(`Produto QA pickup`, { exact: true }).click();
@@ -147,9 +202,34 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
     await page.locator('#checkout-continue-btn').click();
     await page.getByRole('button', { name: /Dinheiro/i }).click();
     await page.locator('#checkout-continue-btn').click();
+    phase = 'checkout-confirmation-navigation';
     await page.locator('#checkout-submit-btn').click();
     await page.waitForURL(new RegExp(`/${fixture.slug}/order/`), { timeout: 20_000 });
-    await screenshot(page, report, 'storefront-pickup-order-confirmation');
+    phase = 'checkout-confirmed';
+    await screenshot(page, report, `storefront-pickup-order-confirmation-${mobile ? 'mobile' : 'desktop'}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 4), false, 'storefront has horizontal overflow');
+  } finally { await context.close(); }
+}
+
+async function runDeliveryOnlyBrowser(browser: Awaited<ReturnType<typeof chromium.launch>>, fixture: Fixture, mobile: boolean, report: Report): Promise<void> {
+  const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  collect(page, report, () => `delivery-only-${mobile ? 'mobile' : 'desktop'}`);
+  try {
+    await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
+    await page.locator(`#${fixture.categorySlug}`).getByText('Produto QA delivery', { exact: true }).click();
+    await page.locator('#product-details-title').waitFor({ timeout: 15_000 });
+    const productDialog = page.locator('[role="dialog"][aria-labelledby="product-details-title"]');
+    await productDialog.getByRole('button', { name: /^Adicionar\b/ }).click();
+    await page.getByRole('button', { name: /Ver carrinho/i }).click();
+    await page.getByRole('button', { name: /Finalizar pedido/i }).click();
+    await page.getByPlaceholder('Seu nome completo').fill('Cliente QA Delivery');
+    await page.getByPlaceholder(/WhatsApp/i).fill('11999990001');
+    await page.locator('#checkout-continue-btn').click();
+    assert.equal(await page.getByRole('button', { name: /Retirada/i }).count(), 0, 'delivery-only storefront exposed pickup');
+    await page.getByRole('button', { name: /Entrega/i }).waitFor({ timeout: 15_000 });
+    await screenshot(page, report, `storefront-delivery-only-${mobile ? 'mobile' : 'desktop'}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 4), false, 'delivery-only storefront has horizontal overflow');
   } finally { await context.close(); }
 }
 
@@ -157,7 +237,7 @@ async function main(): Promise<void> {
   assertEphemeralDatabase();
   await mkdir(artifactDir, { recursive: true });
   const prisma = new PrismaClient();
-  const report: Report = { scenarios: {}, screenshots: [], errors: [] };
+  const report: Report = { qaResult: 'FAIL', scenarios: {}, screenshots: [], errors: [], networkDiagnostics: [], expectedNavigationAborts: [] };
   const tenantIds: string[] = [];
   const browser = await chromium.launch({ headless: true });
   try {
@@ -183,20 +263,31 @@ async function main(): Promise<void> {
     await runDashboard(browser, delivery, deliveryToken, false, report);
     await runDashboard(browser, delivery, deliveryToken, true, report);
     report.scenarios.activation = 'PASS';
-    await runQr(browser, pickupToken, report);
+    await runQr(browser, pickupToken, false, report);
+    await runQr(browser, pickupToken, true, report);
     report.scenarios.qr = 'PASS';
-    await createPickupOrder(browser, pickup, report);
-    const persisted = await prisma.order.findFirstOrThrow({ where: { tenantId: pickup.id, sourceChannel: 'direct_online' }, include: { items: true, timeline: true } });
-    assert.equal(persisted.items.length, 1, 'storefront did not create one order item');
-    assert.ok(persisted.timeline.length >= 1, 'storefront did not create order timeline');
+    await createPickupOrder(browser, pickup, report, false);
+    const firstPersisted = await prisma.order.findFirstOrThrow({ where: { tenantId: pickup.id, sourceChannel: 'direct_online' }, include: { items: true, timeline: true } });
+    assert.equal(firstPersisted.items.length, 1, 'storefront did not create one order item');
+    assert.ok(firstPersisted.timeline.length >= 1, 'storefront did not create order timeline');
     const after = await activation(pickupToken);
     assert.equal(after.status, 200);
     const afterPayload = await after.json() as { data: Activation };
     assert.ok(afterPayload.data.firstStorefrontOrder, 'activation projection did not receive the first storefront order');
+    await runDashboardAfterFirstOrder(browser, pickup, pickupToken, false, report);
+    await runDashboardAfterFirstOrder(browser, pickup, pickupToken, true, report);
+    await createPickupOrder(browser, pickup, report, true);
+    const orderCount = await prisma.order.count({ where: { tenantId: pickup.id, sourceChannel: 'direct_online' } });
+    assert.equal(orderCount, 2, 'mobile checkout did not create a second tenant-scoped order');
     report.scenarios.firstOrder = 'PASS';
+    report.scenarios.mobilePickupCheckout = 'PASS';
     assert.equal(deliveryActivation.data.operationallyReady, true, 'delivery-only tenant is not operationally ready');
+    await runDeliveryOnlyBrowser(browser, delivery, false, report);
+    await runDeliveryOnlyBrowser(browser, delivery, true, report);
     report.scenarios.deliveryOnly = 'PASS';
+    classifyNetworkDiagnostics(report, pickup, true);
     assert.equal(report.errors.length, 0, report.errors.join(' | '));
+    report.qaResult = 'PASS';
     console.log('COMMERCIAL_V4_BROWSER_QA_PASS');
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error));
@@ -204,7 +295,7 @@ async function main(): Promise<void> {
   } finally {
     try {
       await writeFile(join(artifactDir, 'report.json'), JSON.stringify(report, null, 2));
-      await writeFile(join(artifactDir, 'report.md'), `# Commercial V4 browser QA\n\n${Object.entries(report.scenarios).map(([name, status]) => `- ${name}: ${status}`).join('\n')}\n`);
+      await writeFile(join(artifactDir, 'report.md'), `# Commercial V4 browser QA\n\nQA_RESULT: ${report.qaResult}\n\n${Object.entries(report.scenarios).map(([name, status]) => `- ${name}: ${status}`).join('\n')}\n\nExpected navigation aborts: ${report.expectedNavigationAborts.length}\nUnexpected network failures: ${report.errors.filter((error) => error.startsWith('network:')).length}\n`);
     } finally {
       await browser.close();
       if (tenantIds.length) await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
