@@ -128,7 +128,7 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
   try {
     await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
     await page.getByText(`Produto QA pickup`, { exact: false }).first().click();
-    await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
+    await page.getByRole('dialog', { name: /Produto QA pickup/i }).getByRole('button', { name: 'Adicionar', exact: true }).click();
     await page.getByRole('button', { name: /Ver carrinho/i }).click();
     await page.getByRole('button', { name: /Finalizar pedido/i }).click();
     await page.getByPlaceholder('Seu nome completo').fill('Cliente QA');
