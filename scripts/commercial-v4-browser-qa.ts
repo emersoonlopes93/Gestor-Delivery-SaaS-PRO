@@ -14,7 +14,7 @@ const artifactDir = resolve('qa-artifacts/commercial-v4-browser');
 const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const password = `V4-${suffix}-test`;
 
-type Fixture = { id: string; slug: string; productId: string; email: string; deliveryOnly: boolean };
+type Fixture = { id: string; slug: string; categorySlug: string; productId: string; email: string; deliveryOnly: boolean };
 type LoginResponse = { accessToken?: string; data?: { accessToken?: string } };
 type Activation = { storefrontSlug: string; firstStorefrontOrder: unknown | null; operationallyReady: boolean };
 type Report = { scenarios: Record<string, 'PASS' | 'FAIL'>; screenshots: string[]; errors: string[] };
@@ -85,7 +85,8 @@ async function createFixture(prisma: PrismaClient, label: string, deliveryOnly: 
   if (deliveryOnly) {
     await prisma.deliveryCoverageConfig.create({ data: { tenantId: tenant.id, storeLat: -23.5489, storeLng: -46.6388, maxRadiusKm: 10, defaultPricePerKm: 2, isDeliveryEnabled: true } });
   }
-  const category = await prisma.productCategory.create({ data: { tenantId: tenant.id, name: 'Categoria QA', slug: `v4-category-${label}-${suffix}` } });
+  const categorySlug = `v4-category-${label}-${suffix}`;
+  const category = await prisma.productCategory.create({ data: { tenantId: tenant.id, name: 'Categoria QA', slug: categorySlug } });
   const product = await prisma.product.create({ data: { tenantId: tenant.id, categoryId: category.id, name: `Produto QA ${label}`, slug: `v4-product-${label}-${suffix}`, basePrice: 10 } });
   await prisma.tenantOnboarding.create({ data: { tenantId: tenant.id, completedAt: new Date() } });
   await ensureDefaultTenantRoles(prisma, tenant.id);
@@ -93,7 +94,7 @@ async function createFixture(prisma: PrismaClient, label: string, deliveryOnly: 
   const email = `v4-${label}-${suffix}@example.test`;
   const user = await prisma.tenantUser.create({ data: { tenantId: tenant.id, name: `QA ${label}`, email, passwordHash: await bcrypt.hash(password, 10) } });
   await prisma.tenantUserRole.create({ data: { userId: user.id, roleId: ownerRole.id } });
-  return { id: tenant.id, slug: tenant.slug, productId: product.id, email, deliveryOnly };
+  return { id: tenant.id, slug: tenant.slug, categorySlug, productId: product.id, email, deliveryOnly };
 }
 
 async function runDashboard(browser: Awaited<ReturnType<typeof chromium.launch>>, fixture: Fixture, token: string, mobile: boolean, report: Report): Promise<void> {
@@ -127,7 +128,7 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
   collect(page, report);
   try {
     await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
-    await page.locator('#novidades').getByText(`Produto QA pickup`, { exact: true }).click();
+    await page.locator(`#${fixture.categorySlug}`).getByText(`Produto QA pickup`, { exact: true }).click();
     await page.locator('#product-details-title').waitFor({ timeout: 15_000 });
     const productDialog = page.locator('[role="dialog"]').filter({ has: page.locator('#product-details-title') });
     await productDialog.getByRole('button', { name: 'Adicionar', exact: true }).click();
