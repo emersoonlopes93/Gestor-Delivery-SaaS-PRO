@@ -38,7 +38,7 @@ import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
 import { ConfigurableRecipeCompositionService } from '../inventory/configurable-recipe-composition.service';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
-const jwtSecret = 'commercial-v4-http-test-secret';
+const jwtSecret = process.env.JWT_SECRET?.trim() || 'commercial-v4-http-test-secret';
 
 jest.setTimeout(180_000);
 
@@ -141,6 +141,10 @@ describe('Commercial V4 HTTP checkout with real JWT, sessions and RBAC', () => {
       .overrideProvider(ConfigService)
       .useValue(new ConfigService({ JWT_SECRET: jwtSecret }))
       .compile();
+
+    if (moduleRef.get(ConfigService).get<string>('JWT_SECRET') !== jwtSecret) {
+      throw new Error('Commercial V4 HTTP test JWT signer/strategy secret mismatch.');
+    }
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('/api/v1');
