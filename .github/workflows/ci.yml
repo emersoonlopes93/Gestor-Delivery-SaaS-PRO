@@ -567,7 +567,7 @@ jobs:
         run: pnpm db:generate
 
       - name: Build API, web tenant and storefront
-        run: pnpm --filter @gestor/api build && pnpm --filter @gestor/web-tenant build && pnpm --filter @gestor/web-storefront build
+        run: pnpm --filter @gestor/core build && pnpm --filter @gestor/api build && pnpm --filter @gestor/web-tenant build && pnpm --filter @gestor/web-storefront build
 
       - name: Migrate and seed ephemeral database
         run: pnpm --filter @gestor/api prisma:migrate:deploy && pnpm --filter @gestor/api prisma:seed
