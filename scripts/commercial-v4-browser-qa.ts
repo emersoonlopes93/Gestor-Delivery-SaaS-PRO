@@ -127,7 +127,8 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
   collect(page, report);
   try {
     await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
-    await page.getByText(`Produto QA pickup`, { exact: false }).first().click();
+    await page.locator('#novidades').getByText(`Produto QA pickup`, { exact: true }).click();
+    await page.locator('#product-details-title').waitFor({ timeout: 15_000 });
     const productDialog = page.locator('[role="dialog"]').filter({ has: page.locator('#product-details-title') });
     await productDialog.getByRole('button', { name: 'Adicionar', exact: true }).click();
     await page.getByRole('button', { name: /Ver carrinho/i }).click();
