@@ -333,7 +333,7 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
     const rate = new DeliveryRateService(prisma.deliveryRateRule as never, prisma.deliveryCoverageConfig as never, prisma as never, undefined as never, undefined as never);
     const { events, orders } = realOrderHarness(rate);
     const base: CreateOrderDTO = { idempotencyKey: '', items: [{ lineType: 'product', productId: product.id, quantity: 1 }], customerName: 'Cliente Conflito', customerPhone: '11987650002', fulfillmentType: 'pickup', payment: { method: PaymentMethod.cash }, sourceChannel: 'direct_online' };
-    const dto: CreateOrderDTO = { ...base, idempotencyKey: `v1.commercial-${fingerprintOrderSubmission(base)}` };
+    const dto: CreateOrderDTO = { ...base, idempotencyKey: `v1.commercial.${fingerprintOrderSubmission(base)}` };
     const created = await orders.createOrder(tenant.slug, dto);
     const [beforeOrders, beforeItems, beforeTimeline, beforeTenant, emitted] = await Promise.all([
       prisma.order.count({ where: { tenantId: tenant.id } }), prisma.orderItem.count({ where: { tenantId: tenant.id } }), prisma.orderTimeline.count({ where: { tenantId: tenant.id } }), prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { orderSequence: true } }), Promise.resolve(events.emitNewOrder.mock.calls.length),
@@ -347,8 +347,8 @@ describe('Commercial V4 activation with ephemeral PostgreSQL', () => {
 
   it('supports real delivery checkout while rejecting pickup for a delivery-only tenant', async () => {
     const { tenant, product } = await fixture('delivery-only');
-    await prisma.tenantSettings.update({ where: { tenantId: tenant.id }, data: { pickupEnabled: false, lat: -23.55052, lng: -46.633308 } });
-    await prisma.deliveryCoverageConfig.create({ data: { tenantId: tenant.id, storeLat: -23.55052, storeLng: -46.633308, maxRadiusKm: 10, defaultPricePerKm: 2, isDeliveryEnabled: true } });
+    await prisma.tenantSettings.update({ where: { tenantId: tenant.id }, data: { pickupEnabled: false, lat: -23.5489, lng: -46.6388 } });
+    await prisma.deliveryCoverageConfig.create({ data: { tenantId: tenant.id, storeLat: -23.5489, storeLng: -46.6388, maxRadiusKm: 10, defaultPricePerKm: 2, isDeliveryEnabled: true } });
     const location = new LocationProviderService({} as never);
     const rate = new DeliveryRateService(prisma.deliveryRateRule as never, prisma.deliveryCoverageConfig as never, prisma as never, new GeocodingService(location), location);
     const { events, orders } = realOrderHarness(rate);
