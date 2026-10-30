@@ -132,6 +132,12 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
     await page.locator('#product-details-title').waitFor({ timeout: 15_000 });
     const productDialog = page.locator('[role="dialog"][aria-labelledby="product-details-title"]');
     await productDialog.getByRole('button', { name: /^Adicionar\b/ }).click();
+    await screenshot(page, report, 'storefront-pickup-cart-footer-before');
+    await page.getByRole('button', { name: /Prefer.ncias de privacidade/i }).click();
+    const preferencesDialog = page.getByRole('dialog', { name: /Prefer.ncias de privacidade/i });
+    await preferencesDialog.waitFor({ timeout: 15_000 });
+    await screenshot(page, report, 'storefront-pickup-privacy-dialog');
+    await page.getByRole('button', { name: /Fechar prefer.ncias de privacidade/i }).click();
     await page.getByRole('button', { name: /Ver carrinho/i }).click();
     await page.getByRole('button', { name: /Finalizar pedido/i }).click();
     await page.getByPlaceholder('Seu nome completo').fill('Cliente QA');
