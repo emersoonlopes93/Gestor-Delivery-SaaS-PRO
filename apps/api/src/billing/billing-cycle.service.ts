@@ -416,7 +416,13 @@ export class BillingCycleService {
   }
 
   private async acquireCycleLock(tx: Prisma.TransactionClient, cycleId: string): Promise<void> {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${cycleId}))`;
+    const rows = await tx.$queryRaw<Array<{ acquired: number }>>`
+      SELECT 1::integer AS acquired
+      FROM pg_advisory_xact_lock(hashtext(${cycleId}))
+    `;
+    if (rows.length !== 1 || rows[0]?.acquired !== 1) {
+      throw new Error('Failed to acquire billing cycle transaction lock.');
+    }
   }
 
   private assertValidPeriod(periodStart: Date, periodEnd: Date): void {
