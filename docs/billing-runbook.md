@@ -104,6 +104,18 @@ O portal do tenant expõe três capacidades independentes:
 
 O tenant não inicia tentativas de cobrança pelo portal. Tentativas permitidas continuam sendo uma operação administrativa com RBAC, e configurações inválidas falham fechadas.
 
+### Automação recorrente sandbox (C5-B)
+
+`BILLING_AUTOMATION_ENABLED` inicia como `false`. Quando explicitamente habilitada em ambiente isolado não produtivo, o worker BullMQ examina apenas ciclos **já persistidos**, encerrados em UTC e de assinaturas `active`. Ele não inventa ciclos, valores, períodos ou vencimentos.
+
+- `BILLING_AUTOMATION_KILL_SWITCH=true` impede tanto o agendamento quanto jobs já enfileirados no momento da execução.
+- `NODE_ENV=production` bloqueia a automação mesmo com flags ativadas acidentalmente.
+- O modo `manual` fecha ciclo e cria invoice draft, sem chamada externa; somente gateway `sandbox_ready` pode criar tentativa automática.
+- Uma tentativa em `processing` é resultado incerto e exige reconciliação manual: nunca é reenviada automaticamente.
+- A cadência (`BILLING_AUTOMATION_CADENCE_MS`, mínimo 60 s) e o lote (`BILLING_AUTOMATION_BATCH_LIMIT`, 1–200) são configuráveis. O job recorrente possui identificador estável.
+
+O portal continua exibindo cobrança recorrente automática como não habilitada: a saúde do worker não é exposta como uma garantia operacional ao tenant. Cobrança real em produção continua bloqueada.
+
 ## Adesão comercial self-service
 
 O catálogo público expõe somente planos Billing V2 ativos, públicos e do tipo
