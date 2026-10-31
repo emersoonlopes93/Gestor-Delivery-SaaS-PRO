@@ -41,11 +41,13 @@ describe('WebhookSecurityService', () => {
         update: jest.fn(),
       },
     };
-    const mockConfig = new ConfigService({
+    const values: Record<string, string> = {
       ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
       WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
       NODE_ENV: 'production',
-    });
+    };
+    const mockConfig = new ConfigService();
+    jest.spyOn(mockConfig, 'get').mockImplementation((key: string, fallback?: string) => values[key] ?? fallback);
     service = new WebhookSecurityService(
       mockPrisma as never,
       mockConfig,

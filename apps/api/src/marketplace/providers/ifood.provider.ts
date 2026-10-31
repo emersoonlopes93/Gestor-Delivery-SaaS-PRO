@@ -1,12 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { MarketplaceConnection, MarketplaceProvider } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { MarketplaceConnection, MarketplaceDeliveryOwnership, MarketplaceProvider } from '@prisma/client';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { MarketplaceProviderAdapter } from './marketplace-provider.interface';
 import { ExternalMarketplaceOrder, NormalizedMarketplaceOrder, ParsedMarketplaceEvent } from '../marketplace.types';
+import { IfoodHttpClientService } from '../services/ifood-http-client.service';
+import { MarketplaceCredentialService } from '../services/marketplace-credential.service';
 
 @Injectable()
 export class IfoodProvider implements MarketplaceProviderAdapter {
-  private readonly logger = new Logger(IfoodProvider.name);
   provider = MarketplaceProvider.IFOOD;
+
+  constructor(
+    private readonly client: IfoodHttpClientService,
+    private readonly credentials: MarketplaceCredentialService,
+    private readonly config: ConfigService,
+  ) {}
 
   async validateWebhook(input: {
     headers: Record<string, string | string[] | undefined>;
@@ -19,12 +28,18 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       return this.isSmokeModeEnabled();
     }
 
-    const configuredSecret = process.env.MARKETPLACE_IFOOD_WEBHOOK_TOKEN?.trim();
-    if (!configuredSecret) return true;
-
-    const headerValue = input.headers['x-ifood-token'] ?? input.headers['x-marketplace-token'];
-    const candidate = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-    return candidate === configuredSecret;
+    let clientSecret: string;
+    try {
+      clientSecret = this.credentials.getIfoodClientCredentials().clientSecret;
+    } catch {
+      return false;
+    }
+    const headerValue = input.headers['x-ifood-signature'];
+    const signature = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+    if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+    const rawBody = typeof input.rawBody === 'string' ? Buffer.from(input.rawBody) : input.rawBody;
+    const expected = createHmac('sha256', clientSecret).update(rawBody).digest();
+    return timingSafeEqual(expected, Buffer.from(signature, 'hex'));
   }
 
   async parseWebhookEvent(input: {
@@ -37,13 +52,36 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     return {
       provider: MarketplaceProvider.IFOOD,
       eventId: this.readString(payload, ['id', 'eventId', 'event_id']),
-      topic: this.readString(payload, ['topic', 'type', 'eventType']),
+      topic: this.readString(payload, ['fullCode', 'code', 'topic', 'type', 'eventType']),
       externalMerchantId: this.readString(payload, ['merchantId', 'merchant_id']),
       externalStoreId: this.readString(payload, ['storeId', 'store_id']),
       externalOrderId: this.readString(orderPayload, ['id', 'orderId', 'order_id', 'displayId']),
+      eventCreatedAt: this.readDate(payload, ['createdAt', 'created_at']),
+      eventSequence: this.readBigInt(payload, ['sequence', 'sequenceNumber', 'sequence_number']),
       orderPayload,
       rawPayload: payload,
     };
+  }
+
+  async parsePollingEvent(body: Record<string, unknown>): Promise<ParsedMarketplaceEvent> {
+    return this.parseWebhookEvent({ headers: {}, body });
+  }
+
+  async pollEvents(input: {
+    connection: MarketplaceConnection;
+    merchantIds: string[];
+    correlationId: string;
+    filters?: { categories?: string; types?: string; groups?: string };
+  }): Promise<Record<string, unknown>[]> {
+    return this.client.pollEvents(input.connection, input.merchantIds, input.correlationId, input.filters);
+  }
+
+  async acknowledgeEvents(input: {
+    connection: MarketplaceConnection;
+    eventIds: string[];
+    correlationId: string;
+  }): Promise<{ accepted: true; httpStatus: number }> {
+    return this.client.acknowledgeEvents(input.connection, input.eventIds, input.correlationId);
   }
 
   async fetchOrderDetails(input: {
@@ -58,15 +96,29 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     };
   }
 
+  async fetchCurrentOrder(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }): Promise<ExternalMarketplaceOrder> {
+    return this.client.fetchOrderDetails(input.connection, input.externalOrderId, input.correlationId);
+  }
+
   async normalizeOrder(input: {
     connection: MarketplaceConnection;
     externalOrder: ExternalMarketplaceOrder;
   }): Promise<NormalizedMarketplaceOrder> {
     const order = this.asRecord(input.externalOrder);
     const customer = this.asRecord(order.customer);
+    const deliveryDetails = this.asRecord(order.delivery);
     const delivery = this.asRecord(order.deliveryAddress) ?? this.asRecord(order.delivery_address) ?? this.asRecord(order.address);
     const items = Array.isArray(order.items) ? order.items : [];
-    const totalFromPayload = this.toNumber(order.total);
+    const orderTiming = this.readString(order, ['orderTiming', 'order_timing']);
+    const externalCreatedAt = this.readDate(order, ['createdAt', 'created_at']);
+    const preparationStartAt = this.readDate(order, ['preparationStartDateTime', 'preparation_start_date_time']);
+    const deadlineBase = orderTiming?.toUpperCase() === 'SCHEDULED'
+      ? preparationStartAt
+      : externalCreatedAt;
     const normalizedItems = items.map((item, index) => {
       const record = this.asRecord(item) ?? {};
       const quantity = Math.max(1, this.toNumber(record.quantity) || 1);
@@ -74,6 +126,9 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       const totalPrice = this.toNumber(record.totalPrice) || unitPrice * quantity;
       return {
         externalItemId: this.readString(record, ['id', 'itemId', 'sku']),
+        // Only the merchant SKU can be safely matched with a PedeHub product
+        // code. iFood's order item ID is not a catalog identity.
+        catalogIdentity: this.readString(record, ['sku']),
         name: this.readString(record, ['name', 'displayName']) ?? `Item ${index + 1}`,
         quantity,
         unitPrice,
@@ -89,9 +144,13 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       externalOrderId: this.readString(order, ['id', 'orderId', 'order_id']) ?? 'unknown-order',
       externalDisplayId: this.readString(order, ['displayId', 'display_id']),
       externalStatus: this.readString(order, ['status']),
+      externalCreatedAt,
+      preparationStartAt,
+      confirmationDeadlineAt: deadlineBase ? new Date(deadlineBase.getTime() + 8 * 60 * 1000) : null,
       fulfillmentType: this.normalizeFulfillmentType(
         this.readString(order, ['fulfillmentType', 'fulfillment_type', 'serviceType', 'service_type']),
       ),
+      deliveryOwnership: this.normalizeDeliveryOwnership(this.readString(deliveryDetails, ['deliveredBy'])),
       customerName: this.readString(customer, ['name']) ?? 'Cliente Marketplace',
       customerPhone: this.readString(customer, ['phone', 'phoneNumber']) ?? '00000000000',
       customerEmail: this.readString(customer, ['email']),
@@ -119,16 +178,26 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
   async confirmOrder(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
-  }): Promise<void> {
-    this.logger.log(`ifood_confirm_order_stub externalOrderId=${input.externalOrderId} tenantId=${input.connection.tenantId}`);
+    correlationId: string;
+  }) {
+    return this.client.confirmOrder(input.connection, input.externalOrderId, input.correlationId);
+  }
+
+  async getCancellationReasons(input: {
+    connection: MarketplaceConnection;
+    externalOrderId: string;
+    correlationId: string;
+  }) {
+    return this.client.getCancellationReasons(input.connection, input.externalOrderId, input.correlationId);
   }
 
   async cancelOrder(input: {
     connection: MarketplaceConnection;
     externalOrderId: string;
-    reason?: string;
-  }): Promise<void> {
-    this.logger.log(`ifood_cancel_order_stub externalOrderId=${input.externalOrderId} tenantId=${input.connection.tenantId} reason=${input.reason ?? 'n/a'}`);
+    reason: string;
+    correlationId: string;
+  }) {
+    return this.client.cancelOrder(input.connection, input.externalOrderId, input.reason, input.correlationId);
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {
@@ -155,6 +224,23 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     return null;
   }
 
+  private readDate(record: Record<string, unknown> | null, keys: string[]): Date | null {
+    const value = this.readString(record, keys);
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private readBigInt(record: Record<string, unknown> | null, keys: string[]): bigint | null {
+    if (!record) return null;
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'number' && Number.isSafeInteger(value)) return BigInt(value);
+      if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+    }
+    return null;
+  }
+
   private normalizeFulfillmentType(value: string | null): 'delivery' | 'pickup' {
     if (!value) return 'delivery';
 
@@ -174,7 +260,15 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     return 'delivery';
   }
 
+  private normalizeDeliveryOwnership(value: string | null): MarketplaceDeliveryOwnership {
+    const normalized = value?.trim().toUpperCase();
+    if (normalized === 'MERCHANT') return MarketplaceDeliveryOwnership.MERCHANT;
+    if (normalized === 'IFOOD') return MarketplaceDeliveryOwnership.PROVIDER;
+    return MarketplaceDeliveryOwnership.UNKNOWN;
+  }
+
   private isSmokeModeEnabled(): boolean {
-    return process.env.NODE_ENV !== 'production' || process.env.MARKETPLACE_SMOKE_ENABLED === 'true';
+    return this.config.get<string>('NODE_ENV') !== 'production'
+      || this.config.get<string>('MARKETPLACE_SMOKE_ENABLED') === 'true';
   }
 }

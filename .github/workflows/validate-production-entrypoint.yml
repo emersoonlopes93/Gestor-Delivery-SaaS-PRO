@@ -1,0 +1,413 @@
+name: Validate production entrypoint
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main-copy
+    paths:
+      - ".github/workflows/validate-production-entrypoint.yml"
+      - "apps/api/**"
+      - "docker-compose.prod.yml"
+      - ".dockerignore"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-entrypoint:
+    name: Ephemeral PostgreSQL proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: gestor-entrypoint-ci
+      DATABASE_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public
+      DIRECT_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public
+      CLEAN_DB: "false"
+      MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: "false"
+      MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: "false"
+      REDIS_ENABLED: "false"
+      BULLMQ_ENABLED: "false"
+
+    steps:
+      - name: Checkout requested revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client for quality gates
+        run: pnpm --filter @gestor/api prisma:generate
+
+      - name: Create isolated Compose override
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" <<'EOF'
+          services:
+            api:
+              image: gestor-entrypoint-ci-api:local
+              restart: "no"
+              env_file: !reset []
+              environment:
+                DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+                DIRECT_URL: ${DIRECT_URL:?DIRECT_URL is required}
+                NODE_ENV: production
+                CLEAN_DB: ${CLEAN_DB}
+                MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: ${MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED}
+                MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: ${MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED}
+                REDIS_ENABLED: ${REDIS_ENABLED}
+                BULLMQ_ENABLED: ${BULLMQ_ENABLED}
+                JWT_SECRET: ci-ephemeral-not-a-production-secret
+                JWT_REFRESH_SECRET: ci-ephemeral-not-a-production-refresh-secret
+              depends_on:
+                ephemeral-postgres:
+                  condition: service_healthy
+
+            api-migrate:
+              image: gestor-entrypoint-ci-api:local
+              env_file: !reset []
+              environment:
+                DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+                DIRECT_URL: ${DIRECT_URL:?DIRECT_URL is required}
+                NODE_ENV: production
+                CLEAN_DB: ${CLEAN_DB}
+                MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED: ${MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED}
+                MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED: ${MARKETPLACE_IFOOD_POLLING_FALLBACK_ENABLED}
+                REDIS_ENABLED: ${REDIS_ENABLED}
+                BULLMQ_ENABLED: ${BULLMQ_ENABLED}
+                JWT_SECRET: ci-ephemeral-not-a-production-secret
+                JWT_REFRESH_SECRET: ci-ephemeral-not-a-production-refresh-secret
+
+            ephemeral-postgres:
+              image: postgres:16-alpine
+              hostname: ephemeral-postgres
+              networks:
+                - cpnet-attach
+              environment:
+                POSTGRES_USER: gestor
+                POSTGRES_PASSWORD: gestor
+                POSTGRES_DB: gestor_test
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U gestor -d gestor_test"]
+                interval: 2s
+                timeout: 3s
+                retries: 30
+
+          networks:
+            cpnet-attach:
+              external: false
+              internal: true
+              name: gestor-entrypoint-ci-net
+          EOF
+
+      - name: Confirm isolated configuration
+        shell: bash
+        run: |
+          echo "Database host: ephemeral-postgres"
+          echo "Database name: gestor_test"
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" config --quiet
+          rendered_config="$RUNNER_TEMP/docker-compose.entrypoint-ci.rendered.yml"
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" config > "$rendered_config"
+          if grep -Eq '^[[:space:]]*env_file:' "$rendered_config" || \
+            grep -Fq '.env' "$rendered_config" || \
+            grep -Fq 'CLEAN_DB: "true"' "$rendered_config"; then
+            echo "Rendered Compose configuration is not isolated."
+            exit 1
+          fi
+          if ! grep -Fq 'DATABASE_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public' "$rendered_config" || \
+            ! grep -Fq 'DIRECT_URL: postgresql://gestor:gestor@ephemeral-postgres:5432/gestor_test?schema=public' "$rendered_config"; then
+            echo "Rendered Compose configuration does not use the expected ephemeral database."
+            exit 1
+          fi
+
+      - name: Build and inspect the API image
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
+          "${compose[@]}" build api > "$RUNNER_TEMP/api-image-build.log" 2>&1
+
+          if grep -Fq "Environment variables loaded from .env" "$RUNNER_TEMP/api-image-build.log"; then
+            echo "The Docker build loaded an .env file."
+            exit 1
+          fi
+
+          docker run --rm --entrypoint sh gestor-entrypoint-ci-api:local -ec '
+            test -x ./docker-entrypoint.sh
+            test -f ./dist/apps/api/src/main.js
+            test -f ./prisma/schema.prisma
+            test -n "$(find ./prisma/migrations -name migration.sql -print -quit)"
+            test ! -e ./clean_db.js
+            test -z "$(find /app -name .env -print -quit)"
+          '
+          echo "API image structure verified."
+
+      - name: Start ephemeral PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" up -d --wait ephemeral-postgres
+
+      - name: Verify normal startup does not migrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
+          "${compose[@]}" up -d api
+          sleep 10
+          "${compose[@]}" logs --no-color api > "$RUNNER_TEMP/api-before-migration.log" 2>&1 || true
+
+          assert_absent() {
+            if grep -Fqi "$1" "$2"; then
+              echo "Forbidden API log pattern detected: $1"
+              exit 1
+            fi
+          }
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in API logs."
+              exit 1
+            fi
+          }
+          for pattern in "migrate deploy" "Applying migration" "DROP SCHEMA" "clean_db" "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
+            assert_absent "$pattern" "$RUNNER_TEMP/api-before-migration.log"
+          done
+          assert_no_password_value "$RUNNER_TEMP/api-before-migration.log"
+
+          api_id=$("${compose[@]}" ps -aq api)
+          test -n "$api_id"
+          api_running=$(docker inspect -f '{{.State.Running}}' "$api_id")
+          if [ "$api_running" != "true" ]; then
+            api_exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$api_id")
+            test "$api_exit_code" -ne 0
+            test -s "$RUNNER_TEMP/api-before-migration.log"
+            echo "API exited before migrations with a non-zero status, as permitted for an empty schema."
+          fi
+
+          before_count=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = '_prisma_migrations';")
+          test "$before_count" = "0"
+          "${compose[@]}" stop api || true
+          echo "Normal API startup did not apply migrations."
+
+      - name: Verify ephemeral PostgreSQL DNS
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" \
+            --profile operations run --rm --entrypoint sh api-migrate \
+            -c 'getent hosts ephemeral-postgres'
+
+      - name: Run api-migrate manually
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
+          migration_log="$RUNNER_TEMP/api-migrate-first.log"
+          sanitized_log="$migration_log.sanitized"
+
+          set +e
+          "${compose[@]}" --profile operations run --rm api-migrate > "$migration_log" 2>&1
+          migration_exit_code=$?
+          set -e
+
+          if [ "$migration_exit_code" -ne 0 ]; then
+            sed -E \
+              -e 's#postgres(ql)?://[^[:space:]]+#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(DATABASE_URL|DIRECT_URL)[[:space:]]*[:=][^[:space:]]*#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(password|token|secret)[[:space:]]*[:=][^[:space:]]+#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#ci-ephemeral-not-a-production-secret#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#ci-ephemeral-not-a-production-refresh-secret#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#://[^:@[:space:]]*:[^@[:space:]]*@#://[REDACTED]@#g' \
+              "$migration_log" > "$sanitized_log"
+
+            if grep -Eqi 'postgres(ql)?://|DATABASE_URL[[:space:]]*[:=]|DIRECT_URL[[:space:]]*[:=]|(password|token|secret)[[:space:]]*[:=]|ci-ephemeral-not-a-production' "$sanitized_log"; then
+              echo "Sanitization check failed; diagnostic will not be printed."
+              exit "$migration_exit_code"
+            fi
+
+            echo "::group::Sanitized api-migrate diagnostic"
+            cat "$sanitized_log"
+            echo "::endgroup::"
+            exit "$migration_exit_code"
+          fi
+
+          assert_absent() {
+            if grep -Fqi "$1" "$2"; then
+              echo "Forbidden migration log pattern detected: $1"
+              exit 1
+            fi
+          }
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in migration logs."
+              exit 1
+            fi
+          }
+          for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
+            assert_absent "$pattern" "$migration_log"
+          done
+          assert_no_password_value "$migration_log"
+
+          "${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -v ON_ERROR_STOP=1 -c "CREATE TABLE entrypoint_ci_sentinel (id integer PRIMARY KEY); INSERT INTO entrypoint_ci_sentinel VALUES (1);" >/dev/null
+          echo "Manual migration completed."
+
+      - name: Verify api-migrate idempotency
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
+          "${compose[@]}" --profile operations run --rm api-migrate > "$RUNNER_TEMP/api-migrate-second.log" 2>&1
+
+          assert_absent() {
+            if grep -Fqi "$1" "$2"; then
+              echo "Forbidden migration log pattern detected: $1"
+              exit 1
+            fi
+          }
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in migration logs."
+              exit 1
+            fi
+          }
+          for pattern in "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "DROP SCHEMA" "clean_db" "seed" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
+            assert_absent "$pattern" "$RUNNER_TEMP/api-migrate-second.log"
+          done
+          assert_no_password_value "$RUNNER_TEMP/api-migrate-second.log"
+
+          migration_total=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM _prisma_migrations;")
+          migration_failed=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL;")
+          last_migration=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 1;")
+          sentinel_count=$("${compose[@]}" exec -T ephemeral-postgres psql -U gestor -d gestor_test -Atc "SELECT count(*) FROM entrypoint_ci_sentinel;")
+
+          test "$migration_total" -gt 0
+          test "$migration_failed" = "0"
+          test "$sentinel_count" = "1"
+          echo "Migrations total: $migration_total"
+          echo "Migrations failed: $migration_failed"
+          echo "Last migration: $last_migration"
+          echo "Idempotent migration run preserved the ephemeral sentinel."
+
+      - name: Verify API after manual migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml")
+          api_log_raw="$RUNNER_TEMP/api-after-migration.log"
+          api_log_sanitized="$api_log_raw.sanitized"
+          "${compose[@]}" up -d api
+          api_id=$("${compose[@]}" ps -aq api | head -n 1)
+          set +e
+          health_status="000"
+          for attempt in $(seq 1 60); do
+            health_status=$("${compose[@]}" --profile operations run --rm --entrypoint node api-migrate -e 'fetch("http://api:3333/api/v1/health").then((r) => console.log(r.status)).catch(() => console.log("000"))' 2>/dev/null | tail -n 1)
+            [ "$health_status" = "200" ] && break
+            sleep 1
+          done
+          readiness_body="$RUNNER_TEMP/api-readiness.body"
+          readiness_status=$("${compose[@]}" --profile operations run --rm --entrypoint node api-migrate -e 'fetch("http://api:3333/api/v1/health/ready").then(async (r) => { console.log(r.status); console.log(await r.text()) }).catch(() => console.log("000"))' 2>/dev/null > "$readiness_body"; head -n 1 "$readiness_body")
+          set -e
+          if [ -z "$api_id" ]; then
+            echo "::group::Sanitized API startup diagnostic"
+            echo "API container was not created."
+            "${compose[@]}" ps -a
+            echo "::endgroup::"
+            exit 1
+          fi
+          if [ "$health_status" != "200" ] || [ "$readiness_status" != "200" ]; then
+            echo "::group::Sanitized API startup diagnostic"
+            echo "Internal health HTTP status: $health_status"
+            echo "Internal readiness HTTP status: $readiness_status"
+            "${compose[@]}" ps -a
+            docker inspect --format='status={{.State.Status}} running={{.State.Running}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} error={{json .State.Error}} started={{.State.StartedAt}} finished={{.State.FinishedAt}}' "$api_id"
+
+            docker logs "$api_id" > "$api_log_raw" 2>&1 || true
+            sed -E \
+              -e 's#postgres(ql)?://[^[:space:]]+#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(DATABASE_URL|DIRECT_URL)[[:space:]]*[:=][^[:space:]]*#[REDACTED_DATABASE_URL]#gI' \
+              -e 's#(password|token|secret)[[:space:]]*[:=][^[:space:]]+#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#ci-ephemeral-not-a-production-secret#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#ci-ephemeral-not-a-production-refresh-secret#[REDACTED_CREDENTIAL]#gI' \
+              -e 's#://[^:@[:space:]]*:[^@[:space:]]*@#://[REDACTED]@#g' \
+              -e 's#([0-9]{1,3}\.){3}[0-9]{1,3}#[REDACTED_IP]#g' \
+              "$api_log_raw" > "$api_log_sanitized"
+            if grep -Eqi 'postgres(ql)?://|DATABASE_URL[[:space:]]*[:=]|DIRECT_URL[[:space:]]*[:=]|(password|token|secret)[[:space:]]*[:=]|ci-ephemeral-not-a-production' "$api_log_sanitized"; then
+              echo "API startup log sanitization failed; log will not be printed."
+            else
+              cat "$api_log_sanitized"
+            fi
+            tail -n +2 "$readiness_body" | sed -E -e 's#postgres(ql)?://[^[:space:]]+#[REDACTED_DATABASE_URL]#gI' -e 's#(DATABASE_URL|DIRECT_URL|password|token|secret)[^,[:space:]]*#[REDACTED]#gI' -e 's#([0-9]{1,3}\.){3}[0-9]{1,3}#[REDACTED_IP]#g'
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          "${compose[@]}" logs --no-color api > "$api_log_raw" 2>&1 || true
+          assert_absent() {
+            if grep -Fqi "$1" "$2"; then
+              echo "Forbidden API log pattern detected: $1"
+              exit 1
+            fi
+          }
+          assert_no_password_value() {
+            if grep -Eiq 'password[[:space:]]*[:=][^[:space:]]+' "$1"; then
+              echo "Forbidden password value detected in API logs."
+              exit 1
+            fi
+          }
+          for pattern in "migrate deploy" "Applying migration" "DROP SCHEMA" "clean_db" "postgresql://" "DATABASE_URL=" "DIRECT_URL=" "JWT_SECRET=" "JWT_REFRESH_SECRET="; do
+            assert_absent "$pattern" "$api_log_raw"
+          done
+          assert_no_password_value "$api_log_raw"
+
+          test "$(docker inspect -f '{{.State.Running}}' "$api_id")" = "true"
+          echo "API process, health and readiness verified after migration."
+
+      - name: Quality gates
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          pnpm exec eslint --version || failed=1
+          pnpm lint || failed=1
+          pnpm typecheck || failed=1
+          pnpm build || failed=1
+          pnpm test || failed=1
+          DATABASE_URL="$DATABASE_URL" DIRECT_URL="$DIRECT_URL" pnpm prisma:validate || failed=1
+          pnpm check:no-any || failed=1
+          git diff --check || failed=1
+          exit "$failed"
+
+      - name: Cleanup ephemeral resources
+        if: always()
+        shell: bash
+        run: |
+          docker compose --env-file /dev/null -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.prod.yml -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml" down --volumes --remove-orphans --rmi local || true
+          docker image rm -f gestor-entrypoint-ci-api:local || true
+          rm -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.yml"
+          rm -f "$RUNNER_TEMP/docker-compose.entrypoint-ci.rendered.yml"
+          rm -f "$RUNNER_TEMP/api-image-build.log"
+          rm -f "$RUNNER_TEMP/api-before-migration.log"
+          rm -f "$RUNNER_TEMP/api-migrate-first.log"
+          rm -f "$RUNNER_TEMP/api-migrate-first.log.sanitized"
+          rm -f "$RUNNER_TEMP/api-migrate-second.log"
+          rm -f "$RUNNER_TEMP/api-after-migration.log"
+          rm -f "$RUNNER_TEMP/api-after-migration.log.sanitized"
+          rm -f "$RUNNER_TEMP/api-readiness.body"

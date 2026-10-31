@@ -8,6 +8,19 @@ import {
 import { ManualBillingPaymentProvider } from './manual-billing-payment.provider';
 import { MockBillingPaymentProvider } from './mock-billing-payment.provider';
 import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
+import { isAsaasBillingSandboxBaseUrl } from './asaas-billing-client.service';
+
+export type BillingGatewayStatus =
+  | 'disabled'
+  | 'manual_ready'
+  | 'sandbox_ready'
+  | 'invalid_configuration';
+
+const C5_SUPPORTED_PROVIDERS: PaymentProvider[] = [
+  PaymentProvider.manual,
+  PaymentProvider.mock,
+  PaymentProvider.asaas,
+];
 
 export type BillingPaymentRuntimeConfig = {
   paymentsEnabled: boolean;
@@ -15,6 +28,8 @@ export type BillingPaymentRuntimeConfig = {
   mode: BillingGatewayMode | 'disabled';
   productionAllowed: boolean;
   supportedProviders: PaymentProvider[];
+  gatewayStatus: BillingGatewayStatus;
+  gatewayStatusReason: string | null;
 };
 
 @Injectable()
@@ -26,12 +41,28 @@ export class BillingPaymentGatewayService {
   ) {}
 
   getRuntimeConfig(): BillingPaymentRuntimeConfig {
+    const paymentsEnabled = process.env.BILLING_PAYMENTS_ENABLED === 'true';
+    const providerValue = process.env.BILLING_GATEWAY_PROVIDER ?? 'manual';
+    const modeValue = process.env.BILLING_GATEWAY_MODE ?? 'disabled';
+    const provider = this.parseProvider(providerValue);
+    const mode = this.parseMode(modeValue);
+    const capability = this.resolveCapability({
+      paymentsEnabled,
+      providerValue,
+      modeValue,
+      provider,
+      mode,
+    });
+
     return {
-      paymentsEnabled: process.env.BILLING_PAYMENTS_ENABLED === 'true',
-      provider: this.parseProvider(process.env.BILLING_GATEWAY_PROVIDER ?? 'manual'),
-      mode: this.parseMode(process.env.BILLING_GATEWAY_MODE ?? 'disabled'),
-      productionAllowed: process.env.NODE_ENV === 'production',
-      supportedProviders: [PaymentProvider.manual, PaymentProvider.mock, PaymentProvider.asaas],
+      paymentsEnabled,
+      provider,
+      mode,
+      // NODE_ENV alone must never be represented as permission to create real charges.
+      productionAllowed: false,
+      supportedProviders: C5_SUPPORTED_PROVIDERS,
+      gatewayStatus: capability.status,
+      gatewayStatusReason: capability.reason,
     };
   }
 
@@ -99,5 +130,57 @@ export class BillingPaymentGatewayService {
     if (value === BillingGatewayMode.sandbox) return BillingGatewayMode.sandbox;
     if (value === BillingGatewayMode.production) return BillingGatewayMode.production;
     return 'disabled';
+  }
+
+  private resolveCapability(input: {
+    paymentsEnabled: boolean;
+    providerValue: string;
+    modeValue: string;
+    provider: PaymentProvider;
+    mode: BillingGatewayMode | 'disabled';
+  }): { status: BillingGatewayStatus; reason: string | null } {
+    if (!input.paymentsEnabled) {
+      return { status: 'disabled', reason: 'Pagamentos por tentativa estao desativados neste ambiente.' };
+    }
+
+    if (!C5_SUPPORTED_PROVIDERS.includes(input.provider)
+      || input.providerValue !== input.provider) {
+      return { status: 'invalid_configuration', reason: 'Provider de billing nao suportado nesta fase.' };
+    }
+
+    if (!['manual', 'sandbox', 'production'].includes(input.modeValue) || input.mode === 'disabled') {
+      return { status: 'invalid_configuration', reason: 'Modo de billing invalido ou ausente.' };
+    }
+
+    if (input.mode === BillingGatewayMode.production) {
+      return { status: 'invalid_configuration', reason: 'Cobranca real em producao permanece bloqueada nesta fase.' };
+    }
+
+    if (input.provider === PaymentProvider.manual) {
+      return input.mode === BillingGatewayMode.manual
+        ? { status: 'manual_ready', reason: 'Tentativas podem ser iniciadas administrativamente; cobranca recorrente automatica nao esta habilitada.' }
+        : { status: 'invalid_configuration', reason: 'Provider manual exige modo manual.' };
+    }
+
+    if (input.provider === PaymentProvider.mock) {
+      return input.mode === BillingGatewayMode.sandbox
+        ? { status: 'sandbox_ready', reason: 'Gateway mock de sandbox disponivel para testes autorizados; cobranca real permanece bloqueada.' }
+        : { status: 'invalid_configuration', reason: 'Provider mock exige modo sandbox.' };
+    }
+
+    if (input.provider === PaymentProvider.asaas) {
+      if (input.mode !== BillingGatewayMode.sandbox) {
+        return { status: 'invalid_configuration', reason: 'Asaas para billing SaaS esta liberado somente em sandbox.' };
+      }
+      if (!process.env.ASAAS_BILLING_API_KEY?.trim()) {
+        return { status: 'invalid_configuration', reason: 'Asaas sandbox indisponivel: credencial sandbox nao configurada.' };
+      }
+      const baseUrl = process.env.ASAAS_BILLING_BASE_URL?.trim() || 'https://api-sandbox.asaas.com/v3';
+      return isAsaasBillingSandboxBaseUrl(baseUrl)
+        ? { status: 'sandbox_ready', reason: 'Tentativas sandbox podem ser iniciadas administrativamente; cobranca recorrente automatica nao esta habilitada.' }
+        : { status: 'invalid_configuration', reason: 'Asaas sandbox indisponivel: URL fora do ambiente sandbox.' };
+    }
+
+    return { status: 'invalid_configuration', reason: 'Configuracao de billing indisponivel.' };
   }
 }

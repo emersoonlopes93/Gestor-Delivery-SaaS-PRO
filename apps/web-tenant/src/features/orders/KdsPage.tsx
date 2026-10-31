@@ -116,13 +116,19 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
 
               {(() => {
                 const options = (item.snapshotCatalogV2Json as { optionItems?: Array<{ snapshotName: string }> })?.optionItems || [];
-                if (options.length === 0) return null;
+                const marketplaceComposition = item.snapshotComposition
+                  ? item.snapshotComposition.split('\n').map((line) => line.trim()).filter(Boolean)
+                  : [];
+                if (options.length === 0 && marketplaceComposition.length === 0) return null;
                 return (
                   <div className="pl-6 mt-1.5 text-xs text-muted-foreground font-medium space-y-0.5">
                     {options.map((o, idx: number) => (
                       <div key={idx} className="flex justify-between">
                         <span>+ {o.snapshotName}</span>
                       </div>
+                    ))}
+                    {marketplaceComposition.map((line, idx) => (
+                      <div key={`marketplace-${idx}`}>{line}</div>
                     ))}
                   </div>
                 );
@@ -271,7 +277,7 @@ export function KdsPage() {
   };
 
   return (
-    <div className="p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col bg-background overflow-y-auto">
+    <div className="p-6 h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col bg-background overflow-y-auto">
       <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
         <div>
           <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">

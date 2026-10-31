@@ -165,7 +165,7 @@ async function main() {
     assert(overview.plan?.id === defaultPlan.id, 'Overview não retornou o plano Billing V2.');
     assert(overview.usagePreview?.tenantId === tenantA.id, 'Overview não retornou usage do tenant autenticado.');
     assert(overview.paymentModeInfo.automaticBillingActive === false, 'Portal indicou cobrança automática ativa.');
-    assert(overview.paymentModeInfo.paymentsEnabled === false, 'Portal expôs pagamentos como habilitados.');
+    assert(overview.paymentModeInfo.productionAllowed === false, 'Portal indicou cobrança real em produção como liberada.');
 
     const invoicesA = await portal.listMyInvoices(tenantA.id);
     assert(invoicesA.some((invoice) => invoice.id === invoiceA.id), 'Lista não trouxe fatura do tenant A.');

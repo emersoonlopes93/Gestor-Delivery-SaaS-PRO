@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { ProductCategory } from '@gestor/types';
+import { CategoryActiveDay, ProductCategory } from '@gestor/types';
 import { Modal } from '../../components/Modal';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,13 +14,21 @@ interface CategoryFormData {
   order: number;
   templateType: 'none' | 'pizza' | 'combo';
   templateConfig: Record<string, unknown>;
+  activeDays: CategoryActiveDay[];
 }
+
+const CATEGORY_DAY_OPTIONS: Array<{ value: CategoryActiveDay; label: string }> = [
+  { value: 'MONDAY', label: 'Seg' }, { value: 'TUESDAY', label: 'Ter' }, { value: 'WEDNESDAY', label: 'Qua' },
+  { value: 'THURSDAY', label: 'Qui' }, { value: 'FRIDAY', label: 'Sex' }, { value: 'SATURDAY', label: 'Sáb' }, { value: 'SUNDAY', label: 'Dom' },
+];
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<CategoryFormData>({
@@ -31,6 +39,7 @@ export function CategoriesPage() {
     order: 0,
     templateType: 'none',
     templateConfig: {},
+    activeDays: [],
   });
 
   useEffect(() => {
@@ -62,6 +71,7 @@ export function CategoriesPage() {
         order: category.order,
         templateType: category.templateType || 'none',
         templateConfig: category.templateConfig || {},
+        activeDays: category.activeDays ?? [],
       });
     } else {
       setEditingCategory(null);
@@ -76,9 +86,25 @@ export function CategoriesPage() {
           pricingStrategy: 'highest',
           allowHalfHalf: true
         },
+        activeDays: [],
       });
     }
     setIsModalOpen(true);
+  };
+
+  const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const bulkSetActive = async (isActive: boolean) => {
+    if (selectedIds.length === 0 || bulkSaving) return;
+    setBulkSaving(true);
+    try {
+      await api.patch('/catalog/categories/bulk-active', { ids: selectedIds, isActive });
+      setSelectedIds([]);
+      await loadCategories();
+    } catch (error) {
+      console.error('Erro ao atualizar categorias selecionadas:', error);
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -121,6 +147,13 @@ export function CategoriesPage() {
           <span>➕</span> Nova Categoria
         </button>
       </div>
+      {selectedIds.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted p-3 text-sm">
+          <span className="font-bold text-foreground">{selectedIds.length} selecionada(s)</span>
+          <button type="button" disabled={bulkSaving} onClick={() => bulkSetActive(true)} className="rounded-lg bg-status-success px-3 py-1.5 font-bold text-white disabled:opacity-60">Ativar selecionadas</button>
+          <button type="button" disabled={bulkSaving} onClick={() => bulkSetActive(false)} className="rounded-lg bg-status-warning px-3 py-1.5 font-bold text-white disabled:opacity-60">Desativar selecionadas</button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
@@ -133,6 +166,7 @@ export function CategoriesPage() {
             <table className="w-full text-left border-collapse">
               <thead className="bg-muted border-b border-border">
                 <tr>
+                  <th className="px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Selecionar</th>
                   <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nome</th>
                   <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Produtos</th>
                   <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Ordem</th>
@@ -143,6 +177,7 @@ export function CategoriesPage() {
               <tbody className="divide-y divide-border/50">
                 {categories.map((category) => (
                   <tr key={category.id} className="hover:bg-muted transition-colors group">
+                    <td className="px-4 py-4"><input aria-label={`Selecionar ${category.name}`} type="checkbox" checked={selectedIds.includes(category.id)} onChange={() => toggleSelected(category.id)} /></td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-foreground">{category.name}</div>
                       <div className="text-xs text-muted-foreground truncate max-w-xs">{category.description || 'Sem descrição'}</div>
@@ -206,6 +241,7 @@ export function CategoriesPage() {
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{category.description || 'Sem descrição'}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <input aria-label={`Selecionar ${category.name}`} type="checkbox" checked={selectedIds.includes(category.id)} onChange={() => toggleSelected(category.id)} />
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-warning text-white border-status-warning'}`}>
                       {category.isActive ? 'Ativa' : 'Pausada'}
                     </span>
@@ -336,6 +372,25 @@ export function CategoriesPage() {
                 />
                 <span className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Destaque</span>
               </label>
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-xs font-black text-muted-foreground uppercase tracking-wider">Dias ativos</label>
+              <button type="button" onClick={() => setFormData({ ...formData, activeDays: [] })} className="text-xs font-bold text-primary">Todos os dias</button>
+            </div>
+            <p className="text-xs text-muted-foreground">Sem seleção significa disponível todos os dias.</p>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_DAY_OPTIONS.map((day) => (
+                <label key={day.value} className="flex items-center gap-1 text-sm font-medium text-foreground">
+                  <input type="checkbox" checked={formData.activeDays.includes(day.value)} onChange={(event) => setFormData({
+                    ...formData,
+                    activeDays: event.target.checked ? [...formData.activeDays, day.value] : formData.activeDays.filter((value) => value !== day.value),
+                  })} />
+                  {day.label}
+                </label>
+              ))}
             </div>
           </div>
 

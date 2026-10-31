@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+
 export {
   TenantStatus,
   UnitType,
@@ -27,6 +29,7 @@ export {
 export * from './auth';
 export * from './tenant';
 export * from './billing';
+export * from './commercial-billing';
 export * from './purchasing';
 export * from './finance';
 export * from './rbac';
@@ -38,6 +41,9 @@ export * from './customer';
 export * from './promotions';
 export * from './inventory';
 export * from './analytics';
+export * from './analytics-performance';
+export * from './marketing-analytics';
+export * from './storefront-consent';
 export * from './goals';
 export * from './campaigns';
 export * from './chat';
@@ -47,6 +53,7 @@ export * from './kds';
 export * from './notifications';
 export * from './employees';
 export * from './settings';
+export * from './branding';
 export * from './capabilities';
 export * from './feature-control';
 export * from './location';
@@ -69,11 +76,24 @@ export type {
   OrderBoardItemDTO,
   OrderListItemDTO,
   OrderDispatchItemDTO,
+  OrderOperationalViewModel,
+  OrderOperationalAction,
+  OrderOperationalActionType,
+  OrderOperationalActionMode,
+  OrderOperationalCapabilities,
+  OrderOperationalCapability,
+  OrderMarketplaceOperationSummary,
+  OrderFinancialSummary,
+  OrderDeliverySummary,
+  OrderProductionSummary,
+  OrderOrigin,
+  OrderDeliveryOwnership,
 } from './order';
 
 export {
   FULFILLMENT_TYPE_LABELS,
   formatFulfillmentTypeLabel,
+  canonicalizeOrderSubmission,
 } from './order';
 
 export { 

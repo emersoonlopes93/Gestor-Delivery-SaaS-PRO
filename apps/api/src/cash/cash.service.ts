@@ -14,12 +14,13 @@ import {
   CashMovementType,
 } from '@gestor/types';
 import { PaymentMethod as PrismaPaymentMethod, Prisma } from '@prisma/client';
+import { runSerializableTransactionWithRetry } from '../database/serializable-transaction';
 
 @Injectable()
 export class CashService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private parsePaymentMethod(value: string): PrismaPaymentMethod | null {
+  private parsePaymentMethod(value: string | null | undefined): PrismaPaymentMethod | null {
     switch (value) {
       case 'cash':
         return PrismaPaymentMethod.cash;
@@ -139,21 +140,35 @@ export class CashService {
     closingAmountDeclared: number,
     notes?: string,
   ): Promise<CashSessionDetailDTO> {
-    const session = await this.prisma.cashSession.findFirst({
-      where: { id: sessionId, tenantId, operatorId, status: 'open' },
-    });
-
-    if (!session) {
-      throw new NotFoundException(
-        'Sessão de caixa não encontrada ou já fechada.',
-      );
-    }
-
-    // Calculate expected amount
-    const closingAmountCalculated = await this.calculateExpectedAmount(sessionId);
-    const closingDifference = closingAmountDeclared - closingAmountCalculated;
-
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockCashSession(tx, tenantId, sessionId);
+
+      const session = await tx.cashSession.findFirst({
+        where: { id: sessionId, tenantId, operatorId, status: 'open' },
+      });
+      if (!session) {
+        throw new NotFoundException(
+          'Sessão de caixa não encontrada ou já fechada.',
+        );
+      }
+
+      const movements = await tx.cashMovement.findMany({
+        where: { tenantId, cashSessionId: sessionId },
+        select: {
+          type: true,
+          amount: true,
+          paymentMethod: true,
+          orderId: true,
+        },
+      });
+      const closingAmountCalculated = this.calculateExpectedCashAmount(movements.map((movement) => ({
+        type: movement.type as CashMovementType,
+        amount: Number(movement.amount),
+        paymentMethod: movement.paymentMethod,
+        orderId: movement.orderId,
+      })));
+      const closingDifference = closingAmountDeclared - closingAmountCalculated;
+
       // Create closing movement
       await tx.cashMovement.create({
         data: {
@@ -186,6 +201,27 @@ export class CashService {
     });
 
     return this.mapSessionDetailToDTO(updated);
+  }
+
+  private async lockCashSession(
+    client: Prisma.TransactionClient,
+    tenantId: string,
+    cashSessionId: string,
+  ): Promise<void> {
+    await client.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${`cash-session:${tenantId}:${cashSessionId}`}))
+    `;
+  }
+
+  private async lockRefund(
+    client: Prisma.TransactionClient,
+    tenantId: string,
+    cashSessionId: string,
+    orderId: string,
+  ): Promise<void> {
+    await client.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${`cash-refund:${tenantId}:${cashSessionId}:${orderId}`}))
+    `;
   }
 
   /**
@@ -316,9 +352,11 @@ export class CashService {
     orderId: string,
     amount: number,
     paymentMethod: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const parsedPaymentMethod = this.parsePaymentMethod(paymentMethod);
-    await this.prisma.cashMovement.create({
+    const client = tx || this.prisma;
+    await client.cashMovement.create({
       data: {
         tenantId,
         cashSessionId,
@@ -339,37 +377,112 @@ export class CashService {
     cashSessionId: string,
     orderId: string,
     amount: number,
+    paymentMethod: string | null | undefined,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.cashMovement.create({
-      data: {
-        tenantId,
-        cashSessionId,
-        type: 'refund',
-        amount,
-        orderId,
-        description: 'Estorno de venda PDV',
-      },
-    });
-  }
+    const createRefund = async (client: Prisma.TransactionClient): Promise<void> => {
+      // Closing and refunds share a session lock so a refund cannot be written
+      // between the close calculation and its persisted snapshot. The second,
+      // refund-specific lock preserves idempotency for concurrent retries.
+      await this.lockCashSession(client, tenantId, cashSessionId);
+      await this.lockRefund(client, tenantId, cashSessionId, orderId);
 
-  /**
-   * Helper to calculate expected cash balance in a session.
-   */
-  private async calculateExpectedAmount(sessionId: string): Promise<number> {
-    const movements = await this.prisma.cashMovement.findMany({
-      where: { cashSessionId: sessionId },
-    });
+      const session = await client.cashSession.findFirst({
+        where: { id: cashSessionId, tenantId },
+        select: {
+          id: true,
+          status: true,
+          closingAmountDeclared: true,
+        },
+      });
+      if (!session) {
+        throw new NotFoundException('Sessão de caixa não encontrada para registrar o estorno.');
+      }
 
-    return this.calculateExpectedCashAmount(movements.map((movement) => ({
-      type: movement.type as CashMovementType,
-      amount: Number(movement.amount),
-      paymentMethod: movement.paymentMethod,
-    })));
+      const existingRefund = await client.cashMovement.findFirst({
+        where: { tenantId, cashSessionId, orderId, type: 'refund' },
+        select: { id: true },
+      });
+      if (existingRefund) return;
+
+      const parsedPaymentMethod = this.parsePaymentMethod(paymentMethod);
+      const originalSale = parsedPaymentMethod
+        ? null
+        : await client.cashMovement.findFirst({
+            where: { tenantId, cashSessionId, orderId, type: 'sale' },
+            select: { paymentMethod: true },
+          });
+      const physicalPaymentMethod = parsedPaymentMethod ?? originalSale?.paymentMethod ?? null;
+
+      await client.cashMovement.create({
+        data: {
+          tenantId,
+          cashSessionId,
+          type: 'refund',
+          amount,
+          ...(parsedPaymentMethod ? { paymentMethod: parsedPaymentMethod } : {}),
+          orderId,
+          description: 'Estorno de venda PDV',
+        },
+      });
+
+      // A closed session exposes its persisted closing snapshot instead of
+      // recalculating on every read. Keep that snapshot aligned with the cash
+      // ledger when a cash refund is recorded against the original session.
+      // The declared count is historical and intentionally remains unchanged.
+      if (session.status === 'closed' && physicalPaymentMethod === PrismaPaymentMethod.cash) {
+        const movements = await client.cashMovement.findMany({
+          where: { tenantId, cashSessionId },
+          select: {
+            type: true,
+            amount: true,
+            paymentMethod: true,
+            orderId: true,
+          },
+        });
+        const closingAmountCalculated = this.calculateExpectedCashAmount(movements.map((movement) => ({
+          type: movement.type as CashMovementType,
+          amount: Number(movement.amount),
+          paymentMethod: movement.paymentMethod,
+          orderId: movement.orderId,
+        })));
+        const closingAmountDeclared = Number(session.closingAmountDeclared);
+
+        await client.cashSession.update({
+          where: { id: session.id },
+          data: {
+            closingAmountCalculated,
+            ...(session.closingAmountDeclared !== null
+              ? { closingDifference: closingAmountDeclared - closingAmountCalculated }
+              : {}),
+          },
+        });
+      }
+    };
+
+    if (tx) {
+      await createRefund(tx);
+      return;
+    }
+
+    await runSerializableTransactionWithRetry(this.prisma, createRefund);
   }
 
   private calculateExpectedCashAmount(
-    movements: Array<{ type: CashMovementType; amount: number; paymentMethod?: PrismaPaymentMethod | null }>,
+    movements: Array<{
+      type: CashMovementType;
+      amount: number;
+      paymentMethod?: PrismaPaymentMethod | null;
+      orderId?: string | null;
+    }>,
   ): number {
+    const salePaymentMethodsByOrderId = new Map<string, PrismaPaymentMethod | null>();
+    for (const movement of movements) {
+      if (movement.type === 'sale' && movement.orderId) {
+        salePaymentMethodsByOrderId.set(movement.orderId, movement.paymentMethod ?? null);
+      }
+    }
+
     let expected = 0;
     for (const movement of movements) {
       switch (movement.type) {
@@ -383,9 +496,16 @@ export class CashService {
           }
           break;
         case 'withdrawal':
-        case 'refund':
           expected -= movement.amount;
           break;
+        case 'refund': {
+          const refundPaymentMethod = movement.paymentMethod
+            ?? (movement.orderId ? salePaymentMethodsByOrderId.get(movement.orderId) : null);
+          if (refundPaymentMethod === PrismaPaymentMethod.cash) {
+            expected -= movement.amount;
+          }
+          break;
+        }
       }
     }
 
@@ -446,6 +566,7 @@ export class CashService {
             type: movement.type,
             amount: movement.amount,
             paymentMethod: this.parsePaymentMethod(movement.paymentMethod || ''),
+            orderId: movement.orderId,
           }))),
     };
   }

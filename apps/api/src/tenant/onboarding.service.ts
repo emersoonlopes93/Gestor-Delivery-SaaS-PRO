@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, TenantOnboarding } from '@prisma/client';
 import type { OnboardingBackendStep, OnboardingCompletionCheck } from '@gestor/types';
@@ -66,6 +67,10 @@ export class OnboardingService {
   }
 
   async updateStep(tenantId: string, step: OnboardingBackendStep | string, completed = true) {
+    if (step === 'firstOrder') {
+      throw new BadRequestException('O primeiro pedido Ã© derivado de pedidos persistidos e nÃ£o pode ser marcado manualmente.');
+    }
+
     const fieldName =
       STEP_MAPPING[step] ||
       (`step${step.charAt(0).toUpperCase()}${step.slice(1)}` as keyof Prisma.TenantOnboardingUpdateInput);

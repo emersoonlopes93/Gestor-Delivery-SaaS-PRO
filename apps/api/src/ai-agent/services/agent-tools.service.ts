@@ -30,6 +30,8 @@ import { ConversationService } from './conversation.service';
 import { validateOrderDraft } from '../utils/order-draft-validator.util';
 import { UpsellRecommendationEngine } from '../../campaigns/services/upsell-recommendation.engine';
 import { LocationProviderService } from '../../location/location-provider.service';
+import { RecipeExpansionService } from '../../inventory/recipe-expansion.service';
+import { Prisma } from '@prisma/client';
 
 export interface AgentSessionContext {
   customerId?: string;
@@ -282,6 +284,7 @@ export class AgentToolsService {
     private readonly conversationService: ConversationService,
     private readonly upsellRecommendationEngine: UpsellRecommendationEngine,
     private readonly locationProviderService: LocationProviderService,
+    private readonly recipeExpansion: RecipeExpansionService,
   ) {}
 
   /**
@@ -1142,13 +1145,13 @@ export class AgentToolsService {
     const productId = args.productId;
     const term = args.ingrediente.toLowerCase();
 
-    const recipe = await this.prisma.productRecipeIngredient.findMany({
-      where: { productId, tenantId },
-      include: { ingredient: true }
+    const quantities = await this.recipeExpansion.expandProductRecipeToIngredients(tenantId, productId, new Prisma.Decimal(1));
+    const ingredients = await this.prisma.ingredient.findMany({
+      where: { tenantId, id: { in: [...quantities.keys()] } },
+      select: { name: true },
     });
-
-    const found = recipe.some(r => r.ingredient.name.toLowerCase().includes(term));
-    const list = recipe.map(r => r.ingredient.name).join(', ');
+    const found = ingredients.some((ingredient) => ingredient.name.toLowerCase().includes(term));
+    const list = ingredients.map((ingredient) => ingredient.name).join(', ');
 
     return {
       contemIngrediente: found,
@@ -1275,14 +1278,20 @@ export class AgentToolsService {
   private async executeConsultarFormasPagamento(
     tenantId: string,
   ): Promise<ReturnType<typeof buildAgentPaymentMethodsResult>> {
-    const settings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId },
-      select: {
-        paymentMethods: true,
-        pixKey: true,
-        mercadoPagoAccessToken: true,
-      },
-    });
+    const [settings, mercadoPagoConnection] = await Promise.all([
+      this.prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: {
+          paymentMethods: true,
+          pixKey: true,
+          mercadoPagoAccessToken: true,
+        },
+      }),
+      this.prisma.paymentProviderConnection.findFirst({
+        where: { tenantId, provider: 'mercado_pago', status: 'CONNECTED' },
+        select: { id: true },
+      }),
+    ]);
 
     if (!settings) {
       return {
@@ -1295,7 +1304,7 @@ export class AgentToolsService {
     return buildAgentPaymentMethodsResult({
       paymentMethodsRaw: settings.paymentMethods,
       pixKey: settings.pixKey,
-      mercadoPagoAccessToken: settings.mercadoPagoAccessToken,
+      mercadoPagoConnected: Boolean(mercadoPagoConnection || settings.mercadoPagoAccessToken?.trim()),
     });
   }
 

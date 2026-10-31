@@ -25,7 +25,7 @@ type AutomationsPayload = {
   automations: Array<{ id: string; name: string; enabled: boolean }>;
   center?: {
     active: Array<{ id: string; name: string; status: string }>;
-    paused: Array<{ id: string; name: string; status: string }>;
+    queued: Array<{ id: string; name: string; status: string }>;
     lastExecutions: Array<{
       id: string;
       name: string;
@@ -299,7 +299,7 @@ export function AutomationsPage() {
           <Metric icon={Megaphone} label="Ativas" value={center?.active.length ?? 0} />
         </Card>
         <Card>
-          <Metric icon={PauseCircle} label="Pausadas" value={center?.paused.length ?? 0} />
+          <Metric icon={PauseCircle} label="Na Fila" value={center?.queued.length ?? 0} />
         </Card>
         <Card>
           <Metric icon={Send} label="Enviados" value={center?.totals.sent ?? 0} />
@@ -523,7 +523,7 @@ export function AutomationsPage() {
                   {execution.sent} enviados - {execution.converted} conversoes
                 </p>
               </div>
-              <StatusBadge status={execution.status === 'completed' ? 'success' : execution.status === 'running' ? 'info' : 'neutral'}>
+              <StatusBadge status={execution.status === 'completed' ? 'success' : execution.status === 'processing' ? 'info' : 'neutral'}>
                 {execution.status}
               </StatusBadge>
             </div>

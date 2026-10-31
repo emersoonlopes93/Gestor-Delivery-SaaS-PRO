@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, MapPin, Navigation } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { AddressSearchInput } from '../components/AddressSearchInput';
@@ -133,61 +133,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     void loadData();
   }, []);
 
-  useEffect(() => {
-    onMarkValid(isAddressStepValid(form));
-  }, [form, onMarkValid]);
-
-  useEffect(() => {
-    if (!showDetails || !hasRequiredAddressFields(form)) return;
-    if (!coordinatesDirty && hasRealCoordinates(form.lat, form.lng)) return;
-
-    const timeoutId = window.setTimeout(() => {
-      void geocodeCurrentAddress();
-    }, 500);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [form, showDetails, coordinatesDirty]);
-
-  const loadData = async () => {
-    setLoading(true);
-
-    try {
-      const tenantRes = await api.get<TenantMeResponse>('/tenant/me');
-      const settings = tenantRes.data?.settings;
-
-      const nextForm: Step2Data = {
-        searchQuery: buildSearchQueryFromSettings(settings),
-        zipCode: settings?.zipCode || '',
-        street: settings?.street || '',
-        number: settings?.number || '',
-        complement: settings?.complement || '',
-        neighborhood: settings?.neighborhood || '',
-        city: settings?.city || '',
-        state: settings?.state || '',
-        country: 'Brasil',
-        lat: settings?.lat ?? null,
-        lng: settings?.lng ?? null,
-      };
-
-      setForm(nextForm);
-      setShowDetails(Boolean(nextForm.street || nextForm.city || nextForm.zipCode));
-      setManualMode(Boolean(nextForm.street || nextForm.city || nextForm.zipCode));
-      setCoordinatesDirty(false);
-      setAddressNotice(
-        hasRealCoordinates(nextForm.lat, nextForm.lng)
-          ? 'Endereco carregado com coordenadas validas.'
-          : nextForm.street
-            ? 'Revise o endereco para recalcular as coordenadas reais da loja.'
-            : null,
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const geocodeCurrentAddress = async () => {
+  const geocodeCurrentAddress = useCallback(async () => {
     const currentRequest = geocodeRequestRef.current + 1;
     geocodeRequestRef.current = currentRequest;
 
@@ -232,6 +178,60 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         setGeocoding(false);
       }
     }
+  }, [form]);
+
+  useEffect(() => {
+    onMarkValid(isAddressStepValid(form));
+  }, [form, onMarkValid]);
+
+  useEffect(() => {
+    if (!showDetails || !hasRequiredAddressFields(form)) return;
+    if (!coordinatesDirty && hasRealCoordinates(form.lat, form.lng)) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void geocodeCurrentAddress();
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [form, showDetails, coordinatesDirty, geocodeCurrentAddress]);
+
+  const loadData = async () => {
+    setLoading(true);
+
+    try {
+      const tenantRes = await api.get<TenantMeResponse>('/tenant/me');
+      const settings = tenantRes.data?.settings;
+
+      const nextForm: Step2Data = {
+        searchQuery: buildSearchQueryFromSettings(settings),
+        zipCode: settings?.zipCode || '',
+        street: settings?.street || '',
+        number: settings?.number || '',
+        complement: settings?.complement || '',
+        neighborhood: settings?.neighborhood || '',
+        city: settings?.city || '',
+        state: settings?.state || '',
+        country: 'Brasil',
+        lat: settings?.lat ?? null,
+        lng: settings?.lng ?? null,
+      };
+
+      setForm(nextForm);
+      setShowDetails(Boolean(nextForm.street || nextForm.city || nextForm.zipCode));
+      setManualMode(Boolean(nextForm.street || nextForm.city || nextForm.zipCode));
+      setCoordinatesDirty(false);
+      setAddressNotice(
+        hasRealCoordinates(nextForm.lat, nextForm.lng)
+          ? 'Endereco carregado com coordenadas validas.'
+          : nextForm.street
+            ? 'Revise o endereco para recalcular as coordenadas reais da loja.'
+            : null,
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddressSelected = (
@@ -261,8 +261,8 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
       lat: address.lat,
       lng: address.lng,
     }));
-    setShowDetails(true);
     setManualMode(false);
+    setShowDetails(false);
     setCoordinatesDirty(false);
     setAddressNotice(
       address.number

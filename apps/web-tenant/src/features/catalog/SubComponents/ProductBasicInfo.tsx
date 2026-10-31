@@ -142,6 +142,10 @@ export const ProductBasicInfo: React.FC = () => {
                   <option value="simple">Produto Simples</option>
                   <option value="configurable">Produto com Opções</option>
                 </select>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">Produto simples:</span> venda direta, sem personalização.{' '}
+                  <span className="font-semibold text-foreground">Produto com opções:</span> tamanhos, adicionais, escolhas ou personalizações.
+                </p>
               </div>
             ) : (
               <div className="rounded-xl bg-primary/10 border border-primary/20 px-4 py-3">

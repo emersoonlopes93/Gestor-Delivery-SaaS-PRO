@@ -19,6 +19,7 @@ export interface PosCreateSalePayload {
   customerName?: string;
   customerPhone?: string;
   fulfillmentType: PosFulfillmentType;
+  tableId?: string;
   tableNumber?: string;
   deliveryFee?: number;
   selectedAddressId?: string;

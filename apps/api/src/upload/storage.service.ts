@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveMediaStorageDriver } from '../config/environment-aliases';
 
 @Injectable()
 export class StorageService {
@@ -12,11 +13,11 @@ export class StorageService {
   private readonly uploadDir: string;
 
   constructor(private readonly config: ConfigService) {
-    this.driver =
-      this.config.get<'local' | 'r2'>('MEDIA_STORAGE_PROVIDER') ||
-      this.config.get<'local' | 'r2'>('MEDIA_STORAGE_DRIVER') ||
-      this.config.get<'local' | 'r2'>('STORAGE_DRIVER') ||
-      'local';
+    this.driver = resolveMediaStorageDriver({
+      MEDIA_STORAGE_DRIVER: this.config.get<string>('MEDIA_STORAGE_DRIVER'),
+      MEDIA_STORAGE_PROVIDER: this.config.get<string>('MEDIA_STORAGE_PROVIDER'),
+      STORAGE_DRIVER: this.config.get<string>('STORAGE_DRIVER'),
+    });
     const rawUploadDir =
       this.config.get<string>('MEDIA_LOCAL_ROOT') ||
       this.config.get<string>('MEDIA_UPLOAD_DIR') ||
@@ -53,7 +54,7 @@ export class StorageService {
         this.logger.warn('========================================================================');
         this.logger.warn('CRÍTICO: StorageProvider configurado como "local" em ambiente de PRODUÇÃO!');
         this.logger.warn('Os uploads de imagens serão perdidos ao reiniciar o servidor ou durante deploys.');
-        this.logger.warn('Configure as variáveis R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET e STORAGE_DRIVER=r2');
+        this.logger.warn('Configure as variáveis R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET e MEDIA_STORAGE_DRIVER=r2');
         this.logger.warn('========================================================================');
       }
     }

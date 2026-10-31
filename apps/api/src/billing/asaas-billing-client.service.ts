@@ -1,7 +1,17 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-const DEFAULT_ASAAS_SANDBOX_BASE_URL = 'https://api-sandbox.asaas.com/v3';
+export const DEFAULT_ASAAS_SANDBOX_BASE_URL = 'https://api-sandbox.asaas.com/v3';
+
+export function isAsaasBillingSandboxBaseUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.origin === 'https://api-sandbox.asaas.com'
+      && (parsed.pathname === '/v3' || parsed.pathname.startsWith('/v3/'));
+  } catch {
+    return false;
+  }
+}
 
 export type AsaasBillingCustomerRequest = {
   name: string;
@@ -155,7 +165,7 @@ export class AsaasBillingClientService {
 
   private createClient(): AxiosInstance {
     const baseURL = this.baseUrl();
-    if (!baseURL.startsWith(DEFAULT_ASAAS_SANDBOX_BASE_URL)) {
+    if (!isAsaasBillingSandboxBaseUrl(baseURL)) {
       throw new BadRequestException('ASAAS_BILLING_BASE_URL precisa apontar para o ambiente sandbox nesta fase.');
     }
     if (!this.apiKey()) {

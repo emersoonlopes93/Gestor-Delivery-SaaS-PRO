@@ -5,7 +5,7 @@ import { Outlet } from 'react-router-dom';
  */
 export function AuthLayout() {
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-background transition-colors duration-500">
+    <div className="min-h-[100dvh] relative flex items-center justify-center overflow-hidden bg-background transition-colors duration-500 safe-inset">
       {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-secondary/10 blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />

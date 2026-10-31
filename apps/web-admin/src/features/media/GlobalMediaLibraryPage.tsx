@@ -22,6 +22,15 @@ type MediaCategory = {
   slug: string;
 };
 
+type UploadIssue = {
+  fileName: string;
+  reason: string;
+  stage: 'prevalidacao' | 'upload';
+};
+
+const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+
 export function GlobalMediaLibraryPage() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [categories, setCategories] = useState<MediaCategory[]>([]);
@@ -35,6 +44,7 @@ export function GlobalMediaLibraryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadIssues, setUploadIssues] = useState<UploadIssue[]>([]);
 
   // Estados de Gerenciamento de Categorias
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
@@ -139,9 +149,28 @@ export function GlobalMediaLibraryPage() {
     if (files.length === 0) return;
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadIssues([]);
+
+    const validFiles: File[] = [];
+    const rejectedFiles: UploadIssue[] = [];
+    for (const file of files) {
+      if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+        rejectedFiles.push({ fileName: file.name, reason: 'Formato invalido. Use JPG, PNG ou WEBP.', stage: 'prevalidacao' });
+        continue;
+      }
+      if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+        rejectedFiles.push({ fileName: file.name, reason: 'A imagem deve ter no maximo 10 MB.', stage: 'prevalidacao' });
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    setUploadIssues(rejectedFiles);
+
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const uploadFailures: UploadIssue[] = [];
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
         const formData = new FormData();
         formData.set('file', file);
         formData.set('title', file.name);
@@ -158,6 +187,11 @@ export function GlobalMediaLibraryPage() {
           await api.upload<MediaAsset>('/admin/media/gallery/upload', formData);
         } catch (err) {
           console.error(`Error uploading ${file.name}:`, err);
+          uploadFailures.push({
+            fileName: file.name,
+            reason: err instanceof Error ? err.message : 'Falha ao enviar a imagem.',
+            stage: 'upload',
+          });
         }
         setUploadProgress(i + 1);
       }
@@ -165,6 +199,7 @@ export function GlobalMediaLibraryPage() {
       setUploadTags('');
       setUploadCategory('');
       setUploadProgress(0);
+      setUploadIssues((current) => [...current, ...uploadFailures]);
       await loadAssets();
     } finally {
       setIsUploading(false);
@@ -282,6 +317,9 @@ export function GlobalMediaLibraryPage() {
           <p className="text-[10px] uppercase font-bold text-muted-foreground leading-relaxed">
             Selecione múltiplos arquivos e defina uma categoria e status base para todos.
           </p>
+          <p className="text-sm font-semibold text-primary">
+            Os arquivos serao convertidos para WebP automaticamente antes de salvar.
+          </p>
           <input
             type="file"
             multiple
@@ -335,6 +373,18 @@ export function GlobalMediaLibraryPage() {
             <UploadCloud className="h-4 w-4" />
             {isUploading ? `Enviando (${uploadProgress}/${files.length})...` : `Enviar ${files.length} arquivos`}
           </button>
+          {uploadIssues.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <p className="text-xs font-black uppercase tracking-widest">Falhas no upload</p>
+              <ul className="space-y-1">
+                {uploadIssues.map((issue) => (
+                  <li key={`${issue.stage}-${issue.fileName}-${issue.reason}`}>
+                    <span className="font-bold">{issue.fileName}</span>: {issue.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         <section className="space-y-4">

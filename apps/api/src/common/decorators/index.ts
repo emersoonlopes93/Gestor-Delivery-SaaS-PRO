@@ -56,3 +56,11 @@ export const RequireAdminPermissions = (...permissions: string[]) =>
  */
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+
+/**
+ * Keeps an external protocol response outside the standard API success
+ * envelope. Use only when a provider contract requires an exact body.
+ */
+export const SKIP_RESPONSE_ENVELOPE_KEY = 'skipResponseEnvelope';
+export const SkipResponseEnvelope = () =>
+  SetMetadata(SKIP_RESPONSE_ENVELOPE_KEY, true);

@@ -8,6 +8,13 @@ import { Public } from '../common/decorators';
 export class StorefrontController {
   constructor(private readonly storefrontService: StorefrontService) {}
 
+  @Get('branding')
+  @Public()
+  @Throttle({ public: { limit: 120, ttl: 60 } })
+  async getPublicBranding() {
+    return this.storefrontService.getPublicBranding();
+  }
+
   @Get(':slug')
   @Public() // Explicitly open to the public without generic JWT rules
   @Throttle({ public: { limit: 120, ttl: 60 } })

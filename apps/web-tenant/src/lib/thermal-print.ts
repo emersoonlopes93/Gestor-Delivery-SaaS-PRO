@@ -21,6 +21,12 @@ export function printThermalText(content: string, options: ThermalPrintOptions =
   const fontSizePx = options.fontSizePx ?? (paperWidthMm === 58 ? 10 : 12);
   const escapedContent = escapeHtml(content.trimEnd());
 
+  printWindow.onload = () => {
+    printWindow.focus();
+    printWindow.print();
+    window.setTimeout(() => printWindow.close(), 250);
+  };
+
   printWindow.document.write(`
     <!doctype html>
     <html>
@@ -83,13 +89,6 @@ export function printThermalText(content: string, options: ThermalPrintOptions =
       </head>
       <body>
         <pre>${escapedContent}</pre>
-        <script>
-          window.onload = () => {
-            window.focus();
-            window.print();
-            setTimeout(() => window.close(), 250);
-          };
-        </script>
       </body>
     </html>
   `);

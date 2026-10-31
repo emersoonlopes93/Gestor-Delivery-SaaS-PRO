@@ -10,6 +10,14 @@ export interface AvailabilityDecision {
   effectiveStatus: string | null;
 }
 
+export interface StoreStatus {
+  isOpen: boolean;
+  message: string;
+  reason: 'OPEN' | 'PAUSED' | 'CONFIG_PENDING' | 'CLOSED';
+  nextOpenAt?: string | null;
+  missingRequirements?: string[];
+}
+
 @Injectable()
 export class AvailabilityService {
   constructor(private readonly prisma: PrismaService) {}
@@ -18,7 +26,7 @@ export class AvailabilityService {
     tenantId: string, 
     now?: Date,
     context?: { settings?: Partial<TenantSettings> | null; operatingHours?: TenantOperatingHours[] }
-  ): Promise<{ isOpen: boolean; message: string; reason: string; nextOpenAt?: string | null }> {
+  ): Promise<StoreStatus> {
     const d = now ?? new Date();
 
     const settings = await this.prisma.tenantSettings.findUnique({
@@ -31,8 +39,8 @@ export class AvailabilityService {
         number: true,
         neighborhood: true,
         zipCode: true,
-        pixKey: true,
-        paymentMethods: true
+        paymentMethods: true,
+        pickupEnabled: true,
       },
     });
 
@@ -48,45 +56,36 @@ export class AvailabilityService {
     // 1. Validar requisitos operacionais mínimos obrigatórios
     const hasAddress = !!(settings?.street && settings?.number && settings?.neighborhood && settings?.zipCode);
     
-    let hasPayments = false;
-    if (settings?.pixKey && settings?.paymentMethods) {
-      const methods = settings.paymentMethods;
-      if (Array.isArray(methods)) {
-        hasPayments = methods.length > 0;
-      } else if (typeof methods === 'string') {
-        try {
-          const parsed = JSON.parse(methods);
-          hasPayments = Array.isArray(parsed) && parsed.length > 0;
-        } catch {
-          hasPayments = false;
-        }
-      } else if (typeof methods === 'object' && methods !== null) {
-        hasPayments = Object.keys(methods).length > 0;
-      }
-    }
+    const hasPayments = this.hasConfiguredPaymentMethod(settings?.paymentMethods);
 
     const deliveryCoverage = await this.prisma.deliveryCoverageConfig.findUnique({
       where: { tenantId }
     });
-    const hasDelivery = !!deliveryCoverage;
+    const hasDelivery = Boolean(
+      deliveryCoverage?.isDeliveryEnabled &&
+      Number(deliveryCoverage.maxRadiusKm) > 0 &&
+      Number(deliveryCoverage.defaultPricePerKm) >= 0,
+    );
+    const hasPickup = Boolean(settings?.pickupEnabled);
 
     const operatingHours = [...(context?.operatingHours || await this.prisma.tenantOperatingHours.findMany({
       where: { tenantId },
     }))];
     const hasHours = operatingHours.length > 0;
 
-    if (!hasAddress || !hasPayments || !hasDelivery || !hasHours) {
+    if (!hasAddress || !hasPayments || (!hasDelivery && !hasPickup) || !hasHours) {
       const missing = [];
-      if (!hasAddress) missing.push('endereço da loja');
-      if (!hasPayments) missing.push('formas de pagamento');
-      if (!hasDelivery) missing.push('taxa de entrega/cobertura');
-      if (!hasHours) missing.push('horários de funcionamento');
+      if (!hasAddress) missing.push('STORE_ADDRESS_MISSING');
+      if (!hasPayments) missing.push('PAYMENT_METHOD_MISSING');
+      if (!hasDelivery && !hasPickup) missing.push('FULFILLMENT_METHOD_MISSING');
+      if (!hasHours) missing.push('OPERATING_HOURS_MISSING');
 
       return {
         isOpen: false,
-        message: `Loja desativada temporariamente. Configurações pendentes: ${missing.join(', ')}.`,
+        message: 'Loja desativada temporariamente. Existem configurações pendentes.',
         reason: 'CONFIG_PENDING',
         nextOpenAt: null,
+        missingRequirements: missing,
       };
     }
 
@@ -154,6 +153,29 @@ export class AvailabilityService {
     return names[day];
   }
 
+  private hasConfiguredPaymentMethod(value: unknown): boolean {
+    if (Array.isArray(value)) {
+      return value.some((method) => typeof method === 'string' && method.trim().length > 0);
+    }
+
+    if (typeof value === 'string') {
+      try {
+        return this.hasConfiguredPaymentMethod(JSON.parse(value));
+      } catch {
+        return false;
+      }
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.values(value).some((method) => {
+        if (typeof method === 'boolean') return method;
+        return typeof method === 'string' && method.trim().length > 0;
+      });
+    }
+
+    return false;
+  }
+
   async decide(input: {
     tenantId: string;
     productId: string;
@@ -176,11 +198,39 @@ export class AvailabilityService {
     // 2. Check Product existence
     const product = await this.prisma.product.findFirst({
       where: { id: input.productId, tenantId: input.tenantId, deletedAt: null },
-      select: { id: true },
+      select: {
+        id: true,
+        isActive: true,
+        isAvailable: true,
+        category: { select: { isActive: true, activeDays: true } },
+      },
     });
 
     if (!product) {
       return { canSell: false, reason: 'NOT_FOUND', effectiveStatus: null };
+    }
+
+    if (!product.isActive) {
+      return { canSell: false, reason: 'PRODUCT_INACTIVE', effectiveStatus: null };
+    }
+
+    if (!product.isAvailable) {
+      return { canSell: false, reason: 'PRODUCT_UNAVAILABLE', effectiveStatus: null };
+    }
+
+    const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
+      where: { tenantId: input.tenantId },
+      select: { timezone: true },
+    });
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
+    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
+
+    if (!this.isCategoryAvailableNow(product.category, dayOfWeek)) {
+      return {
+        canSell: false,
+        reason: product.category?.isActive === false ? 'CATEGORY_INACTIVE' : 'CATEGORY_OUT_OF_SCHEDULE',
+        effectiveStatus: null,
+      };
     }
 
     // 3. Product Rules (Publication and Availability Rules)
@@ -212,13 +262,6 @@ export class AvailabilityService {
     }
 
     // Re-check timezone and time for product rules
-    const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
-      where: { tenantId: input.tenantId },
-      select: { timezone: true },
-    });
-    const timezone = settings?.timezone || 'America/Sao_Paulo';
-    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
-
     const rules = await this.prisma.catalogAvailabilityRule.findMany({
       where: { tenantId: input.tenantId, publicationId: publication.id, isActive: true, channel: input.channel },
       select: { daysOfWeek: true, startTime: true, endTime: true },
@@ -261,11 +304,23 @@ export class AvailabilityService {
       return results;
     }
 
-    const publications = await this.prisma.catalogPublication.findMany({
+    const [products, publications] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { tenantId: input.tenantId, id: { in: input.productIds }, deletedAt: null },
+        select: {
+          id: true,
+          isActive: true,
+          isAvailable: true,
+          category: { select: { isActive: true, activeDays: true } },
+        },
+      }),
+      this.prisma.catalogPublication.findMany({
       where: { tenantId: input.tenantId, productId: { in: input.productIds } },
       include: { rules: { where: { isActive: true, channel: input.channel } } }
-    });
+      }),
+    ]);
 
+    const productMap = new Map(products.map((product) => [product.id, product]));
     const pubMap = new Map<string, typeof publications[number]>(publications.map(p => [p.productId, p]));
 
     const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
@@ -278,6 +333,27 @@ export class AvailabilityService {
     const isStorefront = input.channel.startsWith('storefront_');
 
     for (const productId of input.productIds) {
+      const product = productMap.get(productId);
+      if (!product) {
+        results.set(productId, { canSell: false, reason: 'NOT_FOUND', effectiveStatus: null });
+        continue;
+      }
+      if (!product.isActive) {
+        results.set(productId, { canSell: false, reason: 'PRODUCT_INACTIVE', effectiveStatus: null });
+        continue;
+      }
+      if (!product.isAvailable) {
+        results.set(productId, { canSell: false, reason: 'PRODUCT_UNAVAILABLE', effectiveStatus: null });
+        continue;
+      }
+      if (!this.isCategoryAvailableNow(product.category, dayOfWeek)) {
+        results.set(productId, {
+          canSell: false,
+          reason: product.category?.isActive === false ? 'CATEGORY_INACTIVE' : 'CATEGORY_OUT_OF_SCHEDULE',
+          effectiveStatus: null,
+        });
+        continue;
+      }
       const pub = pubMap.get(productId);
       if (!pub) {
         results.set(productId, { canSell: true, reason: null, effectiveStatus: null });
@@ -369,6 +445,17 @@ export class AvailabilityService {
       sat: 6,
     };
     return map[v] ?? 0;
+  }
+
+  private isCategoryAvailableNow(
+    category: { isActive: boolean; activeDays: string[] } | null,
+    dayOfWeek: number,
+  ): boolean {
+    if (!category) return true;
+    if (!category.isActive) return false;
+    if (category.activeDays.length === 0) return true;
+    const activeDay = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][dayOfWeek];
+    return category.activeDays.includes(activeDay);
   }
 
   private isTimeInRange(timeHHmm: string, startHHmm: string, endHHmm: string): boolean {

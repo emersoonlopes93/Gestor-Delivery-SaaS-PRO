@@ -228,6 +228,28 @@ export function AppLayout() {
   const openMobile = useCallback(() => setIsMobileOpen(true), []);
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
 
+  const currentPageTitle = useMemo(() => {
+    const details: Array<{ pattern: RegExp; title: string }> = [
+      { pattern: /^\/tenants\/[^/]+\/modules$/, title: 'Módulos da Loja' },
+      { pattern: /^\/tenants\/[^/]+\/access$/, title: 'Acessos da Loja' },
+      { pattern: /^\/tenants\/[^/]+\/ai-agent$/, title: 'Agente IA da Loja' },
+      { pattern: /^\/tenants\/[^/]+\/scheduling$/, title: 'Agendamentos da Loja' },
+      { pattern: /^\/tenants\/[^/]+$/, title: 'Detalhes da Loja' },
+      { pattern: /^\/base-menus\/[^/]+/, title: 'Cardápio Base' },
+    ];
+    const detail = details.find(({ pattern }) => pattern.test(location.pathname));
+    if (detail) return detail.title;
+    for (const group of SIDEBAR_GROUPS) {
+      const item = group.items.find((candidate) => isItemActive(candidate.to, location.pathname));
+      if (item) return item.label;
+    }
+    return 'Página não encontrada';
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.title = `${appName} - ${currentPageTitle}`;
+  }, [appName, currentPageTitle]);
+
   const handleLogout = async () => {
     await api.post('/auth/admin/logout').catch(() => undefined);
     localStorage.removeItem('admin_accessToken');

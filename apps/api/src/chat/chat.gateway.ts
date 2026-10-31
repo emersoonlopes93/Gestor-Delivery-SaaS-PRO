@@ -12,7 +12,7 @@ import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../database/prisma.service';
 import type { ChatMessage, ChatSession } from '@prisma/client';
-import type { TenantJwtPayload } from '@gestor/types';
+import type { TenantJwtPayload, TenantNotificationEventPayload } from '@gestor/types';
 
 interface ChatMessageCreatedEvent {
   sessionId: string;
@@ -163,5 +163,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
     this.server.to(`tenant:${tenantId}`).emit('sessionUpdated', event);
     this.logger.log(`[CHAT_WS] emit_sessionUpdated for session ${session.id} to tenant ${tenantId}`);
+  }
+
+  emitWhatsAppHandoff(tenantId: string, session: Pick<ChatSession, 'id' | 'displayName'>) {
+    if (!this.server) {
+      this.logger.warn(`[CHAT_WS] server_not_initialized skipping emitWhatsAppHandoff sessionId=${session.id}`);
+      return;
+    }
+
+    this.server.to(`tenant:${tenantId}`).emit('whatsapp.handoff', {
+      type: 'whatsapp.handoff',
+      sessionId: session.id,
+      customerName: session.displayName ?? undefined,
+      timestamp: new Date().toISOString(),
+    } satisfies TenantNotificationEventPayload);
+    this.logger.log(`[CHAT_WS] emit_whatsapp_handoff for session ${session.id} to tenant ${tenantId}`);
   }
 }

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { InventoryCountService } from './inventory-count.service';
-import { CreateInventoryCountDTO, InventoryCountDTO } from '@gestor/types';
+import { CloseInventoryCountDTO, InventoryCountDTO, OpenInventoryCountDTO } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
@@ -27,12 +27,31 @@ export class InventoryCountController {
     return this.inventoryCountService.findOne(tenantId, id);
   }
 
-  @Post()
+  @Post('open')
   @RequirePermissions('inventory.adjust')
-  async create(
+  async open(
     @CurrentTenant() tenantId: string,
-    @Body() dto: CreateInventoryCountDTO,
+    @Body() dto: OpenInventoryCountDTO,
   ): Promise<InventoryCountDTO> {
-    return this.inventoryCountService.create(tenantId, dto);
+    return this.inventoryCountService.open(tenantId, dto);
+  }
+
+  @Post(':id/close')
+  @RequirePermissions('inventory.adjust')
+  async close(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: CloseInventoryCountDTO,
+  ): Promise<InventoryCountDTO> {
+    return this.inventoryCountService.close(tenantId, id, dto);
+  }
+
+  @Post(':id/cancel')
+  @RequirePermissions('inventory.adjust')
+  async cancel(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+  ): Promise<InventoryCountDTO> {
+    return this.inventoryCountService.cancel(tenantId, id);
   }
 }

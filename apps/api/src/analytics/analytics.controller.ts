@@ -1,12 +1,20 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { z } from 'zod';
 import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
 import { BusinessIntelligenceService } from './business-intelligence.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
-import { RequirePermissions, CurrentTenant } from '../common/decorators';
+import { RequirePermissions, CurrentTenant, CurrentUser } from '../common/decorators';
 import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
+import { RbacService } from '../rbac/rbac.service';
 import { MetricFilterDTO, DashboardStatsDTO } from '@gestor/types';
+import { AnalyticsPerformanceService, type AcquisitionQuery, type PerformanceQuery, type ProductsQuery } from './analytics-performance.service';
+import { HistoricalCmvService } from './historical-cmv.service';
+
+const performanceQuerySchema = z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), compare: z.enum(['true', 'false']).optional() }).strict();
+const productsQuerySchema = performanceQuerySchema.extend({ limit: z.coerce.number().int().min(1).max(100).optional(), page: z.coerce.number().int().min(1).max(10000).optional(), sort: z.enum(['views', 'addToCart', 'ordersCompleted', 'quantityCompleted', 'realizedRevenue']).optional() }).strict();
+const acquisitionQuerySchema = performanceQuerySchema.extend({ limit: z.coerce.number().int().min(1).max(100).optional(), page: z.coerce.number().int().min(1).max(10000).optional(), sort: z.enum(['sessions', 'menuViews', 'ordersSubmitted', 'ordersCompleted', 'conversionRate']).optional() }).strict();
 
 @Controller('analytics')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -16,22 +24,61 @@ export class AnalyticsController {
     private readonly analyticsService: AnalyticsService,
     private readonly businessInsightsService: BusinessInsightsService,
     private readonly businessIntelligenceService: BusinessIntelligenceService,
+    private readonly performanceService: AnalyticsPerformanceService,
+    private readonly historicalCmvService: HistoricalCmvService,
+    private readonly rbacService: RbacService,
   ) {}
+
+  @Get('performance/overview')
+  @RequirePermissions('reports.read')
+  getPerformanceOverview(@CurrentTenant() tenantId: string, @Query() query: Record<string, unknown>) {
+    return this.performanceService.overview(tenantId, this.performanceQuery(query));
+  }
+
+  @Get('performance/funnel')
+  @RequirePermissions('reports.read')
+  getPerformanceFunnel(@CurrentTenant() tenantId: string, @Query() query: Record<string, unknown>) {
+    return this.performanceService.funnel(tenantId, this.performanceQuery(query));
+  }
+
+  @Get('performance/products')
+  @RequirePermissions('reports.read')
+  getPerformanceProducts(@CurrentTenant() tenantId: string, @Query() query: Record<string, unknown>) {
+    const parsed = this.parse(productsQuerySchema, query);
+    const request: ProductsQuery = { from: parsed.from, to: parsed.to, compare: parsed.compare === 'true', limit: parsed.limit ?? 20, page: parsed.page ?? 1, sort: parsed.sort ?? 'realizedRevenue' };
+    return this.performanceService.products(tenantId, request);
+  }
+
+  @Get('performance/acquisition')
+  @RequirePermissions('reports.read')
+  getPerformanceAcquisition(@CurrentTenant() tenantId: string, @Query() query: Record<string, unknown>) {
+    const parsed = this.parse(acquisitionQuerySchema, query);
+    const request: AcquisitionQuery = { from: parsed.from, to: parsed.to, compare: parsed.compare === 'true', limit: parsed.limit ?? 20, page: parsed.page ?? 1, sort: parsed.sort ?? 'sessions' };
+    return this.performanceService.acquisition(tenantId, request);
+  }
+
+  private performanceQuery(query: Record<string, unknown>): PerformanceQuery { const parsed = this.parse(performanceQuerySchema, query); return { from: parsed.from, to: parsed.to, compare: parsed.compare === 'true' }; }
+  private parse<T>(schema: z.ZodType<T>, query: Record<string, unknown>): T { const result = schema.safeParse(query); if (!result.success) throw new BadRequestException('invalid performance query'); return result.data; }
 
   @Get('dashboard')
   @RequirePermissions('reports.read')
   async getDashboardStats(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Query() filter: MetricFilterDTO
   ): Promise<DashboardStatsDTO> {
-    const [operational, commercial, costs, financial] = await Promise.all([
+    const [operational, commercial, financial, canViewCosts] = await Promise.all([
       this.analyticsService.getOperationalMetrics(tenantId, filter),
       this.analyticsService.getCommercialMetrics(tenantId, filter),
-      this.analyticsService.getCostMarginMetrics(tenantId, filter),
       this.analyticsService.getFinancialMetrics(tenantId, filter),
+      this.rbacService.hasPermissionOrElevatedRole(userId, 'reports.view_costs'),
     ]);
 
-    return { operational, commercial, costs, financial };
+    const costs = canViewCosts
+      ? await this.analyticsService.getCostMarginMetrics(tenantId, filter)
+      : undefined;
+
+    return { operational, commercial, ...(costs ? { costs } : {}), financial };
   }
 
   @Get('operational')
@@ -61,6 +108,16 @@ export class AnalyticsController {
     return this.analyticsService.getCostMarginMetrics(tenantId, filter);
   }
 
+  /** Historical, order-level CMV. The dashboard's legacy estimated metrics stay unchanged. */
+  @Get('orders/:orderId/historical-cmv')
+  @RequirePermissions('reports.view_costs')
+  getHistoricalOrderCmv(
+    @CurrentTenant() tenantId: string,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.historicalCmvService.getOrderCmv(tenantId, orderId);
+  }
+
   @Get('financial-metrics')
   @RequirePermissions('reports.read')
   async getFinancial(
@@ -85,7 +142,24 @@ export class AnalyticsController {
   @Get('business-intelligence')
   @RequiresFeature('bi_advanced')
   @RequirePermissions('reports.read')
-  async getBusinessIntelligence(@CurrentTenant() tenantId: string) {
+  async getBusinessIntelligence(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    const canViewCosts = await this.rbacService.hasPermissionOrElevatedRole(userId, 'reports.view_costs');
+    if (!canViewCosts) {
+      const [dashboard, customerIntelligence, heatmap, forecast, campaigns, loyalty] = await Promise.all([
+        this.businessIntelligenceService.getDashboard(tenantId),
+        this.businessIntelligenceService.getCustomerIntelligence(tenantId),
+        this.businessIntelligenceService.getHeatmap(tenantId),
+        this.businessIntelligenceService.getForecast(tenantId),
+        this.businessIntelligenceService.getCampaignDashboard(tenantId),
+        this.businessIntelligenceService.getLoyaltyDashboard(tenantId),
+      ]);
+
+      return { dashboard, customerIntelligence, heatmap, forecast, campaigns, loyalty };
+    }
+
     const [dashboard, profitability, abcCurve, customerIntelligence, heatmap, forecast, products, campaigns, loyalty] =
       await Promise.all([
         this.businessIntelligenceService.getDashboard(tenantId),
@@ -114,7 +188,11 @@ export class AnalyticsController {
 
   @Get('ai-insights')
   @RequirePermissions('reports.read')
-  async getAiInsights(@CurrentTenant() tenantId: string) {
+  async getAiInsights(@CurrentTenant() tenantId: string, @CurrentUser('sub') userId: string) {
+    const canViewCosts = await this.rbacService.hasPermissionOrElevatedRole(userId, 'reports.view_costs');
+    if (!canViewCosts) {
+      throw new ForbiddenException('Cost and margin permission required');
+    }
     return this.businessIntelligenceService.getAiInsights(tenantId);
   }
 }

@@ -12,7 +12,7 @@ import { TenantStatus, TenantDefaultRole } from '@gestor/core';
 import type { TenantJwtPayload, TenantUserSession } from '@gestor/types';
 import { AuthSessionService } from './auth-session.service';
 import { AuthSubjectType, Prisma } from '@prisma/client';
-import { TenantBillingResolverService } from '../billing/tenant-billing-resolver.service';
+import { TenantBillingResolverService, type CommercialReentryResolution } from '../billing/tenant-billing-resolver.service';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -137,6 +137,7 @@ export class TenantAuthService {
     const roles = this.buildRoles(user);
     const permissions = this.buildPermissions(user);
     const accessibleTenants = await this.findAccessibleTenants(user.email, user.tenant.businessGroupId);
+    const onboardingCompletedAt = user.tenant.onboarding?.completedAt ?? null;
 
     // Resolve módulos ativos do tenant a partir do plano de billing + overrides manuais
     let enabledModules: string[] = [];
@@ -151,6 +152,26 @@ export class TenantAuthService {
       this.logger.warn(`Não foi possível resolver entitlements para tenant ${user.tenantId}: ${String(err)}`);
       // Mantém lista vazia para não bloquear o login, mas sem acesso a módulos avançados
       enabledModules = [];
+    }
+
+    let commercialReentry: CommercialReentryResolution = {
+      state: 'legacy',
+      nextStep: onboardingCompletedAt ? '/dashboard' : '/onboarding',
+    };
+    try {
+      commercialReentry = await this.tenantBillingResolver.resolveCommercialReentry(
+        user.tenantId,
+        user.tenant.commercialSignupStartedAt,
+        onboardingCompletedAt,
+      );
+    } catch (err) {
+      this.logger.warn(`NÃ£o foi possÃ­vel resolver a retomada comercial para tenant ${user.tenantId}: ${String(err)}`);
+      // A marker from Commercial V1 must not fall through to the operational
+      // onboarding when the billing read is unavailable. Legacy tenants retain
+      // their established path without a global billing enforcement change.
+      if (user.tenant.commercialSignupStartedAt) {
+        commercialReentry = { state: 'contract_required', nextStep: '/billing/contract' };
+      }
     }
 
     return {
@@ -168,7 +189,9 @@ export class TenantAuthService {
         slug: user.tenant.slug,
         status: String(user.tenant.status),
       },
-      onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
+      onboardingCompletedAt: onboardingCompletedAt?.toISOString() || null,
+      commercialSignupState: commercialReentry.state,
+      commercialNextStep: commercialReentry.nextStep,
     };
   }
 
@@ -317,6 +340,7 @@ export class TenantAuthService {
     email: string,
     passwordRaw: string,
     context?: RequestSessionContext,
+    commercialSignup = false,
   ) {
     const normalizedEmail = email.toLowerCase();
 
@@ -336,6 +360,7 @@ export class TenantAuthService {
           name: shopName,
           slug,
           status: TenantStatus.ACTIVE,
+          commercialSignupStartedAt: commercialSignup ? new Date() : null,
           
           // Default modules
           onboarding: {

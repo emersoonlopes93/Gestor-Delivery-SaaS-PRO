@@ -22,6 +22,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import type { TenantJwtPayload } from '@gestor/types';
+import { resolveMediaMaxSizeBytes } from '../config/environment-aliases';
 
 type FileFilterCallback = (error: Error | null, acceptFile: boolean) => void;
 
@@ -126,9 +127,7 @@ export class UploadController {
     const tenantId = req.user.tenantId;
 
     // 1. Enforce size limit from environment variables
-    const maxSizeBytes =
-      Number(process.env.MEDIA_MAX_SIZE_BYTES) ||
-      (Number(process.env.MEDIA_MAX_FILE_SIZE_MB) ? Number(process.env.MEDIA_MAX_FILE_SIZE_MB) * 1024 * 1024 : 10 * 1024 * 1024);
+    const maxSizeBytes = resolveMediaMaxSizeBytes(process.env);
     if (uploaded.size > maxSizeBytes || uploaded.buffer.length > maxSizeBytes) {
       throw new BadRequestException('O arquivo excede o limite máximo de tamanho permitido.');
     }

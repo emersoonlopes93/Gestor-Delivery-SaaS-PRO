@@ -1,4 +1,3 @@
-import { BillingRevenueTierInput } from '../admin-billing-api';
 import { ShieldAlert } from 'lucide-react';
 
 export function SafetyAlert() {

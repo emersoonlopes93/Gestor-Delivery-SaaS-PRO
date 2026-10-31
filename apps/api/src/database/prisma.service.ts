@@ -7,6 +7,12 @@ import {
   runBillingDatabasePreflight,
 } from '../billing/billing-database-preflight';
 
+export const STOREFRONT_CACHE_INVALIDATION_MODELS = new Set([
+  'Product', 'ProductCategory', 'ProductOptionGroupLink', 'OptionGroup', 'OptionItem', 'ProductOptionItemPrice',
+  'ComboSlot', 'ComboBundleItem', 'ComboAllowedItem', 'CatalogPublication',
+  'CatalogAvailabilityRule', 'TenantSettings', 'TenantSchedulingSettings', 'DeliveryZone', 'Upsell', 'Tenant',
+]);
+
 @Injectable()
 export class PrismaService
   extends PrismaClient
@@ -182,13 +188,7 @@ export class PrismaService
 
       // Cache invalidation for public storefront
       if (['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
-        const cacheInvalidationModels = [
-          'Product', 'ProductCategory', 'ProductOptionGroup', 'OptionGroup', 'OptionGroupItem', 
-          'ComboSlot', 'ComboBundleItem', 'ComboAllowedItem', 'CatalogPublication', 
-          'CatalogAvailabilityRule', 'TenantSettings', 'TenantSchedulingSettings', 'DeliveryZone', 'Upsell', 'Tenant'
-        ];
-        
-        if (cacheInvalidationModels.includes(model)) {
+        if (STOREFRONT_CACHE_INVALIDATION_MODELS.has(model)) {
           // Se for o próprio Tenant, o ID dele é o tenantId
           const resultRecord = (result && typeof result === 'object') ? (result as Record<string, unknown>) : {};
           const targetTenantId = model === 'Tenant' ? (resultRecord['id'] || argsRecord.where?.['id']) : tenantId;

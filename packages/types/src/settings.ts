@@ -19,7 +19,6 @@ export interface TenantSettingsDTO {
   paymentMethods: string[];
   minimumOrderValue?: number;
   pixKey?: string;
-  mercadoPagoAccessToken?: string;
   logoUrl?: string;
   whatsappNotificationsEnabled: boolean;
   notificationTemplates: Record<string, string>;
@@ -30,6 +29,10 @@ export interface TenantSettingsDTO {
   handoffSound: string;
   readySound: string;
   browserNotificationsEnabled: boolean;
+  autoAcceptOrdersEnabled?: boolean;
+  autoAcceptDelaySeconds?: 0 | 30 | 60;
+  autoAcceptDeliveryOrders?: boolean;
+  autoAcceptPickupOrders?: boolean;
   loyaltyEnabled?: boolean;
   loyaltyPointsPerReal?: number;
   cashbackEnabled?: boolean;

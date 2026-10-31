@@ -8,6 +8,16 @@ interface CustomerOption {
   phone: string;
 }
 
+interface CustomerListResponse {
+  data: CustomerOption[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 interface CustomerSearchBoxProps {
   onSelect: (customer: CustomerOption) => void;
 }
@@ -22,9 +32,9 @@ export function CustomerSearchBox({ onSelect }: CustomerSearchBoxProps) {
     const loadCustomers = async () => {
       try {
         setIsLoading(true);
-        const res = await api.get<CustomerOption[]>('/crm/customers');
-        if (res.success && Array.isArray(res.data)) {
-          setCustomers(res.data);
+        const res = await api.get<CustomerListResponse>('/crm/customers');
+        if (res.success && Array.isArray(res.data.data)) {
+          setCustomers(res.data.data);
         }
       } catch (err) {
         console.error('Erro ao carregar clientes para busca:', err);

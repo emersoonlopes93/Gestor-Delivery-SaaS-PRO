@@ -1,0 +1,150 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { IngredientDTO, RecipeBaseComponentDTO, RecipeBaseCostProjectionDTO, RecipeBaseDTO, RecipeBaseDetailDTO, UnitType, UpsertRecipeBaseComponentDTO } from '@gestor/types';
+import { api } from '../../../lib/api-client';
+import { useTenantAuth } from '../../../hooks/use-tenant-auth';
+
+type DraftComponent = RecipeBaseComponentDTO;
+
+const units = Object.values(UnitType);
+const compatibleUnits = (unit: UnitType): UnitType[] => unit === UnitType.G || unit === UnitType.KG ? [UnitType.G, UnitType.KG] : unit === UnitType.ML || unit === UnitType.L ? [UnitType.ML, UnitType.L] : [UnitType.UN];
+const normalizedPreview = (quantity: number, from: UnitType, target: UnitType): number => {
+  if (from === target) return quantity;
+  if ((from === UnitType.G && target === UnitType.KG) || (from === UnitType.ML && target === UnitType.L)) return quantity / 1000;
+  if ((from === UnitType.KG && target === UnitType.G) || (from === UnitType.L && target === UnitType.ML)) return quantity * 1000;
+  return quantity;
+};
+const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+function CostProjectionSummary({ projection, loading, compact = false }: { projection?: RecipeBaseCostProjectionDTO; loading: boolean; compact?: boolean }) {
+  if (loading) return <p className="text-xs text-muted-foreground">Calculando custo estimado atual…</p>;
+  if (!projection) return null;
+  const unit = projection.outputUnit;
+  if (projection.coverage === 'KNOWN' && projection.estimatedTotalCost !== null && projection.estimatedCostPerYieldUnit !== null) {
+    return <div className={compact ? 'text-xs text-muted-foreground' : 'rounded-lg border border-border bg-muted/30 p-3 text-sm'}><p className="font-medium text-foreground">Custo estimado atual: {formatCurrency(projection.estimatedTotalCost)} por lote</p><p className="text-muted-foreground">{formatCurrency(projection.estimatedCostPerYieldUnit)} por {unit} de rendimento · baseado nos custos atuais dos insumos.</p></div>;
+  }
+  if (projection.coverage === 'PARTIAL' && projection.partialEstimatedTotalCost !== null && projection.partialEstimatedCostPerYieldUnit !== null) {
+    return <div className={compact ? 'text-xs text-status-warning' : 'rounded-lg border border-status-warning/30 bg-status-warning/10 p-3 text-sm text-status-warning'}><p className="font-medium">Custo parcial conhecido: {formatCurrency(projection.partialEstimatedTotalCost)} por lote</p><p>{formatCurrency(projection.partialEstimatedCostPerYieldUnit)} por {unit}; {projection.unknownIngredientCount} componente(s) sem custo confiável.</p></div>;
+  }
+  return <div className={compact ? 'text-xs text-muted-foreground' : 'rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground'}>Custo estimado indisponível: a composição não possui custos atuais confiáveis para todos os componentes.</div>;
+}
+
+export function RecipeBasesPage() {
+  const [bases, setBases] = useState<RecipeBaseDTO[]>([]);
+  const [costProjections, setCostProjections] = useState<Record<string, RecipeBaseCostProjectionDTO>>({});
+  const [costsLoading, setCostsLoading] = useState(false);
+  const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
+  const [editing, setEditing] = useState<RecipeBaseDetailDTO | null>(null);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [unit, setUnit] = useState<UnitType>(UnitType.UN);
+  const [yieldQuantity, setYieldQuantity] = useState('1');
+  const [components, setComponents] = useState<DraftComponent[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const { user } = useTenantAuth();
+  const canViewCosts = Boolean(user?.permissions.includes('reports.view_costs') || user?.roles.includes('tenant_owner') || user?.roles.includes('tenant_admin'));
+
+  const load = useCallback(async () => {
+    const [basesResult, ingredientsResult] = await Promise.all([
+      api.get<RecipeBaseDTO[]>('/inventory/recipe-bases'),
+      api.get<IngredientDTO[]>('/inventory/ingredients'),
+    ]);
+    if (basesResult.success) setBases(basesResult.data);
+    if (ingredientsResult.success) setIngredients(ingredientsResult.data);
+    if (!canViewCosts) {
+      setCostProjections({});
+      return;
+    }
+    setCostsLoading(true);
+    try {
+      const costsResult = await api.get<RecipeBaseCostProjectionDTO[]>('/inventory/recipe-bases/cost-projections');
+      if (costsResult.success) setCostProjections(Object.fromEntries(costsResult.data.map((projection) => [projection.baseId, projection])));
+    } catch {
+      // Costs are intentionally hidden if this session no longer has permission.
+      setCostProjections({});
+    } finally {
+      setCostsLoading(false);
+    }
+  }, [canViewCosts]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const openEditor = async (base?: RecipeBaseDTO) => {
+    setError(null);
+    if (!base) {
+      setEditing(null); setName(''); setDescription(''); setUnit(UnitType.UN); setYieldQuantity('1'); setComponents([]); setHasUnsavedChanges(false); setOpen(true);
+      return;
+    }
+    try {
+      const result = await api.get<RecipeBaseDetailDTO>(`/inventory/recipe-bases/${base.id}`);
+      if (!result.success) throw new Error('Não foi possível carregar a preparação.');
+      setEditing(result.data); setName(result.data.name); setDescription(result.data.description ?? ''); setUnit(result.data.outputUnit); setYieldQuantity(String(result.data.yieldQuantity)); setComponents(result.data.components); setHasUnsavedChanges(false); setOpen(true);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível carregar a preparação.'); }
+  };
+
+  const archivedParent = editing !== null && !editing.isActive;
+  const selectableBases = useMemo(() => bases.filter((base) => base.isActive && base.id !== editing?.id), [bases, editing?.id]);
+  const selectableIngredients = useMemo(() => ingredients.filter((ingredient) => ingredient.isActive), [ingredients]);
+
+  const addIngredient = (ingredientId: string) => {
+    if (!ingredientId || components.some((component) => component.type === 'ingredient' && component.ingredientId === ingredientId)) return;
+    const ingredient = ingredients.find((item) => item.id === ingredientId);
+    if (!ingredient) return;
+    setComponents((current) => [...current, { id: `ingredient-${ingredient.id}`, type: 'ingredient', ingredientId: ingredient.id, ingredientName: ingredient.name, ingredientUnit: ingredient.unit, inputQuantity: 1, inputUnit: ingredient.unit, quantity: 1, normalizedUnit: ingredient.unit, sortOrder: current.length }]); setHasUnsavedChanges(true);
+  };
+  const addBase = (baseId: string) => {
+    if (!baseId || components.some((component) => component.type === 'base' && component.baseId === baseId)) return;
+    const base = bases.find((item) => item.id === baseId);
+    if (!base) return;
+    setComponents((current) => [...current, { id: `base-${base.id}`, type: 'base', baseId: base.id, baseName: base.name, outputUnit: base.outputUnit, isActive: base.isActive, inputQuantity: 1, inputUnit: base.outputUnit, quantity: 1, normalizedUnit: base.outputUnit, sortOrder: current.length }]); setHasUnsavedChanges(true);
+  };
+  const changeQuantity = (index: number, value: string) => {
+    const inputQuantity = Number(value);
+    setComponents((current) => current.map((component, itemIndex) => itemIndex === index ? { ...component, inputQuantity, quantity: normalizedPreview(inputQuantity, component.inputUnit, component.normalizedUnit) } : component)); setHasUnsavedChanges(true);
+  };
+  const changeInputUnit = (index: number, inputUnit: UnitType) => { setComponents((current) => current.map((component, itemIndex) => itemIndex === index ? { ...component, inputUnit, quantity: normalizedPreview(component.inputQuantity, inputUnit, component.normalizedUnit) } : component)); setHasUnsavedChanges(true); };
+  const remove = (index: number) => { setComponents((current) => current.filter((_, itemIndex) => itemIndex !== index).map((component, itemIndex) => ({ ...component, sortOrder: itemIndex }))); setHasUnsavedChanges(true); };
+
+  const save = async () => {
+    setError(null); setSaving(true);
+    try {
+      const metadata = { name, description: description || null, outputUnit: unit, yieldQuantity: Number(yieldQuantity) };
+      let base = editing;
+      if (!base) {
+        const created = await api.post<RecipeBaseDTO>('/inventory/recipe-bases', metadata);
+        if (!created.success) throw new Error('Não foi possível criar a preparação.');
+        base = { ...created.data, components: [] };
+      } else {
+        const updated = await api.put<RecipeBaseDTO>(`/inventory/recipe-bases/${base.id}`, metadata);
+        if (!updated.success) throw new Error('Não foi possível salvar os dados da preparação.');
+      }
+      const payload: UpsertRecipeBaseComponentDTO[] = components.map((component, sortOrder) => component.type === 'ingredient'
+        ? { type: 'ingredient', ingredientId: component.ingredientId, inputQuantity: component.inputQuantity, inputUnit: component.inputUnit, sortOrder }
+        : { type: 'base', baseId: component.baseId, inputQuantity: component.inputQuantity, inputUnit: component.inputUnit, sortOrder });
+      const composition = await api.put<RecipeBaseDetailDTO>(`/inventory/recipe-bases/${base.id}/components`, payload);
+      if (!composition.success) throw new Error('Não foi possível salvar a composição.');
+      setEditing(composition.data); setComponents(composition.data.components); setHasUnsavedChanges(false); await load(); setOpen(false);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível salvar a preparação.'); return; }
+    finally { setSaving(false); }
+  };
+
+  const toggle = async (base: RecipeBaseDTO) => {
+    try { await api.post(`/inventory/recipe-bases/${base.id}/${base.isActive ? 'archive' : 'restore'}`, {}); await load(); if (editing?.id === base.id) await openEditor({ ...base, isActive: !base.isActive }); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível alterar o status.'); }
+  };
+
+  return <div className="space-y-4 p-4">
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><p className="text-sm text-muted-foreground">Preparações reutilizáveis não possuem estoque nem custo próprio.</p><button type="button" onClick={() => void openEditor()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Nova preparação</button></div>
+    {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+    <div className="divide-y divide-border">{bases.map((base) => <div key={base.id} className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center"><div><p className="font-semibold text-foreground">{base.name}</p><p className="text-sm text-muted-foreground">Rendimento: {base.yieldQuantity} {base.outputUnit}{base.description ? ` · ${base.description}` : ''}</p>{canViewCosts && <div className="mt-1"><CostProjectionSummary projection={costProjections[base.id]} loading={costsLoading} compact /></div>}</div><div className="flex items-center gap-3"><span className="text-xs text-muted-foreground">{base.isActive ? 'Ativa' : 'Arquivada'}</span><button type="button" onClick={() => void openEditor(base)} className="text-sm text-primary">Ver / editar</button><button type="button" onClick={() => void toggle(base)} className="text-sm text-primary">{base.isActive ? 'Arquivar' : 'Restaurar'}</button></div></div>)}{bases.length === 0 && <p className="py-10 text-center text-muted-foreground">Nenhuma preparação cadastrada.</p>}</div>
+    {open && <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"><div role="dialog" aria-modal="true" aria-labelledby="recipe-base-title" className="mx-auto my-4 w-full max-w-4xl rounded-xl bg-card p-5 shadow-xl"><div className="mb-4 flex items-start justify-between gap-4"><div><h2 id="recipe-base-title" className="text-lg font-semibold text-foreground">{editing ? 'Editar preparação' : 'Nova preparação'}</h2><p className="text-sm text-muted-foreground">{archivedParent ? 'Esta preparação está arquivada. Restaure-a para editar.' : 'Defina o rendimento e os componentes que formam esta preparação.'}</p></div><button type="button" onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
+      {error && <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+      {canViewCosts && editing && <div className="mb-4"><CostProjectionSummary projection={costProjections[editing.id]} loading={costsLoading} />{hasUnsavedChanges && <p className="mt-1 text-xs text-muted-foreground">Alterações ainda não recalculadas. O custo exibido corresponde à versão salva; salve a composição para atualizar pelo servidor.</p>}</div>}
+      <fieldset disabled={archivedParent || saving} className="space-y-5"><div className="grid gap-3 md:grid-cols-3"><label className="space-y-1 md:col-span-2"><span className="text-xs font-medium text-muted-foreground">Nome</span><input value={name} onChange={(event) => { setName(event.target.value); setHasUnsavedChanges(true); }} className="input-premium w-full" /></label><label className="space-y-1"><span className="text-xs font-medium text-muted-foreground">Rendimento</span><input type="number" min="0.000001" step="0.000001" value={yieldQuantity} onChange={(event) => { setYieldQuantity(event.target.value); setHasUnsavedChanges(true); }} className="input-premium w-full" /></label><label className="space-y-1"><span className="text-xs font-medium text-muted-foreground">Unidade</span><select value={unit} onChange={(event) => { setUnit(event.target.value as UnitType); setHasUnsavedChanges(true); }} className="input-premium w-full">{units.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label className="space-y-1 md:col-span-2"><span className="text-xs font-medium text-muted-foreground">Descrição</span><input value={description} onChange={(event) => { setDescription(event.target.value); setHasUnsavedChanges(true); }} className="input-premium w-full" /></label></div>
+        <section className="space-y-3 rounded-xl border border-border p-4"><div><h3 className="font-semibold text-foreground">Composição</h3><p className="text-xs text-muted-foreground">Informe como você mede cada componente; o servidor normaliza ao salvar.</p></div><div className="grid gap-2 sm:grid-cols-2"><label className="text-sm text-muted-foreground">Adicionar insumo<select defaultValue="" onChange={(event) => { addIngredient(event.target.value); event.currentTarget.value = ''; }} className="input-premium mt-1 w-full"><option value="">Selecione um insumo</option>{selectableIngredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}</select></label><label className="text-sm text-muted-foreground">Adicionar base<select defaultValue="" onChange={(event) => { addBase(event.target.value); event.currentTarget.value = ''; }} className="input-premium mt-1 w-full"><option value="">Selecione uma base ativa</option>{selectableBases.map((base) => <option key={base.id} value={base.id}>{base.name} ({base.outputUnit})</option>)}</select></label></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="py-2">Componente</th><th>Tipo</th><th>Quantidade</th><th>Unidade</th><th>Normalizado</th><th className="text-right">Ações</th></tr></thead><tbody>{components.map((component, index) => { const archivedChild = component.type === 'base' && !component.isActive; return <tr key={`${component.type}-${component.id}-${index}`} className="border-b border-border/60"><td className="py-2 font-medium text-foreground">{component.type === 'ingredient' ? component.ingredientName : component.baseName}{archivedChild && <span className="ml-2 text-xs text-status-warning">Arquivada</span>}</td><td>{component.type === 'ingredient' ? 'Insumo' : 'Base'}</td><td><input aria-label={`Quantidade de ${component.type === 'ingredient' ? component.ingredientName : component.baseName}`} disabled={archivedChild} type="number" min="0.000001" step="0.000001" value={component.inputQuantity} onChange={(event) => changeQuantity(index, event.target.value)} className="input-premium w-28" /></td><td><select disabled={archivedChild} value={component.inputUnit} onChange={(event) => changeInputUnit(index, event.target.value as UnitType)} className="input-premium w-20">{compatibleUnits(component.normalizedUnit).map((candidate) => <option key={candidate} value={candidate}>{candidate}</option>)}</select></td><td className="text-muted-foreground">= {component.quantity} {component.normalizedUnit}</td><td className="text-right"><button type="button" onClick={() => remove(index)} className="text-sm text-destructive">Remover</button></td></tr>; })}</tbody></table>{components.length === 0 && <p className="py-5 text-center text-sm text-muted-foreground">Adicione insumos ou bases para compor esta preparação.</p>}</div></section></fieldset>
+      <div className="mt-5 flex justify-end gap-3">{archivedParent ? <button type="button" onClick={() => editing && void toggle(editing)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Restaurar preparação</button> : <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{saving ? 'Salvando…' : 'Salvar preparação'}</button>}</div>
+    </div></div>}
+  </div>;
+}

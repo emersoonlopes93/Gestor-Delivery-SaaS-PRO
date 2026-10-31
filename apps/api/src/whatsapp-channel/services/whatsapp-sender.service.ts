@@ -42,6 +42,11 @@ export class WhatsAppSenderService {
     );
   }
 
+  async supportsIdempotencyKey(tenantId: string): Promise<boolean> {
+    const { provider } = await this.resolveProvider(tenantId);
+    return provider.supportsIdempotencyKey === true;
+  }
+
   async sendMedia(
     tenantId: string,
     input: WhatsAppSendMediaInput,

@@ -18,6 +18,7 @@ This document summarizes the API environment variables that must stay aligned wi
 - `CORS_ORIGINS`
 - `FRONTEND_URL`
 - `STOREFRONT_CACHE_TTL`
+- `BASE_MENU_IMPORT_ENABLED` (default `false`; set to `true` to reactivate the existing `baseMenu.import` server capability)
 
 ## Database and Prisma
 
@@ -129,6 +130,15 @@ This document summarizes the API environment variables that must stay aligned wi
 - `WHATSAPP_OTP_MESSAGE_TEMPLATE`
 - `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
 - `MARKETPLACE_IFOOD_WEBHOOK_TOKEN`
+- `MARKETPLACE_IFOOD_CLIENT_ID`
+- `MARKETPLACE_IFOOD_CLIENT_SECRET`
+- `MARKETPLACE_IFOOD_API_BASE_URL`
+- `MARKETPLACE_IFOOD_HTTP_TIMEOUT_MS`
+- `MARKETPLACE_IFOOD_BIDIRECTIONAL_ENABLED`
+- `MARKETPLACE_CREDENTIALS_ENCRYPTION_KEY`
+- `MARKETPLACE_CREDENTIALS_KEY_VERSION`
+- `MARKETPLACE_CREDENTIALS_PREVIOUS_ENCRYPTION_KEY`
+- `MARKETPLACE_CREDENTIALS_PREVIOUS_KEY_VERSION`
 
 ## Email, push and docs
 

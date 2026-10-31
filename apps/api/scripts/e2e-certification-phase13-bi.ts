@@ -94,10 +94,10 @@ async function main() {
 
     await prisma.productRecipeIngredient.createMany({
       data: [
-        { tenantId: tenant.id, productId: pizza.id, ingredientId: flour.id, quantity: 0.2 },
-        { tenantId: tenant.id, productId: pizza.id, ingredientId: cheese.id, quantity: 0.2 },
-        { tenantId: tenant.id, productId: calzone.id, ingredientId: flour.id, quantity: 0.15 },
-        { tenantId: tenant.id, productId: calzone.id, ingredientId: cheese.id, quantity: 0.15 },
+        { tenantId: tenant.id, productId: pizza.id, ingredientId: flour.id, inputQuantity: 0.2, inputUnit: 'kg', quantity: 0.2 },
+        { tenantId: tenant.id, productId: pizza.id, ingredientId: cheese.id, inputQuantity: 0.2, inputUnit: 'kg', quantity: 0.2 },
+        { tenantId: tenant.id, productId: calzone.id, ingredientId: flour.id, inputQuantity: 0.15, inputUnit: 'kg', quantity: 0.15 },
+        { tenantId: tenant.id, productId: calzone.id, ingredientId: cheese.id, inputQuantity: 0.15, inputUnit: 'kg', quantity: 0.15 },
       ],
     });
 

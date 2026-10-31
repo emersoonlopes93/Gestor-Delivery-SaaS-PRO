@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import * as bcrypt from 'bcryptjs';
@@ -22,6 +23,9 @@ export class SeedService {
 
   async runSeed() {
     console.log('Starting seed...');
+    // Billing V2 catalog and subscriptions are owned by prisma/seed.ts. This
+    // operational seed deliberately never creates or rewrites commercial
+    // plans, tiers, settings, or tenant billing subscriptions.
     
     await this.seedTenantPermissions();
     await this.seedAdminPermissions();
