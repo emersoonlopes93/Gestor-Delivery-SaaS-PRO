@@ -20,6 +20,14 @@ import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
+function restoreEnvironment(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+}
+
 function assertEphemeralDatabase(): void {
   if (process.env.NODE_ENV !== 'test') throw new Error('C5-B proof requires NODE_ENV=test.');
   const databaseUrl = process.env.DATABASE_URL;
@@ -187,14 +195,18 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
       planId = plan.id;
       await workerA.billingRevenueTier.create({ data: { planId: plan.id, minRevenue: '0.00', maxRevenue: null, price: '100.00', label: 'C5B workers', sortOrder: 0 } });
       const subscription = await workerA.tenantBillingSubscription.create({ data: { tenantId: tenant.id, billingPlanId: plan.id, status: TenantSubscriptionStatus.active, startedAt: periodStart, currentCycleStartedAt: periodStart, currentCycleEndsAt: periodEnd } });
-      await workerA.order.create({ data: { tenantId: tenant.id, orderNumber: `#c5b-workers-${token}`, status: 'completed', fulfillmentType: 'delivery', customerName: 'C5B', customerPhone: '11999999999', itemsSubtotal: '2000.00', discountTotal: '0.00', deliveryFee: '0.00', serviceFee: '0.00', total: '2000.00', sourceChannel: 'storefront', idempotencyKey: `c5b-workers-${token}`, paymentMethod: 'cash', publicTrackingToken: `c5b-workers-track-${token}`, createdAt: new Date('2026-05-10T12:00:00.000Z'), updatedAt: new Date('2026-05-10T12:00:00.000Z') } });
+      await workerA.order.create({ data: { tenantId: tenant.id, orderNumber: `#cw-${token}`, status: 'completed', fulfillmentType: 'delivery', customerName: 'C5B', customerPhone: '11999999999', itemsSubtotal: '2000.00', discountTotal: '0.00', deliveryFee: '0.00', serviceFee: '0.00', total: '2000.00', sourceChannel: 'storefront', idempotencyKey: `c5b-workers-${token}`, paymentMethod: 'cash', publicTrackingToken: `c5b-workers-track-${token}`, createdAt: new Date('2026-05-10T12:00:00.000Z'), updatedAt: new Date('2026-05-10T12:00:00.000Z') } });
       const cycle = await graphA.cycle.getOrCreateCycleForPeriod({ tenantId: tenant.id, subscriptionId: subscription.id, periodStart, periodEnd });
       const [resultA, resultB] = await Promise.allSettled([
         graphA.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 }),
         graphB.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 }),
       ]);
-      expect(resultA.status).toBe('fulfilled');
-      expect(resultB.status).toBe('fulfilled');
+      if (resultA.status !== 'fulfilled' || resultB.status !== 'fulfilled') {
+        throw new Error('At least one independent recurring worker rejected before convergence.');
+      }
+      const cycleResults = [...resultA.value.results, ...resultB.value.results].filter((result) => result.cycleId === cycle.id);
+      expect(cycleResults).toHaveLength(2);
+      expect(cycleResults.some((result) => result.outcome === 'retryable_error')).toBe(false);
       const invoice = await reader.invoice.findFirstOrThrow({ where: { tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id } });
       expect(await reader.billingUsageSnapshot.count({ where: { tenantId: tenant.id, cycleId: cycle.id } })).toBe(1);
       expect(await reader.invoice.count({ where: { tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id } })).toBe(1);
@@ -202,11 +214,11 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
       expect(await reader.paymentAttempt.count({ where: { invoiceId: invoice.id } })).toBe(0);
       expect((await reader.billingCycleRecord.findUniqueOrThrow({ where: { id: cycle.id } })).status).toBe('invoiced');
     } finally {
-      process.env.BILLING_AUTOMATION_ENABLED = original.enabled;
-      process.env.BILLING_AUTOMATION_KILL_SWITCH = original.kill;
-      process.env.BILLING_PAYMENTS_ENABLED = original.payments;
-      process.env.BILLING_GATEWAY_PROVIDER = original.provider;
-      process.env.BILLING_GATEWAY_MODE = original.mode;
+      restoreEnvironment('BILLING_AUTOMATION_ENABLED', original.enabled);
+      restoreEnvironment('BILLING_AUTOMATION_KILL_SWITCH', original.kill);
+      restoreEnvironment('BILLING_PAYMENTS_ENABLED', original.payments);
+      restoreEnvironment('BILLING_GATEWAY_PROVIDER', original.provider);
+      restoreEnvironment('BILLING_GATEWAY_MODE', original.mode);
       if (tenantId) await workerA.tenant.deleteMany({ where: { id: tenantId } });
       if (planId) await workerA.billingPlan.deleteMany({ where: { id: planId } });
       await Promise.all([workerA.$disconnect(), workerB.$disconnect(), reader.$disconnect()]);
