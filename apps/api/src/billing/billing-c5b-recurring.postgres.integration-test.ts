@@ -82,6 +82,140 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
     return { tenant, invoice };
   }
 
+  async function createEligibleCycleFixture(
+    prisma: PrismaService,
+    graph: ReturnType<typeof createRealBillingGraph>,
+    label: string,
+  ) {
+    const token = randomUUID().slice(0, 8);
+    const periodStart = new Date('2026-05-01T00:00:00.000Z');
+    const periodEnd = new Date('2026-06-01T00:00:00.000Z');
+    await graph.settings.ensureDefaultSettings();
+    const tenant = await prisma.tenant.create({ data: { name: `C5B ${label} ${token}`, slug: `c5b-${label}-${token}` } });
+    const plan = await prisma.billingPlan.create({ data: { name: `C5B ${label} ${token}`, slug: `c5b-${label}-plan-${token}`, type: 'revenue_tiered', cycleInterval: 'monthly', isActive: true, isPublic: false } });
+    await prisma.billingRevenueTier.create({ data: { planId: plan.id, minRevenue: '0.00', maxRevenue: null, price: '100.00', label: `C5B ${label}`, sortOrder: 0 } });
+    const subscription = await prisma.tenantBillingSubscription.create({ data: { tenantId: tenant.id, billingPlanId: plan.id, status: TenantSubscriptionStatus.active, startedAt: periodStart, currentCycleStartedAt: periodStart, currentCycleEndsAt: periodEnd } });
+    await prisma.order.create({ data: { tenantId: tenant.id, orderNumber: `#c5b-${token}`, status: 'completed', fulfillmentType: 'delivery', customerName: 'C5B', customerPhone: '11999999999', itemsSubtotal: '2000.00', discountTotal: '0.00', deliveryFee: '0.00', serviceFee: '0.00', total: '2000.00', sourceChannel: 'storefront', idempotencyKey: `c5b-${label}-${token}`, paymentMethod: 'cash', publicTrackingToken: `c5b-${label}-track-${token}`, createdAt: new Date('2026-05-10T12:00:00.000Z'), updatedAt: new Date('2026-05-10T12:00:00.000Z') } });
+    const cycle = await graph.cycle.getOrCreateCycleForPeriod({ tenantId: tenant.id, subscriptionId: subscription.id, periodStart, periodEnd });
+    return { tenantId: tenant.id, planId: plan.id, subscriptionId: subscription.id, cycleId: cycle.id };
+  }
+
+  async function holdCycleLock(prisma: PrismaService, cycleId: string) {
+    let releaseLock: (() => void) | undefined;
+    let markHeld: (() => void) | undefined;
+    const released = new Promise<void>((resolve) => { releaseLock = resolve; });
+    const held = new Promise<void>((resolve) => { markHeld = resolve; });
+    const completion = prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ acquired: number }>>`
+        SELECT 1::integer AS acquired
+        FROM pg_advisory_xact_lock(hashtext(${cycleId}))
+      `;
+      if (rows.length !== 1 || rows[0]?.acquired !== 1) throw new Error('Test barrier could not acquire the cycle lock.');
+      markHeld?.();
+      await released;
+    }, { timeout: 30_000 });
+    await held;
+    return { release: () => releaseLock?.(), completion };
+  }
+
+  async function waitForCycleLockWaiters(prisma: PrismaService, cycleId: string, expected: number): Promise<void> {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const rows = await prisma.$queryRaw<Array<{ waiting: number }>>`
+        SELECT count(*)::integer AS waiting
+        FROM pg_locks
+        WHERE locktype = 'advisory'
+          AND granted = false
+          AND classid = 0
+          AND objid = ((hashtext(${cycleId})::bigint & 4294967295)::oid)
+      `;
+      if (rows[0]?.waiting === expected) return;
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`Expected ${expected} concurrent waiter(s) for the billing cycle lock.`);
+  }
+
+  async function assertWorkerAdminRace(workerStartsFirst: boolean): Promise<void> {
+    const workerPrisma = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const adminPrisma = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const reader = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const blocker = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const workerGraph = createRealBillingGraph(workerPrisma);
+    const adminGraph = createRealBillingGraph(adminPrisma);
+    const original = { enabled: process.env.BILLING_AUTOMATION_ENABLED, kill: process.env.BILLING_AUTOMATION_KILL_SWITCH, payments: process.env.BILLING_PAYMENTS_ENABLED, provider: process.env.BILLING_GATEWAY_PROVIDER, mode: process.env.BILLING_GATEWAY_MODE };
+    let fixture: Awaited<ReturnType<typeof createEligibleCycleFixture>> | undefined;
+    let barrier: Awaited<ReturnType<typeof holdCycleLock>> | undefined;
+    await Promise.all([workerPrisma.$connect(), adminPrisma.$connect(), reader.$connect(), blocker.$connect()]);
+    try {
+      process.env.BILLING_AUTOMATION_ENABLED = 'true';
+      process.env.BILLING_AUTOMATION_KILL_SWITCH = 'false';
+      process.env.BILLING_PAYMENTS_ENABLED = 'true';
+      process.env.BILLING_GATEWAY_PROVIDER = 'manual';
+      process.env.BILLING_GATEWAY_MODE = 'manual';
+      fixture = await createEligibleCycleFixture(workerPrisma, workerGraph, workerStartsFirst ? 'worker-first' : 'admin-first');
+      barrier = await holdCycleLock(blocker, fixture.cycleId);
+
+      const worker = () => workerGraph.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 });
+      const admin = () => adminGraph.cycle.closeCycleAndCreateDraftInvoice(fixture!);
+      let workerPromise: ReturnType<typeof worker>;
+      let adminPromise: ReturnType<typeof admin>;
+      if (workerStartsFirst) {
+        workerPromise = worker();
+        await waitForCycleLockWaiters(reader, fixture.cycleId, 1);
+        adminPromise = admin();
+      } else {
+        adminPromise = admin();
+        await waitForCycleLockWaiters(reader, fixture.cycleId, 1);
+        workerPromise = worker();
+      }
+      await waitForCycleLockWaiters(reader, fixture.cycleId, 2);
+      barrier.release();
+      await barrier.completion;
+      const [workerResult, adminResult] = await Promise.all([workerPromise, adminPromise]);
+
+      expect(workerResult.results).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cycleId: fixture.cycleId }),
+      ]));
+      const cycleResult = workerResult.results.find((result) => result.cycleId === fixture!.cycleId);
+      expect(cycleResult?.outcome).not.toBe('retryable_error');
+      expect(['processed', 'skipped']).toContain(cycleResult?.outcome);
+      expect(adminResult.cycle.status).toBe('invoiced');
+
+      const [cycle, snapshots, invoices] = await Promise.all([
+        reader.billingCycleRecord.findUniqueOrThrow({ where: { id: fixture.cycleId } }),
+        reader.billingUsageSnapshot.findMany({ where: { tenantId: fixture.tenantId, cycleId: fixture.cycleId } }),
+        reader.invoice.findMany({ where: { tenantId: fixture.tenantId, subscriptionId: fixture.subscriptionId, cycleId: fixture.cycleId } }),
+      ]);
+      expect(cycle.status).toBe('invoiced');
+      expect(snapshots).toHaveLength(1);
+      expect(invoices).toHaveLength(1);
+      expect(invoices[0]?.usageSnapshotId).toBe(snapshots[0]?.id);
+      const itemsBeforeRetry = await reader.invoiceItem.findMany({ where: { invoiceId: invoices[0]!.id }, orderBy: { type: 'asc' } });
+      expect(itemsBeforeRetry).toHaveLength(1);
+      expect(await reader.paymentAttempt.count({ where: { invoiceId: invoices[0]!.id } })).toBe(0);
+
+      const adminRetry = await adminGraph.cycle.closeCycleAndCreateDraftInvoice(fixture);
+      const workerRetry = await workerGraph.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 });
+      const itemsAfterRetry = await reader.invoiceItem.findMany({ where: { invoiceId: invoices[0]!.id }, orderBy: { type: 'asc' } });
+      expect(adminRetry.invoice.id).toBe(invoices[0]?.id);
+      expect(adminRetry.usageSnapshotId).toBe(snapshots[0]?.id);
+      expect(itemsAfterRetry).toEqual(itemsBeforeRetry);
+      expect(workerRetry.results.find((result) => result.cycleId === fixture!.cycleId)?.outcome).not.toBe('retryable_error');
+    } finally {
+      barrier?.release();
+      await barrier?.completion.catch(() => undefined);
+      restoreEnvironment('BILLING_AUTOMATION_ENABLED', original.enabled);
+      restoreEnvironment('BILLING_AUTOMATION_KILL_SWITCH', original.kill);
+      restoreEnvironment('BILLING_PAYMENTS_ENABLED', original.payments);
+      restoreEnvironment('BILLING_GATEWAY_PROVIDER', original.provider);
+      restoreEnvironment('BILLING_GATEWAY_MODE', original.mode);
+      if (fixture) {
+        await workerPrisma.tenant.deleteMany({ where: { id: fixture.tenantId } });
+        await workerPrisma.billingPlan.deleteMany({ where: { id: fixture.planId } });
+      }
+      await Promise.all([workerPrisma.$disconnect(), adminPrisma.$disconnect(), reader.$disconnect(), blocker.$disconnect()]);
+    }
+  }
+
   it('uses two independent PostgreSQL clients to reserve at most one sandbox submission', async () => {
     const { tenant, invoice } = await invoiceFixture();
     let release: (() => void) | undefined;
@@ -231,5 +365,13 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
       if (planId) await workerA.billingPlan.deleteMany({ where: { id: planId } });
       await Promise.all([workerA.$disconnect(), workerB.$disconnect(), reader.$disconnect()]);
     }
+  }, 120_000);
+
+  it('converges when the worker reaches the canonical close before the admin close', async () => {
+    await assertWorkerAdminRace(true);
+  }, 120_000);
+
+  it('converges when the admin reaches the canonical close before the worker close', async () => {
+    await assertWorkerAdminRace(false);
   }, 120_000);
 });
