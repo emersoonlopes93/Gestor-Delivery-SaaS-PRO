@@ -114,7 +114,12 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
       markHeld?.();
       await released;
     }, { timeout: 30_000 });
-    await held;
+    await Promise.race([
+      held,
+      completion.then(() => {
+        throw new Error('Test barrier transaction completed before acquiring the cycle lock.');
+      }),
+    ]);
     return { release: () => releaseLock?.(), completion };
   }
 
@@ -125,7 +130,8 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
         FROM pg_locks
         WHERE locktype = 'advisory'
           AND granted = false
-          AND classid = 0
+          AND objsubid = 1
+          AND classid = (((hashtext(${cycleId})::bigint >> 32) & 4294967295)::oid)
           AND objid = ((hashtext(${cycleId})::bigint & 4294967295)::oid)
       `;
       if (rows[0]?.waiting === expected) return;
@@ -144,6 +150,8 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
     const original = { enabled: process.env.BILLING_AUTOMATION_ENABLED, kill: process.env.BILLING_AUTOMATION_KILL_SWITCH, payments: process.env.BILLING_PAYMENTS_ENABLED, provider: process.env.BILLING_GATEWAY_PROVIDER, mode: process.env.BILLING_GATEWAY_MODE };
     let fixture: Awaited<ReturnType<typeof createEligibleCycleFixture>> | undefined;
     let barrier: Awaited<ReturnType<typeof holdCycleLock>> | undefined;
+    let workerPromise: ReturnType<typeof workerGraph.automation.runBatch> | undefined;
+    let adminPromise: ReturnType<typeof adminGraph.cycle.closeCycleAndCreateDraftInvoice> | undefined;
     await Promise.all([workerPrisma.$connect(), adminPrisma.$connect(), reader.$connect(), blocker.$connect()]);
     try {
       process.env.BILLING_AUTOMATION_ENABLED = 'true';
@@ -156,8 +164,6 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
 
       const worker = () => workerGraph.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 });
       const admin = () => adminGraph.cycle.closeCycleAndCreateDraftInvoice(fixture!);
-      let workerPromise: ReturnType<typeof worker>;
-      let adminPromise: ReturnType<typeof admin>;
       if (workerStartsFirst) {
         workerPromise = worker();
         await waitForCycleLockWaiters(reader, fixture.cycleId, 1);
@@ -203,6 +209,10 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
     } finally {
       barrier?.release();
       await barrier?.completion.catch(() => undefined);
+      const pendingOperations: Promise<unknown>[] = [];
+      if (workerPromise) pendingOperations.push(workerPromise);
+      if (adminPromise) pendingOperations.push(adminPromise);
+      await Promise.allSettled(pendingOperations);
       restoreEnvironment('BILLING_AUTOMATION_ENABLED', original.enabled);
       restoreEnvironment('BILLING_AUTOMATION_KILL_SWITCH', original.kill);
       restoreEnvironment('BILLING_PAYMENTS_ENABLED', original.payments);
