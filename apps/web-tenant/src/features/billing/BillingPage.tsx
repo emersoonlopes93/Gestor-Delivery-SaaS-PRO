@@ -32,6 +32,7 @@ import {
   startTrialPro,
   TenantBillingInvoiceSummary,
 } from './billing-api';
+import { billingGatewayCapabilityLabel, billingProductionCapabilityLabel } from './billing-presentation';
 
 function formatCurrency(value: DecimalLike | null | undefined): string {
   if (value === null || value === undefined) return 'Sem valor';
@@ -270,7 +271,9 @@ export function BillingPage() {
                 <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Configuracao de cobranca</h2>
               </div>
               <div className="grid gap-3">
-                <Metric label="Cobranca automatica" value={overview?.paymentModeInfo.automaticBillingActive ? 'Ativa' : 'Desativada'} />
+                <Metric label="Tentativas de cobranca" value={billingGatewayCapabilityLabel(overview?.paymentModeInfo)} />
+                <Metric label="Cobranca recorrente automatica" value={overview?.paymentModeInfo.automaticBillingActive ? 'Ativa' : 'Nao habilitada'} />
+                <Metric label="Cobranca real em producao" value={billingProductionCapabilityLabel(overview?.paymentModeInfo)} />
                 <Metric label="Provider" value={overview?.paymentModeInfo.provider ?? 'manual'} />
                 <Metric label="Modo" value={overview?.paymentModeInfo.mode ?? 'disabled'} />
                 <Metric label="iFood no calculo" value={entitlements?.flags.canUseIfoodIntegration ? 'Sim' : 'Nao'} />

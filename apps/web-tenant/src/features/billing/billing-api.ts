@@ -3,6 +3,19 @@ import { api } from '../../lib/api-client';
 export type DecimalLike = string | number;
 
 export type TenantBillingSource = 'billing_v2' | 'none';
+export type TenantBillingGatewayStatus = 'disabled' | 'manual_ready' | 'sandbox_ready' | 'invalid_configuration';
+
+export type TenantBillingPaymentModeInfo = {
+  paymentsEnabled: boolean;
+  provider: string;
+  mode: string;
+  productionAllowed: boolean;
+  supportedProviders: string[];
+  gatewayStatus: TenantBillingGatewayStatus;
+  gatewayStatusReason: string | null;
+  automaticBillingActive: boolean;
+  message: string;
+};
 
 export type TenantBillingRevenueTier = {
   id: string;
@@ -173,15 +186,7 @@ export type TenantBillingOverview = {
   estimatedMonthlyPrice: DecimalLike | null;
   revenueUntilNextTier: DecimalLike | null;
   latestInvoice: TenantBillingInvoiceSummary | null;
-  paymentModeInfo: {
-    paymentsEnabled: boolean;
-    provider: string;
-    mode: string;
-    productionAllowed: boolean;
-    supportedProviders: string[];
-    automaticBillingActive: false;
-    message: string;
-  };
+  paymentModeInfo: TenantBillingPaymentModeInfo;
   source: TenantBillingSource;
   warning: string | null;
   entitlements: {

@@ -1,13 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   BillingCycleRecord,
-  BillingGatewayMode,
   BillingRevenueTier,
   BillingUsageSnapshot,
   Invoice,
   InvoiceItem,
   PaymentAttempt,
-  PaymentProvider,
   Prisma,
   TenantBillingSubscription,
 } from '@prisma/client';
@@ -24,7 +22,7 @@ type BillingPlanForPortal = Prisma.BillingPlanGetPayload<{
 }>;
 
 export type TenantBillingPortalPaymentModeInfo = BillingPaymentRuntimeConfig & {
-  automaticBillingActive: false;
+  automaticBillingActive: boolean;
   message: string;
 };
 
@@ -240,20 +238,10 @@ export class TenantBillingPortalService {
     const runtime = this.billingPaymentGatewayService.getRuntimeConfig();
     return {
       ...runtime,
-      paymentsEnabled: false,
-      mode: this.resolveDisplayedMode(runtime.mode),
-      provider: this.resolveDisplayedProvider(runtime.provider),
       automaticBillingActive: false,
-      message: 'Cobrança automática ainda não está ativa. Nenhum gateway será chamado nesta fase.',
+      message: runtime.gatewayStatusReason
+        ?? 'Cobranca recorrente automatica nao esta habilitada neste ambiente.',
     };
-  }
-
-  private resolveDisplayedMode(mode: BillingPaymentRuntimeConfig['mode']): BillingGatewayMode | 'disabled' {
-    return process.env.BILLING_PAYMENTS_ENABLED === 'true' ? mode : 'disabled';
-  }
-
-  private resolveDisplayedProvider(provider: PaymentProvider): PaymentProvider {
-    return process.env.BILLING_PAYMENTS_ENABLED === 'true' ? provider : PaymentProvider.manual;
   }
 
   private resolvePortalWarning(source: TenantBillingStateSource, requiresPaymentMethod: boolean): string | null {

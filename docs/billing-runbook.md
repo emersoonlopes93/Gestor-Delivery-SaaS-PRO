@@ -94,6 +94,16 @@ pnpm --filter @gestor/api exec prisma migrate deploy
 
 ## Gateway e cobrança
 
+### Verdade operacional do portal (C5-A)
+
+O portal do tenant expõe três capacidades independentes:
+
+- **Tentativas de cobrança:** podem estar desativadas, disponíveis manualmente para operadores autorizados ou disponíveis somente em sandbox, conforme a configuração efetiva do gateway.
+- **Cobrança recorrente automática:** permanece desabilitada enquanto não existir executor recorrente homologado (scheduler/worker, idempotência operacional, monitoramento e tratamento de falhas).
+- **Cobrança real em produção:** permanece bloqueada nesta fase. `NODE_ENV=production` não autoriza cobrança real por si só; o conector Asaas permitido neste fluxo usa exclusivamente o endpoint sandbox.
+
+O tenant não inicia tentativas de cobrança pelo portal. Tentativas permitidas continuam sendo uma operação administrativa com RBAC, e configurações inválidas falham fechadas.
+
 ## Adesão comercial self-service
 
 O catálogo público expõe somente planos Billing V2 ativos, públicos e do tipo

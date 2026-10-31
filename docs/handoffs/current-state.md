@@ -2889,3 +2889,8 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Após o cadastro, a adesão autenticada cria no máximo uma assinatura por tenant para a oferta escolhida, registra a versão da confirmação comercial, um snapshot das faixas e a regra de faturamento vigente no histórico e na auditoria. Retry retorna a assinatura existente; troca silenciosa de plano é rejeitada.
 - Não há cobrança SaaS real, fatura, provider de produção ou enforcement global nesta fase. Planos que exigem pagamento ficam explicitamente pendentes; o texto comercial exibido não é termo jurídico final.
 - O redirecionamento entre storefront e painel nunca envia JWT na URL: o painel recebe somente e-mail pré-preenchido e retorno permitido para `/onboarding` ou `/billing/contract`. O guard permite Billing para owner ainda em onboarding, sem liberar rotas operacionais.
+# C5-A — verdade operacional do portal Billing
+
+- Branch de trabalho: `fix/billing-portal-runtime-truth`, derivada de `main-copy` em `78de28617c0920b9fd23518a556482a107c671f1`.
+- Escopo: projetar disponibilidade efetiva de tentativa manual/sandbox sem alegar automacao recorrente; cobranca real em producao permanece bloqueada.
+- Sem migration, chamadas de gateway, deploy, merge ou alteracao de regras de cobranca.
