@@ -2894,3 +2894,8 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Branch de trabalho: `fix/billing-portal-runtime-truth`, derivada de `main-copy` em `78de28617c0920b9fd23518a556482a107c671f1`.
 - Escopo: projetar disponibilidade efetiva de tentativa manual/sandbox sem alegar automacao recorrente; cobranca real em producao permanece bloqueada.
 - Sem migration, chamadas de gateway, deploy, merge ou alteracao de regras de cobranca.
+# C5-B — automação recorrente segura em sandbox
+
+- Branch: `feat/billing-c5b-recurring-orchestrator`, derivada de `main-copy` em `6a570446294288f14f0ae9e6151b644e36e383ff`.
+- Escopo: scheduler BullMQ desligado por padrão para ciclos persistidos e vencidos; tentativa automática somente em sandbox e com idempotência existente.
+- Produção, gateway live, C5-C, deploy e migrations remotas permanecem fora do escopo.

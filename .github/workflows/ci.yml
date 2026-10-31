@@ -206,6 +206,14 @@ jobs:
           --config jest.operations-integration.config.js
           --runInBand
           src/billing/billing-payment-attempt.postgres.integration-test.ts
+      - name: Test C5-B recurring billing with ephemeral PostgreSQL
+        env:
+          BILLING_AUTOMATION_ENABLED: 'true'
+          BILLING_AUTOMATION_KILL_SWITCH: 'false'
+          BILLING_PAYMENTS_ENABLED: 'true'
+          BILLING_GATEWAY_PROVIDER: mock
+          BILLING_GATEWAY_MODE: sandbox
+        run: pnpm --filter @gestor/api exec jest --config jest.operations-integration.config.js --runInBand src/billing/billing-c5b-recurring.postgres.integration-test.ts
 
       - name: Test billing seed rerun with ephemeral PostgreSQL
         run: >-
