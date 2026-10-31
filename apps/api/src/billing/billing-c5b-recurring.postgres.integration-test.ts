@@ -12,6 +12,11 @@ import { RevenueLedgerService } from './revenue-ledger.service';
 import { BillingUsageService } from './billing-usage.service';
 import { InvoiceService } from './invoice.service';
 import { BillingCycleService } from './billing-cycle.service';
+import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
+import { ManualBillingPaymentProvider } from './manual-billing-payment.provider';
+import { MockBillingPaymentProvider } from './mock-billing-payment.provider';
+import { AsaasBillingClientService } from './asaas-billing-client.service';
+import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
 
 const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgres']);
 
@@ -34,7 +39,14 @@ function createRealBillingGraph(prisma: PrismaService) {
   const ledger = new RevenueLedgerService(prisma);
   const usage = new BillingUsageService(prisma, settings, rating, ledger);
   const invoices = new InvoiceService(prisma, rating, addons);
-  return { settings, cycle: new BillingCycleService(prisma, usage, invoices, addons) };
+  const cycle = new BillingCycleService(prisma, usage, invoices, addons);
+  const gateway = new BillingPaymentGatewayService(
+    new ManualBillingPaymentProvider(),
+    new MockBillingPaymentProvider(),
+    new AsaasBillingPaymentProvider(new AsaasBillingClientService()),
+  );
+  const attempts = new BillingPaymentAttemptService(prisma, gateway);
+  return { settings, cycle, automation: new BillingRecurringAutomationService(prisma, cycle, attempts, gateway) };
 }
 
 describe('C5-B recurring billing PostgreSQL guard', () => {
@@ -146,6 +158,58 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
       if (tenantId) await prisma.tenant.deleteMany({ where: { id: tenantId } });
       if (planId) await prisma.billingPlan.deleteMany({ where: { id: planId } });
       await prisma.$disconnect();
+    }
+  }, 120_000);
+
+  it('converges two independent real workers on one eligible cycle in manual mode', async () => {
+    const workerA = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const workerB = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const reader = new PrismaService(new TenantContextService(), new EventEmitter2());
+    const graphA = createRealBillingGraph(workerA);
+    const graphB = createRealBillingGraph(workerB);
+    const token = randomUUID().slice(0, 8);
+    const periodStart = new Date('2026-05-01T00:00:00.000Z');
+    const periodEnd = new Date('2026-06-01T00:00:00.000Z');
+    const original = { enabled: process.env.BILLING_AUTOMATION_ENABLED, kill: process.env.BILLING_AUTOMATION_KILL_SWITCH, payments: process.env.BILLING_PAYMENTS_ENABLED, provider: process.env.BILLING_GATEWAY_PROVIDER, mode: process.env.BILLING_GATEWAY_MODE };
+    let tenantId: string | undefined;
+    let planId: string | undefined;
+    await Promise.all([workerA.$connect(), workerB.$connect(), reader.$connect()]);
+    try {
+      process.env.BILLING_AUTOMATION_ENABLED = 'true';
+      process.env.BILLING_AUTOMATION_KILL_SWITCH = 'false';
+      process.env.BILLING_PAYMENTS_ENABLED = 'true';
+      process.env.BILLING_GATEWAY_PROVIDER = 'manual';
+      process.env.BILLING_GATEWAY_MODE = 'manual';
+      await graphA.settings.ensureDefaultSettings();
+      const tenant = await workerA.tenant.create({ data: { name: `C5B workers ${token}`, slug: `c5b-workers-${token}` } });
+      tenantId = tenant.id;
+      const plan = await workerA.billingPlan.create({ data: { name: `C5B workers ${token}`, slug: `c5b-workers-plan-${token}`, type: 'revenue_tiered', cycleInterval: 'monthly', isActive: true, isPublic: false } });
+      planId = plan.id;
+      await workerA.billingRevenueTier.create({ data: { planId: plan.id, minRevenue: '0.00', maxRevenue: null, price: '100.00', label: 'C5B workers', sortOrder: 0 } });
+      const subscription = await workerA.tenantBillingSubscription.create({ data: { tenantId: tenant.id, billingPlanId: plan.id, status: TenantSubscriptionStatus.active, startedAt: periodStart, currentCycleStartedAt: periodStart, currentCycleEndsAt: periodEnd } });
+      await workerA.order.create({ data: { tenantId: tenant.id, orderNumber: `#c5b-workers-${token}`, status: 'completed', fulfillmentType: 'delivery', customerName: 'C5B', customerPhone: '11999999999', itemsSubtotal: '2000.00', discountTotal: '0.00', deliveryFee: '0.00', serviceFee: '0.00', total: '2000.00', sourceChannel: 'storefront', idempotencyKey: `c5b-workers-${token}`, paymentMethod: 'cash', publicTrackingToken: `c5b-workers-track-${token}`, createdAt: new Date('2026-05-10T12:00:00.000Z'), updatedAt: new Date('2026-05-10T12:00:00.000Z') } });
+      const cycle = await graphA.cycle.getOrCreateCycleForPeriod({ tenantId: tenant.id, subscriptionId: subscription.id, periodStart, periodEnd });
+      const [resultA, resultB] = await Promise.allSettled([
+        graphA.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 }),
+        graphB.automation.runBatch({ now: new Date('2026-06-02T00:00:00.000Z'), limit: 100 }),
+      ]);
+      expect(resultA.status).toBe('fulfilled');
+      expect(resultB.status).toBe('fulfilled');
+      const invoice = await reader.invoice.findFirstOrThrow({ where: { tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id } });
+      expect(await reader.billingUsageSnapshot.count({ where: { tenantId: tenant.id, cycleId: cycle.id } })).toBe(1);
+      expect(await reader.invoice.count({ where: { tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id } })).toBe(1);
+      expect(await reader.invoiceItem.count({ where: { invoiceId: invoice.id } })).toBe(1);
+      expect(await reader.paymentAttempt.count({ where: { invoiceId: invoice.id } })).toBe(0);
+      expect((await reader.billingCycleRecord.findUniqueOrThrow({ where: { id: cycle.id } })).status).toBe('invoiced');
+    } finally {
+      process.env.BILLING_AUTOMATION_ENABLED = original.enabled;
+      process.env.BILLING_AUTOMATION_KILL_SWITCH = original.kill;
+      process.env.BILLING_PAYMENTS_ENABLED = original.payments;
+      process.env.BILLING_GATEWAY_PROVIDER = original.provider;
+      process.env.BILLING_GATEWAY_MODE = original.mode;
+      if (tenantId) await workerA.tenant.deleteMany({ where: { id: tenantId } });
+      if (planId) await workerA.billingPlan.deleteMany({ where: { id: planId } });
+      await Promise.all([workerA.$disconnect(), workerB.$disconnect(), reader.$disconnect()]);
     }
   }, 120_000);
 });
