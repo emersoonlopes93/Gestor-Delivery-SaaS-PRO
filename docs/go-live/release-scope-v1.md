@@ -41,6 +41,10 @@ nao sao evidência de bloqueio P0 por si, mas nao possuem aceite V1.
   mas nao confirma pagamento. Cobranca SaaS automatica, gateway de producao e
   enforcement global continuam fora do V1 ate haver uma politica comercial e
   uma integracao de pagamento efetivamente homologadas.
+- O portal pode informar disponibilidade de tentativa manual ou sandbox, mas
+  isso nao representa cobranca recorrente automatica nem autorizacao para
+  cobranca real em producao. Essas capacidades dependem de executor,
+  provedor, conciliacao, monitoramento e gates operacionais proprios.
 
 ## Rollback e piloto
 
