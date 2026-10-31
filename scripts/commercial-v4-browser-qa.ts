@@ -10,6 +10,8 @@ const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', 'ephemeral-postgr
 const apiBase = 'http://127.0.0.1:3333/api/v1';
 const tenantUrl = 'http://127.0.0.1:5173';
 const storefrontUrl = 'http://127.0.0.1:3000';
+const storefrontOrigin = new URL(storefrontUrl).origin;
+const fallbackImagePathSuffix = '/packages/storefront-preview/src/assets/product-fallbacks/other.webp';
 const artifactDir = resolve('qa-artifacts/commercial-v4-browser');
 const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const password = `V4-${suffix}-test`;
@@ -22,8 +24,10 @@ type NetworkDiagnostic = {
   id: number;
   contextId: string;
   method: string;
+  resourceType: string;
   hostname: string;
   path: string;
+  sanitizedUrl: string;
   errorText: string;
   phase: string;
   route: string;
@@ -32,20 +36,24 @@ type NetworkDiagnostic = {
   requestFinished: boolean;
   pageContentReady: boolean;
   contentReadyEvidence: string | null;
+  fallbackImageDomEvidence: string | null;
   completedRequestId: number | null;
   visualEvidence: string | null;
 };
-type RequestTrace = Omit<NetworkDiagnostic, 'errorText' | 'pageContentReady' | 'contentReadyEvidence' | 'completedRequestId' | 'visualEvidence'> & {
+type RequestTrace = Omit<NetworkDiagnostic, 'errorText' | 'pageContentReady' | 'contentReadyEvidence' | 'fallbackImageDomEvidence' | 'completedRequestId' | 'visualEvidence'> & {
   errorText: string | null;
+  requestUrl: string;
 };
 type StorefrontProof = {
   slug: string;
   initialLoadPhases: readonly string[];
   flowCompleted: boolean;
   visualEvidence: string | null;
+  fallbackImageDomEvidence: string | null;
 };
 type PageProbe = {
   markStorefrontContentReady: (evidence: string) => void;
+  markFallbackImageLoaded: (evidence: string) => void;
   finalize: (proof?: StorefrontProof) => void;
 };
 type Report = {
@@ -56,6 +64,7 @@ type Report = {
   networkDiagnostics: NetworkDiagnostic[];
   expectedNavigationAborts: NetworkDiagnostic[];
   recoveredInitialLoadAborts: NetworkDiagnostic[];
+  recoveredFallbackImageAborts: NetworkDiagnostic[];
   unexpectedNetworkFailures: number;
 };
 
@@ -92,12 +101,13 @@ async function activation(token?: string): Promise<Response> {
 
 let nextPageId = 1;
 
-function classifyFailedTrace(trace: RequestTrace, traces: readonly RequestTrace[], proof: StorefrontProof | undefined, contentReadyEvidence: string | null): { kind: 'recovered-initial-load' | 'expected-navigation' | 'unexpected'; completed: RequestTrace | null } {
+function classifyFailedTrace(trace: RequestTrace, traces: readonly RequestTrace[], proof: StorefrontProof | undefined, contentReadyEvidence: string | null): { kind: 'recovered-initial-load' | 'recovered-fallback-image' | 'expected-navigation' | 'unexpected'; completed: RequestTrace | null } {
   const apiHost = new URL(apiBase).hostname;
   const expectedPath = proof ? `/api/v1/public/storefront/${proof.slug}` : '';
   const completed = traces.find((candidate) =>
     candidate.id !== trace.id &&
     candidate.contextId === trace.contextId &&
+    candidate.requestUrl === trace.requestUrl &&
     candidate.method === trace.method &&
     candidate.hostname === trace.hostname &&
     candidate.path === trace.path &&
@@ -114,6 +124,19 @@ function classifyFailedTrace(trace: RequestTrace, traces: readonly RequestTrace[
   );
   if (isStorefrontInitialLoad && completed && contentReadyEvidence && proof?.flowCompleted) {
     return { kind: 'recovered-initial-load', completed };
+  }
+  const isKnownFallbackImage = Boolean(
+    proof &&
+    trace.method === 'GET' &&
+    trace.resourceType === 'image' &&
+    trace.errorText === 'net::ERR_ABORTED' &&
+    trace.sanitizedUrl.startsWith(`${storefrontOrigin}/@fs/`) &&
+    trace.path.endsWith(fallbackImagePathSuffix) &&
+    proof.fallbackImageDomEvidence === `fallback-image-loaded:${trace.sanitizedUrl}` &&
+    proof.flowCompleted,
+  );
+  if (isKnownFallbackImage && completed) {
+    return { kind: 'recovered-fallback-image', completed };
   }
   const isExpectedNavigation = Boolean(
     proof &&
@@ -132,6 +155,7 @@ function collect(page: Page, report: Report, currentPhase: () => string): PagePr
   const requests = new WeakMap<object, RequestTrace>();
   const traces: RequestTrace[] = [];
   let contentReadyEvidence: string | null = null;
+  let fallbackImageDomEvidence: string | null = null;
   let nextId = 1;
   const startedAt = Date.now();
   page.on('console', (message) => {
@@ -145,14 +169,17 @@ function collect(page: Page, report: Report, currentPhase: () => string): PagePr
         id: nextId++,
         contextId,
         method: request.method(),
+        resourceType: request.resourceType(),
         hostname: url.hostname,
         path: url.pathname,
+        sanitizedUrl: `${url.origin}${url.pathname}`,
         phase: currentPhase(),
         route: new URL(page.url()).pathname,
         timestampMs: Date.now() - startedAt,
         responseStatus: null,
         requestFinished: false,
         errorText: null,
+        requestUrl: request.url(),
       };
       requests.set(request, trace);
       traces.push(trace);
@@ -181,6 +208,9 @@ function collect(page: Page, report: Report, currentPhase: () => string): PagePr
     markStorefrontContentReady(evidence: string): void {
       contentReadyEvidence = evidence;
     },
+    markFallbackImageLoaded(evidence: string): void {
+      fallbackImageDomEvidence = evidence;
+    },
     finalize(proof?: StorefrontProof): void {
       for (const trace of traces.filter((candidate) => candidate.errorText !== null)) {
         const classification = classifyFailedTrace(trace, traces, proof, contentReadyEvidence);
@@ -189,12 +219,15 @@ function collect(page: Page, report: Report, currentPhase: () => string): PagePr
           errorText: trace.errorText ?? 'UNKNOWN',
           pageContentReady: contentReadyEvidence !== null,
           contentReadyEvidence,
+          fallbackImageDomEvidence,
           completedRequestId: classification.completed?.id ?? null,
           visualEvidence: proof?.visualEvidence ?? null,
         };
         report.networkDiagnostics.push(diagnostic);
         if (classification.kind === 'recovered-initial-load') {
           report.recoveredInitialLoadAborts.push(diagnostic);
+        } else if (classification.kind === 'recovered-fallback-image') {
+          report.recoveredFallbackImageAborts.push(diagnostic);
         } else if (classification.kind === 'expected-navigation') {
           report.expectedNavigationAborts.push(diagnostic);
         } else {
@@ -207,9 +240,9 @@ function collect(page: Page, report: Report, currentPhase: () => string): PagePr
 }
 
 function runNetworkProbeSelfCheck(): void {
-  const completed: RequestTrace = { id: 2, contextId: 'page-a', method: 'GET', hostname: '127.0.0.1', path: '/api/v1/public/storefront/a', phase: 'storefront-initial-load', route: '/a', timestampMs: 2, responseStatus: 200, requestFinished: true, errorText: null };
+  const completed: RequestTrace = { id: 2, contextId: 'page-a', method: 'GET', resourceType: 'fetch', hostname: '127.0.0.1', path: '/api/v1/public/storefront/a', sanitizedUrl: 'http://127.0.0.1:3333/api/v1/public/storefront/a', phase: 'storefront-initial-load', route: '/a', timestampMs: 2, responseStatus: 200, requestFinished: true, errorText: null, requestUrl: 'http://127.0.0.1:3333/api/v1/public/storefront/a' };
   const aborted: RequestTrace = { ...completed, id: 1, errorText: 'net::ERR_ABORTED', requestFinished: false };
-  const proof: StorefrontProof = { slug: 'a', initialLoadPhases: ['storefront-initial-load'], flowCompleted: true, visualEvidence: 'product-visible' };
+  const proof: StorefrontProof = { slug: 'a', initialLoadPhases: ['storefront-initial-load'], flowCompleted: true, visualEvidence: 'product-visible', fallbackImageDomEvidence: null };
   assert.equal(classifyFailedTrace(aborted, [aborted, completed], proof, 'product-visible').kind, 'recovered-initial-load');
   assert.equal(classifyFailedTrace(aborted, [aborted, { ...completed, requestFinished: false }], proof, 'product-visible').kind, 'unexpected');
   assert.equal(classifyFailedTrace(aborted, [aborted, { ...completed, contextId: 'page-b' }], proof, 'product-visible').kind, 'unexpected');
@@ -217,7 +250,36 @@ function runNetworkProbeSelfCheck(): void {
   assert.equal(classifyFailedTrace(aborted, [aborted, completed], proof, null).kind, 'unexpected');
   assert.equal(classifyFailedTrace({ ...aborted, method: 'POST' }, [aborted, completed], proof, 'product-visible').kind, 'unexpected');
   assert.equal(classifyFailedTrace({ ...aborted, hostname: 'other-host' }, [aborted, completed], proof, 'product-visible').kind, 'unexpected');
+  const fallbackUrl = `${storefrontOrigin}/@fs/workspace${fallbackImagePathSuffix}`;
+  const fallbackCompleted: RequestTrace = { ...completed, id: 4, resourceType: 'image', path: `/@fs/workspace${fallbackImagePathSuffix}`, sanitizedUrl: fallbackUrl, requestUrl: fallbackUrl };
+  const fallbackAborted: RequestTrace = { ...fallbackCompleted, id: 3, requestFinished: false, errorText: 'net::ERR_ABORTED' };
+  const fallbackProof: StorefrontProof = { ...proof, fallbackImageDomEvidence: `fallback-image-loaded:${fallbackUrl}` };
+  assert.equal(classifyFailedTrace(fallbackAborted, [fallbackAborted, fallbackCompleted], fallbackProof, 'product-visible').kind, 'recovered-fallback-image');
+  assert.equal(classifyFailedTrace(fallbackAborted, [fallbackAborted, { ...fallbackCompleted, requestFinished: false }], fallbackProof, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace(fallbackAborted, [fallbackAborted, fallbackCompleted], { ...fallbackProof, fallbackImageDomEvidence: null }, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace(fallbackAborted, [fallbackAborted, { ...fallbackCompleted, contextId: 'page-b' }], fallbackProof, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace(fallbackAborted, [fallbackAborted, { ...fallbackCompleted, path: '/@fs/workspace/packages/storefront-preview/src/assets/product-fallbacks/acai.webp', sanitizedUrl: `${storefrontOrigin}/@fs/workspace/packages/storefront-preview/src/assets/product-fallbacks/acai.webp`, requestUrl: `${storefrontOrigin}/@fs/workspace/packages/storefront-preview/src/assets/product-fallbacks/acai.webp` }], fallbackProof, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace({ ...fallbackAborted, resourceType: 'fetch' }, [fallbackAborted, fallbackCompleted], fallbackProof, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace({ ...fallbackAborted, method: 'POST' }, [fallbackAborted, fallbackCompleted], fallbackProof, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace({ ...fallbackAborted, errorText: 'net::ERR_FAILED' }, [fallbackAborted, fallbackCompleted], fallbackProof, 'product-visible').kind, 'unexpected');
+  assert.equal(classifyFailedTrace({ ...fallbackAborted, responseStatus: 404 }, [fallbackAborted, { ...fallbackCompleted, responseStatus: 404 }], fallbackProof, 'product-visible').kind, 'unexpected');
   console.log('COMMERCIAL_V4_NETWORK_PROBE_SELF_CHECK_PASS');
+}
+
+async function waitForFallbackImage(page: Page, categorySlug: string, productName: string): Promise<string> {
+  const image = page.locator(`#${categorySlug}`).getByAltText(productName, { exact: true });
+  await image.waitFor({ state: 'visible', timeout: 15_000 });
+  const source = await page.waitForFunction(
+    ({ selector, expectedOrigin, expectedSuffix }) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLImageElement) || !element.complete || element.naturalWidth <= 0) return null;
+      const resolved = new URL(element.currentSrc || element.src, window.location.href);
+      return resolved.origin === expectedOrigin && resolved.pathname.endsWith(expectedSuffix) ? resolved.href : null;
+    },
+    { selector: `#${categorySlug} img[alt="${productName}"]`, expectedOrigin: storefrontOrigin, expectedSuffix: fallbackImagePathSuffix },
+    { timeout: 15_000 },
+  );
+  return await source.jsonValue() as string;
 }
 
 async function screenshot(page: Page, report: Report, name: string): Promise<void> {
@@ -300,11 +362,15 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
   const page = await context.newPage();
   const probe = collect(page, report, () => phase);
+  let fallbackImageDomEvidence: string | null = null;
   try {
     await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
     const productCard = page.locator(`#${fixture.categorySlug}`).getByText(`Produto QA pickup`, { exact: true });
     await productCard.waitFor({ timeout: 15_000 });
+    const fallbackImageUrl = await waitForFallbackImage(page, fixture.categorySlug, 'Produto QA pickup');
     probe.markStorefrontContentReady(`product-visible:#${fixture.categorySlug}:Produto QA pickup`);
+    fallbackImageDomEvidence = `fallback-image-loaded:${fallbackImageUrl}`;
+    probe.markFallbackImageLoaded(fallbackImageDomEvidence);
     await productCard.click();
     await page.locator('#product-details-title').waitFor({ timeout: 15_000 });
     const productDialog = page.locator('[role="dialog"][aria-labelledby="product-details-title"]');
@@ -336,6 +402,7 @@ async function createPickupOrder(browser: Awaited<ReturnType<typeof chromium.lau
       initialLoadPhases: ['storefront-initial-load'],
       flowCompleted: phase === 'checkout-confirmed',
       visualEvidence: `storefront-pickup-order-confirmation-${mobile ? 'mobile' : 'desktop'}.png`,
+      fallbackImageDomEvidence,
     });
     await context.close();
   }
@@ -347,11 +414,15 @@ async function runDeliveryOnlyBrowser(browser: Awaited<ReturnType<typeof chromiu
   const phase = `delivery-only-${mobile ? 'mobile' : 'desktop'}`;
   const probe = collect(page, report, () => phase);
   let deliveryFlowCompleted = false;
+  let fallbackImageDomEvidence: string | null = null;
   try {
     await page.goto(`${storefrontUrl}/${fixture.slug}`, { waitUntil: 'domcontentloaded' });
     const productCard = page.locator(`#${fixture.categorySlug}`).getByText('Produto QA delivery', { exact: true });
     await productCard.waitFor({ timeout: 15_000 });
+    const fallbackImageUrl = await waitForFallbackImage(page, fixture.categorySlug, 'Produto QA delivery');
     probe.markStorefrontContentReady(`product-visible:#${fixture.categorySlug}:Produto QA delivery`);
+    fallbackImageDomEvidence = `fallback-image-loaded:${fallbackImageUrl}`;
+    probe.markFallbackImageLoaded(fallbackImageDomEvidence);
     await productCard.click();
     await page.locator('#product-details-title').waitFor({ timeout: 15_000 });
     const productDialog = page.locator('[role="dialog"][aria-labelledby="product-details-title"]');
@@ -372,6 +443,7 @@ async function runDeliveryOnlyBrowser(browser: Awaited<ReturnType<typeof chromiu
       initialLoadPhases: [phase],
       flowCompleted: deliveryFlowCompleted,
       visualEvidence: `storefront-delivery-only-${mobile ? 'mobile' : 'desktop'}.png`,
+      fallbackImageDomEvidence,
     });
     await context.close();
   }
@@ -390,6 +462,7 @@ async function main(): Promise<void> {
     networkDiagnostics: [],
     expectedNavigationAborts: [],
     recoveredInitialLoadAborts: [],
+    recoveredFallbackImageAborts: [],
     unexpectedNetworkFailures: 0,
   };
   const tenantIds: string[] = [];
@@ -448,7 +521,7 @@ async function main(): Promise<void> {
   } finally {
     try {
       await writeFile(join(artifactDir, 'report.json'), JSON.stringify(report, null, 2));
-      await writeFile(join(artifactDir, 'report.md'), `# Commercial V4 browser QA\n\nQA_RESULT: ${report.qaResult}\n\n${Object.entries(report.scenarios).map(([name, status]) => `- ${name}: ${status}`).join('\n')}\n\nExpected navigation aborts: ${report.expectedNavigationAborts.length}\nRecovered initial-load aborts: ${report.recoveredInitialLoadAborts.length}\nUnexpected network failures: ${report.unexpectedNetworkFailures}\n\n## Network diagnostics\n${report.networkDiagnostics.map((diagnostic) => `- ${diagnostic.contextId} request=${diagnostic.id} completed=${diagnostic.completedRequestId ?? 'none'} ${diagnostic.method} ${diagnostic.path} ${diagnostic.errorText}; phase=${diagnostic.phase}; response=${diagnostic.responseStatus ?? 'none'}; finished=${diagnostic.requestFinished}; dom=${diagnostic.pageContentReady}; evidence=${diagnostic.contentReadyEvidence ?? 'none'}; visual=${diagnostic.visualEvidence ?? 'none'}`).join('\n') || '- none'}\n`);
+      await writeFile(join(artifactDir, 'report.md'), `# Commercial V4 browser QA\n\nQA_RESULT: ${report.qaResult}\n\n${Object.entries(report.scenarios).map(([name, status]) => `- ${name}: ${status}`).join('\n')}\n\nExpected navigation aborts: ${report.expectedNavigationAborts.length}\nRecovered initial-load aborts: ${report.recoveredInitialLoadAborts.length}\nRecovered fallback-image aborts: ${report.recoveredFallbackImageAborts.length}\nUnexpected network failures: ${report.unexpectedNetworkFailures}\n\n## Network diagnostics\n${report.networkDiagnostics.map((diagnostic) => `- ${diagnostic.contextId} request=${diagnostic.id} completed=${diagnostic.completedRequestId ?? 'none'} ${diagnostic.method} ${diagnostic.resourceType} ${diagnostic.sanitizedUrl} ${diagnostic.errorText}; phase=${diagnostic.phase}; response=${diagnostic.responseStatus ?? 'none'}; finished=${diagnostic.requestFinished}; productDom=${diagnostic.pageContentReady}; fallbackDom=${diagnostic.fallbackImageDomEvidence ?? 'none'}; visual=${diagnostic.visualEvidence ?? 'none'}`).join('\n') || '- none'}\n`);
     } finally {
       await browser.close();
       if (tenantIds.length) await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
