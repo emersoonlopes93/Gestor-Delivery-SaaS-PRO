@@ -6,6 +6,8 @@ import { SetupWizard } from './SetupWizard';
 import { useDashboardOverview } from './useDashboardOverview';
 import { DashboardSkeleton } from './components/DashboardSkeleton';
 import { OperationsDashboard } from './components/OperationsDashboard';
+import { buildStorefrontUrl, resolveStorefrontBaseUrl } from '../../lib/storefront-url';
+import { StoreActivationCard } from './components/StoreActivationCard';
 
 export const DASHBOARD_ACTION_MENU_ITEM_CLASS = 'block rounded-lg px-3 py-2 font-semibold transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring dark:hover:bg-slate-800';
 export const DASHBOARD_ACTION_MENU_DISABLED_CLASS = 'block w-full rounded-lg px-3 py-2 text-left font-semibold transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-70 dark:hover:bg-slate-800 dark:disabled:text-slate-400';
@@ -19,21 +21,14 @@ function greeting(now = new Date()) {
   return 'Boa noite';
 }
 
-function deriveStorefrontBaseUrl() {
-  const envBase = (import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined)?.trim();
-  if (envBase) return envBase.replace(/\/+$/, '');
-  const { origin, hostname } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') return origin.replace('5173', '3000');
-  if (hostname.startsWith('app-')) return origin.replace('app-', '');
-  if (hostname.startsWith('app.')) return origin.replace('app.', '');
-  return origin.replace('tenant', 'storefront');
-}
-
 export function DashboardPage() {
   const overview = useDashboardOverview('today');
   const [actionsOpen, setActionsOpen] = useState(false);
   const firstName = overview.user?.name?.trim().split(/\s+/)[0] || 'operador';
-  const menuUrl = useMemo(() => overview.tenant?.slug ? `${deriveStorefrontBaseUrl()}/${overview.tenant.slug}` : '', [overview.tenant?.slug]);
+  const menuUrl = useMemo(() => buildStorefrontUrl(
+    resolveStorefrontBaseUrl(window.location, import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined),
+    overview.tenant?.slug,
+  ) ?? '', [overview.tenant?.slug]);
 
   const copyMenu = async () => {
     if (!menuUrl) return;
@@ -106,6 +101,18 @@ export function DashboardPage() {
           hasProducts={overview.setup.hasProducts}
         />
       )}
+
+      {overview.activation ? (
+        <StoreActivationCard
+          activation={overview.activation}
+          publicUrl={menuUrl || null}
+          onCopy={() => void copyMenu()}
+        />
+      ) : overview.hasActivationError ? (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-200">
+          Não foi possível verificar a ativação da loja agora. Os dados operacionais continuam disponíveis.
+        </div>
+      ) : null}
 
       {overview.isLoading ? <DashboardSkeleton /> : overview.hasOperationalError ? (
         <section className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-card">

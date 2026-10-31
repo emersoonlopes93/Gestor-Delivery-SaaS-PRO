@@ -1,12 +1,14 @@
 import { ShieldCheck } from 'lucide-react';
 import { useStorefrontConsent } from './consent-context';
+import { useCartStore } from '../../store/use-cart-store';
 
 export function ConsentFooterAction() {
   const { openPreferences } = useStorefrontConsent();
+  const hasCartItems = useCartStore((state) => state.items.length > 0);
 
   return (
-    <footer className="relative z-10 w-full border-t border-[var(--storefront-border)] bg-[var(--storefront-background)]">
-      <div className="mx-auto flex w-full max-w-4xl justify-center px-4 py-5">
+    <footer className="relative z-0 w-full border-t border-[var(--storefront-border)] bg-[var(--storefront-background)]">
+      <div className={`mx-auto flex w-full max-w-4xl justify-center px-4 py-5${hasCartItems ? ' pb-28' : ''}`}>
         <button
           type="button"
           onClick={openPreferences}

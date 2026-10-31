@@ -20,6 +20,7 @@ import { addNativeNotificationClickListener } from '../lib/native-notifications'
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { OrderAlertTopbarButton } from '../features/orders/v2/OrderAlertTopbarButton';
 import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
+import { buildStorefrontUrl, resolveStorefrontBaseUrl } from '../lib/storefront-url';
 import { filterSidebarNavigation, getActiveSidebarGroupId, getBreadcrumbMetadata, getSidebarNavigation } from '../navigation/navigationRegistry';
 import type { SidebarNavigationGroup, SidebarNavigationItem } from '../navigation/navigation.types';
 
@@ -341,41 +342,14 @@ export function AppLayout() {
     canReadCustomers ? '/customers' : null,
   ].filter((destination): destination is string => destination !== null);
   const tenantSlug = user?.tenant?.slug;
-  const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
+  const publicMenuUrl = buildStorefrontUrl(storefrontBaseUrl, tenantSlug) ?? '';
 
   useEffect(() => {
-    const envBase = (import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined)?.trim();
-    if (envBase) {
-      setStorefrontBaseUrl(envBase.replace(/\/+$/, ''));
-      return;
-    }
-
-    const { hostname, origin } = window.location;
-
-    // Capacitor/Android: hostname Ã© 'capacitor://localhost', nÃ£o fazer parsing
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('capacitor://')) {
-      // Em Capacitor ou localhost, usar variÃ¡vel de ambiente ou fallback seguro
-      // Se nÃ£o tiver VITE_STOREFRONT_BASE_URL configurado, usar a mesma origem da API
-      const apiBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-      if (apiBase && !apiBase.startsWith('/')) {
-        // Extrair origin da API URL (removendo /api/v1 ou similar)
-        const apiOrigin = apiBase.replace(/\/api\/v\d+.*$/, '');
-        setStorefrontBaseUrl(apiOrigin);
-        return;
-      }
-      // Fallback final: nÃ£o definir storefrontBaseUrl em Capacitor sem config
-      setStorefrontBaseUrl('');
-      return;
-    }
-
-    // Production fallback: same origin. Dev fallback: common storefront port.
-    if (hostname.startsWith('app-')) {
-      setStorefrontBaseUrl(origin.replace('app-', ''));
-    } else if (hostname.startsWith('app.')) {
-      setStorefrontBaseUrl(origin.replace('app.', ''));
-    } else {
-      setStorefrontBaseUrl(origin.replace('tenant', 'storefront'));
-    }
+    const envBase = resolveStorefrontBaseUrl(
+      window.location,
+      import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined,
+    );
+    setStorefrontBaseUrl(envBase ?? '');
   }, []);
 
   const groups = useMemo(() => {

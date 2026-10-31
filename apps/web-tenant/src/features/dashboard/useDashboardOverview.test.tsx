@@ -59,6 +59,18 @@ function response<T>(data: T): ApiResponse<T> {
 function mockRequests() {
   return vi.spyOn(api, 'get').mockImplementation(async <T,>(endpoint: string): Promise<ApiResponse<T>> => {
     if (endpoint === '/tenant/me') return response(tenant) as ApiResponse<T>;
+    if (endpoint === '/tenant/activation-status') return response({
+      onboardingCompleted: true,
+      operationallyReady: true,
+      acceptingOrdersNow: true,
+      storefrontAccessible: true,
+      storefrontSlug: 'loja-a',
+      sellableProductCount: 1,
+      reasons: [],
+      storeStatus: { isOpen: true, reason: 'OPEN', message: 'Aberto agora' },
+      firstStorefrontOrder: null,
+      firstCompletedStorefrontOrder: null,
+    }) as ApiResponse<T>;
     if (endpoint.startsWith('/dashboard/operational?')) return response(snapshot) as ApiResponse<T>;
     throw new Error(`Unexpected dashboard request: ${endpoint}`);
   });

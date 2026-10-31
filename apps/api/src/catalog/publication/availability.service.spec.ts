@@ -39,3 +39,45 @@ describe('AvailabilityService category active days', () => {
     expect(productDecision.get('product-1')).toMatchObject({ canSell: false, reason: 'PRODUCT_INACTIVE' });
   });
 });
+
+describe('AvailabilityService operational channel configuration', () => {
+  function createService(input: { pickupEnabled: boolean; paymentMethods: unknown; deliveryCoverage: unknown }) {
+    const prisma = {
+      tenantSettings: {
+        findUnique: jest.fn().mockResolvedValue({
+          isStorePaused: false,
+          timezone: 'America/Sao_Paulo',
+          street: 'Rua A',
+          number: '1',
+          neighborhood: 'Centro',
+          zipCode: '01000-000',
+          pickupEnabled: input.pickupEnabled,
+          paymentMethods: input.paymentMethods,
+        }),
+      },
+      deliveryCoverageConfig: { findUnique: jest.fn().mockResolvedValue(input.deliveryCoverage) },
+      tenantOperatingHours: {
+        findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 1, isOpen: true, openTime: '00:00', closeTime: '23:59' }]),
+      },
+    };
+    return new AvailabilityService(prisma as never);
+  }
+
+  it('keeps a pickup-only store with cash or card available without a Pix key', async () => {
+    const status = await createService({ pickupEnabled: true, paymentMethods: ['cash', 'credit_card'], deliveryCoverage: null })
+      .getStoreStatus('tenant-1', new Date('2026-08-03T12:00:00.000Z'));
+
+    expect(status.reason).not.toBe('CONFIG_PENDING');
+  });
+
+  it('still blocks a store without an accepted payment method or fulfillment mode', async () => {
+    const status = await createService({ pickupEnabled: false, paymentMethods: [], deliveryCoverage: null })
+      .getStoreStatus('tenant-1', new Date('2026-08-03T12:00:00.000Z'));
+
+    expect(status).toMatchObject({ isOpen: false, reason: 'CONFIG_PENDING' });
+    expect(status.missingRequirements).toEqual(expect.arrayContaining([
+      'PAYMENT_METHOD_MISSING',
+      'FULFILLMENT_METHOD_MISSING',
+    ]));
+  });
+});

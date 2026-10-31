@@ -15,10 +15,14 @@ describe('TenantController branch creation capability', () => {
         message: 'A criação de novas filiais está temporariamente indisponível.',
       }),
     };
+    const tenantActivationService = {
+      getStatus: jest.fn(),
+    };
     const controller = new TenantController(
       tenantService as never,
       {} as never,
       {} as never,
+      tenantActivationService as never,
       featureControlService as never,
     );
 

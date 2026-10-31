@@ -6,6 +6,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
+import { TenantActivationService } from './tenant-activation.service';
 import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 import { FeatureControlService } from '../feature-control/feature-control.service';
 import { redactFinancialSecrets } from '../payment-foundation/payment-secret-redaction';
@@ -17,6 +18,7 @@ export class TenantController {
     private readonly tenantService: TenantService,
     private readonly onboardingService: OnboardingService,
     private readonly readinessScoreService: ReadinessScoreService,
+    private readonly tenantActivationService: TenantActivationService,
     private readonly featureControlService: FeatureControlService,
   ) {}
 
@@ -146,7 +148,7 @@ export class TenantController {
   @Patch('onboarding-step')
   async updateOnboardingStep(
     @CurrentTenant() tenantId: string,
-    @Body() body: { step: 'basicInfo' | 'operatingHours' | 'logo' | 'address' | 'delivery' | 'payments' | 'whatsapp' | 'menu' | 'catalog' | 'firstOrder'; completed?: boolean },
+    @Body() body: { step: 'basicInfo' | 'operatingHours' | 'logo' | 'address' | 'delivery' | 'payments' | 'whatsapp' | 'menu' | 'catalog'; completed?: boolean },
   ) {
     return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
   }
@@ -193,6 +195,16 @@ export class TenantController {
   @RequirePermissions('dashboard.view')
   async getReadinessScore(@CurrentTenant() tenantId: string) {
     return this.readinessScoreService.calculate(tenantId);
+  }
+
+  /**
+   * Read-only composition of existing onboarding, availability and Order data.
+   * It never opens a store, changes billing, or writes onboarding milestones.
+   */
+  @Get('activation-status')
+  @RequirePermissions('dashboard.view')
+  async getActivationStatus(@CurrentTenant() tenantId: string) {
+    return this.tenantActivationService.getStatus(tenantId);
   }
 
   /**
