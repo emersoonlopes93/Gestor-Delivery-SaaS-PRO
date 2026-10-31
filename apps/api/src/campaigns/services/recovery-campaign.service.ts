@@ -64,7 +64,11 @@ export class RecoveryCampaignService {
       where: {
         tenantId,
         lastOrderDate: { lte: dateLimit },
-        id: { notIn: optedOutCustomers.map((optOut) => optOut.customerId) },
+        id: {
+          notIn: optedOutCustomers
+            .map((optOut) => optOut.customerId)
+            .filter((customerId): customerId is string => Boolean(customerId)),
+        },
       },
     });
   }

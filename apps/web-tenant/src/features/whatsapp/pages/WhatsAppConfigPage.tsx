@@ -274,21 +274,6 @@ export function WhatsAppConfigPage() {
     },
   });
 
-  const devResetMutation = useMutation({
-    mutationFn: async () => {
-      await api.post('/whatsapp/instance/dev-reset');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-instance'] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
-      setQrCode(null);
-      toast.success('Instância resetada com sucesso.');
-    },
-    onError: () => {
-      toast.error('Erro ao resetar instância.');
-    }
-  });
-
   const [formAi, setFormAi] = useState<AiAgentConfig | null>(null);
 
   useEffect(() => {
@@ -429,13 +414,6 @@ export function WhatsAppConfigPage() {
                             className="px-4 py-2 bg-status-success/10 text-status-success border border-status-success/20 hover:bg-status-success/20 rounded-lg text-sm font-medium transition-colors"
                           >
                             {connectMutation.isPending ? 'Conectando...' : 'Conectar'}
-                          </button>
-                          <button 
-                            onClick={() => devResetMutation.mutate()}
-                            disabled={devResetMutation.isPending}
-                            className="px-4 py-2 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 rounded-lg text-sm font-medium transition-colors"
-                          >
-                            {devResetMutation.isPending ? 'Resetando...' : 'Reset Sessão'}
                           </button>
                         </div>
                       )}

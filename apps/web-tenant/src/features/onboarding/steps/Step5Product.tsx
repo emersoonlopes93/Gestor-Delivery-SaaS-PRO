@@ -5,6 +5,7 @@ import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import { Step5ImportMenu } from './Step5ImportMenu';
 
 import { CurrencyInput } from '@gestor/ui';
+import { useTenantCapabilities } from '../../../hooks/useTenantCapabilities';
 
 interface ProductCategory {
   id: string;
@@ -32,6 +33,7 @@ interface ProductDraft {
 interface Step5Props {
   onNext: (saveFn: () => Promise<void>) => void;
   onPrev: () => void;
+  onSkip: () => void;
   onMarkValid: (valid: boolean) => void;
 }
 
@@ -47,7 +49,9 @@ const EMPTY_DRAFT: ProductDraft = {
 
 type ImportMode = 'choose' | 'manual';
 
-export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
+export function Step5Product({ onNext, onPrev, onSkip, onMarkValid }: Step5Props) {
+  const { capabilities, isLoading: capabilitiesLoading } = useTenantCapabilities();
+  const baseMenuImportEnabled = capabilities?.actions?.['baseMenu.import']?.enabled === true;
   const [products, setProducts] = useState<MinProduct[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
@@ -55,6 +59,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
   const [imagePicker, setImagePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [formError, setFormError] = useState<string | null>(null);
   // 'choose' = tela de importação | 'manual' = form manual
   const [importMode, setImportMode] = useState<ImportMode>('choose');
 
@@ -95,24 +100,47 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
   };
 
   const handleCreateProduct = async () => {
-    if (!draft.name.trim()) { alert('Informe o nome do produto.'); return; }
-    if (!draft.basePrice || draft.basePrice <= 0) { alert('Informe um preço válido.'); return; }
+    if (!draft.name.trim()) {
+      setFormError('Informe o nome do produto.');
+      return;
+    }
+    if (!draft.basePrice || draft.basePrice <= 0) {
+      setFormError('Informe um preço válido.');
+      return;
+    }
+    const creatingCategory = draft.categoryId === '__new__' || categories.length === 0;
+    if ((!draft.categoryId && !draft.newCategoryName.trim()) || (creatingCategory && !draft.newCategoryName.trim())) {
+      setFormError('Informe o nome da nova categoria ou selecione uma categoria existente.');
+      return;
+    }
 
     setSaving(true);
+    setFormError(null);
     try {
-      let categoryId = draft.categoryId;
+      let categoryId = draft.categoryId === '__new__' ? '' : draft.categoryId;
 
       // Create new category if needed
       if (!categoryId && draft.newCategoryName.trim()) {
-        const catRes = await api.post<{ id: string }>('/catalog/categories', {
-          name: draft.newCategoryName.trim(),
-          isActive: true,
-          order: 0,
-        });
-        if (catRes.success) {
-          categoryId = catRes.data.id;
-          setCategories(prev => [...prev, { id: catRes.data.id, name: draft.newCategoryName.trim() }]);
+        const requestedName = draft.newCategoryName.trim();
+        const existingCategory = categories.find((category) => category.name.trim().localeCompare(requestedName, undefined, { sensitivity: 'accent' }) === 0);
+        if (existingCategory) {
+          categoryId = existingCategory.id;
+        } else {
+          const catRes = await api.post<{ id: string }>('/catalog/categories', {
+            name: requestedName,
+            isActive: true,
+            order: 0,
+          });
+          if (catRes.success) {
+            categoryId = catRes.data.id;
+            setCategories(prev => [...prev, { id: catRes.data.id, name: requestedName }]);
+          } else {
+            throw new Error('Não foi possível criar a categoria.');
+          }
         }
+        // A retry after a product failure must reuse this category instead of
+        // issuing another create request, including after a data reload.
+        setDraft(current => ({ ...current, categoryId, newCategoryName: '' }));
       }
 
       const res = await api.post<{ id: string; name: string; basePrice: number }>('/catalog/products', {
@@ -139,8 +167,8 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
         setDraft(EMPTY_DRAFT);
         setShowForm(false);
       }
-    } catch (err) {
-      alert('Erro ao criar produto. Verifique os dados e tente novamente.');
+    } catch {
+      setFormError('Não foi possível salvar o produto. Revise os dados e tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -148,17 +176,17 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
 
   const handleNext = () => {
     if (products.length === 0) {
-      alert('Crie pelo menos 1 produto para continuar.');
+      setFormError('Crie pelo menos um produto ativo para continuar.');
       return;
     }
     onNext(async () => { /* products already saved individually */ });
   };
 
-  const handleSkip = () => {
-    onNext(async () => { /* skip without creating */ });
-  };
+  // Skipping advances only the local wizard. Catalog completion remains the
+  // server's responsibility after it can observe an active product.
+  const handleSkip = () => onSkip();
 
-  if (loading) {
+  if (loading || capabilitiesLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
@@ -167,7 +195,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
   }
 
   // ── Modo: Importação ──────────────────────────────────────────────────────
-  if (importMode === 'choose') {
+  if (importMode === 'choose' && baseMenuImportEnabled) {
     return (
       <Step5ImportMenu
         onImportComplete={async () => {
@@ -179,9 +207,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
           setImportMode('manual');
           setShowForm(true);
         }}
-        onSkipCompletely={() => {
-          onNext(async () => {});
-        }}
+        onSkipCompletely={handleSkip}
       />
     );
   }
@@ -194,7 +220,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
         </div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white">Produtos Iniciais</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Adicione pelo menos 1 produto ao seu cardápio
+          Comece com um produto simples. Pizzas, combos e opções avançadas continuam no catálogo completo.
         </p>
       </div>
 
@@ -226,7 +252,8 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
       {/* Add Product Form */}
       {showForm ? (
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 space-y-4">
-          <p className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Novo Produto</p>
+          <p className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Produto simples</p>
+          {formError ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300">{formError}</p> : null}
 
           {/* Image */}
           <div className="flex items-center gap-4">
@@ -254,7 +281,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
             <input
               type="text"
               value={draft.name}
-              onChange={e => setDraft(f => ({ ...f, name: e.target.value }))}
+              onChange={e => { setDraft(f => ({ ...f, name: e.target.value })); setFormError(null); }}
               placeholder="Ex: X-Bacon, Pizza Margherita..."
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
             />
@@ -265,7 +292,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
             <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">Preço (R$) *</label>
             <CurrencyInput
               value={draft.basePrice}
-              onChange={val => setDraft(f => ({ ...f, basePrice: val }))}
+              onChange={val => { setDraft(f => ({ ...f, basePrice: val })); setFormError(null); }}
               placeholder="R$ 0,00"
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
             />
@@ -289,7 +316,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
             {categories.length > 0 ? (
               <select
                 value={draft.categoryId}
-                onChange={e => setDraft(f => ({ ...f, categoryId: e.target.value, newCategoryName: '' }))}
+                onChange={e => { setDraft(f => ({ ...f, categoryId: e.target.value, newCategoryName: '' })); setFormError(null); }}
                 className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
               >
                 <option value="">Selecionar categoria existente</option>
@@ -300,7 +327,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
               <input
                 type="text"
                 value={draft.newCategoryName}
-                onChange={e => setDraft(f => ({ ...f, newCategoryName: e.target.value, categoryId: '' }))}
+                onChange={e => { setDraft(f => ({ ...f, newCategoryName: e.target.value, categoryId: '' })); setFormError(null); }}
                 placeholder="Nome da categoria (ex: Lanches, Bebidas...)"
                 className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
               />
@@ -309,7 +336,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
               <input
                 type="text"
                 value={draft.newCategoryName}
-                onChange={e => setDraft(f => ({ ...f, newCategoryName: e.target.value, categoryId: '' }))}
+                onChange={e => { setDraft(f => ({ ...f, newCategoryName: e.target.value, categoryId: '__new__' })); setFormError(null); }}
                 placeholder="Nome da nova categoria..."
                 className="w-full mt-2 px-4 py-3 bg-white dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
               />

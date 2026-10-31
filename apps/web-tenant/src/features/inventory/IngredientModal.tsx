@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { IngredientDTO, CreateIngredientDTO, UnitType } from '@gestor/types';
+import { IngredientDTO, CreateIngredientDTO, PurchasePresentationDTO, UnitType } from '@gestor/types';
 import { CurrencyInput } from '@gestor/ui';
+import { Switch } from '../../components/ui/Switch';
+import { api, ApiError } from '../../lib/api-client';
+
+const formatCommercialCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+const formatTechnicalCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value);
+const needsTechnicalCostDetail = (value: number) => Math.abs(value - Math.round(value * 100) / 100) > Number.EPSILON;
 
 interface IngredientModalProps {
   isOpen: boolean;
@@ -15,21 +21,40 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
     sku: '',
     description: '',
     unit: UnitType.G, // Default to g for better precision
-    purchaseUnit: UnitType.KG,
-    conversionFactor: 1000,
+    purchaseUnit: UnitType.G,
+    conversionFactor: 1,
     category: '',
     minStock: 0,
     initialPurchaseActive: false,
     initialPurchase: {
       quantity: 1,
-      unit: UnitType.KG,
+      unit: UnitType.G,
       totalCost: 0,
     }
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [presentations, setPresentations] = useState<PurchasePresentationDTO[]>([]);
+  const [presentationLabel, setPresentationLabel] = useState('');
+  const [presentationQuantity, setPresentationQuantity] = useState<number>(1);
+  const [presentationUnit, setPresentationUnit] = useState<UnitType>(UnitType.G);
+  const [presentationDrafts, setPresentationDrafts] = useState<Array<{ label: string; contentQuantity: number; contentUnit: UnitType }>>([]);
+  const [editingPresentationId, setEditingPresentationId] = useState<string | null>(null);
+  const [editingPresentationLabel, setEditingPresentationLabel] = useState('');
+  const [editingPresentationQuantity, setEditingPresentationQuantity] = useState<number | ''>('');
+  const [editingPresentationUnit, setEditingPresentationUnit] = useState<UnitType | ''>('');
 
   useEffect(() => {
+    setPresentationDrafts([]);
+    setPresentationLabel('');
+    setPresentationQuantity(1);
+    setPresentationUnit(editingIngredient?.unit ?? UnitType.G);
+    setEditingPresentationId(null);
+    setEditingPresentationLabel('');
+    setEditingPresentationQuantity('');
+    setEditingPresentationUnit('');
+    setFormError(null);
     if (editingIngredient) {
       setFormData({
         name: editingIngredient.name,
@@ -37,7 +62,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         description: editingIngredient.description || '',
         unit: editingIngredient.unit,
         purchaseUnit: editingIngredient.purchaseUnit || editingIngredient.unit,
-        conversionFactor: editingIngredient.conversionFactor || 1,
+        conversionFactor: editingIngredient.conversionFactor ?? 1,
         category: editingIngredient.category || '',
         minStock: editingIngredient.minStock || 0,
         initialPurchaseActive: false,
@@ -48,56 +73,193 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         sku: '',
         description: '',
         unit: UnitType.G,
-        purchaseUnit: UnitType.KG,
-        conversionFactor: 1000,
+        purchaseUnit: UnitType.G,
+        conversionFactor: 1,
         category: '',
         minStock: 0,
         initialPurchaseActive: false,
         initialPurchase: {
           quantity: 1,
-          unit: UnitType.KG,
+          unit: UnitType.G,
           totalCost: 0,
         }
       });
     }
   }, [editingIngredient, isOpen]);
 
-  // Auto-detect conversion factor
   useEffect(() => {
-    if (editingIngredient) return; // Don't auto-change during edit
-
-    let factor = 1;
-    if (formData.unit === UnitType.G && formData.purchaseUnit === UnitType.KG) factor = 1000;
-    if (formData.unit === UnitType.ML && formData.purchaseUnit === UnitType.L) factor = 1000;
-    
-    if (factor !== formData.conversionFactor) {
-      setFormData(prev => ({ ...prev, conversionFactor: factor }));
+    if (!editingIngredient || !isOpen) {
+      setPresentations([]);
+      return;
     }
-  }, [formData.unit, formData.purchaseUnit, editingIngredient, formData.conversionFactor]);
+    void api.get<PurchasePresentationDTO[]>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations`)
+      .then((response) => { if (response.success) setPresentations(response.data); })
+      .catch(() => setPresentations([]));
+  }, [editingIngredient, isOpen]);
+
+  const compatiblePresentationUnits = (baseUnit: UnitType): UnitType[] => {
+    if (baseUnit === UnitType.G || baseUnit === UnitType.KG) return [UnitType.G, UnitType.KG];
+    if (baseUnit === UnitType.ML || baseUnit === UnitType.L) return [UnitType.ML, UnitType.L];
+    return [UnitType.UN];
+  };
+
+  const presentationPreview = (quantity: number, unit: UnitType, baseUnit: UnitType) => {
+    const scale: Record<UnitType, number> = { [UnitType.UN]: 1, [UnitType.G]: 1, [UnitType.KG]: 1000, [UnitType.ML]: 1, [UnitType.L]: 1000 };
+    return quantity * scale[unit] / scale[baseUnit];
+  };
+
+  const presentationErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof ApiError && error.code === 'PURCHASE_PRESENTATION_IN_USE') {
+      return 'Esta apresentação já possui histórico de compras e não pode ser excluída. Arquive-a para impedir novas compras.';
+    }
+    return error instanceof ApiError && error.message ? error.message : fallback;
+  };
+
+  const handleBaseUnitChange = (unit: UnitType) => {
+    if (!editingIngredient) {
+      const compatibleUnits = compatiblePresentationUnits(unit);
+      if (!compatibleUnits.includes(presentationUnit)) {
+        setPresentationUnit(unit);
+      }
+      const compatibleDrafts = presentationDrafts.filter((draft) => compatibleUnits.includes(draft.contentUnit));
+      if (compatibleDrafts.length !== presentationDrafts.length) {
+        setPresentationDrafts(compatibleDrafts);
+        setFormError('Apresentações incompatíveis com a nova unidade de estoque foram removidas. Cadastre-as novamente com uma unidade compatível.');
+      }
+    }
+    setFormData((current) => ({ ...current, unit }));
+  };
+
+  const addPresentation = async () => {
+    if (!presentationLabel.trim() || !Number.isFinite(presentationQuantity) || presentationQuantity <= 0) {
+      setFormError('Informe uma apresentacao e um conteudo maior que zero.');
+      return;
+    }
+    if (!editingIngredient) {
+      if (presentationDrafts.some((item) => item.label.toLocaleLowerCase() === presentationLabel.trim().toLocaleLowerCase())) {
+        setFormError('Essa apresentacao ja foi adicionada.');
+        return;
+      }
+      setPresentationDrafts((current) => [...current, { label: presentationLabel.trim(), contentQuantity: presentationQuantity, contentUnit: presentationUnit }]);
+      setPresentationLabel('');
+      setPresentationQuantity(1);
+      setFormError(null);
+      return;
+    }
+    try {
+      const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations`, {
+        label: presentationLabel,
+        contentQuantity: presentationQuantity,
+        contentUnit: presentationUnit,
+      });
+      if (response.success) {
+        setPresentations((current) => [...current, response.data]);
+        setPresentationLabel('');
+        setPresentationQuantity(1);
+        setFormError(null);
+      }
+    } catch (error) {
+      setFormError(presentationErrorMessage(error, 'Não foi possível cadastrar a apresentação.'));
+    }
+  };
+
+  const beginPresentationEdit = (presentation: PurchasePresentationDTO) => {
+    setEditingPresentationId(presentation.id);
+    setEditingPresentationLabel(presentation.label);
+    setEditingPresentationQuantity(presentation.contentQuantity ?? '');
+    setEditingPresentationUnit(presentation.contentUnit ?? '');
+    setFormError(null);
+  };
+
+  const cancelPresentationEdit = () => {
+    setEditingPresentationId(null);
+    setEditingPresentationLabel('');
+    setEditingPresentationQuantity('');
+    setEditingPresentationUnit('');
+  };
+
+  const savePresentationEdit = async () => {
+    if (!editingIngredient || !editingPresentationId) return;
+    if (!editingPresentationLabel.trim() || editingPresentationQuantity === '' || !Number.isFinite(editingPresentationQuantity) || editingPresentationQuantity <= 0 || !editingPresentationUnit) {
+      setFormError('Informe nome, quantidade e unidade do conteúdo para salvar a apresentação.');
+      return;
+    }
+    try {
+      const response = await api.put<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${editingPresentationId}`, {
+        label: editingPresentationLabel.trim(),
+        contentQuantity: editingPresentationQuantity,
+        contentUnit: editingPresentationUnit,
+      });
+      if (response.success) {
+        setPresentations((current) => current.map((item) => item.id === response.data.id ? response.data : item));
+        cancelPresentationEdit();
+        setFormError(null);
+      }
+    } catch (error) {
+      setFormError(presentationErrorMessage(error, 'Não foi possível salvar a apresentação.'));
+    }
+  };
+
+  const archivePresentation = async (presentation: PurchasePresentationDTO) => {
+    if (!editingIngredient) return;
+    try {
+      const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${presentation.id}/archive`, {});
+      if (response.success) {
+        setPresentations((current) => current.map((item) => item.id === presentation.id ? response.data : item));
+        setFormError(null);
+      }
+    } catch (error) {
+      setFormError(presentationErrorMessage(error, 'Não foi possível arquivar a apresentação.'));
+    }
+  };
+
+  const restorePresentation = async (presentation: PurchasePresentationDTO) => {
+    if (!editingIngredient) return;
+    try {
+      const response = await api.post<PurchasePresentationDTO>(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${presentation.id}/restore`, {});
+      if (response.success) {
+        setPresentations((current) => current.map((item) => item.id === presentation.id ? response.data : item));
+        setFormError(null);
+      }
+    } catch (error) {
+      setFormError(presentationErrorMessage(error, 'Não foi possível restaurar a apresentação.'));
+    }
+  };
+
+  const deletePresentation = async (presentation: PurchasePresentationDTO) => {
+    if (!editingIngredient) return;
+    try {
+      const response = await api.delete(`/inventory/ingredients/${editingIngredient.id}/purchase-presentations/${presentation.id}`);
+      if (response.success) {
+        setPresentations((current) => current.filter((item) => item.id !== presentation.id));
+        setFormError(null);
+      }
+    } catch (error) {
+      setFormError(presentationErrorMessage(error, 'Não foi possível excluir a apresentação.'));
+    }
+  };
 
   const calculatedValues = useMemo(() => {
     if (!formData.initialPurchaseActive || !formData.initialPurchase) return null;
     
-    const factor = Number(formData.conversionFactor) || 1;
-    const quantityBase = Number(formData.initialPurchase.quantity) * factor;
+    const quantityBase = Number(formData.initialPurchase.quantity);
     const totalCost = Number(formData.initialPurchase.totalCost);
     const costPerBaseUnit = quantityBase > 0 ? totalCost / quantityBase : 0;
-    const costPerPurchaseUnit = Number(formData.initialPurchase.quantity) > 0 ? totalCost / Number(formData.initialPurchase.quantity) : 0;
-
     return {
       quantityBase,
       costPerBaseUnit,
-      costPerPurchaseUnit
     };
-  }, [formData.initialPurchase, formData.conversionFactor, formData.initialPurchaseActive]);
+  }, [formData.initialPurchase, formData.initialPurchaseActive]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const payload = { ...formData };
+      if (!editingIngredient) payload.purchasePresentations = presentationDrafts;
       delete payload.initialPurchaseActive;
       if (!formData.initialPurchaseActive) {
         delete payload.initialPurchase;
@@ -126,9 +288,9 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         <div className="px-8 py-5 border-b border-border flex justify-between items-center bg-muted/50">
           <div>
             <h2 className="text-xl font-bold text-foreground">
-              {editingIngredient ? 'Refatorar Insumo' : 'Novo Insumo Mestre'}
+              {editingIngredient ? 'Editar insumo' : 'Novo insumo'}
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Defina a unidade base para precisão na ficha técnica.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Organize a unidade de estoque, as apresentações de compra e o saldo inicial.</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
             <span className="text-2xl leading-none">&times;</span>
@@ -136,11 +298,15 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 overflow-y-auto max-h-[85vh] custom-scrollbar">
-          {/* BLOCO A - DADOS DO INSUMO */}
+          {formError && (
+            <div role="alert" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {formError}
+            </div>
+          )}
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-1 h-5 bg-primary rounded-full"></div>
-              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Bloco A — Dados do Insumo</h3>
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Dados do insumo</h3>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -179,27 +345,15 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase">Unidade Base (Consumo) *</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">Unidade de estoque *</label>
                 <select
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value as UnitType })}
+                  onChange={(e) => handleBaseUnitChange(e.target.value as UnitType)}
                   className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none appearance-none bg-input-bg text-foreground cursor-pointer"
                 >
                   {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
-                <p className="text-[10px] text-muted-foreground">Parâmetro da ficha técnica (Ex: g, ml)</p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase">Fator de Conversão</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={formData.conversionFactor}
-                  onChange={(e) => setFormData({ ...formData, conversionFactor: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground text-sm"
-                />
-                <p className="text-[10px] text-muted-foreground">Ex: 1000 se base=g e compra=kg</p>
+                <p className="text-[10px] text-muted-foreground">Use a mesma unidade usada no estoque e nas receitas.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -215,33 +369,91 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
             </div>
           </div>
 
+          <div className="mt-8 rounded-2xl border border-border bg-muted/30 p-5">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-foreground">Como você compra este insumo?</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Cadastre embalagens comerciais. O estoque continua na unidade de estoque.</p>
+            </div>
+            <>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_8rem_8rem_auto]">
+                <input value={presentationLabel} onChange={(event) => setPresentationLabel(event.target.value)} className="input-premium" placeholder="Ex.: Pacote com 50" aria-label="Nome da apresentacao de compra" />
+                <input value={presentationQuantity} onChange={(event) => setPresentationQuantity(Number(event.target.value))} min="0.000001" step="any" type="number" className="input-premium" aria-label="Quantidade do conteudo" />
+                <select value={presentationUnit} onChange={(event) => setPresentationUnit(event.target.value as UnitType)} className="input-premium" aria-label="Unidade do conteudo">
+                  {compatiblePresentationUnits(editingIngredient?.unit ?? formData.unit).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                </select>
+                <button type="button" onClick={() => void addPresentation()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Adicionar</button>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Informe o conteudo comercial. O sistema converte para a unidade de estoque automaticamente.</p>
+              <div className="mt-4 space-y-2">
+                {!editingIngredient && presentationDrafts.map((presentation, index) => (
+                  <div key={`${presentation.label}-${index}`} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
+                    <span className="font-medium text-foreground">{presentation.label}</span>
+                    <span className="flex items-center gap-3 text-muted-foreground">{presentation.contentQuantity} {presentation.contentUnit} = {presentationPreview(presentation.contentQuantity, presentation.contentUnit, formData.unit)} {formData.unit}<button type="button" onClick={() => setPresentationDrafts((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-destructive">Remover</button></span>
+                  </div>
+                ))}
+                {editingIngredient && (presentations.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma apresentação cadastrada. Compras na unidade de estoque continuam disponíveis.</p> : presentations.map((presentation) => (
+                  <div key={presentation.id} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
+                    {editingPresentationId === presentation.id ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_8rem_8rem]">
+                          <input value={editingPresentationLabel} onChange={(event) => setEditingPresentationLabel(event.target.value)} className="input-premium" aria-label="Nome da apresentação em edição" />
+                          <input value={editingPresentationQuantity} onChange={(event) => setEditingPresentationQuantity(event.target.value === '' ? '' : Number(event.target.value))} min="0.000001" step="any" type="number" className="input-premium" aria-label="Quantidade do conteúdo em edição" />
+                          <select value={editingPresentationUnit} onChange={(event) => setEditingPresentationUnit(event.target.value as UnitType | '')} className="input-premium" aria-label="Unidade do conteúdo em edição">
+                            <option value="" disabled>Unidade</option>
+                            {compatiblePresentationUnits(editingIngredient.unit).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                          <button type="button" onClick={cancelPresentationEdit} className="text-muted-foreground hover:text-foreground">Cancelar</button>
+                          <button type="button" onClick={() => void savePresentationEdit()} className="text-primary font-semibold">Salvar apresentação</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="font-medium text-foreground">{presentation.label}</span>
+                        <span className="flex flex-wrap items-center gap-3 text-muted-foreground">
+                          {presentation.contentQuantity !== null && presentation.contentQuantity !== undefined && presentation.contentUnit
+                            ? `${presentation.contentQuantity} ${presentation.contentUnit} = ${presentation.conversionFactor} ${editingIngredient.unit}`
+                            : 'Legado — revisar unidade/conteúdo'}
+                          <button type="button" onClick={() => beginPresentationEdit(presentation)} className="text-primary hover:underline">
+                            {presentation.contentQuantity === null || presentation.contentUnit === null ? 'Revisar' : 'Editar'}
+                          </button>
+                          {presentation.isActive
+                            ? <><button type="button" onClick={() => void archivePresentation(presentation)} className="text-muted-foreground hover:text-foreground">Arquivar</button><button type="button" onClick={() => void deletePresentation(presentation)} className="text-destructive">Excluir</button></>
+                            : <button type="button" onClick={() => void restorePresentation(presentation)} className="text-primary">Restaurar</button>}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )))}
+              </div>
+            </>
+          </div>
+
           <hr className="my-8 border-border" />
 
-          {/* BLOCO B - COMPRA INICIAL / ENTRADA INICIAL */}
           {!editingIngredient && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
+              <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2">
                   <div className="w-1 h-5 bg-green-500 rounded-full"></div>
-                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Saldo inicial</h3>
                 </div>
-                <label className="inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    checked={formData.initialPurchaseActive}
-                    onChange={(e) => setFormData({ ...formData, initialPurchaseActive: e.target.checked })}
+                <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
+                  <span className="min-w-0 text-sm font-medium text-muted-foreground">Informar saldo inicial</span>
+                  <Switch
+                    checked={Boolean(formData.initialPurchaseActive)}
+                    onCheckedChange={(initialPurchaseActive) => setFormData({ ...formData, initialPurchaseActive })}
+                    aria-label="Informar saldo inicial"
                   />
-                  <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                  <span className="ml-3 text-sm font-medium text-muted-foreground">Lançar compra agora</span>
-                </label>
+                </div>
               </div>
 
               {formData.initialPurchaseActive && (
                 <div className="bg-green-500/10 p-6 rounded-2xl border border-green-500/20 space-y-5 animate-in slide-in-from-top-2 duration-300">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Quantidade Comprada</label>
+                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Quantidade atual ({formData.unit})</label>
                       <input
                         type="number"
                         step="0.01"
@@ -256,21 +468,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Unidade da Compra</label>
-                      <select
-                        value={formData.initialPurchase?.unit}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          initialPurchase: { ...formData.initialPurchase!, unit: e.target.value as UnitType } 
-                        })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-green-500/20 focus:ring-2 focus:ring-green-500 outline-none bg-input-bg text-foreground cursor-pointer"
-                      >
-                        {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Custo Total Pago (R$)</label>
+                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Valor total desse estoque (R$)</label>
                       <CurrencyInput
                         value={formData.initialPurchase?.totalCost}
                         onChange={(val) => setFormData({ 
@@ -282,19 +480,16 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                     </div>
                   </div>
 
-                  {/* BLOCO C - RESULTADO AUTOMÁTICO */}
+                  <p className="text-xs text-green-800 dark:text-green-300">O saldo inicial não é uma compra, não gera pagamento e não precisa de fornecedor.</p>
                   {calculatedValues && (
                     <div className="bg-card p-4 rounded-xl border border-green-500/20 flex flex-wrap gap-6 justify-between items-center">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Custo p/ Unidade Base ({formData.unit})</span>
-                        <span className="text-lg font-black text-green-600 dark:text-green-400">R$ {calculatedValues.costPerBaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Custo inicial calculado ({formData.unit})</span>
+                        <span className="text-lg font-black text-green-600 dark:text-green-400">{formatCommercialCurrency(calculatedValues.costPerBaseUnit)}</span>
+                        {needsTechnicalCostDetail(calculatedValues.costPerBaseUnit) && <span className="text-xs text-muted-foreground">Valor técnico: {formatTechnicalCurrency(calculatedValues.costPerBaseUnit)} por {formData.unit}</span>}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Custo p/ Unidade Compra ({formData.initialPurchase?.unit})</span>
-                        <span className="text-sm font-bold text-foreground">R$ {calculatedValues.costPerPurchaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Estoque Inicial Total</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Estoque inicial</span>
                         <span className="text-lg font-black text-green-600 dark:text-green-400">{calculatedValues.quantityBase} <span className="text-sm font-medium">{formData.unit}</span></span>
                       </div>
                     </div>
@@ -308,7 +503,8 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
             <div className="bg-primary/10 p-4 rounded-xl border border-primary/20 flex items-center gap-3">
               <span className="text-xl text-primary">ℹ️</span>
               <p className="text-sm text-primary">
-                O custo atual deste insumo é de <strong>R$ {editingIngredient.currentCost.toLocaleString('pt-BR', { minimumFractionDigits: 4 })}</strong> por <strong>{editingIngredient.unit}</strong>. 
+                O custo atual deste insumo é de <strong>{formatCommercialCurrency(editingIngredient.currentCost)}</strong> por <strong>{editingIngredient.unit}</strong>.
+                {needsTechnicalCostDetail(editingIngredient.currentCost) && <> <span className="text-xs">Valor técnico: {formatTechnicalCurrency(editingIngredient.currentCost)} por {editingIngredient.unit}.</span></>}
                 Para atualizar o estoque e custo, use o módulo de Compras.
               </p>
             </div>

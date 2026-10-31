@@ -166,7 +166,7 @@ export function PwaLifecycle() {
       <button
         type="button"
         onClick={installApp}
-        className="fixed bottom-24 right-4 z-40 flex h-12 items-center gap-2 rounded-xl bg-gray-950 px-4 text-sm font-black text-white shadow-lg active:scale-95"
+        className="storefront-safe-floating-bottom fixed right-4 z-40 flex h-12 items-center gap-2 rounded-xl bg-gray-950 px-4 text-sm font-black text-white shadow-lg active:scale-95"
       >
         <Download className="h-4 w-4" />
         Instalar app
@@ -177,7 +177,7 @@ export function PwaLifecycle() {
   // iOS: banner com instruções de "Adicionar à Tela Inicial"
   if (showIosBanner) {
     return (
-      <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
+      <div className="storefront-safe-sheet fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
         <div className="mx-3 mb-4 rounded-2xl bg-gray-950 p-4 shadow-2xl">
           {/* Header */}
           <div className="mb-3 flex items-start justify-between">

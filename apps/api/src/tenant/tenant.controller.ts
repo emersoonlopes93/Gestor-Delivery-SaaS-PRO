@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Logger, ForbiddenException } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, CurrentUser, RequirePermissions } from '../common/decorators';
@@ -6,8 +6,10 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
+import { TenantActivationService } from './tenant-activation.service';
 import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 import { FeatureControlService } from '../feature-control/feature-control.service';
+import { redactFinancialSecrets } from '../payment-foundation/payment-secret-redaction';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -16,6 +18,7 @@ export class TenantController {
     private readonly tenantService: TenantService,
     private readonly onboardingService: OnboardingService,
     private readonly readinessScoreService: ReadinessScoreService,
+    private readonly tenantActivationService: TenantActivationService,
     private readonly featureControlService: FeatureControlService,
   ) {}
 
@@ -41,6 +44,12 @@ export class TenantController {
     @CurrentUser('sub') userId: string,
   ) {
     return this.featureControlService.getTenantCapabilities(tenantId, userId);
+  }
+
+  @Get('platform-branding')
+  @RequirePermissions('dashboard.view')
+  async getPlatformBranding() {
+    return this.tenantService.getPlatformBranding();
   }
 
   /**
@@ -74,6 +83,14 @@ export class TenantController {
     @CurrentUser('sub') userId: string,
     @Body() body: CreateBranchRequest,
   ) {
+    const capability = this.featureControlService.getTenantActionCapability('branches.create');
+    if (!capability.enabled) {
+      throw new ForbiddenException({
+        code: capability.code,
+        message: capability.message,
+      });
+    }
+
     return this.tenantService.createBranch(tenantId, userId, body);
   }
 
@@ -131,7 +148,7 @@ export class TenantController {
   @Patch('onboarding-step')
   async updateOnboardingStep(
     @CurrentTenant() tenantId: string,
-    @Body() body: { step: 'basicInfo' | 'operatingHours' | 'logo' | 'address' | 'delivery' | 'payments' | 'whatsapp' | 'menu' | 'catalog' | 'firstOrder'; completed?: boolean },
+    @Body() body: { step: 'basicInfo' | 'operatingHours' | 'logo' | 'address' | 'delivery' | 'payments' | 'whatsapp' | 'menu' | 'catalog'; completed?: boolean },
   ) {
     return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
   }
@@ -181,6 +198,16 @@ export class TenantController {
   }
 
   /**
+   * Read-only composition of existing onboarding, availability and Order data.
+   * It never opens a store, changes billing, or writes onboarding milestones.
+   */
+  @Get('activation-status')
+  @RequirePermissions('dashboard.view')
+  async getActivationStatus(@CurrentTenant() tenantId: string) {
+    return this.tenantActivationService.getStatus(tenantId);
+  }
+
+  /**
    * Grava telemetria geral do tenant (ex: Onboarding Readiness actions)
    */
   @Post('telemetry')
@@ -194,7 +221,7 @@ export class TenantController {
       message: 'tenant_telemetry_event',
       tenantId,
       event: body.event,
-      payload: body.payload,
+      payload: redactFinancialSecrets(body.payload),
     });
     return { success: true };
   }

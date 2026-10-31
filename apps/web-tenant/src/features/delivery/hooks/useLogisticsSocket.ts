@@ -17,6 +17,7 @@ export function useLogisticsSocket(tenantId: string | undefined) {
     const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
     const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
     const socket = io(socketPath, {
+      auth: (callback) => callback({ token: localStorage.getItem('accessToken') }),
       reconnection: true,
       reconnectionAttempts: 3,
       reconnectionDelay: 1000,
@@ -31,6 +32,7 @@ export function useLogisticsSocket(tenantId: string | undefined) {
     socket.on('driverAssigned', refresh);
     socket.on('orderUpdated', refresh);
     socket.on('statusUpdated', refresh);
+    socket.on('orderCancelled', refresh);
 
     return () => {
       socket.disconnect();

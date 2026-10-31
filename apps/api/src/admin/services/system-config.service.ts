@@ -1,12 +1,16 @@
 import { Injectable, OnModuleInit, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma, WhatsAppProviderType, AiProviderType } from '@prisma/client';
+import { MediaLibraryService } from '../../upload/media-library.service';
 
 @Injectable()
 export class SystemConfigService implements OnModuleInit {
   private readonly logger = new Logger('SystemConfigService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mediaLibrary: MediaLibraryService,
+  ) {}
 
   async onModuleInit() {
     // Garantir que existe o registro global
@@ -25,6 +29,14 @@ export class SystemConfigService implements OnModuleInit {
   async getConfig() {
     const config = await this.prisma.systemConfig.findUnique({
       where: { id: 'global' },
+      include: {
+        platformLogoMedia: {
+          select: {
+            id: true,
+            publicUrl: true,
+          },
+        },
+      },
     });
     this.logger.log(`[MODEL_DEBUG] loaded model=${config?.googleAiModel ?? 'undefined'}`);
     return config;
@@ -43,6 +55,12 @@ export class SystemConfigService implements OnModuleInit {
     }
 
     try {
+      const previousConfig = await this.prisma.systemConfig.findUnique({
+        where: { id: 'global' },
+        select: { platformLogoMediaId: true },
+      });
+      const hadPlatformLogoChange = Object.prototype.hasOwnProperty.call(updateData, 'platformLogoMediaId');
+
       const result = await this.prisma.systemConfig.upsert({
         where: { id: 'global' },
         update: updateData as Prisma.SystemConfigUpdateInput,
@@ -52,7 +70,29 @@ export class SystemConfigService implements OnModuleInit {
           defaultWhatsAppProvider: (updateData.defaultWhatsAppProvider as WhatsAppProviderType) || WhatsAppProviderType.evolution_go,
           defaultAiProvider: (updateData.defaultAiProvider as AiProviderType) || AiProviderType.openai,
         },
+        include: {
+          platformLogoMedia: {
+            select: {
+              id: true,
+              publicUrl: true,
+            },
+          },
+        },
       });
+
+      if (hadPlatformLogoChange) {
+        const previousLogoId = previousConfig?.platformLogoMediaId ?? null;
+        const nextLogoId = result.platformLogoMediaId ?? null;
+        if (previousLogoId && previousLogoId !== nextLogoId) {
+          try {
+            await this.mediaLibrary.deleteSystemAsset(previousLogoId);
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.warn(`Falha ao remover logo antiga (${previousLogoId}): ${message}`);
+          }
+        }
+      }
+
       this.logger.log('[MODEL_DEBUG] saved model=' + (result.googleAiModel ?? 'undefined'));
       return result;
     } catch (error: unknown) {

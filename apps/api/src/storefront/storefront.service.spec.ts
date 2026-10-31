@@ -8,16 +8,18 @@ import { SchedulingService } from '../scheduling/scheduling.service';
 import { BusinessIntelligenceService } from '../analytics/business-intelligence.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { DateTime } from 'luxon';
+import { StorefrontCacheService } from './services/storefront-cache.service';
+import { FeatureControlService } from '../feature-control/feature-control.service';
 
 describe('StorefrontService', () => {
   let service: StorefrontService;
-  let prismaMock: { tenant: { findUnique: jest.Mock } };
+  let prismaMock: { tenant: { findFirst: jest.Mock } };
   let schedulingServiceMock: { getAvailableTimeSlots: jest.Mock };
 
   beforeEach(async () => {
     const tenantMocks = {
       tenant: {
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
 
@@ -67,6 +69,16 @@ describe('StorefrontService', () => {
             set: jest.fn().mockResolvedValue(null),
           },
         },
+        {
+          provide: StorefrontCacheService,
+          useValue: { getPayload: jest.fn(), setPayload: jest.fn() },
+        },
+        {
+          provide: FeatureControlService,
+          useValue: {
+            resolveTenantFeature: jest.fn().mockResolvedValue({ enabled: true }),
+          },
+        },
       ],
     }).compile();
 
@@ -86,7 +98,7 @@ describe('StorefrontService', () => {
         timezone: 'America/Sao_Paulo',
       },
     };
-    prismaMock.tenant.findUnique.mockResolvedValue(tenant);
+    prismaMock.tenant.findFirst.mockResolvedValue(tenant);
     schedulingServiceMock.getAvailableTimeSlots.mockResolvedValue([
       {
         id: 'slot-1',
@@ -105,5 +117,25 @@ describe('StorefrontService', () => {
       .toJSDate();
 
     expect(schedulingServiceMock.getAvailableTimeSlots).toHaveBeenCalledWith(expectedDate, 'tenant-1');
+  });
+
+  it('resolves authenticated preview through the public payload path without cache and scoped to the current tenant', async () => {
+    prismaMock.tenant.findFirst.mockResolvedValue({ slug: 'tenant-slug' });
+    const customization = { theme: { primaryColor: '#123456' }, layout: { productLayout: 'grid' } };
+    const payload = { tenant: { id: 'tenant-1' }, categories: [], combos: [], upsells: [] };
+    const payloadSpy = jest.spyOn(service, 'getStorefrontPayload').mockResolvedValue(payload as never);
+
+    await expect(service.getStorefrontPreviewPayload('tenant-1', customization, 'pickup'))
+      .resolves.toBe(payload);
+
+    expect(prismaMock.tenant.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tenant-1', status: 'active' },
+      select: { slug: true },
+    });
+    expect(payloadSpy).toHaveBeenCalledWith('tenant-slug', 'pickup', {
+      tenantId: 'tenant-1',
+      customization,
+      bypassCache: true,
+    });
   });
 });

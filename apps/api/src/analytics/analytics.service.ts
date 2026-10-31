@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { RecipeExpansionService } from '../inventory/recipe-expansion.service';
 import type { Prisma } from '@prisma/client';
 import { OrderStatus as PrismaOrderStatus, StockMovementType } from '@prisma/client';
 import { 
@@ -13,7 +14,7 @@ import {
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly recipeExpansion: RecipeExpansionService) {}
 
   private buildDateRange(filter: MetricFilterDTO): Prisma.DateTimeFilter {
     return {
@@ -27,6 +28,7 @@ export class AnalyticsService {
   }
 
   private async buildOrderItemCostCache(
+    tenantId: string,
     items: Array<{
       productId: string | null;
     }>,
@@ -36,13 +38,6 @@ export class AnalyticsService {
     const productIds = Array.from(
       new Set(items.map((item) => item.productId).filter((id): id is string => typeof id === 'string')),
     );
-
-    const productRecipes = productIds.length
-        ? await this.prisma.tenantClient.productRecipeIngredient.findMany({
-            where: { productId: { in: productIds } },
-            include: { ingredient: true },
-          })
-        : [];
 
     const productsDirectCost = productIds.length
       ? await this.prisma.tenantClient.product.findMany({
@@ -61,18 +56,8 @@ export class AnalyticsService {
     }
 
     // Add/Override with recipe cost if recipe exists
-    const recipeCosts = new Map<string, number>();
-    for (const recipe of productRecipes) {
-      const current = recipeCosts.get(recipe.productId) ?? 0;
-      recipeCosts.set(
-        recipe.productId,
-        current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
-      );
-    }
-
-    for (const [pid, cost] of recipeCosts.entries()) {
-      productUnitCost.set(pid, cost);
-    }
+    const recipeCosts = productIds.length ? await this.recipeExpansion.calculateProductRecipeCosts(tenantId, productIds) : new Map<string, Prisma.Decimal>();
+    for (const [pid, cost] of recipeCosts.entries()) productUnitCost.set(pid, this.toNumber(cost));
 
     return { productUnitCost };
   }
@@ -169,6 +154,7 @@ export class AnalyticsService {
       where: {
         tenantId,
         type: StockMovementType.theoretical_depletion,
+        order: { is: { status: { not: PrismaOrderStatus.cancelled } } },
         createdAt: {
           gte: new Date(startDate),
           lte: new Date(endDate),
@@ -229,13 +215,6 @@ export class AnalyticsService {
     const productIds = Array.from(
       new Set(topItems.map((item) => item.productId).filter((id): id is string => typeof id === 'string')),
     );
-    const recipes = productIds.length
-      ? await this.prisma.tenantClient.productRecipeIngredient.findMany({
-          where: { productId: { in: productIds } },
-          include: { ingredient: true },
-        })
-      : [];
-
     const productsDirectCost = productIds.length
       ? await this.prisma.tenantClient.product.findMany({
           where: { id: { in: productIds } },
@@ -253,18 +232,8 @@ export class AnalyticsService {
     }
 
     // Recipe cost (override)
-    const recipeCosts = new Map<string, number>();
-    for (const recipe of recipes) {
-      const current = recipeCosts.get(recipe.productId) ?? 0;
-      recipeCosts.set(
-        recipe.productId,
-        current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
-      );
-    }
-
-    for (const [pid, cost] of recipeCosts.entries()) {
-      productUnitCost.set(pid, cost);
-    }
+    const recipeCosts = productIds.length ? await this.recipeExpansion.calculateProductRecipeCosts(tenantId, productIds) : new Map<string, Prisma.Decimal>();
+    for (const [pid, cost] of recipeCosts.entries()) productUnitCost.set(pid, this.toNumber(cost));
 
     const performance = topItems.map((item) => {
       const revenue = this.toNumber(item._sum.lineTotal);
@@ -301,7 +270,7 @@ export class AnalyticsService {
       }
     });
 
-    const cache = await this.buildOrderItemCostCache(
+    const cache = await this.buildOrderItemCostCache(tenantId,
       items.map((item) => ({
         productId: item.productId,
       })),
@@ -351,7 +320,7 @@ export class AnalyticsService {
     });
 
     const allItems = orders.flatMap((order) => order.items);
-    const cache = await this.buildOrderItemCostCache(
+    const cache = await this.buildOrderItemCostCache(tenantId,
       allItems.map((item) => ({
         productId: item.productId,
       })),
@@ -411,7 +380,7 @@ export class AnalyticsService {
       .reduce((acc: number, t) => acc + Number(t.amount), 0);
 
     const accounts = await this.prisma.financialAccount.aggregate({
-      where: { tenantId },
+      where: { tenantId, active: true },
       _sum: { balance: true }
     });
 

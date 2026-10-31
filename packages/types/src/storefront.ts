@@ -1,3 +1,5 @@
+import type { BusinessSegment } from './tenant';
+
 export interface StorefrontTenantInfo {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface StorefrontTenantInfo {
   description?: string | null;
   logo?: string | null;
   banner?: string | null;
+  businessSegment: BusinessSegment;
   isOpen: boolean; 
   statusMessage?: string | null;
   nextOpenAt?: string | null;
@@ -43,6 +46,8 @@ export interface StorefrontTenantInfo {
   scheduling?: {
     enabled: boolean;
     allowWhenClosed?: boolean;
+    timezone: string;
+    maximumAdvanceDays: number;
   };
 }
 
@@ -55,7 +60,10 @@ export interface StorefrontOptionItemPayload {
   description?: string | null;
   isActive: boolean;
   isAvailable?: boolean;
+  effectiveIsActive?: boolean;
   allowQuantity: boolean;
+  minQty?: number | null;
+  maxQty?: number | null;
   priceImpactType: PriceImpactType;
   priceImpactValue: number;
 }
@@ -123,7 +131,7 @@ export interface StorefrontProductPayload {
   id: string;
   name: string;
   slug: string;
-  type?: 'simple' | 'combo';
+  type?: 'simple' | 'configurable' | 'combo';
   shortDescription?: string | null;
   description?: string | null;
   longDescription?: string | null; // Added for AI agent
@@ -204,12 +212,23 @@ export interface StorefrontCustomizationPayload {
   layout: Record<string, unknown>;
 }
 
+export interface StorefrontPreviewRequest {
+  customization: StorefrontCustomizationPayload;
+  fulfillmentType: 'delivery' | 'pickup';
+}
+
+export interface StorefrontShowcasePayload {
+  title: string;
+  products: StorefrontProductPayload[];
+}
+
 export interface StorefrontPayload {
   tenant: StorefrontTenantInfo;
   categories: StorefrontCategoryPayload[];
   combos: StorefrontComboPayload[];
   upsells: StorefrontUpsellPayload[];
   customization?: StorefrontCustomizationPayload;
+  showcase?: StorefrontShowcasePayload;
 }
 
 export interface StorefrontUpsellItemPayload {
@@ -289,7 +308,7 @@ export interface CartLineItem {
   options?: unknown[];
 
   comboItems?: CartSelectedComboItem[];
-  type?: 'simple' | 'combo';
+  type?: 'simple' | 'configurable' | 'combo';
   selections?: CartSelectedOptionGroup[];
   slots?: CartSelectedComboSlot[];
   pizzaComposition?: PizzaCompositionDTO;

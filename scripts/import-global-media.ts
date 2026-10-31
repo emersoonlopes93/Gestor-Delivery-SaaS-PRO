@@ -8,7 +8,11 @@ import { slugify } from '@gestor/utils';
 // Helper mock para o config service do Storage
 class MockConfigService {
   private config: Record<string, string> = {
-    MEDIA_STORAGE_PROVIDER: process.env.MEDIA_STORAGE_PROVIDER || process.env.STORAGE_DRIVER || 'local',
+    MEDIA_STORAGE_PROVIDER:
+      process.env.MEDIA_STORAGE_DRIVER
+      || process.env.MEDIA_STORAGE_PROVIDER
+      || process.env.STORAGE_DRIVER
+      || 'local',
     R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID || '',
     R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID || '',
     R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY || '',

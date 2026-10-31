@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../../lib/api-client';
 import { 
   Building2, 
@@ -51,7 +51,7 @@ export function FranchiseDashboard() {
   const [allTenants, setAllTenants] = useState<Tenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState('');
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const res = await api.get<FranchiseGroup[]>('/admin/franchises');
       setGroups(res.data);
@@ -61,7 +61,7 @@ export function FranchiseDashboard() {
     } catch (err) {
       console.error('Erro ao carregar grupos:', err);
     }
-  };
+  }, [selectedGroupId]);
 
   const fetchAllTenants = async () => {
     try {
@@ -75,7 +75,7 @@ export function FranchiseDashboard() {
   useEffect(() => {
     fetchGroups();
     fetchAllTenants();
-  }, []);
+  }, [fetchGroups]);
 
   useEffect(() => {
     if (!selectedGroupId) return;

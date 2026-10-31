@@ -94,6 +94,46 @@ pnpm --filter @gestor/api exec prisma migrate deploy
 
 ## Gateway e cobrança
 
+### Verdade operacional do portal (C5-A)
+
+O portal do tenant expõe três capacidades independentes:
+
+- **Tentativas de cobrança:** podem estar desativadas, disponíveis manualmente para operadores autorizados ou disponíveis somente em sandbox, conforme a configuração efetiva do gateway.
+- **Cobrança recorrente automática:** permanece desabilitada enquanto não existir executor recorrente homologado (scheduler/worker, idempotência operacional, monitoramento e tratamento de falhas).
+- **Cobrança real em produção:** permanece bloqueada nesta fase. `NODE_ENV=production` não autoriza cobrança real por si só; o conector Asaas permitido neste fluxo usa exclusivamente o endpoint sandbox.
+
+O tenant não inicia tentativas de cobrança pelo portal. Tentativas permitidas continuam sendo uma operação administrativa com RBAC, e configurações inválidas falham fechadas.
+
+### Automação recorrente sandbox (C5-B)
+
+`BILLING_AUTOMATION_ENABLED` inicia como `false`. Quando explicitamente habilitada em ambiente isolado não produtivo, o worker BullMQ examina apenas ciclos **já persistidos**, encerrados em UTC e de assinaturas `active`. Ele não inventa ciclos, valores, períodos ou vencimentos.
+
+- `BILLING_AUTOMATION_KILL_SWITCH=true` impede tanto o agendamento quanto jobs já enfileirados no momento da execução.
+- `NODE_ENV=production` bloqueia a automação mesmo com flags ativadas acidentalmente.
+- O modo `manual` fecha ciclo e cria invoice draft, sem chamada externa; somente gateway `sandbox_ready` pode criar tentativa automática.
+- Uma tentativa em `processing` é resultado incerto e exige reconciliação manual: nunca é reenviada automaticamente.
+- A cadência (`BILLING_AUTOMATION_CADENCE_MS`, mínimo 60 s) e o lote (`BILLING_AUTOMATION_BATCH_LIMIT`, 1–200) são configuráveis. O job recorrente possui identificador estável.
+
+O portal continua exibindo cobrança recorrente automática como não habilitada: a saúde do worker não é exposta como uma garantia operacional ao tenant. Cobrança real em produção continua bloqueada.
+
+## Adesão comercial self-service
+
+O catálogo público expõe somente planos Billing V2 ativos, públicos e do tipo
+`revenue_tiered`. A página de cadastro mostra faixas e preços persistidos nesse
+catálogo; não calcula mensalidade no navegador nem aceita preço/fator enviado
+pelo cliente.
+
+A adesão cria uma assinatura e registra a versão da oferta, as faixas e a regra
+de faturamento vigente no histórico da assinatura. Isso não representa pagamento
+confirmado. Quando a oferta exigir forma de pagamento, a assinatura permanece
+em estado pendente de acompanhamento no portal Billing até que o fluxo real seja
+homologado.
+
+O texto exibido nesta fase é uma confirmação comercial não jurídica. Conteúdo e
+versão de termos legais finais ainda requerem aprovação de produto/jurídico.
+
+## Gateway e cobrança
+
 ### Pagamentos desligados
 
 ```env
@@ -168,6 +208,21 @@ Resultado esperado:
 - não armazena cartão bruto
 - não usa envs legadas de pedido/split
 - não chama produção
+
+### Reserva idempotente antes do gateway
+
+Toda tentativa de cobrança SaaS é primeiro reservada no banco com a chave
+`(invoiceId, provider, idempotencyKey)` e status `processing`. A chamada ao
+provider ocorre **fora** da transação Prisma; somente a resposta externa
+finaliza a tentativa, a invoice e o customer do provider em uma nova
+transação. Assim, retry concorrente retorna a reserva existente e não cria
+outra cobrança externa.
+
+Se a chamada falhar ou expirar sem resultado autoritativo, a tentativa fica
+`processing` com `gatewaySubmission=unknown_outcome`. Não a marque como paga
+ou falha pela UI e não reenvie a cobrança com outra chave; reconcilie pela
+identidade externa/webhook antes de qualquer nova ação. Asaas continua
+estritamente sandbox nesta fase: CPF sintético não pode ser usado em produção.
 
 O webhook SaaS Asaas fica em:
 

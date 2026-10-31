@@ -1,10 +1,11 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { BillingController } from './billing.controller';
 
 describe('BillingController Trial Pro', () => {
   const makeController = () => {
     const billingService = {};
     const tenantBillingResolver = {
+      assertLegacySubscriptionCreationAllowed: jest.fn().mockResolvedValue(undefined),
       getDefaultBillingPlan: jest.fn().mockResolvedValue({
         id: 'plan-1',
         trialDays: 14,
@@ -45,6 +46,7 @@ describe('BillingController Trial Pro', () => {
         billingPaymentGatewayService as never,
         prisma as never,
       ),
+      tenantBillingResolver,
     };
   };
 
@@ -55,5 +57,14 @@ describe('BillingController Trial Pro', () => {
     await expect(controller.startTrialPro('tenant-1')).rejects.toThrow(
       'Trial Pro com cartao ainda nao esta pronto neste ambiente. Mantenha a flag desabilitada ate o gateway real estar disponivel.',
     );
+  });
+
+  it('stops the legacy trial route when commercial contracting has not been accepted', async () => {
+    const { controller, tenantBillingResolver } = makeController();
+    tenantBillingResolver.assertLegacySubscriptionCreationAllowed.mockRejectedValue(
+      new ConflictException('Conclua a contratação comercial pelo contrato apresentado antes de criar uma assinatura.'),
+    );
+
+    await expect(controller.startTrialPro('tenant-1')).rejects.toThrow('contratação comercial');
   });
 });

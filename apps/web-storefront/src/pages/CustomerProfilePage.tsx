@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Award, Bell, BellRing, ChevronLeft, Gift, History, Percent, Target, User, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { api } from '../lib/api-client';
+import { api, logoutCustomerSession, switchCustomerTenant } from '../lib/api-client';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useEffect } from 'react';
@@ -26,14 +26,14 @@ function money(value: number) {
 
 export function CustomerProfilePage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { isLoggedIn, logout, customer, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
+  const { isLoggedIn, customer, tenantSlug: customerTenantSlug } = useCustomerStore();
   const navigate = useNavigate();
   const { isSupported: pushSupported, isSubscribed, subscribeUser } = usePushNotifications();
 
   useEffect(() => {
     if (!tenantSlug) return;
-    setTenantSlug(tenantSlug);
-  }, [tenantSlug, setTenantSlug]);
+    void switchCustomerTenant(tenantSlug);
+  }, [tenantSlug]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
@@ -70,7 +70,7 @@ export function CustomerProfilePage() {
           </Link>
           <button
             onClick={() => {
-              logout();
+              void logoutCustomerSession();
               navigate(`/${tenantSlug}`);
             }}
             className="text-sm font-bold text-red-500"

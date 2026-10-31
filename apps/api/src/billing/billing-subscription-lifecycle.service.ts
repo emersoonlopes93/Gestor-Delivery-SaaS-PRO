@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { resolveEffectiveBillingEntitlement } from './billing-entitlement-decision';
 
 type BillingSubscriptionReference = {
   status?: string | null;
@@ -15,14 +16,7 @@ export class BillingSubscriptionLifecycleService {
   }
 
   isInGracePeriod(subscription: BillingSubscriptionReference): boolean {
-    const status = subscription.status?.toString().toLowerCase() ?? '';
-    if (!subscription.gracePeriodEndsAt) {
-      return false;
-    }
-
-    const gracePeriodEndsAt = new Date(subscription.gracePeriodEndsAt);
-    const now = new Date();
-    return ['past_due', 'grace_period'].includes(status) && now <= gracePeriodEndsAt;
+    return resolveEffectiveBillingEntitlement(subscription).inGraceWindow;
   }
 
   getAccessDecision(subscription: BillingSubscriptionReference): {
@@ -30,6 +24,7 @@ export class BillingSubscriptionLifecycleService {
     reason?: string;
   } {
     const status = subscription.status?.toString().toLowerCase() ?? '';
+    const entitlement = resolveEffectiveBillingEntitlement(subscription);
 
     if (status === 'canceled') {
       return { canAccess: false, reason: 'Assinatura cancelada.' };
@@ -39,14 +34,12 @@ export class BillingSubscriptionLifecycleService {
       return { canAccess: false, reason: 'Assinatura suspensa.' };
     }
 
-    if (status === 'past_due' && !this.isInGracePeriod(subscription)) {
+    if (status === 'past_due' && !entitlement.inGraceWindow) {
       return { canAccess: false, reason: 'Assinatura em atraso.' };
     }
 
-    if (status === 'trialing') {
-      if (subscription.trialEndsAt && new Date(subscription.trialEndsAt) < new Date()) {
-        return { canAccess: false, reason: 'Trial expirado.' };
-      }
+    if (status === 'trialing' && entitlement.trialExpired) {
+      return { canAccess: false, reason: 'Trial expirado.' };
     }
 
     return { canAccess: true };

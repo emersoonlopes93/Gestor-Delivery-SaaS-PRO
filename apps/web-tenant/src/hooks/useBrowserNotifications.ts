@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react';
 import {
   getNotificationPermission,
-  requestNotificationPermission,
   showWebNotification,
   supportsWebNotifications,
 } from '../lib/notification-support';
 
 /**
- * Hook para gerenciar permissões e registro de notificações do navegador.
- * Integra-se com o service worker para permitir notificações em segundo plano.
+ * Prepares browser notifications without opening a permission prompt.
+ * Permission requests are handled only by an explicit onboarding/settings click.
  */
 export function useBrowserNotifications(
   enabled: boolean = true,
@@ -19,16 +18,12 @@ export function useBrowserNotifications(
 
   useEffect(() => {
     if (!enabled || !tenantId || permissionCheckedRef.current) return;
-
     permissionCheckedRef.current = true;
 
-    // Check if service workers are supported
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       console.warn('[BrowserNotifications] Service Workers not supported');
       return;
     }
-
-    // Check if Notifications API is supported
     if (!supportsWebNotifications()) {
       console.warn('[BrowserNotifications] Notifications API not supported');
       return;
@@ -36,7 +31,6 @@ export function useBrowserNotifications(
 
     const setupNotifications = async () => {
       try {
-        // Register service worker if not already registered
         if (!swRegistrationRef.current) {
           swRegistrationRef.current = await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
@@ -44,27 +38,11 @@ export function useBrowserNotifications(
           console.log('[BrowserNotifications] Service Worker registered:', swRegistrationRef.current);
         }
 
-        // Request permission if not already granted
         const currentPermission = getNotificationPermission();
-
-        if (currentPermission === 'default') {
-          console.log('[BrowserNotifications] Requesting notification permission...');
-          const permission = await requestNotificationPermission();
-          console.log('[BrowserNotifications] Permission result:', permission);
-
-          if (permission === 'granted') {
-            // Show a test notification to confirm setup
-            if (swRegistrationRef.current) {
-              swRegistrationRef.current.showNotification('Notificações Ativadas', {
-                body: 'Você receberá alertas de pedidos, transferências e eventos importantes.',
-                icon: '/favicon.ico',
-                badge: '/favicon.ico',
-                tag: 'setup-confirmation',
-              });
-            }
-          }
-        } else if (currentPermission === 'granted') {
+        if (currentPermission === 'granted') {
           console.log('[BrowserNotifications] Notification permission already granted');
+        } else if (currentPermission === 'default') {
+          console.log('[BrowserNotifications] Notification permission awaits user action');
         } else {
           console.warn('[BrowserNotifications] Notification permission denied');
         }
@@ -73,17 +51,9 @@ export function useBrowserNotifications(
       }
     };
 
-    setupNotifications();
-
-    // Cleanup
-    return () => {
-      // Keep service worker registered for background notifications
-    };
+    void setupNotifications();
   }, [enabled, tenantId]);
 
-  /**
-   * Send a notification through the service worker
-   */
   const sendNotification = async (
     title: string,
     options?: NotificationOptions & { soundUrl?: string; volume?: number },
@@ -95,12 +65,10 @@ export function useBrowserNotifications(
       }
 
       if (!swRegistrationRef.current) {
-        // Fallback to direct notification if SW not available
         return showWebNotification(title, options);
       }
 
-      // Send through service worker for better background handling
-      swRegistrationRef.current.showNotification(title, options);
+      await swRegistrationRef.current.showNotification(title, options);
       return true;
     } catch (error) {
       console.error('[BrowserNotifications] Failed to send notification:', error);

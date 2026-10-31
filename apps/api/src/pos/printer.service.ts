@@ -3,6 +3,34 @@ import { OrderResponseDTO } from '@gestor/types';
 
 @Injectable()
 export class PrinterService {
+  private getKdsOptionItems(snapshot: unknown): Array<{ snapshotName: string; quantity: number }> {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return [];
+
+    const optionItems = (snapshot as { optionItems?: unknown }).optionItems;
+    if (!Array.isArray(optionItems)) return [];
+
+    return optionItems.flatMap((option) => {
+      if (!option || typeof option !== 'object' || Array.isArray(option)) return [];
+
+      const { snapshotName, quantity } = option as { snapshotName?: unknown; quantity?: unknown };
+      if (typeof snapshotName !== 'string' || !snapshotName.trim()) return [];
+
+      return [{
+        snapshotName: snapshotName.trim(),
+        quantity: typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      }];
+    });
+  }
+
+  private getMarketplaceCompositionLines(composition?: string | null): string[] {
+    if (!composition) return [];
+
+    return composition
+      .split('\n')
+      .map((line) => line.trim().replace(/^[-+]\s*/, ''))
+      .filter(Boolean);
+  }
+
   private getFulfillmentLabel(value?: string | null): string {
     if (typeof value !== 'string') return 'PEDIDO';
     const normalized = value.trim();
@@ -47,18 +75,32 @@ export class PrinterService {
 
     if (format === 'escpos') lines.push(INITIALIZE);
 
+    const providerOrderNumber = order.operational?.origin === 'FOOD_99'
+      ? order.operational.providerOrderNumber
+      : null;
+
     // Header
     if (type === 'customer') {
       if (format === 'escpos') lines.push(CENTER, FONT_DOUBLE, BOLD_ON);
       lines.push(center('GESTOR DELIVERY SAAS PRO'));
       if (format === 'escpos') lines.push(FONT_NORMAL);
-      lines.push(center(`${this.getFulfillmentLabel(order.fulfillmentType)} - ${order.orderNumber}`));
+      if (providerOrderNumber) {
+        lines.push(center(`99FOOD - PEDIDO #${providerOrderNumber}`));
+        lines.push(center(`PEDEHUB #${order.orderNumber}`));
+      } else {
+        lines.push(center(`${this.getFulfillmentLabel(order.fulfillmentType)} - ${order.orderNumber}`));
+      }
     } else {
       if (format === 'escpos') lines.push(CENTER, BOLD_ON);
       lines.push(center('*** PRODUCAO / KDS ***'));
       lines.push(center(`SETOR: ${station?.toUpperCase() || 'GERAL'}`));
       if (format === 'escpos') lines.push(FONT_DOUBLE);
-      lines.push(center(`PEDIDO: #${order.orderNumber}`));
+      if (providerOrderNumber) {
+        lines.push(center(`99FOOD - PEDIDO #${providerOrderNumber}`));
+        lines.push(center(`PEDEHUB #${order.orderNumber}`));
+      } else {
+        lines.push(center(`PEDIDO: #${order.orderNumber}`));
+      }
       if (format === 'escpos') lines.push(FONT_NORMAL);
     }
     
@@ -85,8 +127,22 @@ export class PrinterService {
       if (address.reference) lines.push(`REF: ${address.reference}`);
     }
     if (type === 'customer') {
+      const financial = order.operational?.financialSummary;
       lines.push(thinSeparator);
-      lines.push(`PAGAMENTO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+      if (financial?.amountToCollectState) {
+        lines.push(`PAGAMENTO: ${financial.paymentLabel.toUpperCase()}`);
+        lines.push(`METODO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+        if (financial.paymentState === 'PAID' && financial.amountToCollect === 0) {
+          lines.push('*** NAO COBRAR DO CLIENTE ***');
+          lines.push('VALOR A COBRAR: R$ 0,00');
+        } else if (financial.amountToCollectState === 'KNOWN' && typeof financial.amountToCollect === 'number') {
+          lines.push(`VALOR A COBRAR: ${financial.amountToCollect.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+        } else {
+          lines.push('VALOR A COBRAR: NAO INFORMADO');
+        }
+      } else {
+        lines.push(`PAGAMENTO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+      }
       if (order.changeFor) {
         lines.push(`TROCO PARA: ${order.changeFor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
       }
@@ -110,6 +166,14 @@ export class PrinterService {
 
       if (item.notes) {
         lines.push(`  >> OBS: ${item.notes.toUpperCase()}`);
+      }
+
+      for (const option of this.getKdsOptionItems(item.snapshotCatalogV2Json)) {
+        lines.push(`  - ${option.quantity}x ${option.snapshotName.toUpperCase()}`);
+      }
+
+      for (const compositionLine of this.getMarketplaceCompositionLines(item.snapshotComposition)) {
+        lines.push(`  - ${compositionLine.toUpperCase()}`);
       }
       
       // V3 Options and Combo Slots
@@ -143,14 +207,24 @@ export class PrinterService {
 
     if (type === 'customer') {
       const subStr = order.itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
-      const totalStr = order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
+      const financial = order.operational?.financialSummary;
       
       lines.push(`SUBTOTAL: ${subStr}`);
       if (order.discountTotal > 0) lines.push(`DESCONTO: ${order.discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10)}`);
       lines.push(thinSeparator);
       
       if (format === 'escpos') lines.push(BOLD_ON, FONT_DOUBLE);
-      lines.push(`TOTAL PAGO: ${totalStr}`);
+      const customerActuallyPaid = financial?.customerActuallyPaid ?? financial?.customerPaid;
+      if (financial?.paymentState === 'PAID' && typeof customerActuallyPaid === 'number') {
+        const customerPaid = customerActuallyPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        lines.push(`TOTAL PAGO PELO CLIENTE: ${customerPaid}`);
+      } else if (financial?.paymentState === 'PENDING' && typeof financial.amountToCollect === 'number') {
+        const amountToCollect = financial.amountToCollect.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        lines.push(`TOTAL DO CLIENTE: ${amountToCollect}`);
+      } else {
+        const total = order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10);
+        lines.push(`TOTAL INFORMADO: ${total}`);
+      }
       if (format === 'escpos') lines.push(FONT_NORMAL, BOLD_OFF);
 
       lines.push(separator);

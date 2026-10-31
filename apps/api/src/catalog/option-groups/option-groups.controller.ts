@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
-import { RequirePermissions } from '../../common/decorators';
+import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { OptionGroupsService } from './option-groups.service';
 import { CreateOptionGroupDto } from './dto/create-option-group.dto';
@@ -16,58 +16,82 @@ export class OptionGroupsController {
 
   @Post()
   @RequirePermissions('catalog.manage_option_groups')
-  createGroup(@Body() dto: CreateOptionGroupDto) {
-    return this.service.createGroup(dto);
+  createGroup(@Body() dto: CreateOptionGroupDto, @CurrentUser('sub') actorId: string) {
+    return this.service.createGroup(dto, actorId);
   }
 
   @Get()
   @RequirePermissions('catalog.read')
-  listGroups() {
-    return this.service.listGroups();
+  listGroups(@Query('includeArchived') includeArchived?: string) {
+    return this.service.listGroups(includeArchived === 'true');
   }
 
   @Get(':id')
   @RequirePermissions('catalog.read')
-  getGroup(@Param('id') id: string) {
-    return this.service.getGroup(id);
+  getGroup(@Param('id') id: string, @Query('includeArchived') includeArchived?: string) {
+    return this.service.getGroup(id, includeArchived === 'true');
   }
 
   @Patch(':id')
   @RequirePermissions('catalog.manage_option_groups')
-  updateGroup(@Param('id') id: string, @Body() dto: UpdateOptionGroupDto) {
-    return this.service.updateGroup(id, dto);
+  updateGroup(@Param('id') id: string, @Body() dto: UpdateOptionGroupDto, @CurrentUser('sub') actorId: string) {
+    return this.service.updateGroup(id, dto, actorId);
   }
 
   @Delete(':id')
   @RequirePermissions('catalog.manage_option_groups')
-  deleteGroup(@Param('id') id: string) {
-    return this.service.deleteGroup(id);
+  deleteGroup(@Param('id') id: string, @CurrentUser('sub') actorId: string) {
+    return this.service.deleteGroup(id, actorId);
+  }
+
+  @Patch(':id/archive')
+  @RequirePermissions('catalog.manage_option_groups')
+  archiveGroup(@Param('id') id: string, @CurrentUser('sub') actorId: string) {
+    return this.service.archiveGroup(id, actorId);
+  }
+
+  @Patch(':id/restore')
+  @RequirePermissions('catalog.manage_option_groups')
+  restoreGroup(@Param('id') id: string, @CurrentUser('sub') actorId: string) {
+    return this.service.restoreGroup(id, actorId);
   }
 
   @Post('items')
   @RequirePermissions('catalog.manage_option_groups')
-  createItem(@Body() dto: CreateOptionItemDto) {
-    return this.service.createItem(dto);
+  createItem(@Body() dto: CreateOptionItemDto, @CurrentUser('sub') actorId: string) {
+    return this.service.createItem(dto, actorId);
   }
 
   @Post(':id/items')
   @RequirePermissions('catalog.manage_option_groups')
-  createItemWithId(@Param('id') id: string, @Body() dto: CreateOptionItemDto) {
+  createItemWithId(@Param('id') id: string, @Body() dto: CreateOptionItemDto, @CurrentUser('sub') actorId: string) {
     dto.optionGroupId = id;
-    return this.service.createItem(dto);
+    return this.service.createItem(dto, actorId);
   }
 
 
   @Patch('items/:id')
   @RequirePermissions('catalog.manage_option_groups')
-  updateItem(@Param('id') id: string, @Body() dto: UpdateOptionItemDto) {
-    return this.service.updateItem(id, dto);
+  updateItem(@Param('id') id: string, @Body() dto: UpdateOptionItemDto, @CurrentUser('sub') actorId: string) {
+    return this.service.updateItem(id, dto, actorId);
   }
 
   @Delete('items/:id')
   @RequirePermissions('catalog.manage_option_groups')
-  deleteItem(@Param('id') id: string) {
-    return this.service.deleteItem(id);
+  deleteItem(@Param('id') id: string, @CurrentUser('sub') actorId: string) {
+    return this.service.deleteItem(id, actorId);
+  }
+
+  @Patch('items/:id/archive')
+  @RequirePermissions('catalog.manage_option_groups')
+  archiveItem(@Param('id') id: string, @CurrentUser('sub') actorId: string) {
+    return this.service.archiveItem(id, actorId);
+  }
+
+  @Patch('items/:id/restore')
+  @RequirePermissions('catalog.manage_option_groups')
+  restoreItem(@Param('id') id: string, @CurrentUser('sub') actorId: string) {
+    return this.service.restoreItem(id, actorId);
   }
 
   @Post(':id/items/reorder')

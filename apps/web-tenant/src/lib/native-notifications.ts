@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { ActionPerformed } from '@capacitor/local-notifications';
 
-const ORDERS_CHANNEL_ID = 'orders';
+export const ORDERS_CHANNEL_ID = 'new-orders-v2';
 const NOTIFIED_ORDER_IDS_KEY = 'native_notified_order_ids_v1';
 const MAX_STORED_NOTIFIED_IDS = 120;
 
@@ -54,7 +54,15 @@ async function ensureOrdersChannel() {
     vibration: true,
     lights: true,
     lightColor: '#0c93e9',
+    sound: 'new_order_chime.wav',
   });
+}
+
+export async function checkNativeNotificationPermission() {
+  if (!isNativeNotificationsAvailable()) return 'unsupported' as const;
+  const current = await LocalNotifications.checkPermissions();
+  if (current.display === 'granted') await ensureOrdersChannel();
+  return current.display;
 }
 
 export async function requestNativeNotificationPermission() {
@@ -83,7 +91,7 @@ export async function showNewOrderNotification(order: NewOrderNotificationPayloa
   const notifiedIds = getStoredNotifiedIds();
   if (notifiedIds.includes(orderId)) return false;
 
-  const permission = await requestNativeNotificationPermission();
+  const permission = await checkNativeNotificationPermission();
   if (permission !== 'granted') return false;
 
   const total = typeof order.total === 'number'

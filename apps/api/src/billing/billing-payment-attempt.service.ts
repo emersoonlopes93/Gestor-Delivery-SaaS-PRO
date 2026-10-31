@@ -10,10 +10,18 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
-import { BillingPaymentSimulation } from './billing-payment-gateway.interface';
+import {
+  BillingPaymentCreateResult,
+  BillingPaymentSimulation,
+} from './billing-payment-gateway.interface';
 import { mapAsaasPaymentStatusToAttemptStatus } from './asaas-billing-payment.provider';
 
 const PENDING_ATTEMPT_STATUSES = [PaymentAttemptStatus.pending, PaymentAttemptStatus.processing];
+const EXTERNALLY_SUBMITTED_ATTEMPT_STATUSES = [
+  PaymentAttemptStatus.pending,
+  PaymentAttemptStatus.processing,
+  PaymentAttemptStatus.succeeded,
+];
 
 export type CreateBillingPaymentAttemptInput = {
   invoiceId: string;
@@ -37,7 +45,49 @@ export class BillingPaymentAttemptService {
     this.gatewayService.assertPaymentsEnabled(input.provider, input.mode);
     const idempotencyKey = this.resolveIdempotencyKey(input);
 
-    return this.prisma.$transaction(async (tx) => {
+    const reservation = await this.reserveAttempt({
+      ...input,
+      idempotencyKey,
+    });
+    if (!reservation.created) {
+      return reservation.attempt;
+    }
+
+    let gatewayResult: BillingPaymentCreateResult;
+    try {
+      // Never keep a database transaction open while calling a payment provider.
+      // The reservation is durable and keyed before this call, so a timeout or a
+      // concurrent retry cannot submit another external charge for this invoice.
+      gatewayResult = await this.gatewayService.createPaymentForInvoice({
+        invoice: reservation.invoice,
+        provider: input.provider,
+        mode: input.mode,
+        idempotencyKey,
+        providerCustomerId: reservation.invoice.subscription.providerCustomerId,
+        simulate: input.simulate,
+      });
+    } catch (error: unknown) {
+      await this.recordGatewaySubmissionUncertain({
+        attemptId: reservation.attempt.id,
+        message: this.getErrorMessage(error),
+      });
+      throw error;
+    }
+
+    return this.finalizeReservedAttempt({
+      attemptId: reservation.attempt.id,
+      provider: input.provider,
+      mode: input.mode,
+      gatewayResult,
+    });
+  }
+
+  private async reserveAttempt(input: CreateBillingPaymentAttemptInput & { idempotencyKey: string }) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+      // Keep this transaction short: it serializes the reservation decision,
+      // then releases the lock before any external provider call.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`billing-payment-attempt:${input.invoiceId}`}, 0))`;
       const invoice = await tx.invoice.findFirst({
         where: { id: input.invoiceId, tenantId: input.tenantId },
         include: { subscription: true },
@@ -50,22 +100,78 @@ export class BillingPaymentAttemptService {
         where: {
           invoiceId: invoice.id,
           provider: input.provider,
-          idempotencyKey,
+          OR: [
+            { idempotencyKey: input.idempotencyKey },
+            { status: { in: EXTERNALLY_SUBMITTED_ATTEMPT_STATUSES } },
+          ],
         },
+        orderBy: [{ createdAt: 'desc' }],
       });
-      if (existing) return existing;
+      if (existing) return { attempt: existing, invoice, created: false };
 
       this.assertInvoiceAllowsAttempt(invoice);
-
-      const gatewayResult = await this.gatewayService.createPaymentForInvoice({
-        invoice,
-        provider: input.provider,
-        mode: input.mode,
-        idempotencyKey,
-        providerCustomerId: invoice.subscription.providerCustomerId,
-        simulate: input.simulate,
+      const openedInvoice = await this.openInvoiceForAttempt(tx, invoice, null, input.provider);
+        const attempt = await tx.paymentAttempt.create({
+          data: {
+            invoiceId: openedInvoice.id,
+            tenantId: openedInvoice.tenantId,
+            provider: input.provider,
+            mode: input.mode,
+            idempotencyKey: input.idempotencyKey,
+            status: PaymentAttemptStatus.processing,
+            amount: openedInvoice.total,
+            metadataJson: { gatewaySubmission: 'reserved' },
+          },
+        });
+        return { attempt, invoice, created: true };
       });
+    } catch (error: unknown) {
+      // PostgreSQL aborts a transaction after P2002. A recovery read must use
+      // the root client after rollback, never the failed transaction client.
+      if (!this.isPrismaUniqueConstraint(error)) throw error;
+      const [invoice, concurrentAttempt] = await Promise.all([
+        this.prisma.invoice.findFirst({
+          where: { id: input.invoiceId, tenantId: input.tenantId },
+          include: { subscription: true },
+        }),
+        this.prisma.paymentAttempt.findFirst({
+          where: {
+            invoiceId: input.invoiceId,
+            provider: input.provider,
+            OR: [
+              { idempotencyKey: input.idempotencyKey },
+              { status: { in: EXTERNALLY_SUBMITTED_ATTEMPT_STATUSES } },
+            ],
+          },
+          orderBy: [{ createdAt: 'desc' }],
+        }),
+      ]);
+      if (!invoice || !concurrentAttempt) throw error;
+      return { attempt: concurrentAttempt, invoice, created: false };
+    }
+  }
 
+  private async finalizeReservedAttempt(input: {
+    attemptId: string;
+    provider: PaymentProvider;
+    mode: BillingGatewayMode;
+    gatewayResult: Awaited<ReturnType<BillingPaymentGatewayService['createPaymentForInvoice']>>;
+  }): Promise<PaymentAttempt> {
+    return this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.paymentAttempt.findUnique({
+        where: { id: input.attemptId },
+        include: { invoice: { include: { subscription: true } } },
+      });
+      if (!attempt) {
+        throw new NotFoundException('Reserva de payment attempt nao encontrada.');
+      }
+
+      if (attempt.providerPaymentId || attempt.status !== PaymentAttemptStatus.processing) {
+        return attempt;
+      }
+
+      const invoice = attempt.invoice;
+      const gatewayResult = input.gatewayResult;
       if (gatewayResult.providerCustomerId && !invoice.subscription.providerCustomerId) {
         await tx.tenantBillingSubscription.update({
           where: { id: invoice.subscriptionId },
@@ -76,14 +182,17 @@ export class BillingPaymentAttemptService {
         });
       }
 
-      const openedInvoice = await this.openInvoiceForAttempt(tx, invoice, gatewayResult.providerPaymentUrl, input.provider);
-      const attempt = await tx.paymentAttempt.create({
+      const openedInvoice = await this.openInvoiceForAttempt(
+        tx,
+        invoice,
+        gatewayResult.providerPaymentUrl,
+        input.provider,
+      );
+      const finalizedAttempt = await tx.paymentAttempt.update({
+        where: { id: attempt.id },
         data: {
-          invoiceId: openedInvoice.id,
-          tenantId: openedInvoice.tenantId,
           provider: input.provider,
           mode: input.mode,
-          idempotencyKey,
           status: gatewayResult.status,
           amount: openedInvoice.total,
           providerPaymentId: gatewayResult.providerPaymentId,
@@ -109,7 +218,7 @@ export class BillingPaymentAttemptService {
           provider: input.provider,
           mode: input.mode,
           invoiceId: openedInvoice.id,
-          paymentAttemptId: attempt.id,
+          paymentAttemptId: finalizedAttempt.id,
           providerPaymentId: gatewayResult.providerPaymentId,
           providerCustomerId: gatewayResult.providerCustomerId ?? invoice.subscription.providerCustomerId ?? null,
           invoiceStatusBefore: invoice.status,
@@ -124,13 +233,34 @@ export class BillingPaymentAttemptService {
         mode: input.mode,
         tenantId: openedInvoice.tenantId,
         invoiceId: openedInvoice.id,
-        paymentAttemptId: attempt.id,
+        paymentAttemptId: finalizedAttempt.id,
         providerPaymentId: gatewayResult.providerPaymentId,
         transition: `${invoice.status}->${gatewayResult.status === PaymentAttemptStatus.succeeded ? InvoiceStatus.paid : openedInvoice.status}`,
         result: 'created',
       });
 
-      return attempt;
+      return finalizedAttempt;
+    });
+  }
+
+  private async recordGatewaySubmissionUncertain(input: {
+    attemptId: string;
+    message: string;
+  }): Promise<void> {
+    const attempt = await this.prisma.paymentAttempt.findUnique({
+      where: { id: input.attemptId },
+      select: { metadataJson: true },
+    });
+    if (!attempt) return;
+
+    await this.prisma.paymentAttempt.update({
+      where: { id: input.attemptId },
+      data: {
+        metadataJson: this.mergeMetadata(attempt.metadataJson, {
+          gatewaySubmission: 'unknown_outcome',
+          gatewaySubmissionError: input.message,
+        }),
+      },
     });
   }
 
@@ -667,6 +797,14 @@ export class BillingPaymentAttemptService {
     const value = metadata[key];
     if (!Array.isArray(value)) return [];
     return value.filter((entry): entry is string => typeof entry === 'string');
+  }
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'Erro desconhecido ao submeter cobranca ao gateway.';
+  }
+
+  private isPrismaUniqueConstraint(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
   }
 
   private isJsonObject(value: Prisma.JsonValue | null): value is Prisma.JsonObject {

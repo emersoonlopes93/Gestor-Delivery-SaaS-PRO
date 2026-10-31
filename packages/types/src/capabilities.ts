@@ -10,9 +10,11 @@ export type FeatureDecisionReason =
   | 'plan_not_allowed'
   | 'tenant_disabled'
   | 'tenant_enabled_override'
+  | 'tenant_opt_in_required'
   | 'missing_permission'
   | 'beta_disabled'
   | 'env_disabled'
+  | 'release_disabled'
   | 'enabled';
 
 export type TenantCapabilityDecision = {
@@ -21,9 +23,17 @@ export type TenantCapabilityDecision = {
   source?: string;
 };
 
+export type TenantActionCapabilityKey = 'baseMenu.import' | 'branches.create';
+
+export type TenantActionCapabilityDecision = TenantCapabilityDecision & {
+  code: string;
+  message: string;
+};
+
 export type TenantCapabilitiesResponse = {
   features: Record<TenantCapabilityFeatureKey, TenantCapabilityDecision>;
   modules: Record<string, TenantCapabilityDecision>;
+  actions: Record<TenantActionCapabilityKey, TenantActionCapabilityDecision>;
   plan: {
     id: string | null;
     name: string | null;

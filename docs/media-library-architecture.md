@@ -101,3 +101,25 @@ A tabela `media_assets` já foi projetada prevendo a evolução do sistema para:
 * **Galeria própria do Tenant**: Consultas baseadas em `tenantId` com o escopo necessário.
 * **Galeria Global**: Recursos com `isSystem: true` e `tenantId: null` para disponibilizar imagens de banco de imagens gratuitas do sistema para os inquilinos.
 * **Busca e Categorias**: Filtros flexíveis por `category` e `tagsJson` (ex: pesquisar por tags de produtos como 'bebidas', 'doces').
+
+---
+
+## 8. Branding e fallback visual de produtos
+
+- Logo e banner são branding do tenant e usam upload direto. O onboarding não
+  oferece a biblioteca de cardápio nessas superfícies.
+- Produtos continuam podendo selecionar mídia da biblioteca do tenant ou da
+  galeria global publicada. Essa infraestrutura não deve ser removida enquanto
+  o editor de cardápio depender dela.
+- `TenantSettings.businessSegment` é a classificação canônica e opcional do
+  negócio. Registros antigos permanecem `NULL`; somente o payload visual
+  normaliza ausência para `OTHER`.
+- O storefront, o preview administrativo e o SmartShowcase reutilizam o mesmo
+  resolvedor em `@gestor/storefront-ui`: imagem própria do produto, fallback do
+  segmento e fallback genérico `OTHER`.
+- `ProductCategory.image` não participa da cadeia enquanto a procedência dos
+  dados legados não for certificada. Ativá-lo exige follow-up específico.
+- Os fallbacks são WebPs neutros versionados no bundle, sem hotlink, fetch por card,
+  dependência, marca de terceiros ou credencial.
+- Uma URL de produto quebrada troca uma única vez para o fallback calculado; o
+  fallback final não entra em loop de `onError`.

@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { TenantAuthService } from './tenant-auth.service';
 import { CurrentUser, Public } from '../common/decorators';
 import { TenantAuthGuard } from './guards/tenant-auth.guard';
@@ -44,6 +44,11 @@ class RegisterDto {
   @IsString()
   @IsNotEmpty()
   password!: string;
+
+  /** Marks only the Commercial V1 public signup path; legacy registrations stay unchanged. */
+  @IsBoolean()
+  @IsOptional()
+  commercialSignup?: boolean;
 }
 
 class ForgotPasswordDto {
@@ -89,6 +94,7 @@ export class TenantAuthController {
       dto.email,
       dto.password,
       sessionContext(req),
+      dto.commercialSignup === true,
     );
   }
 

@@ -1,11 +1,13 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthSessionStatus, AuthSubjectType, Prisma } from '@prisma/client';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
+import { AUTH_SESSION_REVOKED_EVENT, AuthSessionRevokedEvent } from './auth-session.events';
 
-type SessionContext = {
+export type SessionContext = {
   userAgent?: string;
   ipAddress?: string;
   deviceLabel?: string;
@@ -25,6 +27,9 @@ type CreateSessionInput = {
 type RotateSessionInput = {
   refreshToken: string;
   expectedSubjectType: AuthSubjectType;
+  expectedTenantId?: string;
+  expectedSubjectId?: string;
+  preserveAbsoluteExpiry?: boolean;
   context?: SessionContext;
 };
 
@@ -36,6 +41,7 @@ export class AuthSessionService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    @Optional() private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   async createSession(input: CreateSessionInput) {
@@ -97,7 +103,15 @@ export class AuthSessionService {
     const session = await this.prisma.authSession.findUnique({
       where: { id: sessionId },
     });
-    if (!session || session.refreshTokenFamilyId !== familyId) {
+    if (
+      !session
+      || session.refreshTokenFamilyId !== familyId
+      || session.subjectType !== input.expectedSubjectType
+      || (input.expectedTenantId !== undefined && session.tenantId !== input.expectedTenantId)
+      || (input.expectedSubjectId !== undefined && session.subjectId !== input.expectedSubjectId)
+      || this.asString(payload.sub) !== session.subjectId
+      || (session.tenantId !== null && this.asString(payload.tenantId) !== session.tenantId)
+    ) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -148,19 +162,30 @@ export class AuthSessionService {
       sid: nextSessionId,
       familyId,
     };
-    const nextRefreshToken = this.signRefreshToken(refreshPayload);
-    const nextExpiresAt = this.refreshExpiresAt();
+    const nextExpiresAt = input.preserveAbsoluteExpiry ? session.expiresAt : this.refreshExpiresAt();
+    const nextRefreshToken = this.signRefreshToken(
+      refreshPayload,
+      input.preserveAbsoluteExpiry ? nextExpiresAt : undefined,
+    );
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.authSession.update({
-        where: { id: session.id },
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const consumed = await tx.authSession.updateMany({
+          where: {
+            id: session.id,
+            status: AuthSessionStatus.active,
+            refreshTokenHash: presentedHash,
+          },
         data: {
           status: AuthSessionStatus.rotated,
           lastUsedAt: new Date(),
           replacedBySessionId: nextSessionId,
         },
-      });
-      await tx.authSession.create({
+        });
+        if (consumed.count !== 1) {
+          throw new UnauthorizedException('Invalid refresh token');
+        }
+        await tx.authSession.create({
         data: {
           id: nextSessionId,
           subjectType: session.subjectType,
@@ -181,8 +206,14 @@ export class AuthSessionService {
             rotatedAt: new Date().toISOString(),
           }),
         },
+        });
       });
-    });
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw error;
+    }
 
     this.logger.log({
       message: 'auth_refresh_rotated',
@@ -223,6 +254,7 @@ export class AuthSessionService {
       sessionId,
       reason,
     });
+    this.eventEmitter?.emit(AUTH_SESSION_REVOKED_EVENT, { sessionId } satisfies AuthSessionRevokedEvent);
     return { revoked: true };
   }
 
@@ -247,6 +279,31 @@ export class AuthSessionService {
       reason,
     });
     return { revoked: result.count };
+  }
+
+  async revokeAllActiveSessions(reason: string) {
+    const activeBefore = await this.prisma.authSession.count({
+      where: { status: AuthSessionStatus.active },
+    });
+    const result = await this.prisma.authSession.updateMany({
+      where: { status: AuthSessionStatus.active },
+      data: {
+        status: AuthSessionStatus.revoked,
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    });
+    const activeAfter = await this.prisma.authSession.count({
+      where: { status: AuthSessionStatus.active },
+    });
+    this.logger.warn({
+      message: 'auth_global_sessions_revoked',
+      activeBefore,
+      revoked: result.count,
+      activeAfter,
+      reason,
+    });
+    return { activeBefore, revoked: result.count, activeAfter };
   }
 
   async listActiveSessions(subjectType: AuthSubjectType, subjectId: string) {
@@ -293,10 +350,13 @@ export class AuthSessionService {
     }
   }
 
-  private signRefreshToken(payload: object) {
+  private signRefreshToken(payload: object, absoluteExpiresAt?: Date) {
+    const expiresIn = absoluteExpiresAt
+      ? Math.max(1, Math.floor((absoluteExpiresAt.getTime() - Date.now()) / 1000))
+      : this.config.get('JWT_REFRESH_EXPIRES_IN', '7d');
     return this.jwtService.sign(payload, {
       secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+      expiresIn,
     });
   }
 

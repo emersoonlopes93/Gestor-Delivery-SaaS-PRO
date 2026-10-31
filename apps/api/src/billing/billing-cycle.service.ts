@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   BillingCycleRecord,
+  BillingCycleStatus,
   BillingRevenueTier,
   Invoice,
   Prisma,
@@ -88,15 +89,34 @@ export class BillingCycleService {
     });
     if (existing) return existing;
 
-    return this.prisma.billingCycleRecord.create({
-      data: {
-        tenantId: input.tenantId,
-        subscriptionId: input.subscriptionId,
-        startedAt: input.periodStart,
-        endedAt: input.periodEnd,
-        status: 'open',
-      },
-    });
+    try {
+      return await this.prisma.billingCycleRecord.create({
+        data: {
+          tenantId: input.tenantId,
+          subscriptionId: input.subscriptionId,
+          startedAt: input.periodStart,
+          endedAt: input.periodEnd,
+          status: 'open',
+        },
+      });
+    } catch (error: unknown) {
+      // The database unique key is the authority under concurrent callers.
+      // Re-read the winner instead of exposing a false failure for an idempotent
+      // get-or-create request.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+        throw error;
+      }
+      const concurrent = await this.prisma.billingCycleRecord.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          subscriptionId: input.subscriptionId,
+          startedAt: input.periodStart,
+          endedAt: input.periodEnd,
+        },
+      });
+      if (!concurrent) throw error;
+      return concurrent;
+    }
   }
 
   async previewCloseCycle(input: {
@@ -157,6 +177,7 @@ export class BillingCycleService {
     const periodEnd = this.requireCycleEnd(preview.cycle);
 
     return this.prisma.$transaction(async (tx) => {
+      await this.acquireCycleLock(tx, input.cycleId);
       await this.billingUsageService.getOrCreateUsageSnapshot({
         tenantId: input.tenantId,
         cycleId: input.cycleId,
@@ -210,14 +231,46 @@ export class BillingCycleService {
     });
 
     return this.prisma.$transaction(async (tx) => {
+      await this.acquireCycleLock(tx, input.cycleId);
+      const currentCycle = await tx.billingCycleRecord.findFirst({
+        where: {
+          id: input.cycleId,
+          tenantId: input.tenantId,
+          subscriptionId: input.subscriptionId,
+        },
+      });
+      if (!currentCycle) {
+        throw new NotFoundException('Ciclo de billing nÃ£o encontrado.');
+      }
+
+      if (currentCycle.status === 'invoiced') {
+        const [invoice, snapshot] = await Promise.all([
+          tx.invoice.findFirst({
+            where: {
+              tenantId: input.tenantId,
+              subscriptionId: input.subscriptionId,
+              cycleId: input.cycleId,
+            },
+          }),
+          tx.billingUsageSnapshot.findFirst({
+            where: { tenantId: input.tenantId, cycleId: input.cycleId },
+          }),
+        ]);
+        if (!invoice || !snapshot) {
+          throw new NotFoundException('Fechamento de ciclo faturado estÃ¡ incompleto.');
+        }
+        return { cycle: currentCycle, invoice, usageSnapshotId: snapshot.id };
+      }
+
       const snapshot = await this.getOrCreateUsageSnapshotFromPreview({
         tenantId: input.tenantId,
         cycleId: input.cycleId,
         preview,
+        cycleStatus: currentCycle.status,
         tx,
       });
 
-      if (preview.cycle.status === 'open') {
+      if (currentCycle.status === 'open') {
         await tx.billingCycleRecord.update({
           where: { id: input.cycleId },
           data: {
@@ -233,7 +286,7 @@ export class BillingCycleService {
         });
       }
 
-      if (!['open', 'closed', 'invoiced'].includes(preview.cycle.status)) {
+      if (!['open', 'closed'].includes(currentCycle.status)) {
         throw new BadRequestException('Ciclo não pode ser faturado neste status.');
       }
 
@@ -309,6 +362,7 @@ export class BillingCycleService {
     tenantId: string;
     cycleId: string;
     preview: BillingCycleInvoicePreview;
+    cycleStatus: BillingCycleStatus;
     tx: Prisma.TransactionClient;
   }) {
     const usage = input.preview.usage;
@@ -340,7 +394,7 @@ export class BillingCycleService {
     };
 
     if (existing) {
-      if (input.preview.cycle.status !== 'open') {
+      if (input.cycleStatus !== 'open') {
         return existing;
       }
 
@@ -359,6 +413,16 @@ export class BillingCycleService {
         ...data,
       },
     });
+  }
+
+  private async acquireCycleLock(tx: Prisma.TransactionClient, cycleId: string): Promise<void> {
+    const rows = await tx.$queryRaw<Array<{ acquired: number }>>`
+      SELECT 1::integer AS acquired
+      FROM pg_advisory_xact_lock(hashtext(${cycleId}))
+    `;
+    if (rows.length !== 1 || rows[0]?.acquired !== 1) {
+      throw new Error('Failed to acquire billing cycle transaction lock.');
+    }
   }
 
   private assertValidPeriod(periodStart: Date, periodEnd: Date): void {

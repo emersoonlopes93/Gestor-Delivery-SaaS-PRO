@@ -1,248 +1,150 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Store, User, Phone, Mail, Lock, ArrowRight, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { CheckCircle, CircleAlert, CreditCard, Lock, Mail, Phone, Store, User } from 'lucide-react';
+import type { PublicCommercialPlanDTO, PublicCommercialPricingDTO, TenantLoginResponse } from '@gestor/types';
 import { api } from '../lib/api-client';
 import { maskPhone, unmask } from '@gestor/utils';
 
+const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+
+type CommercialSubscriptionResponse = {
+  subscriptionId: string;
+  status: string;
+  created: boolean;
+  requiresPaymentMethod: boolean;
+  canProceedToOnboarding: boolean;
+};
+
+type RegistrationSession = Pick<TenantLoginResponse, 'accessToken' | 'refreshToken' | 'user'>;
+
+function formatCurrency(value: string, currency: string) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(Number(value));
+}
+
+function formatRevenueRange(plan: PublicCommercialPlanDTO, minRevenue: string, maxRevenue: string | null) {
+  const min = formatCurrency(minRevenue, plan.currency);
+  return maxRevenue === null ? `Acima de ${min}` : `${min} até ${formatCurrency(maxRevenue, plan.currency)}`;
+}
+
 export function SaasRegisterPage() {
-  const [formData, setFormData] = useState({
-    ownerName: '',
-    shopName: '',
-    phone: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+  const [searchParams] = useSearchParams();
+  const [formData, setFormData] = useState({ ownerName: '', shopName: '', phone: '', email: '', password: '', confirmPassword: '' });
+  const [catalog, setCatalog] = useState<PublicCommercialPricingDTO | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [session, setSession] = useState<RegistrationSession | null>(null);
+  const [subscription, setSubscription] = useState<CommercialSubscriptionResponse | null>(null);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await api.get<PublicCommercialPricingDTO>('/saas/pricing');
+        setCatalog(response.data);
+        const requestedPlanId = searchParams.get('plan');
+        const requestedPlanIsAvailable = response.data.plans.some((plan) => plan.id === requestedPlanId);
+        setSelectedPlanId(requestedPlanIsAvailable ? requestedPlanId ?? '' : response.data.plans[0]?.id ?? '');
+      } catch {
+        setError('Não foi possível carregar as ofertas comerciais agora. Tente novamente em instantes.');
+      } finally {
+        setLoadingCatalog(false);
+      }
+    })();
+  }, [searchParams]);
+
+  const selectedPlan = useMemo(
+    () => catalog?.plans.find((plan) => plan.id === selectedPlanId) ?? null,
+    [catalog, selectedPlanId],
+  );
+
+  const subscribe = async (registrationSession: RegistrationSession) => {
+    if (!selectedPlan || !catalog) throw new Error('Selecione uma oferta disponível antes de continuar.');
+    const response = await fetch(`${API_BASE}/billing/commercial-subscription`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${registrationSession.accessToken}` },
+      body: JSON.stringify({ planId: selectedPlan.id, termsVersion: catalog.termsVersion, acceptedCommercialTerms: true }),
+    });
+    const body = await response.json().catch(() => null) as { data?: CommercialSubscriptionResponse; error?: { message?: string } } | null;
+    if (!response.ok || !body?.data) throw new Error(body?.error?.message ?? 'Sua conta foi criada, mas não foi possível registrar a adesão. Você pode tentar novamente sem criar outra conta.');
+    return body.data;
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('As senhas não conferem.');
-      setLoading(false);
-      return;
-    }
-    
+    if (!selectedPlan || !catalog) return setError('Nenhuma oferta comercial está disponível para contratação neste momento.');
+    if (!acceptedTerms) return setError('Confirme que você leu as condições comerciais para continuar.');
+    if (formData.password !== formData.confirmPassword) return setError('As senhas não conferem.');
+    setLoading(true);
     try {
-      const payload = {
-        ownerName: formData.ownerName,
-        shopName: formData.shopName,
-        email: formData.email,
-        password: formData.password,
-        phone: unmask(formData.phone), // enviar normalizado
-      };
-
-      await api.post('/auth/tenant/register', payload);
-      setSuccess(true);
-    } catch (err: unknown) {
-      const e = err as Error;
-      setError(e.message || 'Ocorreu um erro ao criar a conta.');
+      const registration = await api.post<TenantLoginResponse>('/auth/tenant/register', {
+        ownerName: formData.ownerName, shopName: formData.shopName, email: formData.email,
+        password: formData.password, phone: unmask(formData.phone), commercialSignup: true,
+      });
+      const registrationSession = registration.data;
+      setSession(registrationSession);
+      setSubscription(await subscribe(registrationSession));
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível criar sua conta.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    
-    if (name === 'phone') {
-      setFormData({ ...formData, phone: maskPhone(value) });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
+  const retrySubscription = async () => {
+    if (!session) return;
+    setLoading(true);
+    setError(null);
+    try { setSubscription(await subscribe(session)); }
+    catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Não foi possível concluir a adesão.'); }
+    finally { setLoading(false); }
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-100">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
-          </div>
-          <h2 className="text-3xl font-bold text-slate-900 mb-4">Conta criada!</h2>
-          <p className="text-slate-600 mb-8">
-            Seu delivery inteligente já está pronto. Acesse o painel de gerenciamento para concluir a configuração inicial.
-          </p>
-          <Link
-            to="/login"
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 px-4 rounded-xl hover:bg-indigo-700 transition-colors font-medium"
-          >
-            Acessar Meu Painel <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
-      </div>
-    );
+  const goToTenantLogin = () => {
+    const tenantUrl = import.meta.env.VITE_TENANT_URL || 'http://localhost:5173';
+    const returnTo = subscription?.canProceedToOnboarding ? '/onboarding' : '/billing/contract';
+    window.location.assign(`${tenantUrl}/login?${new URLSearchParams({ email: formData.email, returnTo }).toString()}`);
+  };
+
+  if (subscription) {
+    const pendingPayment = !subscription.canProceedToOnboarding;
+    return <main className="min-h-screen bg-[var(--storefront-background)] px-4 py-12 text-[var(--storefront-foreground)]"><section className="mx-auto max-w-lg rounded-2xl border border-[var(--storefront-border)] bg-[var(--storefront-card)] p-8 text-center shadow-xl">
+      {pendingPayment ? <CreditCard className="mx-auto mb-5 h-11 w-11 text-amber-500" /> : <CheckCircle className="mx-auto mb-5 h-11 w-11 text-emerald-500" />}
+      <h1 className="text-2xl font-bold">{pendingPayment ? 'Adesão registrada' : 'Conta e adesão confirmadas'}</h1>
+      <p className="mt-3 text-sm text-[var(--storefront-muted-foreground)]">{pendingPayment ? 'A forma de pagamento é obrigatória para esta oferta e a cobrança automática ainda não está disponível. Acesse o painel para acompanhar o próximo passo comercial.' : 'Sua assinatura foi registrada com sucesso. Entre no painel para continuar a configuração inicial da sua loja.'}</p>
+      <button type="button" onClick={goToTenantLogin} className="mt-7 w-full rounded-xl bg-[var(--storefront-primary)] px-4 py-3 font-semibold text-white">Entrar no painel</button>
+    </section></main>;
   }
 
-  return (
-    <div className="min-h-screen bg-[var(--storefront-background)] text-[var(--storefront-foreground)] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-[var(--storefront-foreground)]">
-          Crie sua Loja Grátis
-        </h2>
-        <p className="mt-2 text-center text-sm text-[var(--storefront-muted-foreground)]">
-          Ou{' '}
-          <Link to="/login" className="font-medium text-[var(--storefront-primary)] hover:opacity-90">
-            faça login se já possui uma conta
-          </Link>
-        </p>
-      </div>
+  const fields: Array<{ name: keyof typeof formData; label: string; Icon: typeof User; type: string }> = [
+    { name: 'ownerName', label: 'Seu nome', Icon: User, type: 'text' }, { name: 'shopName', label: 'Nome da loja', Icon: Store, type: 'text' },
+    { name: 'phone', label: 'WhatsApp', Icon: Phone, type: 'tel' }, { name: 'email', label: 'E-mail', Icon: Mail, type: 'email' },
+    { name: 'password', label: 'Senha', Icon: Lock, type: 'password' }, { name: 'confirmPassword', label: 'Confirmar senha', Icon: Lock, type: 'password' },
+  ];
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[var(--storefront-card)] py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-[var(--storefront-border)]">
-          
-          {error && (
-            <div className="mb-6 bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
-
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">Seu Nome</label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
-                </div>
-                <input
-                  name="ownerName"
-                  type="text"
-                  required
-                  value={formData.ownerName}
-                  onChange={handleChange}
-                  className="appearance-none block w-full pl-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="Ex: João Silva"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">Nome da Loja</label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Store className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
-                </div>
-                <input
-                  name="shopName"
-                  type="text"
-                  required
-                  value={formData.shopName}
-                  onChange={handleChange}
-                  className="appearance-none block w-full pl-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="Ex: Lanches do João"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">WhatsApp</label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
-                </div>
-                <input
-                  name="phone"
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="appearance-none block w-full pl-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">E-mail</label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
-                </div>
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="appearance-none block w-full pl-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="voce@exemplo.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">Senha</label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
-                </div>
-                <input
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="appearance-none block w-full pl-10 pr-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="Mínimo 8 caracteres"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-foreground)] transition-colors focus:outline-none"
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">Confirmar Senha</label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
-                </div>
-                <input
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="appearance-none block w-full pl-10 pr-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="Mínimo 8 caracteres"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-foreground)] transition-colors focus:outline-none"
-                  aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-[var(--storefront-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--storefront-primary)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                {loading ? 'Criando Loja...' : 'Finalizar Cadastro'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+  return <main className="min-h-screen bg-[var(--storefront-background)] px-4 py-10 text-[var(--storefront-foreground)] sm:px-6"><section className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+    <div className="rounded-2xl border border-[var(--storefront-border)] bg-[var(--storefront-card)] p-6 shadow-xl sm:p-9">
+      <p className="text-sm font-semibold text-[var(--storefront-primary)]">PedeHub para sua operação</p><h1 className="mt-2 text-3xl font-bold">Crie sua loja e conheça sua mensalidade</h1>
+      <p className="mt-3 text-sm text-[var(--storefront-muted-foreground)]">A faixa é calculada automaticamente conforme o faturamento elegível da loja. Você não escolhe uma faixa nem paga percentual sobre a venda.</p>
+      {error && <div role="alert" className="mt-5 flex gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600"><CircleAlert className="h-5 w-5 shrink-0" />{error}</div>}
+      <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
+        {fields.map(({ name, label, Icon, type }) => <label key={name} className="block text-sm font-medium">{label}<span className="relative mt-1 block"><Icon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--storefront-muted-foreground)]" /><input required name={name} type={type} value={formData[name]} onChange={(event) => setFormData((current) => ({ ...current, [name]: name === 'phone' ? maskPhone(event.target.value) : event.target.value }))} className="min-h-11 w-full rounded-xl border border-[var(--storefront-border)] bg-[var(--storefront-background)] py-3 pl-10 pr-3" /></span></label>)}
+        <label className="flex items-start gap-3 rounded-xl border border-[var(--storefront-border)] p-4 text-sm"><input type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Li as condições comerciais desta oferta e entendo que a mensalidade é definida pela faixa de faturamento elegível. O conteúdo jurídico definitivo ainda será formalizado.</span></label>
+        <button type="submit" disabled={loading || loadingCatalog || !selectedPlan || !acceptedTerms} className="min-h-11 w-full rounded-xl bg-[var(--storefront-primary)] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{loading ? 'Criando conta e registrando adesão...' : 'Criar conta e aderir à oferta'}</button>
+      </form>
+      {session && !subscription && <button type="button" onClick={retrySubscription} disabled={loading} className="mt-4 w-full rounded-xl border border-[var(--storefront-primary)] px-4 py-3 text-sm font-semibold text-[var(--storefront-primary)]">Tentar concluir adesão novamente</button>}
+      <p className="mt-5 text-center text-sm text-[var(--storefront-muted-foreground)]">Já possui uma conta? <Link to="/login" className="font-semibold text-[var(--storefront-primary)]">Faça login</Link></p>
     </div>
-  );
+    <aside className="rounded-2xl border border-[var(--storefront-border)] bg-[var(--storefront-card)] p-6 sm:p-8"><h2 className="text-xl font-bold">Oferta comercial vigente</h2>
+      {loadingCatalog && <p className="mt-4 text-sm text-[var(--storefront-muted-foreground)]">Carregando ofertas...</p>}
+      {!loadingCatalog && !catalog?.plans.length && <p className="mt-4 text-sm text-[var(--storefront-muted-foreground)]">Nenhuma oferta está disponível para contratação online neste momento.</p>}
+      <div className="mt-5 space-y-4">{catalog?.plans.map((plan) => <label key={plan.id} className={`block cursor-pointer rounded-xl border p-4 ${selectedPlanId === plan.id ? 'border-[var(--storefront-primary)] bg-[var(--storefront-primary)]/5' : 'border-[var(--storefront-border)]'}`}>
+        <span className="flex items-start gap-3"><input type="radio" name="plan" value={plan.id} checked={selectedPlanId === plan.id} onChange={() => setSelectedPlanId(plan.id)} className="mt-1" /><span><strong>{plan.name}</strong>{plan.description && <span className="mt-1 block text-sm text-[var(--storefront-muted-foreground)]">{plan.description}</span>}<span className="mt-2 block text-xs text-[var(--storefront-muted-foreground)]">Ciclo {plan.cycleInterval === 'monthly' ? 'mensal' : 'anual'}{plan.trialDays > 0 && !plan.requiresPaymentMethod ? ` · ${plan.trialDays} dias de teste configurados` : ''}</span></span></span>
+        <span className="mt-4 block space-y-2">{plan.revenueTiers.map((tier) => <span key={tier.id} className="flex justify-between gap-3 text-sm"><span>{tier.label ?? formatRevenueRange(plan, tier.minRevenue, tier.maxRevenue)}</span><strong>{formatCurrency(tier.price, plan.currency)}</strong></span>)}</span>
+        {plan.requiresPaymentMethod && <span className="mt-4 block rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">Esta oferta exige forma de pagamento. A cobrança automática ainda não está disponível; a adesão ficará pendente de acompanhamento comercial.</span>}
+      </label>)}</div>
+    </aside>
+  </section></main>;
 }
-

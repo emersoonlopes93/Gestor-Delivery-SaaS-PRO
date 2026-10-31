@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
@@ -10,6 +10,9 @@ import { CatalogTemplatesService } from '../catalog-templates.service';
 import { AvailabilityService, SalesChannel } from '../publication/availability.service';
 import type { Upsell } from '@gestor/types';
 import { MediaLibraryService } from '../../upload/media-library.service';
+import { BulkSetProductActiveDto } from './dto/bulk-set-product-active.dto';
+import { ComboComponentEligibilityService } from '../combo-component-eligibility.service';
+import { runSerializableTransactionWithRetry } from '../../database/serializable-transaction';
 
 @Injectable()
 export class ProductsService {
@@ -19,6 +22,7 @@ export class ProductsService {
     private readonly catalogTemplates: CatalogTemplatesService,
     private readonly availabilityService: AvailabilityService,
     private readonly mediaLibrary: MediaLibraryService,
+    private readonly comboEligibility: ComboComponentEligibilityService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -45,6 +49,10 @@ export class ProductsService {
       this.cacheManager.del(`storefront:${tenant.slug}:delivery`),
       this.cacheManager.del(`storefront:${tenant.slug}:pickup`),
     ]);
+  }
+
+  async invalidateStorefrontCacheForTenant(tenantId: string): Promise<void> {
+    await this.invalidateStorefrontCache(tenantId);
   }
 
   calculateComboBundleFinalPrice(
@@ -247,7 +255,24 @@ export class ProductsService {
         })
       },
       orderBy: { order: 'asc' },
-      include: { category: true, mediaAsset: true, publication: { include: { rules: true } } }
+      include: {
+        category: true,
+        mediaAsset: true,
+        publication: { include: { rules: true } },
+        _count: {
+          select: {
+            optionGroupLinks: {
+              where: {
+                optionGroup: {
+                  isActive: true,
+                  deletedAt: null,
+                  items: { some: { isActive: true, deletedAt: null } },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     // If channel is provided, filter using AvailabilityService
@@ -281,7 +306,7 @@ export class ProductsService {
         category: true,
         mediaAsset: true,
 
-        optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
+        optionGroupLinks: { where: { optionGroup: { deletedAt: null } }, include: { optionGroup: { include: { items: { where: { deletedAt: null }, orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
 
         comboBundleItems: {
           include: { product: true },
@@ -358,9 +383,14 @@ export class ProductsService {
       nextBasePrice = nextPricingType === 'fixed_price' ? nextPricingValue ?? 0 : 0;
     }
 
-    const product = await this.prisma.tenantClient.product.update({
-      where: { id },
-      data: {
+    const tenantId = this.getRequiredTenantId();
+    const product = await runSerializableTransactionWithRetry(this.prisma, async (tx) => {
+      const routesBefore = (updateProductDto.categoryId === undefined && updateProductDto.type === undefined)
+        ? new Map()
+        : await this.comboEligibility.getProductConfigurationRoutes(tenantId, [id], { requireActive: false }, tx);
+      const product = await tx.product.update({
+        where: { id },
+        data: {
         name: updateProductDto.name,
         type: nextType,
         comboMode: nextType === 'combo' ? nextComboMode : null,
@@ -384,7 +414,12 @@ export class ProductsService {
         order: updateProductDto.order,
         costPrice: updateProductDto.costPrice,
         ...(slug ? { slug } : {}),
-      },
+        },
+      });
+      if (routesBefore.size) {
+        await this.comboEligibility.assertDoesNotInvalidateExistingComboComponents(tenantId, [id], routesBefore, tx);
+      }
+      return product;
     });
 
     if (nextType === 'combo' && nextComboMode === 'bundle') {
@@ -421,6 +456,25 @@ export class ProductsService {
     await this.invalidateStorefrontCache(this.getRequiredTenantId());
 
     return product;
+  }
+
+  async bulkSetActive(dto: BulkSetProductActiveDto) {
+    const tenantId = this.getRequiredTenantId();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { tenantId, id: { in: dto.ids }, deletedAt: null },
+        select: { id: true },
+      });
+      if (products.length !== dto.ids.length) {
+        throw new BadRequestException('Um ou mais produtos não pertencem a esta loja ou não estão disponíveis.');
+      }
+      return tx.product.updateMany({
+        where: { tenantId, id: { in: dto.ids }, deletedAt: null },
+        data: { isActive: dto.isActive },
+      });
+    });
+    await this.invalidateStorefrontCache(tenantId);
+    return { updated: updated.count, isActive: dto.isActive };
   }
 
   async remove(id: string) {
@@ -464,8 +518,19 @@ export class ProductsService {
         optionGroupLinks: true,
 
         comboBundleItems: true,
-        publication: true,
+        publication: { include: { rules: true } },
         recipeIngredients: true,
+        recipeBases: {
+          include: {
+            base: {
+              select: { id: true, isActive: true, name: true },
+            },
+          },
+        },
+        optionItemRecipeIngredients: true,
+        optionItemRecipeBases: {
+          include: { base: { select: { id: true, isActive: true, name: true } } },
+        },
 
         optionItemPrices: true,
         upsellLinks: true,
@@ -474,6 +539,15 @@ export class ProductsService {
 
     if (!source) {
       throw new NotFoundException('Produto base não encontrado');
+    }
+
+    const archivedRecipeBase = source.recipeBases.find((link) => !link.base.isActive);
+    const archivedOptionRecipeBase = source.optionItemRecipeBases.find((link) => !link.base.isActive);
+    if (archivedRecipeBase || archivedOptionRecipeBase) {
+      const base = archivedRecipeBase?.base ?? archivedOptionRecipeBase?.base;
+      throw new ConflictException(
+        `O produto possui a preparação arquivada "${base?.name}" na ficha técnica. Restaure-a antes de duplicar o produto.`,
+      );
     }
 
     const newName = `${source.name} (Cópia)`;
@@ -506,7 +580,30 @@ export class ProductsService {
             create: (source.recipeIngredients || []).map((ri) => ({
               tenantId,
               ingredientId: ri.ingredientId,
+              inputQuantity: ri.inputQuantity,
+              inputUnit: ri.inputUnit,
               quantity: ri.quantity,
+            })),
+          },
+          recipeBases: {
+            create: (source.recipeBases || []).map((base) => ({
+              tenantId,
+              baseId: base.baseId,
+              inputQuantity: base.inputQuantity,
+              inputUnit: base.inputUnit,
+              quantity: base.quantity,
+            })),
+          },
+          optionItemRecipeIngredients: {
+            create: source.optionItemRecipeIngredients.map((item) => ({
+              tenantId, optionItemId: item.optionItemId, ingredientId: item.ingredientId,
+              inputQuantity: item.inputQuantity, inputUnit: item.inputUnit, quantity: item.quantity,
+            })),
+          },
+          optionItemRecipeBases: {
+            create: source.optionItemRecipeBases.map((item) => ({
+              tenantId, optionItemId: item.optionItemId, baseId: item.baseId,
+              inputQuantity: item.inputQuantity, inputUnit: item.inputUnit, quantity: item.quantity,
             })),
           },
         },
@@ -570,15 +667,40 @@ export class ProductsService {
         });
       }
 
-      // Create Draft Publication
-      await tx.catalogPublication.create({
-        data: {
-          tenantId,
-          productId: duplicate.id,
-          publicationStatus: 'draft',
-          operationalStatus: 'inactive',
-        },
-      });
+      // The product itself starts inactive, so copying the source publication is
+      // safe. Once activated, a copy of a sellable product must retain the same
+      // publication contract instead of remaining permanently draft/inactive.
+      if (source.publication) {
+        await tx.catalogPublication.create({
+          data: {
+            tenantId,
+            productId: duplicate.id,
+            publicationStatus: source.publication.publicationStatus,
+            operationalStatus: source.publication.operationalStatus,
+            rules: {
+              create: source.publication.rules.map((rule) => ({
+                tenantId,
+                channel: rule.channel,
+                daysOfWeek: rule.daysOfWeek,
+                startTime: rule.startTime,
+                endTime: rule.endTime,
+                isActive: rule.isActive,
+              })),
+            },
+          },
+        });
+      } else if (source.sellableOnline) {
+        // Older products can legitimately lack a publication record. Match the
+        // create-product default so activation restores storefront visibility.
+        await tx.catalogPublication.create({
+          data: {
+            tenantId,
+            productId: duplicate.id,
+            publicationStatus: 'published',
+            operationalStatus: 'active',
+          },
+        });
+      }
 
       return duplicate;
     });

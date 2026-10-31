@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException, OnModuleDestroy, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -48,8 +48,8 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     }
 
     if (!this.campaignQueue) {
-      this.logger.warn('Campaign automation scheduler requires campaign-dispatch queue, but it is not available (Redis disabled).');
-      return;
+      this.logger.error('Campaign queue not available (BullMQ disabled)');
+      throw new ServiceUnavailableException('Campaign queue is disabled. Check BULLMQ_ENABLED.');
     }
 
     this.logger.log('Campaign automation scheduler enabled via BullMQ.');
@@ -555,11 +555,11 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
   }
 
   private captureFailure(result: AutomationRunResult, automation: string, error: unknown) {
-    if (error instanceof BadRequestException) {
-      result.failures.push({ automation, reason: error.message });
+    if (error instanceof BadRequestException || error instanceof Error) {
+      result.failures.push({ automation, reason: (error as Error).message });
       return;
     }
-    const reason = error instanceof Error ? error.message : 'unknown_error';
+    const reason = 'unknown_error';
     result.failures.push({ automation, reason });
   }
 }

@@ -36,7 +36,7 @@ function hasRealCoordinates(lat?: number | null, lng?: number | null) {
   );
 }
 
-function ToggleCard({
+export function ToggleCard({
   title,
   description,
   enabled,
@@ -86,15 +86,18 @@ function ToggleCard({
         </div>
 
         {!disabled && onChange ? (
-          <label className="relative inline-flex cursor-pointer items-center">
+          <label className="relative inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-xl focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-950">
             <input
               type="checkbox"
               className="peer sr-only"
               checked={enabled}
               onChange={(event) => onChange(event.target.checked)}
+              role="switch"
+              aria-label={title}
+              aria-checked={enabled}
             />
             <div className="h-6 w-11 rounded-full bg-slate-200 transition peer-checked:bg-indigo-600 dark:bg-slate-700">
-              <div className="absolute left-[2px] top-[2px] h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5" />
+              <div className={`absolute left-0.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-primary-foreground transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
             </div>
           </label>
         ) : (

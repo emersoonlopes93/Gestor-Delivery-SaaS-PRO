@@ -1,7 +1,7 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { PaymentTxStatus, PaymentMethod, OrderStatus, Prisma } from '@prisma/client';
+import { OrderPaymentAttemptStatus, PaymentTxStatus, PaymentMethod, OrderStatus, PaymentProvider, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { WebhookDto } from './dto/create-pix-payment.dto';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -9,8 +9,14 @@ import { MercadoPagoPaymentSchema, MercadoPagoPayment } from './schemas/mercadop
 import { ModuleRef } from '@nestjs/core';
 import { OrdersService } from '../orders/orders.service';
 import { OrderStatus as SharedOrderStatus } from '@gestor/types';
+import { PaymentProviderConnectionService } from '../payment-foundation/payment-provider-connection.service';
+import { PaymentWebhookInboxService } from '../payment-foundation/payment-webhook-inbox.service';
+import { redactFinancialSecretText } from '../payment-foundation/payment-secret-redaction';
+import { OrderPaymentAttemptService } from '../payment-foundation/order-payment-attempt.service';
+import { PaymentRefundService } from './payment-refund.service';
 
 interface MercadoPagoConfig {
+  connectionId: string | null;
   accessToken: string;
   publicKey: string;
   webhookUrl: string;
@@ -101,6 +107,10 @@ export class PaymentGatewayService {
     private readonly tenantContext: TenantContextService,
     private readonly configService: ConfigService,
     private readonly moduleRef: ModuleRef,
+    private readonly connectionService: PaymentProviderConnectionService,
+    private readonly webhookInbox: PaymentWebhookInboxService,
+    private readonly paymentAttemptService: OrderPaymentAttemptService,
+    private readonly paymentRefundService: PaymentRefundService,
   ) {}
 
   private async getOrdersService(): Promise<OrdersService> {
@@ -196,19 +206,16 @@ export class PaymentGatewayService {
   }
 
   private async getMercadoPagoConfig(tenantId: string): Promise<MercadoPagoConfig> {
-    const settings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId },
-    });
-
-    const accessToken = settings?.mercadoPagoAccessToken || this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
-    const publicKey = settings?.mercadoPagoPublicKey || this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY');
+    const connection = await this.connectionService.resolveMercadoPagoCredentials(tenantId);
+    const accessToken = connection?.accessToken || this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
+    const publicKey = connection?.publicKey || this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY');
     const webhookUrl = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL');
 
     if (!accessToken || !publicKey || !webhookUrl) {
       throw new Error('Mercado Pago configuration missing for tenant ' + tenantId);
     }
 
-    return { accessToken, publicKey, webhookUrl };
+    return { connectionId: connection?.connectionId ?? null, accessToken, publicKey, webhookUrl };
   }
 
   async createPixPayment(orderId: string, customerEmail: string, customerName?: string): Promise<{
@@ -248,8 +255,6 @@ export class PaymentGatewayService {
         pixKey: true,
         razaoSocial: true,
         city: true,
-        mercadoPagoAccessToken: true,
-        mercadoPagoPublicKey: true,
       },
     });
 
@@ -265,32 +270,72 @@ export class PaymentGatewayService {
     const merchantCity = this.normalizePixField(tenantSettings?.city || 'SAO PAULO', 15);
     const pixKey = tenantSettings?.pixKey?.trim();
 
-    const paymentTransaction = await this.prisma.tenantClient.paymentTransaction.create({
-      data: {
-        tenantId,
-        orderId,
-        gatewayName: 'mercadopago',
-        gatewayTxId: '',
-        method: PaymentMethod.pix,
-        amount: order.total,
-        status: PaymentTxStatus.pending,
-        metadata: {
-          customerEmail,
-          customerName,
-          orderNumber: order.orderNumber,
-        } as Prisma.InputJsonObject,
-      },
+    let mpConfig: MercadoPagoConfig | null = null;
+    try {
+      mpConfig = await this.getMercadoPagoConfig(tenantId);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.startsWith('Mercado Pago configuration missing')) {
+        throw error;
+      }
+    }
+
+    const selectedProvider = mpConfig ? PaymentProvider.mercado_pago : PaymentProvider.manual;
+    const paymentAttempt = await this.paymentAttemptService.createAttempt({
+      tenantId,
+      orderId,
+      provider: selectedProvider,
+      providerConnectionId: mpConfig?.connectionId ?? null,
+      idempotencyKey: `order:${orderId}:pix:${selectedProvider}`,
     });
-
-    const mpConfigAvailable = Boolean(
-      tenantSettings?.mercadoPagoAccessToken || this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN'),
-    ) && Boolean(
-      tenantSettings?.mercadoPagoPublicKey || this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY'),
-    ) && Boolean(this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL'));
-
-    if (mpConfigAvailable) {
+    let paymentTransaction = await this.prisma.paymentTransaction.findFirst({
+      where: { tenantId, orderPaymentAttemptId: paymentAttempt.id },
+    });
+    if (!paymentTransaction) {
       try {
-        const config = await this.getMercadoPagoConfig(tenantId);
+        paymentTransaction = await this.prisma.paymentTransaction.create({
+          data: {
+            tenantId,
+            orderId,
+            orderPaymentAttemptId: paymentAttempt.id,
+            gatewayName: mpConfig ? 'mercadopago' : 'manual_pix',
+            gatewayTxId: '',
+            method: PaymentMethod.pix,
+            amount: order.total,
+            status: PaymentTxStatus.pending,
+            metadata: {
+              customerEmail,
+              customerName,
+              orderNumber: order.orderNumber,
+            } as Prisma.InputJsonObject,
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+        paymentTransaction = await this.prisma.paymentTransaction.findFirst({
+          where: { tenantId, orderPaymentAttemptId: paymentAttempt.id },
+        });
+        if (!paymentTransaction) throw error;
+      }
+    }
+
+    const previousStatus = await this.getPaymentStatus(paymentTransaction.id, tenantId);
+    if (previousStatus.qrCode) {
+      return {
+        transactionId: previousStatus.transactionId,
+        qrCode: previousStatus.qrCode,
+        qrCodeBase64: previousStatus.qrCodeBase64 ?? '',
+        ticketUrl: previousStatus.ticketUrl ?? '',
+        expiresAt: new Date(previousStatus.expiresAt ?? paymentTransaction.createdAt),
+      };
+    }
+
+    if (mpConfig) {
+      try {
+        await this.paymentAttemptService.transitionStatus({
+          tenantId,
+          attemptId: paymentAttempt.id,
+          status: OrderPaymentAttemptStatus.PENDING,
+        });
         const payload: MercadoPagoPixRequest = {
           transaction_amount: Number(order.total),
           description: `Pedido #${order.orderNumber}`,
@@ -306,8 +351,9 @@ export class PaymentGatewayService {
         const response = await fetch('https://api.mercadopago.com/v1/payments', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${config.accessToken}`,
+            'Authorization': `Bearer ${mpConfig.accessToken}`,
             'Content-Type': 'application/json',
+            'X-Idempotency-Key': paymentAttempt.id,
           },
           body: JSON.stringify(payload),
         });
@@ -316,6 +362,13 @@ export class PaymentGatewayService {
           const mpResponse: MercadoPagoPixResponse = await response.json();
           const expiresAt = new Date();
           expiresAt.setMinutes(expiresAt.getMinutes() + 30);
+
+          await this.paymentAttemptService.attachExternalPayment({
+            tenantId,
+            attemptId: paymentAttempt.id,
+            externalPaymentId: mpResponse.id,
+            expiresAt,
+          });
 
           await this.prisma.tenantClient.paymentTransaction.update({
             where: { id: paymentTransaction.id },
@@ -345,10 +398,20 @@ export class PaymentGatewayService {
         }
 
         const error = await response.text();
-        this.logger.warn(`Mercado Pago API error, using local PIX fallback: ${error}`);
+        await this.paymentAttemptService.transitionStatus({
+          tenantId,
+          attemptId: paymentAttempt.id,
+          status: OrderPaymentAttemptStatus.FAILED,
+          failureCode: `mercado_pago_http_${response.status}`,
+          failureReason: 'Mercado Pago rejected payment creation.',
+        });
+        this.logger.warn(`Mercado Pago API rejected PIX creation: ${redactFinancialSecretText(error)}`);
+        throw new ServiceUnavailableException('Mercado Pago could not create the PIX payment.');
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.warn(`Error creating PIX with Mercado Pago, using local PIX fallback: ${message}`);
+        this.logger.warn(`Error creating PIX with Mercado Pago; provider attempt retained: ${redactFinancialSecretText(message)}`);
+        if (error instanceof ServiceUnavailableException) throw error;
+        throw new ServiceUnavailableException('Mercado Pago payment state is pending verification.');
       }
     }
 
@@ -366,6 +429,13 @@ export class PaymentGatewayService {
       amount: Number(order.total),
       txid,
       description: `Pedido #${order.orderNumber}`,
+    });
+
+    await this.paymentAttemptService.attachExternalPayment({
+      tenantId,
+      attemptId: paymentAttempt.id,
+      externalPaymentId: txid,
+      expiresAt,
     });
 
     await this.prisma.tenantClient.paymentTransaction.update({
@@ -629,11 +699,20 @@ export class PaymentGatewayService {
       return;
     }
 
-    const transaction = await this.prisma.paymentTransaction.findFirst({
-      where: { gatewayTxId: payload.data.id.toString() },
+    const matchingTransactions = await this.prisma.paymentTransaction.findMany({
+      where: {
+        gatewayName: 'mercadopago',
+        gatewayTxId: payload.data.id.toString(),
+      },
+      take: 2,
     });
 
+    const transaction = matchingTransactions.length === 1 ? matchingTransactions[0] : null;
+
     if (!transaction) {
+      if (matchingTransactions.length > 1) {
+        throw new BadRequestException('Ambiguous payment transaction identity');
+      }
       this.logger.warn(`Transaction not found for payment ${payload.data.id}`);
       return;
     }
@@ -660,8 +739,8 @@ export class PaymentGatewayService {
       });
 
       if (!response.ok) {
-        this.logger.error(`Failed to fetch payment info: ${await response.text()}`);
-        return;
+        this.logger.error(`Failed to fetch payment info: ${redactFinancialSecretText(await response.text())}`);
+        throw new Error('Failed to fetch payment info');
       }
 
       const mpRawPayment = await response.json();
@@ -670,10 +749,22 @@ export class PaymentGatewayService {
         this.logger.warn(`Webhook payment reference mismatch for tenant ${transaction.tenantId} payment ${payload.data.id}`);
         throw new BadRequestException('Payment reference mismatch');
       }
-      await this.processPaymentUpdate(payment);
+      await this.webhookInbox.registerAuthenticatedAndProcess({
+        authenticityVerified: true,
+        provider: PaymentProvider.mercado_pago,
+        externalEventId: payload.id,
+        eventType: payload.action,
+        payload: JSON.stringify(payload),
+        tenantId: transaction.tenantId,
+        providerConnectionId: config.connectionId,
+        paymentAttemptId: transaction.orderPaymentAttemptId,
+        externalPaymentId: payment.id,
+        process: () => this.processPaymentUpdate(payment, transaction.tenantId),
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error processing webhook: ${message}`);
+      this.logger.error(`Error processing webhook: ${redactFinancialSecretText(message)}`);
+      throw error;
     }
   }
 
@@ -729,32 +820,27 @@ export class PaymentGatewayService {
   }
 
   private async getWebhookSecret(tenantId: string): Promise<string | undefined> {
-    const settings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId },
-      select: { mercadoPagoWebhookSecret: true },
-    });
-
-    const tenantSecret = settings?.mercadoPagoWebhookSecret?.trim();
-    if (tenantSecret) return tenantSecret;
+    const connection = await this.connectionService.resolveMercadoPagoCredentials(tenantId);
+    if (connection?.webhookSecret) return connection.webhookSecret;
 
     const globalSecret = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_SECRET')?.trim();
     return globalSecret || undefined;
   }
 
-  private async processPaymentUpdate(payment: MercadoPagoPayment): Promise<void> {
+  private async processPaymentUpdate(payment: MercadoPagoPayment, tenantId: string): Promise<void> {
     if (!payment.external_reference) {
       this.logger.warn(`No external_reference found for payment ${payment.id}`);
       return;
     }
 
     const transaction = await this.prisma.paymentTransaction.findFirst({
-      where: { id: payment.external_reference },
+      where: { id: payment.external_reference, tenantId },
       include: { order: true },
     });
 
     if (!transaction) {
       const fallbackTx = await this.prisma.paymentTransaction.findFirst({
-        where: { gatewayTxId: payment.id.toString() },
+        where: { gatewayName: 'mercadopago', gatewayTxId: payment.id.toString(), tenantId },
         include: { order: true },
       });
       
@@ -769,6 +855,28 @@ export class PaymentGatewayService {
   }
 
   private async updateTransactionRecord(transaction: Prisma.PaymentTransactionGetPayload<{ include: { order: true } }>, payment: MercadoPagoPayment): Promise<void> {
+    if (payment.status === 'refunded') {
+      const refundTransitioned = await this.paymentRefundService.confirmFullRefundFromPaymentWebhook({
+        tenantId: transaction.tenantId,
+        paymentTransactionId: transaction.id,
+        providerPaymentId: payment.id.toString(),
+      });
+      await this.prisma.paymentTransaction.update({
+        where: { id: transaction.id },
+        data: {
+          metadata: this.mergeMetadata(transaction.metadata, { mercadoPagoPayment: payment }),
+        },
+      });
+      if (refundTransitioned && transaction.orderPaymentAttemptId) {
+        await this.paymentAttemptService.transitionStatusOnce({
+          tenantId: transaction.tenantId,
+          attemptId: transaction.orderPaymentAttemptId,
+          status: OrderPaymentAttemptStatus.REFUNDED,
+        });
+      }
+      return;
+    }
+
     let newStatus: PaymentTxStatus;
     let orderStatus: OrderStatus;
 
@@ -791,6 +899,7 @@ export class PaymentGatewayService {
         return;
     }
 
+    let transactionTransitioned = false;
     if (transaction.status === newStatus) {
       await this.prisma.paymentTransaction.update({
         where: { id: transaction.id },
@@ -801,20 +910,44 @@ export class PaymentGatewayService {
         },
       });
       this.logger.log(`Payment webhook idempotent update ignored for transaction ${transaction.id}`);
-      return;
+    } else {
+      const claimed = await this.prisma.paymentTransaction.updateMany({
+        where: { id: transaction.id, tenantId: transaction.tenantId, status: transaction.status },
+        data: {
+          status: newStatus,
+          confirmedAt: newStatus === PaymentTxStatus.confirmed ? new Date() : undefined,
+          metadata: this.mergeMetadata(transaction.metadata, {
+            mercadoPagoPayment: payment,
+          }),
+        },
+      });
+      transactionTransitioned = claimed.count === 1;
+      if (!transactionTransitioned) {
+        this.logger.log(`Concurrent payment webhook update ignored for transaction ${transaction.id}`);
+      }
     }
 
-    await this.prisma.paymentTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        status: newStatus,
-        metadata: this.mergeMetadata(transaction.metadata, {
-          mercadoPagoPayment: payment,
-        }),
-      },
-    });
+    let paymentAttemptTransitioned = false;
+    if (transaction.orderPaymentAttemptId) {
+      const attemptStatus = newStatus === PaymentTxStatus.confirmed
+        ? OrderPaymentAttemptStatus.PAID
+        : newStatus === PaymentTxStatus.failed
+          ? OrderPaymentAttemptStatus.FAILED
+          : OrderPaymentAttemptStatus.PENDING;
+      const attemptTransition = await this.paymentAttemptService.transitionStatusOnce({
+        tenantId: transaction.tenantId,
+        attemptId: transaction.orderPaymentAttemptId,
+        status: attemptStatus,
+        failureCode: attemptStatus === OrderPaymentAttemptStatus.FAILED ? `mercado_pago_${payment.status}` : undefined,
+        failureReason: attemptStatus === OrderPaymentAttemptStatus.FAILED ? payment.status_detail : undefined,
+      });
+      paymentAttemptTransitioned = attemptTransition.transitioned;
+    }
 
-    if (newStatus === PaymentTxStatus.confirmed && transaction.orderId) {
+    const ownsPaidSideEffect = transaction.orderPaymentAttemptId
+      ? paymentAttemptTransitioned
+      : transactionTransitioned;
+    if (newStatus === PaymentTxStatus.confirmed && transaction.orderId && ownsPaidSideEffect) {
       try {
         const ordersService = await this.getOrdersService();
         await ordersService.updateOrderStatus(transaction.orderId, transaction.tenantId, {
@@ -828,7 +961,7 @@ export class PaymentGatewayService {
     }
   }
 
-  async getPaymentStatus(transactionId: string): Promise<{
+  async getPaymentStatus(transactionId: string, tenantId?: string): Promise<{
     transactionId: string;
     status: PaymentTxStatus;
     gatewayStatus?: string;
@@ -841,8 +974,8 @@ export class PaymentGatewayService {
     expiresAt?: string;
     confirmedAt?: Date | null;
   }> {
-    const transaction = await this.prisma.paymentTransaction.findUnique({
-      where: { id: transactionId },
+    const transaction = await this.prisma.paymentTransaction.findFirst({
+      where: { id: transactionId, ...(tenantId ? { tenantId } : {}) },
       include: {
         order: {
           select: {
@@ -918,9 +1051,9 @@ export class PaymentGatewayService {
     };
   }
 
-  async cancelPayment(transactionId: string): Promise<void> {
-    const transaction = await this.prisma.paymentTransaction.findUnique({
-      where: { id: transactionId },
+  async cancelPayment(transactionId: string, tenantId: string): Promise<void> {
+    const transaction = await this.prisma.paymentTransaction.findFirst({
+      where: { id: transactionId, tenantId },
       include: { order: true },
     });
 
@@ -975,7 +1108,7 @@ export class PaymentGatewayService {
       this.logger.log(`Payment cancelled: ${transactionId}`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error cancelling payment: ${message}`);
+      this.logger.error(`Error cancelling payment: ${redactFinancialSecretText(message)}`);
       throw error;
     }
   }

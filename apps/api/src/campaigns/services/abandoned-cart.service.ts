@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { normalizeMarketingPhone } from '../../common/utils/marketing-opt-out.util';
 
 type ReminderStep = '30m' | '2h' | '24h';
 
@@ -28,7 +30,7 @@ export class AbandonedCartService {
       take: 100,
     });
 
-    const phones = sessions.map((session) => session.customerPhone).filter(Boolean);
+    const phones = sessions.map((session) => normalizeMarketingPhone(session.customerPhone)).filter(Boolean);
     const optOuts = phones.length
       ? await this.prisma.customerOptOut.findMany({
           where: { tenantId, phone: { in: phones } },
@@ -49,7 +51,7 @@ export class AbandonedCartService {
           lastMessageAt: session.lastMessageAt,
           step,
           minutesInactive: Math.floor((Date.now() - session.lastMessageAt.getTime()) / 60_000),
-          optedOut: optedOutPhones.has(session.customerPhone),
+          optedOut: optedOutPhones.has(normalizeMarketingPhone(session.customerPhone)),
         };
       })
       .filter((cart): cart is NonNullable<typeof cart> => Boolean(cart && !cart.optedOut));
@@ -193,7 +195,7 @@ export class AbandonedCartService {
         tenantId,
         name,
         objective: 'abandoned_cart',
-        status: 'running',
+        status: 'processing',
         messageTemplate,
         // sessionId e step gravados em segmentRules para permitir lookup idempotente
         segmentRules: {
@@ -214,6 +216,7 @@ export class AbandonedCartService {
         customerId: customer.id,
         phone,
         status: 'queued',
+        idempotencyKey: `campaign:${campaign.id}:dispatch:${randomUUID()}`,
       },
     });
 

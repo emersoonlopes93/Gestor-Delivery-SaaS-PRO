@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
@@ -17,6 +18,8 @@ import {
   type FeatureOperationalStatus,
   type FeaturePresetKey,
   type FeatureStatus,
+  TENANT_ACTION_CAPABILITIES,
+  type TenantActionCapabilityKey,
 } from '@gestor/core';
 import type {
   AdminFeatureCatalogItem,
@@ -35,6 +38,14 @@ type ResolveTenantFeatureInput = {
   featureKey: string;
   userId?: string;
   requiredPermission?: string | string[];
+  /**
+   * The tenant-admin inventory is a configuration view, not a login session
+   * for the platform administrator who requested it. It must therefore show
+   * whether the tenant can receive the feature without accidentally testing
+   * the SaaS admin id against tenant-scoped roles. User-facing capability
+   * endpoints keep this disabled and continue to enforce RBAC.
+   */
+  skipUserPermissionCheck?: boolean;
 };
 
 type TenantModuleAccessRow = {
@@ -135,6 +146,19 @@ export class FeatureControlService {
     private readonly rbacService: RbacService,
   ) {}
 
+  getTenantActionCapability(actionKey: TenantActionCapabilityKey) {
+    const capability = TENANT_ACTION_CAPABILITIES[actionKey];
+    if (actionKey === 'baseMenu.import' && process.env.BASE_MENU_IMPORT_ENABLED?.trim().toLowerCase() === 'true') {
+      return {
+        ...capability,
+        enabled: true,
+        reason: 'enabled',
+        source: 'BASE_MENU_IMPORT_ENABLED',
+      } as const;
+    }
+    return capability;
+  }
+
   async resolveTenantFeature(input: ResolveTenantFeatureInput): Promise<TenantCapabilityDecision> {
     const feature = this.requireFeature(input.featureKey);
     if (feature.essential) {
@@ -189,6 +213,10 @@ export class FeatureControlService {
     return {
       features: Object.fromEntries(featureEntries),
       modules: Object.fromEntries(moduleEntries),
+      actions: Object.fromEntries(
+        (Object.keys(TENANT_ACTION_CAPABILITIES) as TenantActionCapabilityKey[])
+          .map((actionKey) => [actionKey, this.getTenantActionCapability(actionKey)]),
+      ) as TenantCapabilitiesResponse['actions'],
       plan: {
         id: context.billingState.plan?.id ?? null,
         name: context.billingState.plan?.name ?? null,
@@ -222,7 +250,7 @@ export class FeatureControlService {
     });
   }
 
-  async getTenantFeatureCatalog(tenantId: string, userId?: string): Promise<AdminTenantFeaturesResponse> {
+  async getTenantFeatureCatalog(tenantId: string): Promise<AdminTenantFeaturesResponse> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { id: true, name: true, slug: true },
@@ -231,7 +259,7 @@ export class FeatureControlService {
       throw new NotFoundException('Tenant nao encontrado.');
     }
 
-    const context = await this.buildContext(tenantId, userId);
+    const context = await this.buildContext(tenantId);
 
     return {
       tenant,
@@ -239,8 +267,8 @@ export class FeatureControlService {
         const decision = this.resolveTenantFeatureWithContext(
           {
             tenantId,
-            userId,
             featureKey: feature.key,
+            skipUserPermissionCheck: true,
           },
           context,
         );
@@ -635,13 +663,58 @@ export class FeatureControlService {
       context.moduleAccessMap,
     );
     const tenantOverride = this.resolveEffectiveOverride(feature, context);
+
+    if (feature.requiresExplicitTenantEnablement) {
+      if (tenantOverride?.mode === 'disabled') {
+        return {
+          enabled: false,
+          reason: 'tenant_disabled',
+          source: tenantOverride.source,
+        };
+      }
+
+      if (tenantOverride?.mode !== 'enabled') {
+        return {
+          enabled: false,
+          reason: 'tenant_opt_in_required',
+          source: 'feature_catalog',
+        };
+      }
+
+      // An opt-in grants eligibility for this tenant, but it never bypasses
+      // the canonical plan/module or RBAC gates below.
+      if (!availabilityResult.enabled) {
+        return availabilityResult;
+      }
+
+      const permissionDecision = input.skipUserPermissionCheck
+        ? null
+        : this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
+      if (permissionDecision) {
+        return permissionDecision;
+      }
+
+      const envDecision = this.resolveEnvFallback(feature);
+      if (envDecision) {
+        return envDecision;
+      }
+
+      return {
+        enabled: true,
+        reason: 'tenant_enabled_override',
+        source: tenantOverride.source,
+      };
+    }
+
     const effectiveAvailability = this.applyTenantOverrideToAvailability(availabilityResult, tenantOverride);
 
     if (!effectiveAvailability.enabled) {
       return effectiveAvailability;
     }
 
-    const permissionDecision = this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
+    const permissionDecision = input.skipUserPermissionCheck
+      ? null
+      : this.resolvePermissionDecision(feature, input.requiredPermission, context.permissions);
     if (permissionDecision) {
       return permissionDecision;
     }
