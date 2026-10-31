@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   BillingCycleRecord,
+  BillingCycleStatus,
   BillingRevenueTier,
   Invoice,
   Prisma,
@@ -176,6 +177,7 @@ export class BillingCycleService {
     const periodEnd = this.requireCycleEnd(preview.cycle);
 
     return this.prisma.$transaction(async (tx) => {
+      await this.acquireCycleLock(tx, input.cycleId);
       await this.billingUsageService.getOrCreateUsageSnapshot({
         tenantId: input.tenantId,
         cycleId: input.cycleId,
@@ -229,14 +231,46 @@ export class BillingCycleService {
     });
 
     return this.prisma.$transaction(async (tx) => {
+      await this.acquireCycleLock(tx, input.cycleId);
+      const currentCycle = await tx.billingCycleRecord.findFirst({
+        where: {
+          id: input.cycleId,
+          tenantId: input.tenantId,
+          subscriptionId: input.subscriptionId,
+        },
+      });
+      if (!currentCycle) {
+        throw new NotFoundException('Ciclo de billing nÃ£o encontrado.');
+      }
+
+      if (currentCycle.status === 'invoiced') {
+        const [invoice, snapshot] = await Promise.all([
+          tx.invoice.findFirst({
+            where: {
+              tenantId: input.tenantId,
+              subscriptionId: input.subscriptionId,
+              cycleId: input.cycleId,
+            },
+          }),
+          tx.billingUsageSnapshot.findFirst({
+            where: { tenantId: input.tenantId, cycleId: input.cycleId },
+          }),
+        ]);
+        if (!invoice || !snapshot) {
+          throw new NotFoundException('Fechamento de ciclo faturado estÃ¡ incompleto.');
+        }
+        return { cycle: currentCycle, invoice, usageSnapshotId: snapshot.id };
+      }
+
       const snapshot = await this.getOrCreateUsageSnapshotFromPreview({
         tenantId: input.tenantId,
         cycleId: input.cycleId,
         preview,
+        cycleStatus: currentCycle.status,
         tx,
       });
 
-      if (preview.cycle.status === 'open') {
+      if (currentCycle.status === 'open') {
         await tx.billingCycleRecord.update({
           where: { id: input.cycleId },
           data: {
@@ -252,7 +286,7 @@ export class BillingCycleService {
         });
       }
 
-      if (!['open', 'closed', 'invoiced'].includes(preview.cycle.status)) {
+      if (!['open', 'closed'].includes(currentCycle.status)) {
         throw new BadRequestException('Ciclo não pode ser faturado neste status.');
       }
 
@@ -328,6 +362,7 @@ export class BillingCycleService {
     tenantId: string;
     cycleId: string;
     preview: BillingCycleInvoicePreview;
+    cycleStatus: BillingCycleStatus;
     tx: Prisma.TransactionClient;
   }) {
     const usage = input.preview.usage;
@@ -359,7 +394,7 @@ export class BillingCycleService {
     };
 
     if (existing) {
-      if (input.preview.cycle.status !== 'open') {
+      if (input.cycleStatus !== 'open') {
         return existing;
       }
 
@@ -378,6 +413,10 @@ export class BillingCycleService {
         ...data,
       },
     });
+  }
+
+  private async acquireCycleLock(tx: Prisma.TransactionClient, cycleId: string): Promise<void> {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${cycleId}))`;
   }
 
   private assertValidPeriod(periodStart: Date, periodEnd: Date): void {

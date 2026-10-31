@@ -208,11 +208,19 @@ describe('C5-B recurring billing PostgreSQL guard', () => {
       expect(cycleResults).toHaveLength(2);
       expect(cycleResults.some((result) => result.outcome === 'retryable_error')).toBe(false);
       const invoice = await reader.invoice.findFirstOrThrow({ where: { tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id } });
+      const snapshot = await reader.billingUsageSnapshot.findFirstOrThrow({ where: { tenantId: tenant.id, cycleId: cycle.id } });
+      const itemsBeforeRetry = await reader.invoiceItem.findMany({ where: { invoiceId: invoice.id }, orderBy: { type: 'asc' } });
+      expect(invoice.usageSnapshotId).toBe(snapshot.id);
       expect(await reader.billingUsageSnapshot.count({ where: { tenantId: tenant.id, cycleId: cycle.id } })).toBe(1);
       expect(await reader.invoice.count({ where: { tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id } })).toBe(1);
-      expect(await reader.invoiceItem.count({ where: { invoiceId: invoice.id } })).toBe(1);
+      expect(itemsBeforeRetry).toHaveLength(1);
       expect(await reader.paymentAttempt.count({ where: { invoiceId: invoice.id } })).toBe(0);
       expect((await reader.billingCycleRecord.findUniqueOrThrow({ where: { id: cycle.id } })).status).toBe('invoiced');
+      const retry = await graphB.cycle.closeCycleAndCreateDraftInvoice({ tenantId: tenant.id, subscriptionId: subscription.id, cycleId: cycle.id, planId: plan.id });
+      const itemsAfterRetry = await reader.invoiceItem.findMany({ where: { invoiceId: invoice.id }, orderBy: { type: 'asc' } });
+      expect(retry.invoice.id).toBe(invoice.id);
+      expect(retry.usageSnapshotId).toBe(snapshot.id);
+      expect(itemsAfterRetry).toEqual(itemsBeforeRetry);
     } finally {
       restoreEnvironment('BILLING_AUTOMATION_ENABLED', original.enabled);
       restoreEnvironment('BILLING_AUTOMATION_KILL_SWITCH', original.kill);
