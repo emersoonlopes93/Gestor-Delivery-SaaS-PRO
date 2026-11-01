@@ -2899,3 +2899,9 @@ Validação local: TypeScript nos três apps, lint focado, 4 suítes/34 testes d
 - Branch: `feat/billing-c5b-recurring-orchestrator`, derivada de `main-copy` em `6a570446294288f14f0ae9e6151b644e36e383ff`.
 - Escopo: scheduler BullMQ desligado por padrão para ciclos persistidos e vencidos; tentativa automática somente em sandbox e com idempotência existente.
 - Produção, gateway live, C5-C, deploy e migrations remotas permanecem fora do escopo.
+
+# C5-C — readiness operacional fail-closed para cobrança SaaS
+
+- Branch: `feat/billing-c5c-operational-readiness`, derivada de `main-copy` em `952d52e36dee97235a58227d93aa6c32147c5aba`.
+- Escopo: diagnóstico administrativo somente leitura, política explícita de reconciliação manual para resultado incerto e runbook operacional; não há migration, scheduler em produção, chamada live, cobrança, deploy ou merge.
+- A autorização live continua bloqueada por contrato externo pendente do provider, segregação verificável de credenciais/webhook, homologação sandbox E2E e aprovações financeira, jurídica e operacional.

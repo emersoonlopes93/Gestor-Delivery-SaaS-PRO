@@ -22,6 +22,7 @@ import { BillingAddonService } from './billing-addon.service';
 import { BillingEntitlementsService } from './billing-entitlements.service';
 import { BillingRecurringAutomationService } from './billing-recurring-automation.service';
 import { BillingRecurringAutomationProcessor } from './billing-recurring-automation.processor';
+import { BillingOperationalReadinessService } from './billing-operational-readiness.service';
 import { BILLING_AUTOMATION_QUEUE, isBillingAutomationQueueEnabled } from './billing-automation.constants';
 
 const enableBillingAutomationQueue = isBillingAutomationQueueEnabled();
@@ -62,6 +63,7 @@ const enableBillingAutomationQueue = isBillingAutomationQueueEnabled();
     BillingAddonService,
     BillingEntitlementsService,
     BillingRecurringAutomationService,
+    BillingOperationalReadinessService,
     ...(enableBillingAutomationQueue ? [BillingRecurringAutomationProcessor] : []),
   ],
   exports: [
@@ -81,6 +83,7 @@ const enableBillingAutomationQueue = isBillingAutomationQueueEnabled();
     BillingEntitlementsService,
     AsaasBillingClientService,
     BillingRecurringAutomationService,
+    BillingOperationalReadinessService,
   ],
 })
 export class BillingDomainModule {}
