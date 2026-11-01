@@ -73,4 +73,16 @@ já existente deve ser reexecutada pela CI no SHA final da PR.
 - Runbook com política de resultado incerto, alertas, rollback e requisitos da autorização live futura.
 - Sem schema, migration, flags remotas, provider live, job novo ou rota mutável.
 
-SHA final, PR Draft e CI serão registrados após a publicação.
+## Publicação e CI
+
+- Commit funcional: `0f5db6a98224bcb265b90be304ab2db1e9597095`
+- Draft PR: [#176](https://github.com/emersoonlopes93/Gestor-Delivery-SaaS-PRO/pull/176)
+- Base: `main-copy` em `952d52e36dee97235a58227d93aa6c32147c5aba`
+- CI `build-and-migrate`: PASS — inclui a regressão C5-B recorrente em PostgreSQL efêmero.
+- `Ephemeral PostgreSQL proof`: PASS.
+- Secret scanning: PASS.
+- Smoke com seed e E2Es de consentimento, áudio e dashboard: PASS.
+- Previews Vercel de Admin, Tenant, Storefront e Delivery: PASS.
+
+Esta atualização documental não muda o contrato funcional. A CI deve ser
+reexecutada no SHA final deste relatório antes de qualquer revisão técnica.
