@@ -306,6 +306,29 @@ export type BillingPaymentConfig = {
   supportedProviders: string[];
 };
 
+export type BillingOperationalReadiness = {
+  state: 'disabled' | 'manual' | 'sandbox' | 'live_not_authorized' | 'invalid_configuration' | 'external_contract_pending';
+  reason: string;
+  realChargeEnabled: false;
+  automaticBillingActive: false;
+  productionAllowed: false;
+  automation: {
+    queueConfigured: boolean;
+    requested: boolean;
+    killSwitchEnabled: boolean;
+    executionAllowed: boolean;
+  };
+  reconciliation: {
+    unknownOutcomePolicy: 'requires_manual_reconciliation';
+    automaticReplayAllowed: false;
+    providerEvidenceRequired: true;
+  };
+  liveAuthorization: {
+    status: 'external_contract_pending';
+    requirements: string[];
+  };
+};
+
 export type UsageRatingPreview = {
   planId: string;
   selectedTier: BillingRevenueTier | null;
@@ -493,6 +516,10 @@ export const adminBillingApi = {
   },
   getBillingPaymentConfig: async () => {
     const res = await api.get<BillingPaymentConfig>('/admin/billing/payment-config');
+    return res.data;
+  },
+  getBillingOperationalReadiness: async () => {
+    const res = await api.get<BillingOperationalReadiness>('/admin/billing/operational-readiness');
     return res.data;
   },
   getTenantBillingSubscription: async (tenantId: string) => {

@@ -1,10 +1,10 @@
-import { BillingOverview } from '../admin-billing-api';
+import { BillingOperationalReadiness, BillingOverview } from '../admin-billing-api';
 import { money } from '../types';
 import { AlertTriangle, BadgeDollarSign, CalendarClock, CheckCircle2, ClipboardList, Receipt, Store, TrendingUp } from 'lucide-react';
 import { Panel, MetricCard, EmptyState, LoadingBlock } from './BillingShared';
 
-export function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
-  const { overview, loading } = props;
+export function OverviewTab(props: { overview?: BillingOverview; readiness?: BillingOperationalReadiness; loading: boolean }) {
+  const { overview, readiness, loading } = props;
   if (loading) return <LoadingBlock />;
   if (!overview) {
     return <EmptyState icon={TrendingUp} title="Sem dados de overview" text="O backend não retornou métricas para o console de billing." />;
@@ -33,6 +33,22 @@ export function OverviewTab(props: { overview?: BillingOverview; loading: boolea
           </p>
         </div>
       </Panel>
+      {readiness ? (
+        <Panel>
+          <div className="space-y-3 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold text-muted-foreground">Prontidão para cobrança SaaS</p>
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">
+                {readiness.state === 'sandbox' ? 'Somente sandbox' : 'Cobrança real não autorizada'}
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-foreground">{readiness.reason}</p>
+            <p className="text-sm text-muted-foreground">
+              Cobrança real e recorrência automática permanecem desativadas. Resultados incertos exigem reconciliação manual com evidência externa; o sistema não reenviará uma cobrança automaticamente.
+            </p>
+          </div>
+        </Panel>
+      ) : null}
     </div>
   );
 }

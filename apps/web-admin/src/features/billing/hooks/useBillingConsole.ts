@@ -17,6 +17,7 @@ export function useBillingConsole() {
   const plansQuery = useQuery({ queryKey: ['admin-billing-plans-v2'], queryFn: adminBillingApi.listBillingPlansV2 });
   const settingsQuery = useQuery({ queryKey: ['admin-billing-settings'], queryFn: adminBillingApi.getBillingSettings });
   const paymentConfigQuery = useQuery({ queryKey: ['admin-billing-payment-config'], queryFn: adminBillingApi.getBillingPaymentConfig });
+  const operationalReadinessQuery = useQuery({ queryKey: ['admin-billing-operational-readiness'], queryFn: adminBillingApi.getBillingOperationalReadiness });
   const draftInvoicesQuery = useQuery({ queryKey: ['admin-billing-draft-invoices'], queryFn: adminBillingApi.listDraftInvoices });
 
   const tenantBillingQuery = useQuery({
@@ -244,7 +245,7 @@ export function useBillingConsole() {
     usageSnapshotsQuery, subscriptionHistoryQuery, settingsQuery,
     createCycleMutation, closeCycleMutation, createSubscriptionMutation,
     usagePreviewMutation, invoicePreviewMutation, createPaymentAttemptMutation,
-    markPaymentAttemptPaidMutation, markPaymentAttemptFailedMutation,
+    markPaymentAttemptPaidMutation, markPaymentAttemptFailedMutation, operationalReadinessQuery,
     updatePlanMutation, updateSettingsMutation,
     tenants, revenueGrowthPlans, selectedTenantBilling
   };

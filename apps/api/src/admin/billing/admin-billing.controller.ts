@@ -10,6 +10,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { BillingSettingsService } from '../../billing/billing-settings.service';
 import { BillingPaymentAttemptService } from '../../billing/billing-payment-attempt.service';
 import { BillingPaymentGatewayService } from '../../billing/billing-payment-gateway.service';
+import { BillingOperationalReadinessService } from '../../billing/billing-operational-readiness.service';
 import { BillingGatewayMode, PaymentProvider, Prisma } from '@prisma/client';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { normalizeSeededRevenueTierLabel } from '../../billing/revenue-tier-label';
@@ -113,6 +114,7 @@ export class AdminBillingController {
     private readonly billingSettingsService: BillingSettingsService,
     private readonly billingPaymentAttemptService: BillingPaymentAttemptService,
     private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
+    private readonly billingOperationalReadinessService: BillingOperationalReadinessService,
     private readonly tenantBillingResolver: TenantBillingResolverService,
     private readonly revenueLedgerService: RevenueLedgerService,
     private readonly billingAddonService: BillingAddonService,
@@ -416,6 +418,12 @@ export class AdminBillingController {
   @RequireAdminPermissions('saas.billing.read')
   getBillingPaymentConfig() {
     return this.billingPaymentGatewayService.getRuntimeConfig();
+  }
+
+  @Get('operational-readiness')
+  @RequireAdminPermissions('saas.billing.read')
+  getOperationalReadiness() {
+    return this.billingOperationalReadinessService.getReadiness();
   }
 
   @Get('tenants/:tenantId/subscription')

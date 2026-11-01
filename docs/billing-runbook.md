@@ -116,6 +116,34 @@ O tenant não inicia tentativas de cobrança pelo portal. Tentativas permitidas 
 
 O portal continua exibindo cobrança recorrente automática como não habilitada: a saúde do worker não é exposta como uma garantia operacional ao tenant. Cobrança real em produção continua bloqueada.
 
+### Readiness operacional para cobrança real (C5-C)
+
+C5-C não ativa cobrança real. O endpoint administrativo somente leitura
+`GET /admin/billing/operational-readiness`, protegido por `saas.billing.read`,
+expõe a verdade operacional sem retornar credenciais, hosts, payloads do
+provider ou dados de tenants. Os estados possíveis são `disabled`, `manual`,
+`sandbox`, `live_not_authorized` e `invalid_configuration`.
+
+- `realChargeEnabled`, `automaticBillingActive` e `productionAllowed` permanecem sempre `false` nesta fase.
+- Mesmo que flags permissivas existam, `NODE_ENV=production` resulta em `live_not_authorized`; não agenda ou executa o worker C5-B.
+- `processing` e `gatewaySubmission=unknown_outcome` exigem evidência externa e reconciliação manual. Nunca reenviar uma tentativa ambígua automaticamente, inclusive após restart, retry ou resposta `not found` isolada.
+- O endpoint indica `external_contract_pending` até haver contrato oficial versionado do provider live, credenciais e webhook segregados, sandbox E2E homologado, aprovação financeira/jurídica e runbook de incidentes aprovado.
+
+#### Alertas e resposta operacional futura
+
+Enquanto não houver plataforma de métricas homologada, os logs estruturados de
+tentativa, webhook e automação são a evidência primária. Alertar o responsável
+de Billing para: qualquer `unknown_outcome`; tentativa `processing` por mais de
+15 minutos; falhas persistentes do mesmo invoice; backlog de automação; e
+acionamento do kill switch. Diferenciar falha de comunicação de falha de
+cobrança: a primeira conserva o resultado como incerto, a segunda só é final
+após evidência autoritativa.
+
+Rollback operacional significa interromper novos agendamentos com o kill
+switch, preservar invoices e attempts para auditoria e reconciliar resultados
+pendentes manualmente. Não apaga registros, não marca uma invoice como paga sem
+prova e não tenta cancelar uma cobrança externa apenas por mudar uma flag local.
+
 ## Adesão comercial self-service
 
 O catálogo público expõe somente planos Billing V2 ativos, públicos e do tipo
